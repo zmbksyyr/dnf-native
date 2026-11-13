@@ -1,0 +1,59 @@
+[
+  {
+    "arch": "i686",
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\i686-w64-mingw32-clang.exe",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O2",
+      "-g",
+      "-D_WIN32_WINNT=0x0601",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-municode",
+      "-static",
+      "D:\\cache\\dnf-runtime\\dnf-native\\runtime\\elf.c",
+      "D:\\cache\\dnf-runtime\\dnf-native\\runtime\\main.c",
+      "-lbcrypt",
+      "-o",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+      "-Wl,--large-address-aware"
+    ],
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)\nTarget: i686-w64-windows-gnu\nThread model: posix\nInstalledDir: D:/cache/dnf-runtime/dnf-native/.local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin\nConfiguration file: D:/cache/dnf-runtime/dnf-native/.local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin/i686-w64-windows-gnu.cfg\n",
+    "sources": {
+      "runtime\\elf.c": "a0f50eb8fd8bceb9c7ee4a261161b8b04c98c2b7007b31e6d777158c6cc7e92d",
+      "runtime\\main.c": "198635392563c1bcca6dc64501a4514c772dd7e0cdfb665af44c09116799a11a"
+    },
+    "output_sha256": "6c760c4ab1f3e509512b80e1672271847e4977f7b3451299e231acaa4b77544e"
+  },
+  {
+    "arch": "x86_64",
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang.exe",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O2",
+      "-g",
+      "-D_WIN32_WINNT=0x0601",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-municode",
+      "-static",
+      "D:\\cache\\dnf-runtime\\dnf-native\\runtime\\elf.c",
+      "D:\\cache\\dnf-runtime\\dnf-native\\runtime\\main.c",
+      "-lbcrypt",
+      "-o",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe"
+    ],
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)\nTarget: x86_64-w64-windows-gnu\nThread model: posix\nInstalledDir: D:/cache/dnf-runtime/dnf-native/.local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin\nConfiguration file: D:/cache/dnf-runtime/dnf-native/.local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin/x86_64-w64-windows-gnu.cfg\n",
+    "sources": {
+      "runtime\\elf.c": "a0f50eb8fd8bceb9c7ee4a261161b8b04c98c2b7007b31e6d777158c6cc7e92d",
+      "runtime\\main.c": "198635392563c1bcca6dc64501a4514c772dd7e0cdfb665af44c09116799a11a"
+    },
+    "output_sha256": "6ae6cc2d74a0260c5000718597798d4f43c259b803c8e1f2e392424b08666db4"
+  }
+]

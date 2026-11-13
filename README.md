@@ -2,9 +2,9 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P0 文档与静态调研完成，等待用户审阅。** 本轮没有实现 runtime、GUI 或 MySQL 自解压程序，没有运行原版服务或继承历史工程的验收结论。
+**当前状态：P1 实施中。** 自研双架构宿主已完成 19 个原版 ELF 的原址映射及四项输入拒绝检查；尚未执行原版服务。实际范围与证据见[实施记录](docs/06-progress.md)。
 
-从[审阅入口](docs/05-review.md)开始，其中列出需确认的技术边界和四次阶段提交。
+设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
 - [工作纪律](AGENTS.md)：仅约束工作行为。
 - [用户需求原文](docs/requirements.md)：从工作区需求文件逐字节归档，作为需求基线。
@@ -23,3 +23,11 @@ python tools/audit_resources.py --workspace .. --output .local/resource-inventor
 ```
 
 其中 `--workspace` 是包含原始输入包的目录。运行包将不依赖 Python。证据包含生成时间，重复审计应比较输入/工具哈希与结构化结果，不要求时间字段相同。
+
+开发与当前检查：
+
+```powershell
+python tools/bootstrap.py
+python tools/import_inputs.py
+python tools/test.py
+```

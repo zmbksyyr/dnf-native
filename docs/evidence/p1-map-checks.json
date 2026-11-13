@@ -1,0 +1,312 @@
+{
+  "recorded_utc": "2026-11-13T06:22:26.823723+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "ELF validation and private initial PT_LOAD mapping only",
+  "guest_execution": false,
+  "service_acceptance": false,
+  "host_sha256": {
+    "32": "6c760c4ab1f3e509512b80e1672271847e4977f7b3451299e231acaa4b77544e",
+    "64": "6ae6cc2d74a0260c5000718597798d4f43c259b803c8e1f2e392424b08666db4"
+  },
+  "results": [
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\auction\\df_auction_r",
+        "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050e60\",\"bias\":\"0x0\",\"reserved_bytes\":2752512,\"sha256\":\"b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/auction/df_auction_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\bridge\\df_bridge_r",
+        "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050060\",\"bias\":\"0x0\",\"reserved_bytes\":3145728,\"sha256\":\"30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/bridge/df_bridge_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\channel\\df_channel_r",
+        "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8049de0\",\"bias\":\"0x0\",\"reserved_bytes\":1114112,\"sha256\":\"7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/channel/df_channel_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\community\\df_community_r",
+        "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x804a990\",\"bias\":\"0x0\",\"reserved_bytes\":720896,\"sha256\":\"fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/community/df_community_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\coserver\\df_coserver_r",
+        "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x804a950\",\"bias\":\"0x0\",\"reserved_bytes\":786432,\"sha256\":\"1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/coserver/df_coserver_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\dbmw_guild\\df_dbmw_r",
+        "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050930\",\"bias\":\"0x0\",\"reserved_bytes\":3276800,\"sha256\":\"0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/dbmw_guild/df_dbmw_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\dbmw_mnt\\df_dbmw_r",
+        "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050930\",\"bias\":\"0x0\",\"reserved_bytes\":3276800,\"sha256\":\"0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/dbmw_mnt/df_dbmw_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\dbmw_stat\\df_dbmw_r",
+        "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050930\",\"bias\":\"0x0\",\"reserved_bytes\":3276800,\"sha256\":\"0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/dbmw_stat/df_dbmw_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\game\\df_game_r",
+        "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x807e910\",\"bias\":\"0x0\",\"reserved_bytes\":21823488,\"sha256\":\"da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/game/df_game_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\guild\\df_guild_r",
+        "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x804ae20\",\"bias\":\"0x0\",\"reserved_bytes\":1572864,\"sha256\":\"51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/guild/df_guild_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\manager\\df_manager_r",
+        "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050780\",\"bias\":\"0x0\",\"reserved_bytes\":2686976,\"sha256\":\"74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/manager/df_manager_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\monitor\\df_monitor_r",
+        "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x804af70\",\"bias\":\"0x0\",\"reserved_bytes\":1638400,\"sha256\":\"a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/monitor/df_monitor_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\point\\df_point_r",
+        "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8050e60\",\"bias\":\"0x0\",\"reserved_bytes\":2752512,\"sha256\":\"0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/point/df_point_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\relay\\df_relay_r",
+        "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8049b80\",\"bias\":\"0x0\",\"reserved_bytes\":327680,\"sha256\":\"39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/relay/df_relay_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\secsvr\\gunnersvr\\gunnersvr",
+        "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8070c10\",\"bias\":\"0x0\",\"reserved_bytes\":917504,\"sha256\":\"ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/secsvr/gunnersvr/gunnersvr",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\secsvr\\zergsvr\\secagent",
+        "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8099d70\",\"bias\":\"0x0\",\"reserved_bytes\":2031616,\"sha256\":\"4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/secsvr/zergsvr/secagent",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\secsvr\\zergsvr\\zergsvr",
+        "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x8075010\",\"bias\":\"0x0\",\"reserved_bytes\":1048576,\"sha256\":\"c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/secsvr/zergsvr/zergsvr",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\statics\\df_statics_r",
+        "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":32,\"entry\":\"0x804aa10\",\"bias\":\"0x0\",\"reserved_bytes\":1245184,\"sha256\":\"37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/statics/df_statics_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\stun\\df_stun_r",
+        "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mapped\":true,\"bits\":64,\"entry\":\"0x401440\",\"bias\":\"0x0\",\"reserved_bytes\":2162688,\"sha256\":\"63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528\",\"executed\":false}\n",
+      "stderr": "",
+      "case": "home/neople/stun/df_stun_r",
+      "expected": "original fixed-address PT_LOAD mapping; not executed"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\relay\\df_relay_r",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "ELF validation failed: ELF SHA-256 mismatch\n",
+      "case": "hash-mismatch",
+      "expected": "rejected before guest execution"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\relay\\df_relay_r",
+        "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "ELF validation failed: invalid ELF architecture or header\n",
+      "case": "architecture-mismatch",
+      "expected": "rejected before guest execution"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\invalid-inputs\\truncated",
+        "d3ca3eba3e339c880980803fbfe417a10a82480be5876bb0d63b0f0663688f6a"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "ELF validation failed: cannot read ELF\n",
+      "case": "truncated",
+      "expected": "rejected before guest execution"
+    },
+    {
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--map",
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\invalid-inputs\\phoff-outside-file",
+        "ec907f10d7bdf1de4a2cb74f8740bc266dd4313dda33b3de4bcea6ac4fcc99b9"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "ELF validation failed: invalid ELF architecture or header\n",
+      "case": "phoff-outside-file",
+      "expected": "rejected before guest execution"
+    }
+  ]
+}
