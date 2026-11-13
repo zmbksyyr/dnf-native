@@ -1,0 +1,93 @@
+{
+  "decoder": {
+    "name": "Zydis",
+    "version": "4.1.1",
+    "url": "https://github.com/zyantific/zydis",
+    "commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+    "license": "MIT",
+    "purpose": "Decode observed syscall/TLS instructions and encode native TLS operations; no CPU emulation"
+  },
+  "support": {
+    "name": "Zycore",
+    "url": "https://github.com/zyantific/zycore-c",
+    "commit": "0b2432ced0884fd152b471d97ecf0258ff4d859f",
+    "license": "MIT"
+  },
+  "linux_libraries": {
+    "source": "https://vault.centos.org/7.9.2009/os/x86_64/",
+    "metadata_sha256": "2b479c0f3efa73f75b7fb76c82687744275fff78e4a138b5b3efba95f91e099e",
+    "packages": [
+      {
+        "name": "glibc",
+        "arch": "i686",
+        "version": "2.17-317.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/glibc-2.17-317.el7.i686.rpm",
+        "sha256": "e4df5a58d0f90095d141e1835d93bb4822824a49e24db3d00d712c1bc6683686"
+      },
+      {
+        "name": "glibc",
+        "arch": "x86_64",
+        "version": "2.17-317.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/glibc-2.17-317.el7.x86_64.rpm",
+        "sha256": "49eb081de1ddd13f5440abdbb3b42cdd01d11b74d624793ae1b80a1cf432551b"
+      },
+      {
+        "name": "libgcc",
+        "arch": "i686",
+        "version": "4.8.5-44.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/libgcc-4.8.5-44.el7.i686.rpm",
+        "sha256": "ca7f63386ed014a1b1e1f31b1532b72dfa54c666560f85dbb6b67857831676d5"
+      },
+      {
+        "name": "libgcc",
+        "arch": "x86_64",
+        "version": "4.8.5-44.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/libgcc-4.8.5-44.el7.x86_64.rpm",
+        "sha256": "cb1967fba485ad3da345e33018c0e8b367359f251c6b1a8847a4976579d74ffa"
+      },
+      {
+        "name": "libstdc++",
+        "arch": "i686",
+        "version": "4.8.5-44.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/libstdc++-4.8.5-44.el7.i686.rpm",
+        "sha256": "9e7963ccb4fd6d85ade5503fe813717ccf16aa59a9d24049b7167a3105e4bcfb"
+      },
+      {
+        "name": "libstdc++",
+        "arch": "x86_64",
+        "version": "4.8.5-44.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/libstdc++-4.8.5-44.el7.x86_64.rpm",
+        "sha256": "e2b6a7f6eadfbc9473638713cc816b4a19e4be6d4774d6ca91ad9bc79a3b07d2"
+      },
+      {
+        "name": "nss-softokn-freebl",
+        "arch": "i686",
+        "version": "3.44.0-8.el7_7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/nss-softokn-freebl-3.44.0-8.el7_7.i686.rpm",
+        "sha256": "8810195ab1f44e12e638db9fa6001ffa2066b0b07549e1c6f1913af1175d0900"
+      },
+      {
+        "name": "nss-softokn-freebl",
+        "arch": "x86_64",
+        "version": "3.44.0-8.el7_7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/nss-softokn-freebl-3.44.0-8.el7_7.x86_64.rpm",
+        "sha256": "9949831b67f6eb68dc9df6df3e4570bd5f9301de3c7d67c41512fcaaadb40da5"
+      },
+      {
+        "name": "zlib",
+        "arch": "i686",
+        "version": "1.2.7-18.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/zlib-1.2.7-18.el7.i686.rpm",
+        "sha256": "0e5f1063138645d51a7e248c81d56b602146ebff8c54c9230252f1c04916e8ed"
+      },
+      {
+        "name": "zlib",
+        "arch": "x86_64",
+        "version": "1.2.7-18.el7",
+        "url": "https://vault.centos.org/7.9.2009/os/x86_64/Packages/zlib-1.2.7-18.el7.x86_64.rpm",
+        "sha256": "35c675532754fb15dce330b8f56f3627efa453382d7888b2b9a55cfffb39be0e"
+      }
+    ],
+    "note": "RPM scripts not executed. File aliases are development copies; full guest symlink semantics not implemented."
+  }
+}

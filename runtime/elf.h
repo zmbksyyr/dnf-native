@@ -6,6 +6,23 @@
 #include <stddef.h>
 
 typedef struct {
+    uint32_t name, type;
+#ifdef _WIN64
+    uint64_t flags, addr, offset, size;
+    uint32_t link, info;
+    uint64_t align, entsize;
+#else
+    uint32_t flags, addr, offset, size, link, info, align, entsize;
+#endif
+} NrElfSection;
+
+typedef struct {
+    uintptr_t pc;
+    unsigned char original[2];
+    unsigned char tls;
+} NrTrap;
+
+typedef struct {
     unsigned char ident[16];
     uint16_t type, machine;
     uint32_t version;
@@ -37,10 +54,14 @@ typedef struct {
     size_t allocation_size;
     uintptr_t low, bias, entry;
     char sha256[65];
+    NrTrap *traps;
+    size_t trap_count;
 } NrElf;
 
 int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, const char **error);
 int nr_elf_map(NrElf *elf, const char **error);
 void nr_elf_close(NrElf *elf);
+int nr_adapt(NrElf *elf, const char **error);
+int nr_syscall_site(const NrElf *elf, uintptr_t pc, int *tls);
 
 #endif

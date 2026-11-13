@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P1 实施中。** 自研双架构宿主已完成 19 个原版 ELF 的原址映射及四项输入拒绝检查；尚未执行原版服务。实际范围与证据见[实施记录](docs/06-progress.md)。
+**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化。19 个 ELF 原址映射和双架构执行原语检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -29,5 +29,12 @@ python tools/audit_resources.py --workspace .. --output .local/resource-inventor
 ```powershell
 python tools/bootstrap.py
 python tools/import_inputs.py
+python tools/import_linux.py
 python tools/test.py
+python tools/test_entry.py
+python tools/test_ld.py
+python tools/test_stun.py
+python tools/probe_manager.py
 ```
+
+协议检查使用 STUN 原有 `test` 前台模式，绑定原 UDP 端口 2311–2313，结束后强制回收本次启动的测试进程；manager 使用原有 `nofork` 模式。测试实例写在 `build/probes/` 的独立目录。它们证明的范围不包含后台派生、正常停服或最终验收。[第三方来源](THIRD_PARTY.md)记录实际引入的指令库和用户库。

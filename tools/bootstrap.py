@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import urllib.request
 import zipfile
 
@@ -46,6 +47,17 @@ def main():
                "source": "Official mstorsjo/llvm-mingw release asset; GitHub published SHA-256",
                "role": "Development compiler only; not a product runtime dependency"}
     (ROOT / ".local/compiler.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    decoder = ROOT / ".local/sources/zydis-4.1.1"
+    if not decoder.exists():
+        subprocess.run(["git", "clone", "--depth", "1", "--branch", "v4.1.1",
+                        "--recurse-submodules", "--shallow-submodules",
+                        "https://github.com/zyantific/zydis.git", str(decoder)], check=True)
+    for path, commit in [(decoder, "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc"),
+                         (decoder / "dependencies/zycore", "0b2432ced0884fd152b471d97ecf0258ff4d859f")]:
+        actual = subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+        if actual != commit:
+            raise ValueError("Upstream decoder source commit mismatch")
+        subprocess.run(["git", "-C", str(path), "diff", "--exit-code", "HEAD"], check=True)
     print(compiler)
 
 

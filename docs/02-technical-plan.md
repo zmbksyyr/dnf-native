@@ -8,7 +8,7 @@
 |---|---|---|
 | 服务身份 | 原包封样 ELF，由自研 x86/x64 宿主执行；一个有效服务实例对应独立 Windows 执行进程 | 不编译 rednf 服务替代，不复用参考 loader |
 | 用户态 ABI | 运行独立获取并锁定的 Linux `ld.so`、glibc、libstdc++、libgcc 等依赖 | 避免从零仿制 libc/C++/pthread；同名符号不能代替布局与行为一致 |
-| 基线候选 | CentOS 7 系列 glibc 2.17 / GCC 4.8.5 用户库，i686 与 x86_64 分开封样 | 来源候选为 CentOS Vault；本轮未独立下载或验证该闭包，`GLIBC_PRIVATE` 仍须专项核对 |
+| 基线候选 | CentOS 7 系列 glibc 2.17 / GCC 4.8.5 用户库，i686 与 x86_64 分开封样 | 已从 CentOS Vault 独立导入并验证十个 RPM，原版 manager/STUN 进入初始化；完整闭包及插件 `GLIBC_PRIVATE` 仍须专项核对 |
 | CPU 执行 | x86/x64 机器码在同架构宿主直接执行；只讨论受控 ABI 入口和局部 TLS/syscall 适配 | 不引入通用 CPU 模拟器、全程序动态翻译或驱动；局部指令改写边界须先审阅 |
 | 原地址 | game 的 `ET_EXEC` 地址与入口保持；宿主、依赖和辅助桩避让 | 不能为解决地址冲突重定位主 ELF |
 | 插件 | DP2 与 game 同进程，原指针与 Lua/C ABI 保持 | 旁路 RPC 不能替代进程内对象接口 |

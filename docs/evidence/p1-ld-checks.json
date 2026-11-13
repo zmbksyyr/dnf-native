@@ -1,0 +1,82 @@
+{
+  "recorded_utc": "2026-11-13T07:45:13.234140+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Official ld.so entry/usage and genuine ENOENT for a missing program; no DNF service acceptance.",
+  "results": [
+    {
+      "case": "i686/usage",
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--root",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\i686",
+        "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "--run",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\i686\\lib\\ld-2.17.so",
+        "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "ld.so"
+      ],
+      "elf_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "exit_code": 127,
+      "stdout": "",
+      "stderr": "adapt sha256=12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd sections=3 syscall_traps=0 tls_traps=40\r\nenter guest bits=32 entry=0x19c1150 stack=0x6a7f830 argc=1\r\nUsage: ld.so [OPTION]... EXECUTABLE-FILE [ARGS-FOR-PROGRAM...]\nYou have invoked `ld.so', the helper program for shared library executables.\nThis program usually lives in the file `/lib/ld.so', and special directives\nin executable files using ELF shared libraries tell the system's program\nloader to load the helper program from this file.  This helper program loads\nthe shared libraries needed by the program executable, prepares the program\nto run, and runs it.  You may invoke this helper program directly from the\ncommand line to load and run an ELF executable file; this is like executing\nthat file itself, but always uses this helper program from the file you\nspecified, instead of the helper program file specified in the executable\nfile you run.  This is mostly of use for maintainers to test new versions\nof this helper program; chances are you did not intend to run this program.\n\n  --list                list all dependencies and how they are resolved\n  --verify              verify that given object really is a dynamically linked\n\t\t\tobject we can handle\n  --inhibit-cache       Do not use /etc/ld.so.cache\n  --library-path PATH   use given PATH instead of content of the environment\n\t\t\tvariable LD_LIBRARY_PATH\n  --inhibit-rpath LIST  ignore RUNPATH and RPATH information in object names\n\t\t\tin LIST\n  --audit LIST          use objects named in LIST as auditors\nguest exit status=127\r\n",
+      "passed": true
+    },
+    {
+      "case": "i686/missing-program",
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--root",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\i686",
+        "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "--run",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\i686\\lib\\ld-2.17.so",
+        "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "ld.so",
+        "--help"
+      ],
+      "elf_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "exit_code": 127,
+      "stdout": "",
+      "stderr": "adapt sha256=12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd sections=3 syscall_traps=0 tls_traps=40\r\nenter guest bits=32 entry=0x1441150 stack=0x69af820 argc=2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\i686\\etc\\ld.so.cache flags=0x80000 errno=-2\r\n--help: error while loading shared libraries: --help: cannot open shared object file: No such file or directory\nguest exit status=127\r\n",
+      "passed": true
+    },
+    {
+      "case": "x86_64/usage",
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+        "--root",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\x86_64",
+        "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+        "--run",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\x86_64\\lib64\\ld-2.17.so",
+        "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+        "ld.so"
+      ],
+      "elf_sha256": "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+      "exit_code": 127,
+      "stdout": "",
+      "stderr": "adapt sha256=09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d sections=2 syscall_traps=37 tls_traps=39\r\nenter guest bits=64 entry=0x22932e01140 stack=0xdd4e0ff550 argc=1\r\nUsage: ld.so [OPTION]... EXECUTABLE-FILE [ARGS-FOR-PROGRAM...]\nYou have invoked `ld.so', the helper program for shared library executables.\nThis program usually lives in the file `/lib/ld.so', and special directives\nin executable files using ELF shared libraries tell the system's program\nloader to load the helper program from this file.  This helper program loads\nthe shared libraries needed by the program executable, prepares the program\nto run, and runs it.  You may invoke this helper program directly from the\ncommand line to load and run an ELF executable file; this is like executing\nthat file itself, but always uses this helper program from the file you\nspecified, instead of the helper program file specified in the executable\nfile you run.  This is mostly of use for maintainers to test new versions\nof this helper program; chances are you did not intend to run this program.\n\n  --list                list all dependencies and how they are resolved\n  --verify              verify that given object really is a dynamically linked\n\t\t\tobject we can handle\n  --inhibit-cache       Do not use /etc/ld.so.cache\n  --library-path PATH   use given PATH instead of content of the environment\n\t\t\tvariable LD_LIBRARY_PATH\n  --inhibit-rpath LIST  ignore RUNPATH and RPATH information in object names\n\t\t\tin LIST\n  --audit LIST          use objects named in LIST as auditors\nguest exit status=127\r\n",
+      "passed": true
+    },
+    {
+      "case": "x86_64/missing-program",
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+        "--root",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\x86_64",
+        "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+        "--run",
+        "D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\x86_64\\lib64\\ld-2.17.so",
+        "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+        "ld.so",
+        "--help"
+      ],
+      "elf_sha256": "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+      "exit_code": 127,
+      "stdout": "",
+      "stderr": "adapt sha256=09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d sections=2 syscall_traps=37 tls_traps=39\r\nenter guest bits=64 entry=0x1f9e6621140 stack=0x3deb8ff640 argc=2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\.local\\sysroot\\x86_64\\etc\\ld.so.cache flags=0x80000 errno=-2\r\n--help: error while loading shared libraries: --help: cannot open shared object file: No such file or directory\nguest exit status=127\r\n",
+      "passed": true
+    }
+  ],
+  "failures": []
+}

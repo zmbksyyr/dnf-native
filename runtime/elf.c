@@ -69,7 +69,7 @@ int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, cons
     CloseHandle(input);
     input = INVALID_HANDLE_VALUE;
     *error = "ELF SHA-256 mismatch";
-    if (!file_hash(elf) || strlen(expected_hash) != 64 || _stricmp(elf->sha256, expected_hash))
+    if (!file_hash(elf) || (expected_hash && (strlen(expected_hash) != 64 || _stricmp(elf->sha256, expected_hash))))
         goto fail;
     NrElfHeader *h = elf->header = (NrElfHeader *)elf->file;
     *error = "invalid ELF architecture or header";
@@ -184,5 +184,6 @@ fail:
 void nr_elf_close(NrElf *elf) {
     if (elf->allocation) VirtualFree(elf->allocation, 0, MEM_RELEASE);
     if (elf->file) HeapFree(GetProcessHeap(), 0, elf->file);
+    if (elf->traps) HeapFree(GetProcessHeap(), 0, elf->traps);
     memset(elf, 0, sizeof(*elf));
 }
