@@ -1,0 +1,133 @@
+{
+  "recorded_utc": "20261113T092439751529Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "P1 runtime and original game startup observation; not service acceptance",
+  "host_build": [
+    {
+      "arch": "i686",
+      "output_sha256": "3b308425fbd60e9ae88d7188c0a77d40d1c5692961683e144ebc6510bf3c0e05",
+      "runtime_sources": {
+        "runtime\\adapt.c": "375721df1f45cfa6ff0f1ae2af4506634f787f42d0b16b8ee6b749c772cbbdf9",
+        "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+        "runtime\\files.c": "27e8b0ddf9d42b02234a9c5ad0632ac6a0234be3950e9db92809bde5ba582b36",
+        "runtime\\net.c": "e14d393b0c423de2b6d19c3582a917b384549116a2ec5be332b6e90b9fc908fe",
+        "runtime\\run.c": "ba077da7c735075e14a9530026a195b80be1bcf800478e7f1591101503fc6c61",
+        "runtime\\run.h": "1dab5d2bab75a66923f949eae7a189ad3f87453cfd4a54d96633fba32f3f3d0e",
+        "runtime\\vm.c": "2cf754c64c6f5b01320f879d3ba1de26ef02a77dd9225848d4bdea4c1d611b08"
+      }
+    },
+    {
+      "arch": "x86_64",
+      "output_sha256": "d0f887b3db6eb0d6901f82aa30de8593f8d3cd1f87abc355f4890c119172330e",
+      "runtime_sources": {
+        "runtime\\adapt.c": "375721df1f45cfa6ff0f1ae2af4506634f787f42d0b16b8ee6b749c772cbbdf9",
+        "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+        "runtime\\files.c": "27e8b0ddf9d42b02234a9c5ad0632ac6a0234be3950e9db92809bde5ba582b36",
+        "runtime\\net.c": "e14d393b0c423de2b6d19c3582a917b384549116a2ec5be332b6e90b9fc908fe",
+        "runtime\\run.c": "ba077da7c735075e14a9530026a195b80be1bcf800478e7f1591101503fc6c61",
+        "runtime\\run.h": "1dab5d2bab75a66923f949eae7a189ad3f87453cfd4a54d96633fba32f3f3d0e",
+        "runtime\\vm.c": "2cf754c64c6f5b01320f879d3ba1de26ef02a77dd9225848d4bdea4c1d611b08"
+      }
+    }
+  ],
+  "original_game": {
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "host_sha256": "63e514578811aa8924ed38b47b69d2f693bb755a8acfcc7fe654353639ce068a",
+    "exit_code": 1,
+    "forced_cleanup": true,
+    "elapsed_seconds": 900.124,
+    "initialization_markers": [
+      "All DB Open Success",
+      "Init Query Table Success",
+      "Init GlobalData Success",
+      "Init HistoryLog Success",
+      "InitRDARScriptStringManager Success"
+    ],
+    "syscall_gaps": [
+      "syscall gap nr=54",
+      "syscall gap nr=75"
+    ],
+    "runtime_gaps": [
+      "mmap unsupported flags=0x1",
+      "network unsupported nr=102 op=1",
+      "network unsupported nr=102 op=14",
+      "network unsupported nr=54 op=4",
+      "socket timeout unsupported seconds=31536000 microseconds=0"
+    ]
+  },
+  "manager": {
+    "host_sha256": "3b308425fbd60e9ae88d7188c0a77d40d1c5692961683e144ebc6510bf3c0e05",
+    "exit_code": 1,
+    "forced_cleanup": false,
+    "initialization_markers": {
+      "Application Init() Success!": true,
+      "Application App Config Load_Table() Success!": true,
+      "Application Server Config Load_Table() Success!": true
+    },
+    "pid_matches_host": true,
+    "pid_removed": true,
+    "shutdown_markers": {
+      "Recv SIGTERM signal": true,
+      "Thread Free Success!": true,
+      "Application End!": true,
+      "Application Stop!": true
+    },
+    "syscall_gaps": []
+  },
+  "mysql": {
+    "script_sha256": "20f8eb4a641babdc3ed7f8337d85d22c28ae77b86c3594b350d2055e6fb5c396",
+    "passed": true,
+    "database_count": 18,
+    "seed": {
+      "bytes": 977716,
+      "sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198"
+    },
+    "reexport": {
+      "bytes": 977716,
+      "sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198"
+    },
+    "source_unchanged": true,
+    "server_exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "forced_cleanup": [
+      false,
+      false,
+      false
+    ]
+  },
+  "limitations": [
+    "Windows 10 x64 developer machine only",
+    "game stopped after 900-second observation during original Items loading",
+    "DP2/Lua/Frida/full service business, Win7/Win11 and package closure remain unverified"
+  ],
+  "checks": {
+    "vm": {
+      "recorded_utc": "2026-11-13T09:44:34.495399+00:00",
+      "results_sha256": "1b57acd899bc5100b724ea9e92080eb95616eddfaeb87678c011b47f0e52b8c0",
+      "passed": true
+    },
+    "files": {
+      "recorded_utc": "20261113T094434613514Z",
+      "results_sha256": "7504a10bbce5c1c6ad6ec47f4ced13204d03533924f6bbd19307afec44859e9e",
+      "passed": true
+    },
+    "net": {
+      "recorded_utc": "2026-11-13T09:44:35.217323+00:00",
+      "results_sha256": "11536c8bfce95598a97c7bd44794c21a78b840e551ac911d11e12a28490943ee",
+      "passed": true
+    },
+    "entry": {
+      "recorded_utc": "2026-11-13T09:44:35.721087+00:00",
+      "results_sha256": "bbc1a974f1d51dd46b5919b892c7825e95282266ee098b03a48144ff929ce0bb",
+      "passed": true
+    },
+    "ld-start": {
+      "recorded_utc": "2026-11-13T09:44:35.828644+00:00",
+      "results_sha256": "778f9ec8cf1a71f33e22a1d46841760146b567898538d9c68c84eaf14e255694",
+      "passed": true
+    }
+  }
+}
