@@ -1,5 +1,6 @@
 #define FD_SETSIZE 256
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include "run.h"
 #include <string.h>
 #include <stdio.h>
@@ -23,9 +24,14 @@ static intptr_t socket_error(void) {
         case WSAENETUNREACH: return -101;
         case WSAEHOSTUNREACH: return -113;
         case WSAEMSGSIZE: return -90;
+        case WSAENOPROTOOPT: return -92;
         case WSAENOTCONN: return -107;
         default: return -5;
     }
+}
+
+static intptr_t socket_io_error(void) {
+    return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
 }
 
 static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
@@ -96,6 +102,46 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     return count;
 }
 
+static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
+    struct { int32_t fd; int16_t events, revents; } entries[256];
+    if (args[1] > 256) return -22;
+    size_t bytes = (size_t)args[1] * sizeof(entries[0]);
+    if (!nr_memory(args[0], bytes, 1)) return -14;
+    memcpy(entries, (const void *)args[0], bytes);
+    WSAPOLLFD polls[256]; unsigned indices[256]; ULONG count = 0;
+    int ready = 0;
+    for (unsigned i = 0; i < args[1]; ++i) {
+        entries[i].revents = 0;
+        int fd = entries[i].fd;
+        if (fd < 0) continue;
+        if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
+        if (run->file_access[fd] != 4 || (entries[i].events & ~(1 | 2 | 4 | 64 | 256))) return -38;
+        polls[count].fd = (SOCKET)run->sockets[fd];
+        polls[count].events = 0; polls[count].revents = 0;
+        if (entries[i].events & (1 | 64)) polls[count].events |= POLLRDNORM;
+        if (entries[i].events & 2) polls[count].events |= POLLPRI;
+        if (entries[i].events & (4 | 256)) polls[count].events |= POLLWRNORM;
+        indices[count++] = i;
+    }
+    int milliseconds = ready ? 0 : (int)args[2];
+    if (!count) Sleep(milliseconds < 0 ? INFINITE : (DWORD)milliseconds);
+    else if (WSAPoll(polls, count, milliseconds) == SOCKET_ERROR) return socket_error();
+    for (ULONG i = 0; i < count; ++i) {
+        unsigned at = indices[i];
+        short events = 0;
+        if (polls[i].revents & POLLRDNORM) events |= entries[at].events & (1 | 64);
+        if (polls[i].revents & POLLPRI) events |= entries[at].events & 2;
+        if (polls[i].revents & POLLWRNORM) events |= entries[at].events & (4 | 256);
+        if (polls[i].revents & POLLERR) events |= 8;
+        if (polls[i].revents & POLLHUP) events |= 16;
+        if (polls[i].revents & POLLNVAL) events |= 32;
+        entries[at].revents = events;
+        if (events) ++ready;
+    }
+    memcpy((void *)args[0], entries, bytes);
+    return ready;
+}
+
 static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uintptr_t maximum, intptr_t milliseconds) {
     if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
     size_t capacity = maximum > 256 ? 256 : maximum;
@@ -127,14 +173,15 @@ static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uint
 
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {CLOSE = 3, IOCTL = 16, FCNTL = 72, SELECT = 23, EP_CREATE = 213, EP_CREATE1 = 291, EP_CTL = 233, EP_WAIT = 232};
+    enum {READ = 0, WRITE = 1, CLOSE = 3, IOCTL = 16, FCNTL = 72, SELECT = 23, POLL = 7, EP_CREATE = 213, EP_CREATE1 = 291, EP_CTL = 233, EP_WAIT = 232};
 #else
-    enum {CLOSE = 6, IOCTL = 54, FCNTL = 55, SELECT = 142, EP_CREATE = 254, EP_CREATE1 = 329, EP_CTL = 255, EP_WAIT = 256};
+    enum {READ = 3, WRITE = 4, CLOSE = 6, IOCTL = 54, FCNTL = 55, SELECT = 142, POLL = 168, EP_CREATE = 254, EP_CREATE1 = 329, EP_CTL = 255, EP_WAIT = 256};
 #endif
 #ifndef _WIN64
     if (number == 221) number = FCNTL;
 #endif
     if (number == SELECT) { *result = select_sockets(run, input); return 1; }
+    if (number == POLL) { *result = poll_sockets(run, input); return 1; }
     if (number == EP_CREATE || number == EP_CREATE1) {
         if ((number == EP_CREATE && (intptr_t)input[0] <= 0) || (number == EP_CREATE1 && (input[0] & ~0x80000u))) { *result = -22; return 1; }
         unsigned fd;
@@ -190,7 +237,11 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
 #endif
     uintptr_t fd = args[0];
-    if (!operation && ((number != CLOSE && number != IOCTL && number != FCNTL) || fd >= 256 || run->file_access[fd] != 4)) return 0;
+    if (operation && GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
+        fprintf(stderr, "socket op=%d args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n", operation,
+                (unsigned long long)args[0], (unsigned long long)args[1], (unsigned long long)args[2],
+                (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
+    if (!operation && ((number != CLOSE && number != IOCTL && number != FCNTL && number != READ && number != WRITE) || fd >= 256 || run->file_access[fd] != 4)) return 0;
     if (operation == 1) {
         if (args[0] != AF_INET || ((args[1] & 15) != SOCK_DGRAM && (args[1] & 15) != SOCK_STREAM) ||
             (args[1] & ~(uintptr_t)(15 | 0x800 | 0x80000))) { *result = -38; return 1; }
@@ -206,6 +257,14 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
     if (fd >= 256 || run->file_access[fd] != 4) { *result = -9; return 1; }
     SOCKET s = (SOCKET)run->sockets[fd];
+    if (!operation && (number == READ || number == WRITE)) {
+        int receiving = number == READ;
+        size_t bytes = args[2] > 0x7ffff000 ? 0x7ffff000 : args[2];
+        if (!nr_memory(args[1], bytes, receiving)) { *result = -14; return 1; }
+        if (!bytes) { *result = 0; return 1; }
+        int r = receiving ? recv(s, (char *)args[1], (int)bytes, 0) : send(s, (const char *)args[1], (int)bytes, 0);
+        *result = r == SOCKET_ERROR ? socket_io_error() : r; return 1;
+    }
     if (number == CLOSE && !operation) {
         *result = closesocket(s) == 0 ? 0 : socket_error();
         if (!*result) { run->file_access[fd] = 0; run->sockets[fd] = 0; run->nonblock[fd] = 0; }
@@ -237,10 +296,34 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     if (operation == 4) { *result = listen(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 13) { *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 14) {
+        if (args[1] == 1 && (args[2] == 20 || args[2] == 21)) {
+            if (args[4] != 2 * sizeof(uintptr_t)) { *result = -22; return 1; }
+            if (!nr_memory(args[3], args[4], 0)) { *result = -14; return 1; }
+            intptr_t duration[2]; memcpy(duration, (const void *)args[3], sizeof(duration));
+            if (duration[0] < 0 || duration[1] < 0 || duration[1] >= 1000000) { *result = -22; return 1; }
+            uint64_t ms = (uint64_t)duration[0] * 1000 + ((uint64_t)duration[1] + 999) / 1000;
+            if (ms > MAXDWORD - 1) {
+                fprintf(stderr, "socket timeout unsupported seconds=%lld microseconds=%lld\n",
+                        (long long)duration[0], (long long)duration[1]);
+                *result = -38; return 1;
+            }
+            DWORD value = (DWORD)ms;
+            int option = args[2] == 20 ? SO_RCVTIMEO : SO_SNDTIMEO;
+            *result = setsockopt(s, SOL_SOCKET, option, (const char *)&value, sizeof(value)) == 0 ? 0 : socket_error(); return 1;
+        }
+        if (args[1] == 0 && args[2] == 1 && args[4] == 4) {
+            if (!nr_memory(args[3], 4, 0)) { *result = -14; return 1; }
+            *result = setsockopt(s, IPPROTO_IP, IP_TOS, (const char *)args[3], 4) == 0 ? 0 : socket_error(); return 1;
+        }
+        if (args[1] == 6 && args[2] == 1 && args[4] == 4) {
+            if (!nr_memory(args[3], 4, 0)) { *result = -14; return 1; }
+            *result = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (const char *)args[3], 4) == 0 ? 0 : socket_error(); return 1;
+        }
         if (args[1] != 1 || args[4] != 4 || !nr_memory(args[3], 4, 0)) { *result = -38; return 1; }
         int option;
         switch (args[2]) { case 2: option = SO_REUSEADDR; break; case 6: option = SO_BROADCAST; break;
-            case 7: option = SO_SNDBUF; break; case 8: option = SO_RCVBUF; break; default: *result = -38; return 1; }
+            case 7: option = SO_SNDBUF; break; case 8: option = SO_RCVBUF; break;
+            case 9: option = SO_KEEPALIVE; break; default: *result = -38; return 1; }
         int value; memcpy(&value, (const void *)args[3], 4);
         *result = setsockopt(s, SOL_SOCKET, option, (const char *)&value, 4) == 0 ? 0 : socket_error(); return 1;
     }
@@ -278,7 +361,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         int r = receiving ? recvfrom(s, (char *)args[1], (int)args[2], 0, args[4] ? (struct sockaddr *)&address : NULL, args[4] ? &bytes : NULL) :
                             sendto(s, (const char *)args[1], (int)args[2], 0, args[4] ? (const struct sockaddr *)&address : NULL, args[4] ? 16 : 0);
-        if (r == SOCKET_ERROR) { *result = socket_error(); return 1; }
+        if (r == SOCKET_ERROR) { *result = socket_io_error(); return 1; }
         if (receiving && args[4]) {
             if (capacity > bytes) capacity = bytes;
             if (capacity > 0) memcpy((void *)args[4], &address, (size_t)capacity);

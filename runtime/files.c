@@ -1,6 +1,9 @@
 #include "run.h"
+#include <bcrypt.h>
 #include <string.h>
 #include <stdio.h>
+
+enum { NR_URANDOM = 16 };
 
 static intptr_t file_error(void) {
     switch (GetLastError()) {
@@ -77,17 +80,30 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
 #endif
     size_t output_size = legacy ? 64 : BYTES;
     if (!nr_memory(destination, output_size, 1)) return -14;
-    BY_HANDLE_FILE_INFORMATION info;
-    if (!GetFileInformationByHandle(file, &info)) return file_error();
+    BY_HANDLE_FILE_INFORMATION info = {0};
+    uint64_t inode = 9;
+    uint32_t mode = 0020666;
+    if (file) {
+        if (!GetFileInformationByHandle(file, &info)) return file_error();
+        inode = ((uint64_t)info.nFileIndexHigh << 32) | info.nFileIndexLow;
+        wchar_t filesystem[32];
+        if (!GetVolumeInformationByHandleW(file, NULL, 0, NULL, NULL, NULL, filesystem, 32)) return file_error();
+        /* NTFS file references combine a 48-bit MFT record with a 16-bit reuse
+           sequence. Use the record as the inode, retaining real 32-bit overflow. */
+        if (!wcscmp(filesystem, L"NTFS")) inode &= 0x0000ffffffffffffULL;
+        mode = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? 0040555 : 0100444;
+    } else {
+        /* The runtime's /dev/urandom is a character device, backed by CNG. */
+        info.nNumberOfLinks = 1;
+    }
     unsigned char bytes[BYTES] = {0};
-    uint64_t inode = ((uint64_t)info.nFileIndexHigh << 32) | info.nFileIndexLow;
     uint64_t size = ((uint64_t)info.nFileSizeHigh << 32) | info.nFileSizeLow;
-    uint32_t mode = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? 0040555 : 0100444;
     FILETIME times[] = {info.ftLastAccessTime, info.ftLastWriteTime, info.ftCreationTime};
 #ifdef _WIN64
     put64(bytes, 0, info.dwVolumeSerialNumber); put64(bytes, 8, inode);
     put64(bytes, 16, info.nNumberOfLinks); put32(bytes, 24, mode);
     put32(bytes, 28, 1000); put32(bytes, 32, 1000);
+    put64(bytes, 40, file ? 0 : 0x109);
     put64(bytes, 48, size); put64(bytes, 56, 4096); put64(bytes, 64, (size + 511) / 512);
     for (unsigned i = 0; i < 3; ++i) {
         uint64_t ns = time_ns(times[i]);
@@ -97,6 +113,7 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
     put64(bytes, 0, info.dwVolumeSerialNumber); put32(bytes, 12, (uint32_t)inode);
     put32(bytes, 16, mode); put32(bytes, 20, info.nNumberOfLinks);
     put32(bytes, 24, 1000); put32(bytes, 28, 1000);
+    put64(bytes, 32, file ? 0 : 0x109);
     put64(bytes, 44, size); put32(bytes, 52, 4096); put64(bytes, 56, (size + 511) / 512);
     for (unsigned i = 0; i < 3; ++i) {
         uint64_t ns = time_ns(times[i]);
@@ -110,6 +127,7 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
         put32(bytes, 0, info.dwVolumeSerialNumber); put32(bytes, 4, (uint32_t)inode);
         uint16_t fields[] = {(uint16_t)mode, (uint16_t)info.nNumberOfLinks, 1000, 1000};
         memcpy(bytes + 8, fields, sizeof(fields));
+        put32(bytes, 16, file ? 0 : 0x109);
         put32(bytes, 20, (uint32_t)size); put32(bytes, 24, 4096); put32(bytes, 28, (uint32_t)((size + 511) / 512));
         for (unsigned i = 0; i < 3; ++i) {
             uint64_t ns = time_ns(times[i]);
@@ -122,13 +140,14 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
     int legacy = 0;
 #ifndef _WIN64
+    if (number == 221) number = FCNTL;
     if (number == 106) { number = STAT; legacy = 1; }
     if (number == 108) { number = FSTAT; legacy = 1; }
     if (number == 140) {
@@ -142,6 +161,53 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
 #endif
+    if (number == IOCTL && a < 256 && run->file_access[a] && run->file_access[a] != 4 && b == 0x5401) {
+        *result = -25; /* TCGETS on a regular file/pipe is ENOTTY. */
+        return 1;
+    }
+    if (number == FLOCK) {
+        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        uintptr_t mode = b & ~(uintptr_t)4;
+        if (mode != 1 && mode != 2 && mode != 8) { *result = -22; return 1; }
+        if (mode == run->flock_mode[a]) { *result = 0; return 1; }
+        OVERLAPPED overlapped = {0};
+        if (run->flock_mode[a]) {
+            if (!UnlockFileEx(run->files[a], 0, 0xffffffff, 0xffffffff, &overlapped)) { *result = file_error(); return 1; }
+            run->flock_mode[a] = 0;
+        }
+        if (mode == 8) { *result = 0; return 1; }
+        DWORD flags = (b & 4) ? LOCKFILE_FAIL_IMMEDIATELY : 0;
+        if (mode == 2) flags |= LOCKFILE_EXCLUSIVE_LOCK;
+        *result = LockFileEx(run->files[a], flags, 0, 0xffffffff, 0xffffffff, &overlapped) ? 0 :
+                  (GetLastError() == ERROR_LOCK_VIOLATION ? -11 : file_error());
+        if (!*result) run->flock_mode[a] = (unsigned char)mode;
+        return 1;
+    }
+    if (number == FCNTL) {
+        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM)) { *result = -9; return 1; }
+        if (b == 1) *result = run->descriptor_flags[a];
+        else if (b == 2 && !(c & ~1u)) { run->descriptor_flags[a] = (unsigned char)c; *result = 0; }
+        else if (run->file_access[a] == NR_URANDOM && b == 3) *result = run->nonblock[a] ? 0x800 : 0;
+        else if (run->file_access[a] == NR_URANDOM && b == 4 && !(c & ~(uintptr_t)0x800)) {
+            run->nonblock[a] = (c & 0x800) != 0; *result = 0;
+        }
+        else *result = -38;
+        return 1;
+    }
+    if (number == FTRUNCATE) {
+        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (!(run->file_access[a] & 2)) { *result = -22; return 1; }
+        LARGE_INTEGER zero = {0}, old, length;
+        length.QuadPart = (LONGLONG)b;
+#ifndef _WIN64
+        length.QuadPart = (LONGLONG)(((uint64_t)c << 32) | b);
+#endif
+        if (length.QuadPart < 0) { *result = -22; return 1; }
+        if (!SetFilePointerEx(run->files[a], zero, &old, FILE_CURRENT)) { *result = file_error(); return 1; }
+        *result = SetFilePointerEx(run->files[a], length, NULL, FILE_BEGIN) && SetEndOfFile(run->files[a]) ? 0 : file_error();
+        if (!SetFilePointerEx(run->files[a], old, NULL, FILE_BEGIN) && !*result) *result = file_error();
+        return 1;
+    }
     if (number == OPENAT) {
         if ((intptr_t)a != -100) { *result = -38; return 1; }
         number = OPEN; a = b; b = c; c = args[3];
@@ -156,6 +222,25 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         wchar_t path[32768];
         *result = guest_path(run, a, path);
         if (*result) return 1;
+        if (!wcscmp(path + wcslen(run->root), L"\\dev\\urandom")) {
+            if (number == STAT) *result = stat_file(NULL, b, legacy);
+            else if (number == ACCESS) *result = b & ~4u ? -38 : 0;
+            else if (number != OPEN) *result = -38;
+            else if (b & ~(uintptr_t)(0x800 | 0x8000 | 0x80000)) *result = -38;
+            else {
+                unsigned fd;
+                for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
+                if (fd == 256) *result = -24;
+                else {
+                    run->file_access[fd] = NR_URANDOM;
+                    run->descriptor_flags[fd] = (b & 0x80000) != 0;
+                    run->nonblock[fd] = (b & 0x800) != 0;
+                    *result = fd;
+                }
+            }
+            if (*result == -38) fprintf(stderr, "urandom unsupported nr=%llu flags=0x%llx\n", (unsigned long long)number, (unsigned long long)b);
+            return 1;
+        }
         if (number == UNLINK) {
             *result = DeleteFileW(path) ? 0 : file_error();
             return 1;
@@ -213,15 +298,32 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         }
         run->files[fd] = file;
         run->file_access[fd] = (b & 3) == 0 ? 1 : (b & 3) == 1 ? 2 : 3;
+        run->descriptor_flags[fd] = (b & 0x80000) != 0;
         *result = fd;
         return 1;
     }
     if (number != READ && number != CLOSE && number != FSTAT && number != LSEEK) return 0;
+    if (a < 256 && run->file_access[a] == NR_URANDOM) {
+        if (number == CLOSE) {
+            run->file_access[a] = 0; run->descriptor_flags[a] = 0; run->nonblock[a] = 0;
+            *result = 0;
+        } else if (number == FSTAT) *result = stat_file(NULL, b, legacy);
+        else if (number == READ) {
+            if (c > 0x7ffff000) c = 0x7ffff000;
+            if (!nr_memory(b, c, 1)) *result = -14;
+            else if (!c) *result = 0;
+            else *result = BCryptGenRandom(NULL, (PUCHAR)b, (ULONG)c, BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0 ? -5 : (intptr_t)c;
+        } else {
+            fprintf(stderr, "urandom unsupported nr=%llu\n", (unsigned long long)number);
+            *result = -38;
+        }
+        return 1;
+    }
     HANDLE file = a < 256 ? run->files[a] : NULL;
     if (!file) { *result = -9; return 1; }
     if (number == CLOSE) {
         *result = CloseHandle(file) ? 0 : file_error();
-        if (!*result) { run->files[a] = NULL; run->file_access[a] = 0; }
+        if (!*result) { run->files[a] = NULL; run->file_access[a] = 0; run->descriptor_flags[a] = 0; run->flock_mode[a] = 0; }
     } else if (number == FSTAT) {
         *result = stat_file(file, b, legacy);
     } else if (number == LSEEK) {

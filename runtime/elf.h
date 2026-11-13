@@ -62,6 +62,6 @@ int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, cons
 int nr_elf_map(NrElf *elf, const char **error);
 void nr_elf_close(NrElf *elf);
 int nr_adapt(NrElf *elf, const char **error);
-int nr_syscall_site(const NrElf *elf, uintptr_t pc, int *tls);
+const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc);
 
 #endif

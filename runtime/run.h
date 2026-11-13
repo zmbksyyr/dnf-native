@@ -3,6 +3,8 @@
 
 #include "elf.h"
 
+#define NR_VM_SLOTS 1024
+
 typedef struct {
     uint32_t events;
     uint64_t data;
@@ -28,6 +30,7 @@ typedef struct {
 typedef struct {
     void *base;
     size_t size;
+    unsigned char *mapped_pages; /* NULL means the entire guest range is mapped. */
     HANDLE source;
     NrElf image;
 } NrVm;
@@ -41,10 +44,12 @@ typedef struct {
     char cwd[4096];
     HANDLE files[256];
     unsigned char file_access[256];
+    unsigned char descriptor_flags[256];
+    unsigned char flock_mode[256];
     uintptr_t sockets[256];
     unsigned char nonblock[256];
     NrWatch *epolls[256];
-    NrVm vm[64];
+    NrVm vm[NR_VM_SLOTS];
     NrSignal actions[65];
     uint64_t signal_pending;
     HANDLE terminate_event;
@@ -53,6 +58,8 @@ typedef struct {
     volatile LONG thread_count;
     int argc;
     char **argv;
+    int environment_count;
+    char *environment[32];
 } NrRun;
 
 int nr_run(NrRun *run);

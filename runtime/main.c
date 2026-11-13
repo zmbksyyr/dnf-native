@@ -4,18 +4,36 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char *utf8(const wchar_t *value) {
+    int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, NULL, 0, NULL, NULL);
+    char *text = bytes ? malloc((size_t)bytes) : NULL;
+    if (!text) return NULL;
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, text, bytes, NULL, NULL)) {
+        free(text); return NULL;
+    }
+    return text;
+}
+
 int wmain(int argc, wchar_t **argv) {
+    NrRun run = {0};
     wchar_t *root = NULL, *ld_hash = NULL, *cwd = NULL;
     while (argc >= 3) {
         if (argc >= 4 && !wcscmp(argv[1], L"--root")) {
             root = argv[2]; ld_hash = argv[3]; argc -= 3; argv += 3;
         } else if (!wcscmp(argv[1], L"--cwd")) {
             cwd = argv[2]; argc -= 2; argv += 2;
+        } else if (!wcscmp(argv[1], L"--env")) {
+            const wchar_t *equals = wcschr(argv[2], L'=');
+            if (!equals || equals == argv[2] || run.environment_count == 32) return 2;
+            char *value = utf8(argv[2]);
+            if (!value) return 1;
+            run.environment[run.environment_count++] = value;
+            argc -= 2; argv += 2;
         } else break;
     }
     int execute = argc >= 5 && !wcscmp(argv[1], L"--run");
     if (!execute && (argc != 4 || wcscmp(argv[1], L"--map"))) {
-        fputs("usage: host --map ELF SHA256\n       host [--root ROOT INTERPRETER_SHA256] [--cwd GUEST_DIR] --run ELF SHA256 GUEST_ARGV0 [ARGS...]\n", stderr);
+        fputs("usage: host --map ELF SHA256\n       host [--root ROOT INTERPRETER_SHA256] [--cwd GUEST_DIR] [--env NAME=VALUE] --run ELF SHA256 GUEST_ARGV0 [ARGS...]\n", stderr);
         return 2;
     }
     char expected[65];
@@ -24,7 +42,6 @@ int wmain(int argc, wchar_t **argv) {
         fputs("invalid SHA256 argument\n", stderr);
         return 2;
     }
-    NrRun run = {0};
     strcpy(run.cwd, "/");
     if (cwd && (cwd[0] != L'/' || !WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, cwd, -1, run.cwd, sizeof(run.cwd), NULL, NULL))) return 2;
     if (root && (!GetFullPathNameW(root, 32768, run.root, NULL) || wcslen(run.root) >= 32767)) return 2;
@@ -66,13 +83,12 @@ int wmain(int argc, wchar_t **argv) {
         run.argv = calloc((size_t)run.argc, sizeof(char *));
         if (!run.argv) return 1;
         for (int i = 0; i < run.argc; ++i) {
-            int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i + 4], -1, NULL, 0, NULL, NULL);
-            if (!bytes || !(run.argv[i] = malloc((size_t)bytes))) return 1;
-            if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i + 4], -1, run.argv[i], bytes, NULL, NULL)) return 1;
+            if (!(run.argv[i] = utf8(argv[i + 4]))) return 1;
         }
         int status = nr_run(&run);
         for (int i = 0; i < run.argc; ++i) free(run.argv[i]);
         free(run.argv);
+        for (int i = 0; i < run.environment_count; ++i) free(run.environment[i]);
         nr_elf_close(elf);
         return status;
     }

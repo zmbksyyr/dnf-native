@@ -1,6 +1,7 @@
 #include "elf.h"
 #include <Zydis/Decoder.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static uintptr_t got_address(const NrElf *elf) {
@@ -15,6 +16,11 @@ static uintptr_t got_address(const NrElf *elf) {
         }
     }
     return 0;
+}
+
+static int trap_compare(const void *left, const void *right) {
+    const NrTrap *a = left, *b = right;
+    return a->pc > b->pc ? 1 : a->pc < b->pc ? -1 : 0;
 }
 
 int nr_adapt(NrElf *elf, const char **error) {
@@ -136,6 +142,7 @@ int nr_adapt(NrElf *elf, const char **error) {
         }
     }
     if (!section_count) return 0;
+    if (elf->trap_count > 1) qsort(elf->traps, elf->trap_count, sizeof(*elf->traps), trap_compare);
     if (!FlushInstructionCache(GetCurrentProcess(), elf->allocation, elf->allocation_size)) return 0;
     fprintf(stderr, "adapt sha256=%s sections=%zu syscall_traps=%zu tls_traps=%zu\n",
             elf->sha256, section_count, syscall_count, tls_count);
@@ -144,12 +151,14 @@ int nr_adapt(NrElf *elf, const char **error) {
 }
 
 
-int nr_syscall_site(const NrElf *elf, uintptr_t pc, int *tls) {
-    for (size_t i = 0; i < elf->trap_count; ++i) {
-        if (elf->traps[i].pc == pc) {
-            *tls = elf->traps[i].tls;
-            return 1;
-        }
+const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc) {
+    uintptr_t base = (uintptr_t)elf->allocation;
+    if (!base || pc < base || pc - base >= elf->allocation_size) return NULL;
+    size_t low = 0, high = elf->trap_count;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        if (elf->traps[middle].pc < pc) low = middle + 1;
+        else high = middle;
     }
-    return 0;
+    return low < elf->trap_count && elf->traps[low].pc == pc ? &elf->traps[low] : NULL;
 }

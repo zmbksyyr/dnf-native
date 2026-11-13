@@ -22,7 +22,7 @@ static int in_image(const NrElf *elf, uintptr_t pc) {
 
 static int executable(uintptr_t pc) {
     if (in_image(&active->program, pc) || in_image(&active->interpreter, pc)) return 1;
-    for (unsigned i = 0; i < 64; ++i) if (in_image(&active->vm[i].image, pc)) return 1;
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (in_image(&active->vm[i].image, pc)) return 1;
     return 0;
 }
 
@@ -42,13 +42,14 @@ int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
             if (!elf->allocation) continue;
             for (unsigned i = 0; i < elf->header->phnum; ++i) {
                 NrElfProgram *p = &elf->programs[i];
-                uintptr_t first = elf->bias + (uintptr_t)p->vaddr;
+                uintptr_t first = (elf->bias + (uintptr_t)p->vaddr) & ~(uintptr_t)4095;
+                uintptr_t last = (elf->bias + (uintptr_t)p->vaddr + (uintptr_t)p->memsz + 4095) & ~(uintptr_t)4095;
                 if (p->type == 1 && (p->flags & (write ? 2 : 5)) && address >= first &&
-                    address - first < p->memsz && first + p->memsz > covered)
-                    covered = first + (uintptr_t)p->memsz;
+                    address < last && last > covered)
+                    covered = last;
             }
         }
-        for (unsigned i = 0; i < 64; ++i) {
+        for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
             NrVm *v = &active->vm[i];
             uintptr_t first = (uintptr_t)v->base;
             if (first && address >= first && address - first < v->size && first + v->size > covered)
@@ -89,15 +90,34 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
                 (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     intptr_t result;
-    if (nr_net(active, number, args, &result)) return result;
+    if (nr_net(active, number, args, &result)) {
+        if (result == -38) fprintf(stderr, "network unsupported nr=%llu op=%llu\n", (unsigned long long)number, (unsigned long long)a);
+        return result;
+    }
     if (nr_files(active, number, args, &result)) return result;
     if (nr_vm(active, number, args, &result)) return result;
     if (nr_signals(active, number, args, &result)) return result;
 #ifdef _WIN64
-    enum {SYS_TIME = 201, SYS_GETTIMEOFDAY = 96, SYS_GETRLIMIT = 97, SYS_TIMES = 100, SYS_NANOSLEEP = 35};
+    enum {SYS_TIME = 201, SYS_GETTIMEOFDAY = 96, SYS_GETRLIMIT = 97, SYS_TIMES = 100, SYS_NANOSLEEP = 35, SYS_CLOCK_GETTIME = 228};
 #else
-    enum {SYS_TIME = 13, SYS_GETTIMEOFDAY = 78, SYS_GETRLIMIT = 191, SYS_TIMES = 43, SYS_NANOSLEEP = 162};
+    enum {SYS_TIME = 13, SYS_GETTIMEOFDAY = 78, SYS_GETRLIMIT = 191, SYS_TIMES = 43, SYS_NANOSLEEP = 162, SYS_CLOCK_GETTIME = 265};
 #endif
+    if (number == SYS_CLOCK_GETTIME) {
+        if (a > 1) return -38;
+        if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;
+        uint64_t ticks, frequency;
+        if (!a) {
+            FILETIME time; GetSystemTimeAsFileTime(&time);
+            ticks = (((uint64_t)time.dwHighDateTime << 32) | time.dwLowDateTime) - 116444736000000000ULL;
+            frequency = 10000000;
+        } else {
+            LARGE_INTEGER counter, rate;
+            if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&rate)) return -5;
+            ticks = (uint64_t)counter.QuadPart; frequency = (uint64_t)rate.QuadPart;
+        }
+        uintptr_t values[] = {(uintptr_t)(ticks / frequency), (uintptr_t)(ticks % frequency * 1000000000 / frequency)};
+        memcpy((void *)b, values, sizeof(values)); return 0;
+    }
     if (number == SYS_TIMES) {
         if (a) {
             if (!nr_memory(a, 4 * sizeof(uintptr_t), 1)) return -14;
@@ -289,18 +309,15 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     }
     if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION && nr_tls_finish(active, c))
         return EXCEPTION_CONTINUE_EXECUTION;
-    int tls = 0;
-    int site = nr_syscall_site(&active->program, pc, &tls) || nr_syscall_site(&active->interpreter, pc, &tls);
-    for (unsigned i = 0; !site && i < 64; ++i) site = nr_syscall_site(&active->vm[i].image, pc, &tls);
-    if (site && executable(pc) &&
-        exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
-        if (tls) {
-            const NrTrap *record = NULL;
-            const NrElf *images[66] = {&active->program, &active->interpreter};
-            for (unsigned i = 0; i < 64; ++i) images[i + 2] = &active->vm[i].image;
-            for (unsigned i = 0; !record && i < 66; ++i)
-                for (size_t j = 0; j < images[i]->trap_count; ++j)
-                    if (images[i]->traps[j].pc == pc) { record = &images[i]->traps[j]; break; }
+    const NrTrap *record = NULL;
+    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
+        record = nr_syscall_site(&active->program, pc);
+        if (!record) record = nr_syscall_site(&active->interpreter, pc);
+        for (unsigned i = 0; !record && i < NR_VM_SLOTS; ++i)
+            record = nr_syscall_site(&active->vm[i].image, pc);
+    }
+    if (record && executable(pc)) {
+        if (record->tls) {
             if (nr_tls(active, c, record)) return EXCEPTION_CONTINUE_EXECUTION;
             fprintf(stderr, "unimplemented guest TLS site pc=0x%llx\n", (unsigned long long)pc);
             fflush(NULL);
@@ -372,6 +389,8 @@ static DWORD WINAPI start_guest(void *argument) {
     uintptr_t cursor = run->stack_high - 256;
     uintptr_t arguments[256];
     for (int i = run->argc - 1; i >= 0; --i) arguments[i] = push_string(&cursor, run->argv[i]);
+    uintptr_t environment[32];
+    for (int i = 0; i < run->environment_count; ++i) environment[i] = push_string(&cursor, run->environment[i]);
     uintptr_t env_path = push_string(&cursor, "PATH=/usr/bin:/bin");
     uintptr_t env_lang = push_string(&cursor, "LANG=C");
     uintptr_t platform = push_string(&cursor, sizeof(void *) == 8 ? "x86_64" : "i686");
@@ -396,13 +415,14 @@ static DWORD WINAPI start_guest(void *argument) {
         {11, 1000}, {12, 1000}, {13, 1000}, {14, 1000}, {15, platform},
         {16, 0}, {17, 100}, {23, 0}, {25, random}, {26, 0}, {31, arguments[0]}, {0, 0},
     };
-    size_t words = 1 + (size_t)run->argc + 1 + 2 + 1 + sizeof(aux) / sizeof(uintptr_t);
+    size_t words = 1 + (size_t)run->argc + 1 + (size_t)run->environment_count + 2 + 1 + sizeof(aux) / sizeof(uintptr_t);
     uintptr_t stack = (cursor - words * sizeof(uintptr_t)) & ~(uintptr_t)15;
     if (stack < run->stack_low) ExitProcess(124);
     uintptr_t *out = (uintptr_t *)stack;
     *out++ = (uintptr_t)run->argc;
     for (int i = 0; i < run->argc; ++i) *out++ = arguments[i];
     *out++ = 0;
+    for (int i = 0; i < run->environment_count; ++i) *out++ = environment[i];
     *out++ = env_path;
     *out++ = env_lang;
     *out++ = 0;
@@ -416,8 +436,8 @@ static DWORD WINAPI start_guest(void *argument) {
 int nr_run(NrRun *run) {
     if (run->argc < 1 || run->argc > 256) return 2;
     size_t bytes = 0;
-    for (int i = 0; i < run->argc; ++i) {
-        size_t n = strlen(run->argv[i]) + 1;
+    for (int i = 0; i < run->argc + run->environment_count; ++i) {
+        size_t n = strlen(i < run->argc ? run->argv[i] : run->environment[i - run->argc]) + 1;
         if (n > 256 * 1024 || bytes > 256 * 1024 - n) return 2;
         bytes += n;
     }

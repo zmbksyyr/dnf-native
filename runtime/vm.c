@@ -12,6 +12,24 @@ static int contains(uintptr_t base, size_t size, uintptr_t address, size_t bytes
     return base && address >= base && address - base <= size && bytes <= size - (address - base);
 }
 
+static int mapped(const NrVm *v, uintptr_t address, size_t length) {
+    if (!v->mapped_pages) return 1;
+    size_t first = (address - (uintptr_t)v->base) / 4096;
+    for (size_t i = first; i < first + length / 4096; ++i)
+        if (!(v->mapped_pages[i / 8] & (1u << (i % 8)))) return 0;
+    return 1;
+}
+
+static void mark_pages(NrVm *v, uintptr_t address, size_t length, int present) {
+    if (!v->mapped_pages) return;
+    size_t first = (address - (uintptr_t)v->base) / 4096;
+    for (size_t i = first; i < first + length / 4096; ++i) {
+        unsigned char bit = (unsigned char)(1u << (i % 8));
+        if (present) v->mapped_pages[i / 8] |= bit;
+        else v->mapped_pages[i / 8] &= (unsigned char)~bit;
+    }
+}
+
 static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     uintptr_t address = args[0], flags = args[3], fd = args[4];
     size_t length = (size_t)args[1];
@@ -21,14 +39,14 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
 #endif
     if (!length || length > SIZE_MAX - 4095 || (args[2] & ~7u) || (offset & 4095)) return -22;
     length = (length + 4095) & ~(size_t)4095;
-    if (flags & ~(uintptr_t)(2 | 0x10 | 0x20 | 0x800 | 0x20000)) {
+    if (flags & ~(uintptr_t)(2 | 0x10 | 0x20 | 0x800 | 0x4000 | 0x20000)) {
         fprintf(stderr, "mmap unsupported flags=0x%llx\n", (unsigned long long)flags); return -38;
     }
     if (!(flags & 2)) return -38;
     if (flags & 0x10) {
         if (address & 4095) return -22;
         NrVm *v = NULL;
-        for (unsigned i = 0; i < 64; ++i)
+        for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
             if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
         if (!v) return -38;
         if (!(flags & 0x20) && (!v->image.file || fd >= 256 || !run->files[fd] || !v->source)) return -38;
@@ -49,14 +67,15 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
             memcpy((void *)address, v->image.file + offset, bytes);
         }
         if (!VirtualProtect((void *)address, length, protect(args[2]), &old)) return -13;
+        mark_pages(v, address, length, 1);
         return (intptr_t)address;
     }
     NrVm *v = NULL;
-    for (unsigned i = 0; i < 64; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
-    if (!v) return -12;
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
+    if (!v) { fputs("mmap guest region table exhausted\n", stderr); return -12; }
     if (flags & 0x20) {
         if (args[2] & 4) return -38;
-        v->base = VirtualAlloc(NULL, length, MEM_RESERVE | MEM_COMMIT, protect(args[2]));
+        v->base = VirtualAlloc(NULL, length, MEM_RESERVE | (args[2] ? MEM_COMMIT : 0), protect(args[2]));
         if (!v->base) return -12;
         v->size = length;
         return (intptr_t)v->base;
@@ -97,10 +116,10 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
     length = (length + 4095) & ~(size_t)4095;
     NrVm *v = NULL;
-    for (unsigned i = 0; i < 64; ++i)
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
     if (number == MADVISE) {
-        if (!v) *result = -12;
+        if (!v || !mapped(v, address, length)) *result = -12;
         else if (args[2] != 4 || v->image.file) *result = -38;
         else if (!nr_memory(address, length, 1)) *result = -38;
         else if (!VirtualFree((void *)address, length, MEM_DECOMMIT)) *result = -12;
@@ -110,12 +129,21 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     if (number == MUNMAP) {
         if (!v) { *result = -38; return 1; }
         if (address == (uintptr_t)v->base && length == v->size) {
-            if (v->image.file) nr_elf_close(&v->image); else VirtualFree(v->base, 0, MEM_RELEASE);
+            if (v->image.file) nr_elf_close(&v->image);
+            else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
             if (v->source) CloseHandle(v->source);
+            if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
             memset(v, 0, sizeof(*v));
             *result = 0;
         } else {
+            if (!v->mapped_pages) {
+                size_t bytes = (v->size / 4096 + 7) / 8;
+                v->mapped_pages = HeapAlloc(GetProcessHeap(), 0, bytes);
+                if (!v->mapped_pages) { *result = -12; return 1; }
+                memset(v->mapped_pages, 255, bytes);
+            }
             *result = VirtualFree((void *)address, length, MEM_DECOMMIT) ? 0 : -22;
+            if (!*result) mark_pages(v, address, length, 0);
         }
         return 1;
     }
@@ -125,7 +153,27 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
         if (contains((uintptr_t)images[i]->allocation, images[i]->allocation_size, address, length)) owned = 1;
     if (!owned) { *result = -12; return 1; }
     if ((args[2] & ~7u) || ((args[2] & 4) && v && !v->image.file)) { *result = -38; return 1; }
+    if (v && !mapped(v, address, length)) { *result = -12; return 1; }
     DWORD old;
+    if (v && !v->image.file && !args[2]) {
+        /* Reserved PROT_NONE pages are still guest mappings. Only committed
+           pages need a Windows protection change; do not commit the rest. */
+        uintptr_t cursor = address, end = address + length;
+        while (cursor < end) {
+            MEMORY_BASIC_INFORMATION info;
+            if (!VirtualQuery((const void *)cursor, &info, sizeof(info))) { *result = -12; return 1; }
+            size_t bytes = info.RegionSize - (cursor - (uintptr_t)info.BaseAddress);
+            if (bytes > end - cursor) bytes = end - cursor;
+            if (info.State == MEM_COMMIT) {
+                if (!VirtualProtect((void *)cursor, bytes, PAGE_NOACCESS, &old)) { *result = -12; return 1; }
+            } else if (info.State != MEM_RESERVE) { *result = -12; return 1; }
+            cursor += bytes;
+        }
+        *result = 0; return 1;
+    }
+    if (v && !v->image.file && args[2] && !VirtualAlloc((void *)address, length, MEM_COMMIT, protect(args[2]))) {
+        *result = -12; return 1;
+    }
     *result = VirtualProtect((void *)address, length, protect(args[2]), &old) ? 0 : -12;
     return 1;
 }
