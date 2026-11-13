@@ -615,6 +615,8 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             fprintf(stderr, "open failed path=%ls flags=0x%llx errno=%lld\n", path, (unsigned long long)b, (long long)*result);
             return 1;
         }
+        if (GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
+            fprintf(stderr, "open success path=%ls flags=0x%llx\n", path, (unsigned long long)b);
         if (b & (0x10000 | 0x20000)) {
             BY_HANDLE_FILE_INFORMATION info;
             if (!GetFileInformationByHandle(file, &info)) {

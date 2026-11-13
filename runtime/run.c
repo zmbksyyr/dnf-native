@@ -86,8 +86,8 @@ static intptr_t write_copy(HANDLE file, const void *bytes, DWORD count) {
 static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
     uintptr_t a = args[0], b = args[1], c = args[2];
     if (GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
-        fprintf(stderr, "trace nr=%llu args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
-                (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
+        fprintf(stderr, "trace pc=0x%llx nr=%llu args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
+                (unsigned long long)pc, (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     intptr_t result;
     if (nr_net(active, number, args, &result)) {
