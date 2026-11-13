@@ -2,7 +2,9 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-当前交付为需求、资源调研和实施方案，完成后等待用户审阅。本轮不实现 runtime、GUI 或 MySQL 自解压程序，不继承历史工程的实现或验收结论。
+**当前状态：P0 文档与静态调研完成，等待用户审阅。** 本轮没有实现 runtime、GUI 或 MySQL 自解压程序，没有运行原版服务或继承历史工程的验收结论。
+
+从[审阅入口](docs/05-review.md)开始，其中列出需确认的技术边界和四次阶段提交。
 
 - [工作纪律](AGENTS.md)：仅约束工作行为。
 - [用户需求原文](docs/requirements.md)：从工作区需求文件逐字节归档，作为需求基线。
@@ -10,5 +12,14 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 - [静态证据](docs/evidence/resource-inventory.json)与[网络来源](docs/evidence/web-resources.json)：本轮重新生成的记录。
 - [原生运行方案](docs/02-technical-plan.md)：双架构、ELF、syscall/TLS、插件和服务管理。
 - [数据库、GUI 与交付](docs/03-database-and-delivery.md)：MySQL 单文件、预快照/回滚及离线包。
+- [实施阶段与验收](docs/04-milestones-and-acceptance.md)：P1 否决关卡、19 项服务矩阵、三系统矩阵及需求追踪。
 
 仓库与上级目录中的输入包、`dnf-winport/`、`opendnf-win-jbz69/`、`x/` 独立。原始资产和构建产物不进入 Git。
+
+静态审计可在开发机使用 Python 3.11+ 标准库复核，不执行或落盘解包输入代码：
+
+```powershell
+python tools/audit_resources.py --workspace .. --output .local/resource-inventory.json
+```
+
+其中 `--workspace` 是包含原始输入包的目录。运行包将不依赖 Python。证据包含生成时间，重复审计应比较输入/工具哈希与结构化结果，不要求时间字段相同。
