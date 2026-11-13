@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include "run.h"
 #include <string.h>
+#include <stdio.h>
 
 static intptr_t socket_error(void) {
     switch (WSAGetLastError()) {
@@ -65,7 +66,18 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
         if (input[0] < 0 || input[0] > LONG_MAX || input[1] < 0 || input[1] >= 1000000) return -22;
         timeout.tv_sec = (long)input[0]; timeout.tv_usec = (long)input[1]; wait = &timeout;
     }
-    int count = select(0, &sets[0], &sets[1], &sets[2], wait);
+    int count;
+    if (!sets[0].fd_count && !sets[1].fd_count && !sets[2].fd_count) {
+        if (!wait) Sleep(INFINITE);
+        else {
+            uint64_t milliseconds = (uint64_t)timeout.tv_sec * 1000 + (timeout.tv_usec + 999) / 1000;
+            while (milliseconds) {
+                DWORD part = milliseconds > MAXDWORD - 1 ? MAXDWORD - 1 : (DWORD)milliseconds;
+                Sleep(part); milliseconds -= part;
+            }
+        }
+        count = 0;
+    } else count = select(0, &sets[0], &sets[1], &sets[2], wait);
     if (count == SOCKET_ERROR) return socket_error();
     for (unsigned i = 0; i < 3; ++i) {
         if (!args[i + 1]) continue;
@@ -84,13 +96,80 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     return count;
 }
 
+static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uintptr_t maximum, intptr_t milliseconds) {
+    if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
+    size_t capacity = maximum > 256 ? 256 : maximum;
+    if (!nr_memory(address, capacity * 12, 1)) return -14;
+    WSAPOLLFD polls[256]; unsigned fds[256]; ULONG count = 0;
+    for (unsigned fd = 0; fd < 256; ++fd) {
+        if (!watches[fd].used || run->file_access[fd] != 4) continue;
+        polls[count].fd = (SOCKET)run->sockets[fd]; polls[count].events = 0; polls[count].revents = 0;
+        if (watches[fd].events & 1) polls[count].events |= POLLRDNORM;
+        if (watches[fd].events & 4) polls[count].events |= POLLWRNORM;
+        fds[count++] = fd;
+    }
+    if (!count) { Sleep(milliseconds == -1 ? INFINITE : (DWORD)milliseconds); return 0; }
+    int ready = WSAPoll(polls, count, milliseconds > INT_MAX ? INT_MAX : (int)milliseconds);
+    if (ready == SOCKET_ERROR) return socket_error();
+    intptr_t written = 0;
+    for (ULONG i = 0; i < count && (size_t)written < capacity; ++i) {
+        uint32_t events = 0;
+        if (polls[i].revents & (POLLRDNORM | POLLRDBAND)) events |= 1;
+        if (polls[i].revents & POLLWRNORM) events |= 4;
+        if (polls[i].revents & POLLERR) events |= 8;
+        if (polls[i].revents & (POLLHUP | POLLNVAL)) events |= 16;
+        if (!events) continue;
+        unsigned char *out = (unsigned char *)address + written * 12;
+        memcpy(out, &events, 4); memcpy(out + 4, &watches[fds[i]].data, 8); ++written;
+    }
+    return written;
+}
+
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {CLOSE = 3, IOCTL = 16, FCNTL = 72, SELECT = 23};
+    enum {CLOSE = 3, IOCTL = 16, FCNTL = 72, SELECT = 23, EP_CREATE = 213, EP_CREATE1 = 291, EP_CTL = 233, EP_WAIT = 232};
 #else
-    enum {CLOSE = 6, IOCTL = 54, FCNTL = 55, SELECT = 142};
+    enum {CLOSE = 6, IOCTL = 54, FCNTL = 55, SELECT = 142, EP_CREATE = 254, EP_CREATE1 = 329, EP_CTL = 255, EP_WAIT = 256};
+#endif
+#ifndef _WIN64
+    if (number == 221) number = FCNTL;
 #endif
     if (number == SELECT) { *result = select_sockets(run, input); return 1; }
+    if (number == EP_CREATE || number == EP_CREATE1) {
+        if ((number == EP_CREATE && (intptr_t)input[0] <= 0) || (number == EP_CREATE1 && (input[0] & ~0x80000u))) { *result = -22; return 1; }
+        unsigned fd;
+        for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
+        if (fd == 256) { *result = -24; return 1; }
+        run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 256 * sizeof(NrWatch));
+        if (!run->epolls[fd]) { *result = -12; return 1; }
+        run->file_access[fd] = 8;
+        *result = fd; return 1;
+    }
+    if (number == CLOSE && input[0] < 256) {
+        unsigned fd = (unsigned)input[0];
+        if (run->file_access[fd] == 8) {
+            HeapFree(GetProcessHeap(), 0, run->epolls[fd]); run->epolls[fd] = NULL; run->file_access[fd] = 0;
+            *result = 0; return 1;
+        }
+        for (unsigned i = 0; i < 256; ++i) if (run->epolls[i]) run->epolls[i][fd].used = 0;
+    }
+    if (number == EP_CTL || number == EP_WAIT) {
+        if (input[0] >= 256 || run->file_access[input[0]] != 8) { *result = -9; return 1; }
+        NrWatch *watches = run->epolls[input[0]];
+        if (number == EP_WAIT) { *result = epoll_wait(run, watches, input[1], input[2], (intptr_t)input[3]); return 1; }
+        if (input[2] >= 256 || run->file_access[input[2]] != 4) { *result = -9; return 1; }
+        NrWatch *watch = &watches[input[2]];
+        if (input[1] == 2) { *result = watch->used ? 0 : -2; watch->used = 0; return 1; }
+        if (input[1] != 1 && input[1] != 3) { *result = -22; return 1; }
+        if (!nr_memory(input[3], 12, 0)) { *result = -14; return 1; }
+        uint32_t events; memcpy(&events, (const void *)input[3], 4);
+        if (events & ~29u) {
+            fprintf(stderr, "epoll unsupported events=0x%x\n", events); *result = -38; return 1;
+        }
+        if ((input[1] == 1 && watch->used) || (input[1] == 3 && !watch->used)) { *result = watch->used ? -17 : -2; return 1; }
+        watch->used = 1; watch->events = events; memcpy(&watch->data, (const void *)(input[3] + 4), 8);
+        *result = 0; return 1;
+    }
     uintptr_t args[6]; memcpy(args, input, sizeof(args));
     int operation = 0;
 #ifdef _WIN64

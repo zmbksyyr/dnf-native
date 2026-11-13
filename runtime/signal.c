@@ -51,8 +51,17 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         *result = 0; return 1;
     }
     if (number == KILL) {
-        if (a != GetCurrentProcessId()) { *result = -38; return 1; }
         if (b > 64) { *result = -22; return 1; }
+        if (a != GetCurrentProcessId()) {
+            if ((intptr_t)a <= 0 || (b != 0 && b != 15)) { *result = -38; return 1; }
+            wchar_t name[80];
+            swprintf(name, 80, L"Local\\dnf-native-terminate-%lu", (DWORD)a);
+            HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, name);
+            if (!event) { *result = GetLastError() == ERROR_ACCESS_DENIED ? -1 : -3; return 1; }
+            *result = !b || SetEvent(event) ? 0 : -5;
+            CloseHandle(event);
+            return 1;
+        }
         if (b) {
             if (b == 19 || b == 18) { *result = -38; return 1; }
             run->signal_pending |= 1ULL << (b - 1);
@@ -64,6 +73,7 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
 
 int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread = nr_current();
+    if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) run->signal_pending |= 1ULL << 14;
     if (thread->in_signal || thread->tls_resume) return 1;
     uint64_t ready = run->signal_pending & ~thread->signal_mask;
     for (unsigned signal = 1; signal <= 64; ++signal) {

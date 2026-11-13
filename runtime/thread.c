@@ -8,7 +8,7 @@ static Waiter *waiters;
 
 NrThread *nr_current(void) { return thread_key == TLS_OUT_OF_INDEXES ? NULL : TlsGetValue(thread_key); }
 void nr_thread_attach(NrThread *thread) {
-    thread->tid = GetCurrentThreadId();
+    if (!thread->tid) thread->tid = GetCurrentThreadId();
     if (!TlsSetValue(thread_key, thread)) ExitProcess(124);
 }
 int nr_thread_init(NrRun *run) {
@@ -46,7 +46,7 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
     enum {CLONE = 120, FUTEX = 240, SETTID = 258, EXIT = 1, ROBUST = 311};
 #endif
     NrThread *thread = nr_current();
-    if (number == SETTID) { thread->clear_tid = args[0]; *result = GetCurrentThreadId(); return 1; }
+    if (number == SETTID) { thread->clear_tid = args[0]; *result = thread->tid; return 1; }
     if (number == ROBUST) {
         /* Robust owner-death handling is not implemented. */
         *result = -38; return 1;

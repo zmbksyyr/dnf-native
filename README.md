@@ -37,4 +37,4 @@ python tools/test_stun.py
 python tools/probe_manager.py
 ```
 
-协议检查使用 STUN 原有 `test` 前台模式，绑定原 UDP 端口 2311–2313，结束后强制回收本次启动的测试进程；manager 使用原有 `nofork` 模式。测试实例写在 `build/probes/` 的独立目录。它们证明的范围不包含后台派生、正常停服或最终验收。[第三方来源](THIRD_PARTY.md)记录实际引入的指令库和用户库。
+协议检查使用 STUN 原有 `test` 前台模式，绑定原 UDP 端口 2311–2313，结束后强制回收本次启动的测试进程；manager 使用原有 `nofork` 模式，再通过第二个原版 manager 的 `stop` 命令完成 SIGTERM 和应用资源清理。测试实例写在 `build/probes/` 的独立目录。后台派生、manager 管理协议和最终验收仍未通过。[第三方来源](THIRD_PARTY.md)记录实际引入的指令库和用户库。

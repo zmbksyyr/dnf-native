@@ -4,6 +4,12 @@
 #include "elf.h"
 
 typedef struct {
+    uint32_t events;
+    uint64_t data;
+    unsigned char used;
+} NrWatch;
+
+typedef struct {
     uintptr_t tls_base, tls_resume, tls_end;
     unsigned char *tls_code;
     uint64_t signal_mask, saved_mask;
@@ -37,9 +43,11 @@ typedef struct {
     unsigned char file_access[256];
     uintptr_t sockets[256];
     unsigned char nonblock[256];
+    NrWatch *epolls[256];
     NrVm vm[64];
     NrSignal actions[65];
     uint64_t signal_pending;
+    HANDLE terminate_event;
     unsigned char *signal_code;
     NrThread threads[64];
     volatile LONG thread_count;

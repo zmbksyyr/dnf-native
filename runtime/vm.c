@@ -86,12 +86,12 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
 
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11};
+    enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28};
 #else
-    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91};
+    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219};
 #endif
     if (number == MMAP) { *result = mapping(run, args); return 1; }
-    if (number != MPROTECT && number != MUNMAP) return 0;
+    if (number != MPROTECT && number != MUNMAP && number != MADVISE) return 0;
     uintptr_t address = args[0];
     size_t length = args[1];
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
@@ -99,6 +99,14 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     NrVm *v = NULL;
     for (unsigned i = 0; i < 64; ++i)
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
+    if (number == MADVISE) {
+        if (!v) *result = -12;
+        else if (args[2] != 4 || v->image.file) *result = -38;
+        else if (!nr_memory(address, length, 1)) *result = -38;
+        else if (!VirtualFree((void *)address, length, MEM_DECOMMIT)) *result = -12;
+        else *result = VirtualAlloc((void *)address, length, MEM_COMMIT, PAGE_READWRITE) ? 0 : -12;
+        return 1;
+    }
     if (number == MUNMAP) {
         if (!v) { *result = -38; return 1; }
         if (address == (uintptr_t)v->base && length == v->size) {

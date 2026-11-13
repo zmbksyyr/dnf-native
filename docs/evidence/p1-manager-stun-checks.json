@@ -1,0 +1,474 @@
+{
+  "recorded_utc": "20261113T080017686591Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "command": [
+    "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+    "--root",
+    "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261113T080017686591Z\\stun",
+    "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+    "--run",
+    "D:\\cache\\dnf-runtime\\dnf-native\\originals\\dp123\\home\\neople\\stun\\df_stun_r",
+    "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+    "/home/neople/stun/df_stun_r",
+    "test"
+  ],
+  "elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+  "host_sha256": "97e87815246d4b015312a4ae26b6461c3830f49e5133c8603fd25fe5c051c4fc",
+  "scope": "Original STUN test/foreground mode, loopback UDP only. Forced test cleanup; no graceful-stop, fork or three-OS acceptance.",
+  "forced_cleanup_exit_code": 1,
+  "syscall_gaps": [],
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "8d399583c26002f2efc28c7db38ea6eea4fe813a49c012a11584ce5c76c71be4",
+  "results": [
+    {
+      "iteration": 0,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 0,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 0,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 0,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 0,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 1,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 1,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 1,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 1,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 1,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "port": 2311,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2311,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "port": 2312,
+      "request_hex": "01",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2312,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "port": 2311,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "port": 2312,
+      "request_hex": "05",
+      "reply_hex": "020100007fd9f1",
+      "expected_hex": "020100007fd9f1",
+      "source_port": 2313,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "port": 2313,
+      "request_hex": "6c656e6774682d70726f6265",
+      "reply_hex": "0c00",
+      "expected_hex": "0c00",
+      "source_port": 2313,
+      "passed": true
+    }
+  ]
+}

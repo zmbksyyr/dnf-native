@@ -69,13 +69,14 @@ static uint64_t time_ns(FILETIME time) {
     return ticks > 116444736000000000ULL ? (ticks - 116444736000000000ULL) * 100 : 0;
 }
 
-static intptr_t stat_file(HANDLE file, uintptr_t destination) {
+static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
 #ifdef _WIN64
     enum {BYTES = 144};
 #else
     enum {BYTES = 96};
 #endif
-    if (!nr_memory(destination, BYTES, 1)) return -14;
+    size_t output_size = legacy ? 64 : BYTES;
+    if (!nr_memory(destination, output_size, 1)) return -14;
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(file, &info)) return file_error();
     unsigned char bytes[BYTES] = {0};
@@ -103,17 +104,44 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination) {
     }
     put64(bytes, 88, inode);
 #endif
-    memcpy((void *)destination, bytes, BYTES);
+    if (legacy) {
+        if (size > INT32_MAX || inode > UINT32_MAX) return -75;
+        memset(bytes, 0, sizeof(bytes));
+        put32(bytes, 0, info.dwVolumeSerialNumber); put32(bytes, 4, (uint32_t)inode);
+        uint16_t fields[] = {(uint16_t)mode, (uint16_t)info.nNumberOfLinks, 1000, 1000};
+        memcpy(bytes + 8, fields, sizeof(fields));
+        put32(bytes, 20, (uint32_t)size); put32(bytes, 24, 4096); put32(bytes, 28, (uint32_t)((size + 511) / 512));
+        for (unsigned i = 0; i < 3; ++i) {
+            uint64_t ns = time_ns(times[i]);
+            put32(bytes, 32 + i * 8, (uint32_t)(ns / 1000000000)); put32(bytes, 36 + i * 8, (uint32_t)(ns % 1000000000));
+        }
+    }
+    memcpy((void *)destination, bytes, output_size);
     return 0;
 }
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
+    int legacy = 0;
+#ifndef _WIN64
+    if (number == 106) { number = STAT; legacy = 1; }
+    if (number == 108) { number = FSTAT; legacy = 1; }
+    if (number == 140) {
+        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (!nr_memory(args[3], 8, 1)) { *result = -14; return 1; }
+        LARGE_INTEGER offset, position;
+        offset.QuadPart = (LONGLONG)(((uint64_t)b << 32) | c);
+        if (args[4] > 2) *result = -22;
+        else if (!SetFilePointerEx(run->files[a], offset, &position, (DWORD)args[4])) *result = file_error();
+        else { memcpy((void *)args[3], &position.QuadPart, 8); *result = 0; }
+        return 1;
+    }
+#endif
     if (number == OPENAT) {
         if ((intptr_t)a != -100) { *result = -38; return 1; }
         number = OPEN; a = b; b = c; c = args[3];
@@ -124,10 +152,14 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (*result > 0) memcpy((void *)a, run->cwd, bytes);
         return 1;
     }
-    if (number == OPEN || number == ACCESS || number == STAT || number == CHDIR || number == MKDIR) {
+    if (number == OPEN || number == ACCESS || number == STAT || number == CHDIR || number == MKDIR || number == UNLINK) {
         wchar_t path[32768];
         *result = guest_path(run, a, path);
         if (*result) return 1;
+        if (number == UNLINK) {
+            *result = DeleteFileW(path) ? 0 : file_error();
+            return 1;
+        }
         if (number == MKDIR) {
             *result = CreateDirectoryW(path, NULL) ? 0 : file_error();
             return 1;
@@ -147,9 +179,9 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             *result = 0; return 1;
         }
         if (number == STAT) {
-            HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+            HANDLE file = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
             if (file == INVALID_HANDLE_VALUE) { *result = file_error(); return 1; }
-            *result = stat_file(file, b);
+            *result = stat_file(file, b, legacy);
             CloseHandle(file);
             return 1;
         }
@@ -167,7 +199,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         DWORD desired = (b & 3) != 1 ? GENERIC_READ : 0;
         if (b & 3) desired |= b & 0x400 ? FILE_APPEND_DATA : GENERIC_WRITE;
         DWORD creation = b & 0x40 ? (b & 0x80 ? CREATE_NEW : b & 0x200 ? CREATE_ALWAYS : OPEN_ALWAYS) : b & 0x200 ? TRUNCATE_EXISTING : OPEN_EXISTING;
-        HANDLE file = CreateFileW(path, desired, FILE_SHARE_READ, NULL, creation, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        HANDLE file = CreateFileW(path, desired, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, creation, FILE_FLAG_BACKUP_SEMANTICS, NULL);
         if (file == INVALID_HANDLE_VALUE) {
             *result = file_error();
             fprintf(stderr, "open failed path=%ls flags=0x%llx errno=%lld\n", path, (unsigned long long)b, (long long)*result);
@@ -191,7 +223,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         *result = CloseHandle(file) ? 0 : file_error();
         if (!*result) { run->files[a] = NULL; run->file_access[a] = 0; }
     } else if (number == FSTAT) {
-        *result = stat_file(file, b);
+        *result = stat_file(file, b, legacy);
     } else if (number == LSEEK) {
         LARGE_INTEGER offset, position;
         offset.QuadPart = (intptr_t)b;

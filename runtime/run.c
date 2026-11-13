@@ -84,6 +84,10 @@ static intptr_t write_copy(HANDLE file, const void *bytes, DWORD count) {
 
 static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
     uintptr_t a = args[0], b = args[1], c = args[2];
+    if (GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
+        fprintf(stderr, "trace nr=%llu args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
+                (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
+                (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     intptr_t result;
     if (nr_net(active, number, args, &result)) return result;
     if (nr_files(active, number, args, &result)) return result;
@@ -186,7 +190,7 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
         ExitProcess((UINT)a & 255);
     }
     if (number == SYS_GETPID) return (intptr_t)GetCurrentProcessId();
-    if (number == SYS_GETTID) return (intptr_t)GetCurrentThreadId();
+    if (number == SYS_GETTID) return (intptr_t)nr_current()->tid;
     if (number == SYS_BRK) {
         if (!a || a < active->heap_base || a - active->heap_base > 64 * 1024 * 1024)
             return (intptr_t)active->heap_break;
@@ -323,7 +327,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     if ((code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_PRIV_INSTRUCTION || code == EXCEPTION_ILLEGAL_INSTRUCTION) &&
         executable(pc) &&
         nr_memory(pc, 2, 0) && !memcmp((const void *)pc, "\xcd\x80", 2)) {
-        if (c->Eax == 173 && nr_current()->in_signal) {
+        if ((c->Eax == 119 || c->Eax == 173) && nr_current()->in_signal) {
             *c = nr_current()->saved_context; nr_current()->signal_mask = nr_current()->saved_mask; nr_current()->in_signal = 0;
             if (!nr_deliver_signal(active, c)) ExitProcess(124);
             return EXCEPTION_CONTINUE_EXECUTION;
@@ -418,7 +422,12 @@ int nr_run(NrRun *run) {
         bytes += n;
     }
     active = run;
+    wchar_t event_name[80];
+    swprintf(event_name, 80, L"Local\\dnf-native-terminate-%lu", GetCurrentProcessId());
+    run->terminate_event = CreateEventW(NULL, FALSE, FALSE, event_name);
+    if (!run->terminate_event) return 1;
     run->thread_count = 1;
+    run->threads[0].tid = GetCurrentProcessId();
     if (!nr_thread_init(run)) return 1;
     run->signal_code = VirtualAlloc(NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (!run->signal_code) return 1;
