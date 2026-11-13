@@ -50,6 +50,8 @@ typedef struct {
     unsigned char flock_mode[256];
     uintptr_t sockets[256];
     unsigned char nonblock[256];
+    uint64_t receive_timeout[256];
+    uint64_t send_timeout[256];
     NrWatch *epolls[256];
     NrVm vm[NR_VM_SLOTS];
     NrSignal actions[65];

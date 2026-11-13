@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "run.h"
+#include <limits.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -32,6 +33,18 @@ static intptr_t socket_error(void) {
 
 static intptr_t socket_io_error(void) {
     return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
+}
+
+static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout) {
+    if (!timeout) return 0;
+    if (timeout / 1000000 > LONG_MAX) return -22;
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(socket, &set);
+    struct timeval duration = {(long)(timeout / 1000000), (long)(timeout % 1000000)};
+    int ready = select(0, writing ? NULL : &set, writing ? &set : NULL, NULL, &duration);
+    if (ready == SOCKET_ERROR) return socket_error();
+    return ready ? 0 : -11;
 }
 
 static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
@@ -262,12 +275,21 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         size_t bytes = args[2] > 0x7ffff000 ? 0x7ffff000 : args[2];
         if (!nr_memory(args[1], bytes, receiving)) { *result = -14; return 1; }
         if (!bytes) { *result = 0; return 1; }
+        if (!run->nonblock[fd] &&
+            (receiving ? run->receive_timeout[fd] : run->send_timeout[fd]) > (uint64_t)(MAXDWORD - 1) * 1000) {
+            intptr_t waited = wait_socket(s, !receiving,
+                                          receiving ? run->receive_timeout[fd] : run->send_timeout[fd]);
+            if (waited) { *result = waited; return 1; }
+        }
         int r = receiving ? recv(s, (char *)args[1], (int)bytes, 0) : send(s, (const char *)args[1], (int)bytes, 0);
         *result = r == SOCKET_ERROR ? socket_io_error() : r; return 1;
     }
     if (number == CLOSE && !operation) {
         *result = closesocket(s) == 0 ? 0 : socket_error();
-        if (!*result) { run->file_access[fd] = 0; run->sockets[fd] = 0; run->nonblock[fd] = 0; }
+        if (!*result) {
+            run->file_access[fd] = 0; run->sockets[fd] = 0; run->nonblock[fd] = 0;
+            run->receive_timeout[fd] = run->send_timeout[fd] = 0;
+        }
         return 1;
     }
     if (number == FCNTL && !operation) {
@@ -302,14 +324,17 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
             intptr_t duration[2]; memcpy(duration, (const void *)args[3], sizeof(duration));
             if (duration[0] < 0 || duration[1] < 0 || duration[1] >= 1000000) { *result = -22; return 1; }
             uint64_t ms = (uint64_t)duration[0] * 1000 + ((uint64_t)duration[1] + 999) / 1000;
+            uint64_t microseconds = (uint64_t)duration[0] * 1000000 + (uint64_t)duration[1];
+            uint64_t *saved = args[2] == 20 ? &run->receive_timeout[fd] : &run->send_timeout[fd];
+            *saved = microseconds;
             if (ms > MAXDWORD - 1) {
-                fprintf(stderr, "socket timeout unsupported seconds=%lld microseconds=%lld\n",
-                        (long long)duration[0], (long long)duration[1]);
-                *result = -38; return 1;
+                *result = 0; return 1;
             }
             DWORD value = (DWORD)ms;
             int option = args[2] == 20 ? SO_RCVTIMEO : SO_SNDTIMEO;
-            *result = setsockopt(s, SOL_SOCKET, option, (const char *)&value, sizeof(value)) == 0 ? 0 : socket_error(); return 1;
+            *result = setsockopt(s, SOL_SOCKET, option, (const char *)&value, sizeof(value)) == 0 ? 0 : socket_error();
+            if (*result) *saved = 0;
+            return 1;
         }
         if (args[1] == 0 && args[2] == 1 && args[4] == 4) {
             if (!nr_memory(args[3], 4, 0)) { *result = -14; return 1; }

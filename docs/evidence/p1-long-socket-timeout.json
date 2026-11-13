@@ -1,0 +1,46 @@
+﻿{
+    "recorded_utc":  "2026-11-13T12:12:27Z",
+    "os":  "Windows-10-10.0.19044-SP0",
+    "scope":  "Long Linux socket timeout setter and blocking I/O adaptation; not service acceptance",
+    "implementation":  {
+                           "runtime/net.c":  "8c1e3db90f706c26995cb90209745fd506fea8e0739aa753d0cc370a8f8e24f1",
+                           "runtime/run.h":  "e685f8628a41fb6a3fb298f535b85992d46af25781cac09dd1b44c2a1e157262",
+                           "tests/net.c":  "b4949ee504da5c9c6373e49424c33806b3434e5d5425b9b95951008a34c8dfaa",
+                           "build/i686/dnf-host.exe":  "f0d39f2951350d271da347674459493e9aab2bf85d23e262650caceff8a8b1fc",
+                           "build/x86_64/dnf-host.exe":  "871e1c9cb8d98f13905eb57a11e535529fdc9e3c267942831086c10f5d0e041f"
+                       },
+    "checks":  {
+                   "python tools/build.py":  "passed: i686 and x86_64",
+                   "python tools/test_net.py":  "passed: both architectures, TCP/poll/100ms timeout and 31536000-second SO_RCVTIMEO setter",
+                   "python tools/test.py":  "passed: 19 original fixed-address mappings and 4 rejection checks",
+                   "python tools/test_entry.py":  "passed: both architectures",
+                   "python tools/test_files.py":  "passed: both architectures",
+                   "python tools/test_vm.py":  "passed: both architectures",
+                   "python tools/test_stun.py":  "passed: 50 verified UDP responses",
+                   "python tools/test_ld.py":  "passed: both architectures"
+               },
+    "original_game":  {
+                          "elf_sha256":  "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+                          "probe":  "build/probes/20261113T121047968634Z/game",
+                          "elapsed_seconds":  45.1,
+                          "forced_cleanup":  true,
+                          "syscall_gaps":  [
+
+                                           ],
+                          "runtime_gaps":  [
+                                               "ELF dependency snapshot failed: execution adaptation currently requires valid executable sections",
+                                               "network unsupported nr=102 op=1",
+                                               "network unsupported nr=54 op=4"
+                                           ],
+                          "timeout_diagnostic_absent":  true,
+                          "initialization_markers":  [
+                                                         "All DB Open Success",
+                                                         "Init GlobalData Success"
+                                                     ]
+                      },
+    "limitations":  [
+                        "The one-year timeout was validated at the setter boundary; the fixture resets to 100 ms before blocking so the test remains bounded.",
+                        "AF_UNIX, SIOCGIFHWADDR and DP2 packed-section adaptation remain explicit gaps.",
+                        "The game observation was stopped by the probe timeout and does not establish service readiness."
+                    ]
+}

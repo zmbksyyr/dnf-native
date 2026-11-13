@@ -95,3 +95,11 @@ Linux 库从官方 CentOS 7.9 元数据导入 glibc、libgcc、libstdc++、zlib 
 
 本阶段仍不等于服务就绪：game 观察由超时清理，业务初始化只记录到本次 probe 实际出现的标记；DP2/Lua/Frida、完整服务互通、Win7/Win11 和最终交付包继续等待后续阶段。
 补充复测：修正目录游标后，`20261113T113748756047Z`的 180 秒观察同时记录了 TSS `rc=0`、`Init GlobalData`、`Init HistoryLog`、`InitRDARScriptStringManager`，并进入 `Loading Monsters`；syscall gap 仍为空。长观察仍保留上段列出的网络诊断。
+
+## 2026-11-13 · 超长 socket 超时
+
+本阶段沿 game trace 中实际出现的 `SO_RCVTIMEO/SO_SNDTIMEO=31536000` 秒缺口补齐最小语义。Windows Winsock 的 `DWORD` 毫秒参数无法表示一年，runtime 现在保存超出该范围的 Linux timeval，并在阻塞读写前用 Winsock `select` 等待；可直接表示的短超时仍使用原有 `setsockopt` 路径，非阻塞 socket 不额外等待。关闭 socket 时同步清除记录。
+
+独立双架构网络样件先设置 31536000 秒接收超时并检查返回成功，再恢复 100 ms 验证真实 `EAGAIN` 等待和 TCP 往返；两架构均通过。45 秒的原版 game + DP2 preload 复测中，原有超长 timeout 诊断消失，数据库初始化进入 `All DB Open Success` 和 `Init GlobalData Success`；AF_UNIX、`SIOCGIFHWADDR` 以及 DP2 打包 ELF 节适配仍明确保留为缺口。
+
+证据见 [超长 socket 超时](evidence/p1-long-socket-timeout.json)。本阶段未将一年等待实际阻塞测试，样件在 setter 检查后恢复 100 ms，game 观察也由超时清理，因此不构成服务就绪或最终验收结论。

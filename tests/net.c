@@ -80,8 +80,9 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     }
     for (word i = 0; i < sizeof(reply); ++i) CHECK(reply[i] == expected[i]);
 
-    result timeout[] = {0, 100000}, before[2], after[2];
-    report[13] = (int)net(14, fd, 1, 20, (word)timeout, sizeof(timeout));
+    result timeout[] = {31536000, 0}, short_timeout[] = {0, 100000}, before[2], after[2];
+    CHECK(net(14, fd, 1, 20, (word)timeout, sizeof(timeout)) == 0);
+    report[13] = (int)net(14, fd, 1, 20, (word)short_timeout, sizeof(short_timeout));
     CHECK(report[13] == 0);
     CHECK(call(CLOCK, 1, (word)before, 0) == 0);
     report[9] = (int)call(READ, fd, (word)reply, 1);
