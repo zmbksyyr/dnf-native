@@ -122,3 +122,13 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 ? DP2 preload ? 10 ???????snapshot failure ? syscall gap ????DP2 ????????? `/proc/self/maps`?????????? maps ??????????????????
 
 ??? [readlink ? packed ELF](evidence/p1-readlink-packed.json)?
+
+## 2026-11-13 · `/proc/self/maps` 运行时映射快照
+
+本阶段沿 DP2 preload 的实际失败路径补齐 `/proc/self/maps`。打开该路径时，runtime 根据已加载 ELF 的 `PT_LOAD`、私有 ELF 依赖快照、匿名 VM 区域、heap 和 stack 生成一次只读快照；映射按 guest 地址排序，权限和文件偏移来自 ELF，依赖快照保留 guest 路径。合成文件支持 `read`、`lseek`、`fstat`、`fcntl` 标志查询和 `close`。
+
+双架构文件样件通过，`/proc/self/maps` 能打开、读取到 `/proc-test` 路径并关闭；此前 DP2 的 `cannot open maps` 已消失。完整回归 `test.py`、`test_vm.py`、`test_entry.py`、`test_ld.py`、`test_net.py`、`test_stun.py` 及文件检查均通过。
+
+最新 `python tools/probe_game.py --preload --timeout 3` 继续越过 maps 阶段，随后暴露 `nr=266`、`nr=270`、`nr=331`、`nr=42` 四个 syscall gap，并以 `0xc0000096` 结束；packed DP2 ELF 的适配仍是部分适配。因此本阶段只证明 maps 缺口已解决，不代表 DP2、Lua、Frida、game 服务或最终验收通过。探测未强制清理。
+
+证据见 [proc maps](evidence/p1-proc-maps.json)。开发环境为 Windows 10 x64 10.0.19044；构建、原始 ELF 哈希、命令、强制清理状态和后续 syscall 缺口均记录在证据文件中。

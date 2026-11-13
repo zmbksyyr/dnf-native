@@ -2,8 +2,9 @@
 #include <bcrypt.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-enum { NR_URANDOM = 16 };
+enum { NR_URANDOM = 16, NR_MAPS = 17 };
 
 static intptr_t file_error(void) {
     switch (GetLastError()) {
@@ -64,6 +65,7 @@ static int guest_path(NrRun *run, uintptr_t address, wchar_t *path) {
     return -36;
 }
 
+static void put16(unsigned char *bytes, size_t offset, uint16_t value) { memcpy(bytes + offset, &value, 2); }
 static void put32(unsigned char *bytes, size_t offset, uint32_t value) { memcpy(bytes + offset, &value, 4); }
 static void put64(unsigned char *bytes, size_t offset, uint64_t value) { memcpy(bytes + offset, &value, 8); }
 
@@ -240,6 +242,112 @@ static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, u
     return (intptr_t)used;
 }
 
+typedef struct {
+    uintptr_t start, end;
+    uint32_t flags;
+    uint64_t offset, inode;
+    const char *path;
+} NrMapRange;
+
+static int map_compare(const void *left, const void *right) {
+    const NrMapRange *a = left, *b = right;
+    return a->start > b->start ? 1 : a->start < b->start ? -1 : 0;
+}
+
+static size_t map_image_count(const NrElf *image) {
+    size_t count = 0;
+    if (!image->allocation) return 0;
+    for (unsigned i = 0; i < image->header->phnum; ++i)
+        if (image->programs[i].type == 1 && image->programs[i].memsz) ++count;
+    return count;
+}
+
+static void map_add_image(NrMapRange *ranges, size_t *count, const NrElf *image, const char *path) {
+    if (!image->allocation) return;
+    for (unsigned i = 0; i < image->header->phnum; ++i) {
+        const NrElfProgram *p = &image->programs[i];
+        if (p->type != 1 || !p->memsz) continue;
+        uintptr_t start = (image->bias + (uintptr_t)p->vaddr) & ~(uintptr_t)4095;
+        uintptr_t end = (image->bias + (uintptr_t)p->vaddr + (uintptr_t)p->memsz + 4095) & ~(uintptr_t)4095;
+        if (end <= start) continue;
+        ranges[*count] = (NrMapRange){start, end, p->flags & 7, p->offset & ~(uint64_t)4095, 1, path};
+        ++*count;
+    }
+}
+
+static void map_add_anonymous(NrMapRange *ranges, size_t *count, uintptr_t start, size_t size,
+                              uint32_t flags, const char *path) {
+    if (!start || !size) return;
+    start &= ~(uintptr_t)4095;
+    uintptr_t end = (start + size + 4095) & ~(uintptr_t)4095;
+    if (end > start) ranges[*count] = (NrMapRange){start, end, flags, 0, 0, path}, ++*count;
+}
+
+static char *maps_text(NrRun *run, size_t *size) {
+    char interpreter[4096] = {0};
+    for (unsigned i = 0; i < run->program.header->phnum; ++i) {
+        const NrElfProgram *p = &run->program.programs[i];
+        if (p->type == 3 && p->filesz && p->filesz < sizeof(interpreter) && p->offset <= run->program.file_size &&
+            p->filesz <= run->program.file_size - p->offset) {
+            memcpy(interpreter, run->program.file + p->offset, (size_t)p->filesz);
+            break;
+        }
+    }
+    size_t capacity = map_image_count(&run->program) + map_image_count(&run->interpreter) + 2;
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+        capacity += run->vm[i].image.allocation ? map_image_count(&run->vm[i].image) : run->vm[i].base ? 1 : 0;
+    if (!capacity) return NULL;
+    NrMapRange *ranges = HeapAlloc(GetProcessHeap(), 0, capacity * sizeof(*ranges));
+    if (!ranges) return NULL;
+    size_t count = 0;
+    map_add_image(ranges, &count, &run->program, run->argc ? run->argv[0] : NULL);
+    map_add_image(ranges, &count, &run->interpreter, interpreter[0] ? interpreter : NULL);
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
+        NrVm *v = &run->vm[i];
+        if (v->image.allocation) map_add_image(ranges, &count, &v->image, v->path);
+        else if (v->base) map_add_anonymous(ranges, &count, (uintptr_t)v->base, v->size, 6, NULL);
+    }
+    map_add_anonymous(ranges, &count, run->heap_base, run->heap_committed, 6, "[heap]");
+    map_add_anonymous(ranges, &count, run->stack_low, run->stack_high - run->stack_low, 6, "[stack]");
+    qsort(ranges, count, sizeof(*ranges), map_compare);
+    size_t output_capacity = count * 512 + 1, used = 0;
+    char *output = HeapAlloc(GetProcessHeap(), 0, output_capacity);
+    if (!output) { HeapFree(GetProcessHeap(), 0, ranges); return NULL; }
+    for (size_t i = 0; i < count; ++i) {
+        char permissions[5] = {
+            ranges[i].flags & 4 ? 'r' : '-', ranges[i].flags & 2 ? 'w' : '-',
+            ranges[i].flags & 1 ? 'x' : '-', 'p', 0
+        };
+        int written = _snprintf(output + used, output_capacity - used, "%llx-%llx %s %08llx 00:00 %llu%s%s\n",
+                                (unsigned long long)ranges[i].start, (unsigned long long)ranges[i].end,
+                                permissions, (unsigned long long)ranges[i].offset,
+                                (unsigned long long)ranges[i].inode,
+                                ranges[i].path ? " " : "", ranges[i].path ? ranges[i].path : "");
+        if (written < 0 || (size_t)written >= output_capacity - used) {
+            HeapFree(GetProcessHeap(), 0, output); HeapFree(GetProcessHeap(), 0, ranges); return NULL;
+        }
+        used += (size_t)written;
+    }
+    HeapFree(GetProcessHeap(), 0, ranges);
+    *size = used;
+    return output;
+}
+
+static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, int legacy) {
+    if (fd >= 256 || run->file_access[fd] != NR_MAPS) return -9;
+    if (!nr_memory(destination, legacy ? 64 : sizeof(void *) == 8 ? 144 : 96, 1)) return -14;
+    unsigned char bytes[144] = {0};
+#ifdef _WIN64
+    if (!legacy) { put64(bytes, 0, 1); put64(bytes, 8, 1); put64(bytes, 16, 1); put32(bytes, 24, 0100444); put32(bytes, 28, 1000); put32(bytes, 32, 1000); put64(bytes, 48, run->synthetic_sizes[fd]); put64(bytes, 56, 4096); }
+    else { put32(bytes, 0, 1); put32(bytes, 4, 1); put16(bytes, 8, 0100444); put16(bytes, 12, 1); put16(bytes, 16, 1000); put16(bytes, 18, 1000); put32(bytes, 20, (uint32_t)run->synthetic_sizes[fd]); put32(bytes, 24, 4096); }
+#else
+    if (!legacy) { put64(bytes, 0, 1); put32(bytes, 12, 1); put32(bytes, 16, 0100444); put32(bytes, 20, 1); put32(bytes, 24, 1000); put32(bytes, 28, 1000); put64(bytes, 44, run->synthetic_sizes[fd]); put32(bytes, 52, 4096); put64(bytes, 88, 1); }
+    else { put32(bytes, 0, 1); put32(bytes, 4, 1); put16(bytes, 8, 0100444); put16(bytes, 10, 1); put16(bytes, 12, 1000); put16(bytes, 14, 1000); put32(bytes, 20, (uint32_t)run->synthetic_sizes[fd]); put32(bytes, 24, 4096); put32(bytes, 28, (uint32_t)((run->synthetic_sizes[fd] + 511) / 512)); }
+#endif
+    memcpy((void *)destination, bytes, legacy ? 64 : sizeof(void *) == 8 ? 144 : 96);
+    return 0;
+}
+
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
     enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
@@ -308,7 +416,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FCNTL) {
-        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM)) { *result = -9; return 1; }
+        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM && run->file_access[a] != NR_MAPS)) { *result = -9; return 1; }
         if (b == 1) *result = run->descriptor_flags[a];
         else if (b == 2 && !(c & ~1u)) { run->descriptor_flags[a] = (unsigned char)c; *result = 0; }
         else if (run->file_access[a] == NR_URANDOM && b == 3) *result = run->nonblock[a] ? 0x800 : 0;
@@ -362,6 +470,22 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         wchar_t path[32768];
         *result = guest_path(run, a, path);
         if (*result) return 1;
+        if (number == OPEN && !wcscmp(path + wcslen(run->root), L"\\proc\\self\\maps")) {
+            if (b & ~(uintptr_t)0x80000) { *result = -13; return 1; }
+            unsigned fd;
+            for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
+            if (fd == 256) { *result = -24; return 1; }
+            size_t bytes = 0;
+            char *text = maps_text(run, &bytes);
+            if (!text) { *result = -12; return 1; }
+            run->synthetic_files[fd] = text;
+            run->synthetic_sizes[fd] = bytes;
+            run->synthetic_offsets[fd] = 0;
+            run->file_access[fd] = NR_MAPS;
+            run->descriptor_flags[fd] = (b & 0x80000) != 0;
+            *result = fd;
+            return 1;
+        }
         if (!wcscmp(path + wcslen(run->root), L"\\dev\\urandom")) {
             if (number == STAT) *result = stat_file(NULL, b, legacy);
             else if (number == ACCESS) *result = b & ~4u ? -38 : 0;
@@ -465,6 +589,32 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         } else {
             fprintf(stderr, "urandom unsupported nr=%llu\n", (unsigned long long)number);
             *result = -38;
+        }
+        return 1;
+    }
+    if (a < 256 && run->file_access[a] == NR_MAPS) {
+        if (number == CLOSE) {
+            HeapFree(GetProcessHeap(), 0, run->synthetic_files[a]);
+            run->synthetic_files[a] = NULL; run->synthetic_sizes[a] = 0; run->synthetic_offsets[a] = 0;
+            run->file_access[a] = 0; run->descriptor_flags[a] = 0;
+            *result = 0;
+        } else if (number == FSTAT) *result = synthetic_stat(run, a, b, legacy);
+        else if (number == LSEEK) {
+            int64_t offset = (int64_t)(intptr_t)b;
+            int64_t base = c == 1 ? (int64_t)run->synthetic_offsets[a] : c == 2 ? (int64_t)run->synthetic_sizes[a] : 0;
+            if (c > 2 || offset < -base || base + offset < 0) *result = -22;
+            else { run->synthetic_offsets[a] = (uint64_t)(base + offset); *result = (intptr_t)run->synthetic_offsets[a]; }
+        } else {
+            if (c > 0x7ffff000) c = 0x7ffff000;
+            if (!nr_memory(b, c, 1)) *result = -14;
+            else {
+                size_t available = run->synthetic_offsets[a] < run->synthetic_sizes[a] ?
+                    run->synthetic_sizes[a] - (size_t)run->synthetic_offsets[a] : 0;
+                size_t copied = c < available ? (size_t)c : available;
+                if (copied) memcpy((void *)b, run->synthetic_files[a] + run->synthetic_offsets[a], copied);
+                run->synthetic_offsets[a] += copied;
+                *result = (intptr_t)copied;
+            }
         }
         return 1;
     }

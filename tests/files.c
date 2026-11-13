@@ -76,6 +76,21 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
           executable[8] == 's' && executable[9] == 't' && executable[10] == 0x7f);
     CHECK(call(READLINK, (word)"/proc/self/exe", 1, 0) == 0);
     CHECK(call(READLINK, (word)"/proc/self/exe", 1, 1) == -14);
+    result maps = call(OPEN, (word)"/proc/self/maps", 0, 0);
+    CHECK(maps >= 0);
+    unsigned char map_bytes[512];
+    for (unsigned i = 0; i < sizeof(map_bytes); ++i) map_bytes[i] = 0;
+    result map_count = call(READ, maps, (word)map_bytes, sizeof(map_bytes) - 1);
+    CHECK(map_count > 0 && map_count < (result)sizeof(map_bytes));
+    unsigned map_path = 0;
+    for (result i = 0; i + 10 <= map_count; ++i) {
+        unsigned match = map_bytes[i] == '/';
+        for (unsigned j = 0; match && j < 10; ++j)
+            match = map_bytes[i + j] == (unsigned char)"/proc-test"[j];
+        if (match) map_path = 1;
+    }
+    CHECK(map_path && call(CLOSE, maps, 0, 0) == 0);
+
     result fd = call(OPEN, (word)"/sample", 2, 0);
     CHECK(fd >= 0);
     CHECK(call(IOCTL, fd, 0x5401, (word)stat) == -25);

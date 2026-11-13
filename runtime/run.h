@@ -33,6 +33,7 @@ typedef struct {
     unsigned char *mapped_pages; /* NULL means the entire guest range is mapped. */
     HANDLE source;
     HANDLE section; /* Real shared file view; NULL for VirtualAlloc regions. */
+    char *path; /* Guest pathname for /proc/self/maps, when this is a file image. */
     NrElf image;
 } NrVm;
 
@@ -45,6 +46,9 @@ typedef struct {
     char cwd[4096];
     HANDLE files[256];
     unsigned char file_access[256];
+    char *synthetic_files[256];
+    size_t synthetic_sizes[256];
+    uint64_t synthetic_offsets[256];
     unsigned char descriptor_flags[256];
     uint64_t directory_offset[256];
     unsigned char flock_mode[256];

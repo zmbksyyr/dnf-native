@@ -12,6 +12,31 @@ static int contains(uintptr_t base, size_t size, uintptr_t address, size_t bytes
     return base && address >= base && address - base <= size && bytes <= size - (address - base);
 }
 
+static char *guest_path_from_handle(NrRun *run, HANDLE file) {
+    wchar_t path[32768];
+    DWORD count = GetFinalPathNameByHandleW(file, path, 32768, FILE_NAME_NORMALIZED);
+    if (!count || count >= 32768) return NULL;
+    const wchar_t *host = path;
+    if (!wcsncmp(host, L"\\\\?\\", 4)) host += 4;
+    size_t root_length = wcslen(run->root);
+    if (_wcsnicmp(host, run->root, root_length) ||
+        (host[root_length] && host[root_length] != L'\\')) return NULL;
+    const wchar_t *relative = host + root_length;
+    while (*relative == L'\\') ++relative;
+    size_t length = wcslen(relative);
+    char *guest = HeapAlloc(GetProcessHeap(), 0, length + 2);
+    if (!guest) return NULL;
+    guest[0] = '/';
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, relative, (int)length,
+                             guest + 1, (int)length + 1, NULL, NULL)) {
+        HeapFree(GetProcessHeap(), 0, guest);
+        return NULL;
+    }
+    guest[length + 1] = 0;
+    for (char *p = guest; *p; ++p) if (*p == '\\') *p = '/';
+    return guest;
+}
+
 static int mapped(const NrVm *v, uintptr_t address, size_t length) {
     if (!v->mapped_pages) return 1;
     size_t first = (address - (uintptr_t)v->base) / 4096;
@@ -121,6 +146,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     if (!DuplicateHandle(GetCurrentProcess(), run->files[fd], GetCurrentProcess(), &v->source, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
         nr_elf_close(&v->image); return -5;
     }
+    v->path = guest_path_from_handle(run, run->files[fd]);
     v->base = v->image.allocation;
     v->size = v->image.allocation_size;
     fprintf(stderr, "ELF dependency private snapshot sha256=%s base=0x%llx bytes=%zu\n", v->image.sha256,
@@ -160,6 +186,7 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
             } else if (v->image.file) nr_elf_close(&v->image);
             else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
             if (v->source) CloseHandle(v->source);
+            if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
             if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
             memset(v, 0, sizeof(*v));
             *result = 0;

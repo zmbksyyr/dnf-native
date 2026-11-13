@@ -1,0 +1,59 @@
+{
+  "recorded_utc": "2026-11-13T13:29:16Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Minimal synthetic /proc/self/maps snapshot for the runtime process; not DP2, game, or service acceptance",
+  "implementation": {
+    "runtime/files.c": "e424190b4b7bfa617b7ae2b32e24cdba42eb086071abec4980356d17ef5ef2b4",
+    "runtime/run.h": "73b1fe5bfc669ced3c8d7f4ee72c5cf0f6e12eee5067191335ff986f2cd5a757",
+    "runtime/vm.c": "d52f1c1332d02558bcaff1244c1e422b8d32f9bdf6a43f62ef389748fe7d799f",
+    "tests/files.c": "ea323eea280910f182fdbec45937eaaebc07bb3ca97a2a8b799ae2c4dbd64ea9",
+    "build/i686/dnf-host.exe": "801de9fdd71b3fc645deade615343dc46b28ad945df63fd2fd1fb67983329800",
+    "build/x86_64/dnf-host.exe": "0c8279dc777a99a4806165e24c7308ff3e09f7f7cefc76f1738fc95f46696376"
+  },
+  "commands": [
+    "python tools/build.py",
+    "python tools/test_files.py",
+    "python tools/test.py",
+    "python tools/test_vm.py",
+    "python tools/test_entry.py",
+    "python tools/test_ld.py",
+    "python tools/test_net.py",
+    "python tools/test_stun.py",
+    "python tools/probe_game.py --preload --timeout 3"
+  ],
+  "checks": {
+    "build": "passed: i686 and x86_64",
+    "files": "passed: synthetic /proc/self/maps opens, reads, contains /proc-test, and closes on both architectures",
+    "regression": "passed: ELF mappings, VM, entry/syscalls, loader, network, and STUN checks",
+    "maps_contract": [
+      "ELF PT_LOAD ranges are sorted by guest address",
+      "permissions and page-aligned file offsets come from PT_LOAD flags",
+      "program, interpreter, private ELF snapshots, heap, stack, and anonymous VM ranges are represented",
+      "synthetic descriptor supports read, lseek, fstat, fcntl flags, and close"
+    ]
+  },
+  "original_inputs": {
+    "game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "dp2_libdp2_so_sha256": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+    "dp2_preload_sha256": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72"
+  },
+  "game_probe": {
+    "command": "python tools/probe_game.py --preload --timeout 3",
+    "exit_code": 125,
+    "forced_cleanup": false,
+    "maps_open_failure": "absent after this change",
+    "syscall_gaps": [
+      "syscall gap nr=266",
+      "syscall gap nr=270",
+      "syscall gap nr=331",
+      "syscall gap nr=42"
+    ],
+    "terminal_observation": "unhandled exception code=0xc0000096; packed DP2 image remains partially adapted"
+  },
+  "limitations": [
+    "The map snapshot is synthetic and does not claim Linux device or inode identity equivalence.",
+    "The DP2 preload probe still fails after later syscall and privileged-instruction gaps.",
+    "No service readiness, database acceptance, or final package acceptance is claimed.",
+    "No source, original asset, database, build output, or private log is included in this evidence file."
+  ]
+}
