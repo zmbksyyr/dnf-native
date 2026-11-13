@@ -140,3 +140,11 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 双架构文件、入口、syscall、VM、ELF 映射、加载器、网络和 STUN 回归均通过。最新 `python tools/probe_game.py --preload --timeout 3` 中此前的 4 个 syscall gap 已全部消失，也没有新的 gap 或 unhandled exception；进程运行到 3 秒观察窗口结束后被清理，尚未出现业务初始化标记，因此不代表 DP2、Lua、Frida、game 服务或最终验收通过。
 
 证据见 [i386 启动 syscall](evidence/p1-i386-startup-syscalls.json)。开发环境为 Windows 10 x64 10.0.19044；强制清理、原始输入哈希、构建哈希和未支持的 eventfd 限制均已记录。
+
+## 2026-11-13 · i386 `mremap` 与动态代码页权限
+
+沿带私有 MySQL 的原版 game + DP2 preload 复测，实际缺口是 i386 `mremap`（nr=163），而不是此前观察到的 `/proc/self/fd/8` 或 `/etc/localtime` 打开失败。runtime 为匿名映射补齐同进程可移动扩展、缩小和内容复制，并允许已映射匿名页按真实 `mprotect` 请求切换为可执行权限；只接受本次 trace 出现的 `MREMAP_MAYMOVE` 组合。独立 i386 VM 样件现在同时验证扩展后内容保留和匿名页执行，x86_64 行为保持原路径。
+
+清理后的双架构构建通过 `test.py`、`test_vm.py`、`test_files.py`、`test_net.py`、`test_entry.py`、`test_ld.py`、`test_stun.py` 和 `probe_manager.py`。同一台 Windows 10 x64 10.0.19044 上，game 复测运行约 63 秒、无 syscall gap，继续进入 Lua/Frida 加载；当前下一停止点是 Frida ELF（SHA-256 `8ca458e422deead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239`）section 12 的 Zydis 解码失败，guest 以 2 退出。没有跳过该检查或伪造插件加载成功。
+
+证据见 [i386 mremap 与动态代码](evidence/p1-i386-mremap-dynamic-code.json)。本阶段仍不代表 DP2、Frida、game 服务就绪或最终验收通过；Win7/Win11、完整 Lua/Frida 双向调用、服务互通、GUI 和交付包仍未验收。

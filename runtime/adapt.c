@@ -89,7 +89,7 @@ int nr_adapt(NrElf *elf, const char **error) {
             if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, elf->file + section->offset + offset,
                                                      (size_t)section->size - offset, &instruction, operands))) {
                 *error = "undecodable executable section; adaptation stopped";
-                fprintf(stderr, "decode gap section=%u pc=0x%llx file_offset=0x%llx remaining=%llu\n", s,
+                fprintf(stderr, "decode gap sha256=%s section=%u pc=0x%llx file_offset=0x%llx remaining=%llu\n", elf->sha256, s,
                         (unsigned long long)(elf->bias + section->addr + offset),
                         (unsigned long long)(section->offset + offset), (unsigned long long)(section->size - offset));
                 return 0;

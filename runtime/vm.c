@@ -154,13 +154,52 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     return (intptr_t)v->base;
 }
 
+#ifndef _WIN64
+static intptr_t remapping(NrRun *run, const uintptr_t args[6]) {
+    uintptr_t address = args[0], flags = args[3];
+    size_t old_size = (size_t)args[1], new_size = (size_t)args[2];
+    if (!address || !old_size || !new_size || (address & 4095) ||
+        old_size > SIZE_MAX - 4095 || new_size > SIZE_MAX - 4095 ||
+        flags != 1) return -22;
+    old_size = (old_size + 4095) & ~(size_t)4095;
+    new_size = (new_size + 4095) & ~(size_t)4095;
+    NrVm *v = NULL;
+    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+        if ((uintptr_t)run->vm[i].base == address) { v = &run->vm[i]; break; }
+    if (!v || v->size != old_size || v->section || v->image.file) return -22;
+    if (new_size <= old_size) {
+        if (new_size < old_size && !VirtualFree((void *)(address + new_size), old_size - new_size, MEM_DECOMMIT))
+            return -12;
+        v->size = new_size;
+        return (intptr_t)address;
+    }
+    void *replacement = VirtualAlloc(NULL, new_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (!replacement) return -12;
+    memcpy(replacement, (const void *)address, old_size);
+    if (!VirtualFree((void *)address, 0, MEM_RELEASE)) {
+        VirtualFree(replacement, 0, MEM_RELEASE);
+        return -12;
+    }
+    if (v->mapped_pages) {
+        HeapFree(GetProcessHeap(), 0, v->mapped_pages);
+        v->mapped_pages = NULL;
+    }
+    v->base = replacement;
+    v->size = new_size;
+    return (intptr_t)replacement;
+}
+#endif
+
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
     enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28};
 #else
-    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219};
+    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163};
 #endif
     if (number == MMAP) { *result = mapping(run, args); return 1; }
+#ifndef _WIN64
+    if (number == MREMAP) { *result = remapping(run, args); return 1; }
+#endif
     if (number != MPROTECT && number != MUNMAP && number != MADVISE) return 0;
     uintptr_t address = args[0];
     size_t length = args[1];
@@ -208,7 +247,7 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     for (unsigned i = 0; i < 2; ++i)
         if (contains((uintptr_t)images[i]->allocation, images[i]->allocation_size, address, length)) owned = 1;
     if (!owned) { *result = -12; return 1; }
-    if ((args[2] & ~7u) || ((args[2] & 4) && v && !v->image.file)) { *result = -38; return 1; }
+    if (args[2] & ~7u) { *result = -38; return 1; }
     if (v && !mapped(v, address, length)) { *result = -12; return 1; }
     DWORD old;
     if (v && !v->image.file && !args[2]) {
@@ -227,8 +266,18 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
         }
         *result = 0; return 1;
     }
-    if (v && !v->image.file && !v->section && args[2] && !VirtualAlloc((void *)address, length, MEM_COMMIT, protect(args[2]))) {
-        *result = -12; return 1;
+    if (v && !v->image.file && !v->section && args[2]) {
+        uintptr_t cursor = address, end = address + length;
+        while (cursor < end) {
+            MEMORY_BASIC_INFORMATION info;
+            if (!VirtualQuery((const void *)cursor, &info, sizeof(info))) { *result = -12; return 1; }
+            size_t bytes = info.RegionSize - (cursor - (uintptr_t)info.BaseAddress);
+            if (bytes > end - cursor) bytes = end - cursor;
+            if (info.State == MEM_RESERVE) {
+                if (!VirtualAlloc((void *)cursor, bytes, MEM_COMMIT, protect(args[2]))) { *result = -12; return 1; }
+            } else if (info.State != MEM_COMMIT) { *result = -12; return 1; }
+            cursor += bytes;
+        }
     }
     *result = VirtualProtect((void *)address, length, protect(args[2]), &old) ? 0 : -12;
     return 1;

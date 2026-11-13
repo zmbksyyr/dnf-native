@@ -21,7 +21,7 @@ static __attribute__((noinline)) result call6(word n, word a, word b, word c, wo
 #ifdef __x86_64__
 enum {WRITE = 1, MMAP = 9, MPROTECT = 10, MUNMAP = 11, EXIT = 60};
 #else
-enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, EXIT = 1};
+enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, MREMAP = 163, EXIT = 1};
 #endif
 
 static void check(int condition, word line) {
@@ -72,6 +72,24 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(data[0] == 0x27);
     CHECK(UNMAP(base, bytes) == 0);
     CHECK(PROTECT(base, bytes, 3) == -12);
+
+#ifndef __x86_64__
+    word remap = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);
+    CHECK(remap && remap < (word)-4095);
+    *(volatile unsigned char *)remap = 0x6b;
+    word grown = (word)call6(MREMAP, remap, page, 2 * page, 1, 0, 0);
+    CHECK(grown && grown < (word)-4095 && ((volatile unsigned char *)grown)[0] == 0x6b);
+    CHECK(UNMAP(grown, 2 * page) == 0);
+
+    word code = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);
+    CHECK(code && code < (word)-4095);
+    unsigned char *instructions = (unsigned char *)code;
+    instructions[0] = 0xb8; instructions[1] = 42; instructions[2] = 0;
+    instructions[3] = 0; instructions[4] = 0; instructions[5] = 0xc3;
+    CHECK(PROTECT(code, page, 5) == 0);
+    CHECK(((int (*)(void))code)() == 42);
+    CHECK(UNMAP(code, page) == 0);
+#endif
 
     const char passed[] = "anon-vm-ok\n";
     CHECK(call6(WRITE, 1, (word)passed, sizeof(passed) - 1, 0, 0, 0) == (result)(sizeof(passed) - 1));
