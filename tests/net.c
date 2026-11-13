@@ -28,9 +28,9 @@ static result net(unsigned operation, word a, word b, word c, word d, word e) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, CLOSE=3, POLL=7, CLOCK=228, EXIT=60};
+enum {READ=0, WRITE=1, CLOSE=3, IOCTL=16, POLL=7, CLOCK=228, EXIT=60};
 #else
-enum {READ=3, WRITE=4, CLOSE=6, POLL=168, CLOCK=265, EXIT=1};
+enum {READ=3, WRITE=4, CLOSE=6, IOCTL=54, POLL=168, CLOCK=265, EXIT=1};
 #endif
 
 static void check(int condition, word line) {
@@ -47,6 +47,10 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     int report[14] = {0}, one = 1;
     result fd = net(1, 2, 1, 0, 0, 0);
     CHECK(fd >= 0);
+    struct { char name[16]; unsigned short family; unsigned char address[14]; } ifr = {"eth0", 0, {0}};
+    CHECK(call(IOCTL, fd, 0x8927, (word)&ifr) == 0);
+    CHECK(ifr.family == 1 && (ifr.address[0] | ifr.address[1] | ifr.address[2] |
+                             ifr.address[3] | ifr.address[4] | ifr.address[5]) != 0);
     report[11] = (int)net(14, fd, 1, 9, (word)&one, sizeof(one));
     report[12] = (int)net(14, fd, 6, 1, (word)&one, sizeof(one));
     CHECK(report[11] == 0 && report[12] == 0);

@@ -1,0 +1,51 @@
+﻿{
+    "recorded_utc":  "2026-11-13T12:22:16Z",
+    "os":  "Windows-10-10.0.19044-SP0",
+    "scope":  "i386 SIOCGIFHWADDR compatibility for the actual game ioctl path; not service acceptance",
+    "implementation":  {
+                           "runtime/net.c":  "d5175bb658225f6e4dbf55872d43507243a4c480272a4de38adec4c5bb947945",
+                           "tools/build.py":  "f2a7fcf6f565c815bf3cbe55fed5cdce075c1d6f75acbb4df6a789544353adb5",
+                           "tests/net.c":  "f97a04b9030bb989bbe976eec7dfacaa1b71dd0c410c1a93f7e1a4860370ae7b",
+                           "build/i686/dnf-host.exe":  "ee61e055cdc237df73a4a9220909dc273ea5a319cdd97c78af23c1cb82071f8a",
+                           "build/x86_64/dnf-host.exe":  "b14c150a65d00cde6b69cf314fec4c121f1d6b22b7465bf39c66fff0a775dfc8"
+                       },
+    "checks":  {
+                   "python tools/build.py":  "passed: i686 and x86_64",
+                   "python tools/test_net.py":  "passed: both architectures, real SIOCGIFHWADDR response, TCP/poll/timeout",
+                   "python tools/test.py":  "passed: 19 original fixed-address mappings and 4 rejection checks",
+                   "python tools/test_entry.py":  "passed: both architectures",
+                   "python tools/test_files.py":  "passed: both architectures",
+                   "python tools/test_vm.py":  "passed: both architectures",
+                   "python tools/test_stun.py":  "passed: 50 verified UDP responses",
+                   "python tools/test_ld.py":  "passed: both architectures"
+               },
+    "ioctl_fixture":  {
+                          "request":  "0x8927",
+                          "interface":  "eth0",
+                          "result":  0,
+                          "family":  "ARPHRD_ETHER (1)",
+                          "mac":  "real Windows adapter address",
+                          "architectures":  [
+                                                "i686",
+                                                "x86_64"
+                                            ]
+                      },
+    "game_probe":  {
+                       "probe":  "build/probes/20261113T122033387589Z/game",
+                       "elapsed_seconds":  45.1,
+                       "forced_cleanup":  false,
+                       "syscall_gaps":  [
+
+                                        ],
+                       "runtime_gaps":  [
+                                            "ELF dependency snapshot failed: execution adaptation currently requires valid executable sections",
+                                            "network unsupported nr=102 op=1"
+                                        ],
+                       "ioctl_gap_absent":  true,
+                       "scope":  "The run ended before a new SIOCGIFHWADDR call; the fixture is the direct coverage for this ioctl."
+                   },
+    "limitations":  [
+                        "The implementation selects the first Windows adapter exposing a six-byte hardware address; AF_UNIX NSS and DP2 packed-section adaptation remain separate gaps.",
+                        "The game probe does not establish service readiness."
+                    ]
+}

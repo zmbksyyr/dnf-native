@@ -103,3 +103,11 @@ Linux 库从官方 CentOS 7.9 元数据导入 glibc、libgcc、libstdc++、zlib 
 独立双架构网络样件先设置 31536000 秒接收超时并检查返回成功，再恢复 100 ms 验证真实 `EAGAIN` 等待和 TCP 往返；两架构均通过。45 秒的原版 game + DP2 preload 复测中，原有超长 timeout 诊断消失，数据库初始化进入 `All DB Open Success` 和 `Init GlobalData Success`；AF_UNIX、`SIOCGIFHWADDR` 以及 DP2 打包 ELF 节适配仍明确保留为缺口。
 
 证据见 [超长 socket 超时](evidence/p1-long-socket-timeout.json)。本阶段未将一年等待实际阻塞测试，样件在 setter 检查后恢复 100 ms，game 观察也由超时清理，因此不构成服务就绪或最终验收结论。
+
+## 2026-11-13 · SIOCGIFHWADDR 实际网卡查询
+
+本阶段补齐 trace 中确认的 i386 `ioctl(0x8927)`，即 Linux `SIOCGIFHWADDR`。runtime 通过 Windows `GetAdaptersInfo` 取得真实六字节适配器地址，按 Linux `ifreq` 布局写入 `ARPHRD_ETHER` 和 MAC；没有可用硬件地址时返回 `ENODEV`，不伪造成功。构建显式加入系统自带 `iphlpapi`，没有引入第三方依赖。
+
+双架构网络样件均验证 `eth0` 请求返回真实 MAC、地址族为 1，同时继续通过 TCP、poll、短超时和超长超时 setter 检查。带私有数据库的 45 秒 game 复测未产生新的 `SIOCGIFHWADDR` 缺口；该次在更早的 NSS AF_UNIX 路径结束，故 ioctl 样件是本阶段的直接覆盖，不能据此宣称 game 服务就绪。AF_UNIX 和 DP2 打包 ELF 适配仍保留为下一阶段缺口。
+
+证据见 [SIOCGIFHWADDR](evidence/p1-sio-ifhwaddr.json)。

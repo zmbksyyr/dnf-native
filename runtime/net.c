@@ -1,6 +1,7 @@
 #define FD_SETSIZE 256
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <iphlpapi.h>
 #include "run.h"
 #include <limits.h>
 #include <string.h>
@@ -45,6 +46,24 @@ static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout) {
     int ready = select(0, writing ? NULL : &set, writing ? &set : NULL, NULL, &duration);
     if (ready == SOCKET_ERROR) return socket_error();
     return ready ? 0 : -11;
+}
+
+static int interface_mac(unsigned char mac[6]) {
+    ULONG bytes = 0;
+    if (GetAdaptersInfo(NULL, &bytes) != ERROR_BUFFER_OVERFLOW || !bytes) return 0;
+    PIP_ADAPTER_INFO adapters = HeapAlloc(GetProcessHeap(), 0, bytes);
+    if (!adapters) return 0;
+    int found = 0;
+    if (GetAdaptersInfo(adapters, &bytes) == ERROR_SUCCESS) {
+        for (PIP_ADAPTER_INFO adapter = adapters; adapter; adapter = adapter->Next) {
+            if (adapter->AddressLength != 6) continue;
+            memcpy(mac, adapter->Address, 6);
+            found = 1;
+            break;
+        }
+    }
+    HeapFree(GetProcessHeap(), 0, adapters);
+    return found;
 }
 
 static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
@@ -302,6 +321,18 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         return 1;
     }
     if (number == IOCTL && !operation) {
+        if (args[1] == 0x8927) {
+            if (!nr_memory(args[2], 32, 1)) { *result = -14; return 1; }
+            unsigned char mac[6];
+            if (!interface_mac(mac)) { *result = -19; return 1; }
+            unsigned char *request = (unsigned char *)args[2];
+            memset(request + 16, 0, 16);
+            uint16_t family = 1; /* ARPHRD_ETHER */
+            memcpy(request + 16, &family, sizeof(family));
+            memcpy(request + 18, mac, 6);
+            *result = 0;
+            return 1;
+        }
         if (args[1] != 0x5421 || !nr_memory(args[2], 4, 0)) { *result = args[1] == 0x5421 ? -14 : -38; return 1; }
         u_long mode; memcpy(&mode, (const void *)args[2], 4); mode = mode != 0;
         *result = ioctlsocket(s, FIONBIO, &mode) == 0 ? 0 : socket_error();
