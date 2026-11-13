@@ -29,10 +29,10 @@ static result call6(word n, word a, word b, word c, word d, word e, word f) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, EXIT=60,
+enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
       FLOCK=73, IOCTL=16, MMAP=9, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
-enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, EXIT=1,
+enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
       FLOCK=143, IOCTL=54, MMAP=192, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
@@ -90,6 +90,22 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         if (match) map_path = 1;
     }
     CHECK(map_path && call(CLOSE, maps, 0, 0) == 0);
+
+    int pipe_fds[2];
+    unsigned char pipe_bytes[8] = {0};
+    CHECK(call(PIPE2, (word)pipe_fds, 0x80800, 0) == 0);
+    int nonblock = 1;
+    CHECK(call(IOCTL, pipe_fds[0], 0x5451, 0) == 0);
+    CHECK(call(IOCTL, pipe_fds[0], 0x5421, (word)&nonblock) == 0);
+    CHECK(call(READ, pipe_fds[0], (word)pipe_bytes, 1) == -11);
+    CHECK(call(WRITE, pipe_fds[1], (word)"pipe-ok\n", 8) == 8);
+    CHECK(call(READ, pipe_fds[0], (word)pipe_bytes, sizeof(pipe_bytes)) == 8);
+    CHECK(pipe_bytes[0] == 'p' && pipe_bytes[7] == '\n');
+    CHECK(call(CLOSE, pipe_fds[0], 0, 0) == 0 && call(CLOSE, pipe_fds[1], 0, 0) == 0);
+    CHECK(call(PIPE, (word)pipe_fds, 0, 0) == 0);
+    CHECK(call(WRITE, pipe_fds[1], (word)"pipe-ok\n", 8) == 8);
+    CHECK(call(READ, pipe_fds[0], (word)pipe_bytes, sizeof(pipe_bytes)) == 8);
+    CHECK(call(CLOSE, pipe_fds[0], 0, 0) == 0 && call(CLOSE, pipe_fds[1], 0, 0) == 0);
 
     result fd = call(OPEN, (word)"/sample", 2, 0);
     CHECK(fd >= 0);

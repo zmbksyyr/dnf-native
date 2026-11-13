@@ -30,9 +30,9 @@ static volatile word received;
 static void handler(int signal) { received = (word)signal; }
 
 #ifdef __x86_64__
-enum {WRITE = 1, WRITEV = 20, BRK = 12, EXIT = 60, GETRLIMIT = 97, SETRLIMIT = 160};
+enum {WRITE = 1, WRITEV = 20, BRK = 12, EXIT = 60, GETRLIMIT = 97, SETRLIMIT = 160, CLOCK_GETRES = 229, TGKILL = 234};
 #else
-enum {WRITE = 4, WRITEV = 146, BRK = 45, EXIT = 1, GETRLIMIT = 191, SETRLIMIT = 75};
+enum {WRITE = 4, WRITEV = 146, BRK = 45, EXIT = 1, GETRLIMIT = 191, SETRLIMIT = 75, CLOCK_GETRES = 266, TGKILL = 270};
 #endif
 
 static void check(int condition, word line) {
@@ -55,6 +55,9 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(WRITEV, 1, 1, 1) == -14);
     CHECK(call(WRITEV, 1, (word)v, (word)-1) == -22);
     CHECK(call(WRITEV, 1, (word)v, 3) == 10);
+
+    word resolution[2] = {0, 0};
+    CHECK(call(CLOCK_GETRES, 1, (word)resolution, 0) == 0 && resolution[0] == 0 && resolution[1] > 0);
 
     word limits[2] = {1, 1};
     CHECK(call(GETRLIMIT, 4, (word)limits, 0) == 0 && limits[0] == 0 && limits[1] == 0);
@@ -97,9 +100,9 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(loaded == 123 && tls[2] == 130);
     word action[5] = {(word)handler, 0, 0, 0, 0};
 #ifdef __x86_64__
-    enum {ACTION = 13, MASK = 14, KILL = 62, GETPID = 39};
+    enum {ACTION = 13, MASK = 14, KILL = 62, GETPID = 39, GETTID = 186};
 #else
-    enum {ACTION = 174, MASK = 175, KILL = 37, GETPID = 20};
+    enum {ACTION = 174, MASK = 175, KILL = 37, GETPID = 20, GETTID = 224};
 #endif
     CHECK(call4(ACTION, 15, (word)action, 0, 8) == 0);
     unsigned long long mask = 1ULL << 14;
@@ -107,6 +110,8 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(KILL, (word)call(GETPID, 0, 0, 0), 15, 0) == 0);
     CHECK(received == 0);
     CHECK(call4(MASK, 1, (word)&mask, 0, 8) == 0);
+    CHECK(received == 15);
+    CHECK(call(TGKILL, (word)call(GETPID, 0, 0, 0), (word)call(GETTID, 0, 0, 0), 15) == 0);
     CHECK(received == 15);
     call(EXIT, 42, 0, 0);
     __builtin_unreachable();

@@ -102,11 +102,35 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
 #else
     enum {SYS_TIME = 13, SYS_GETTIMEOFDAY = 78, SYS_GETRLIMIT = 191, SYS_TIMES = 43, SYS_NANOSLEEP = 162, SYS_CLOCK_GETTIME = 265};
 #endif
+    if (number ==
+#ifdef _WIN64
+        229
+#else
+        266
+#endif
+    ) {
+        uint64_t nanoseconds;
+        if (a == 0) {
+            nanoseconds = 1;
+        } else if (a == 5 || a == 6) {
+            nanoseconds = 1000000;
+        } else if (a == 1) {
+            LARGE_INTEGER rate;
+            if (!QueryPerformanceFrequency(&rate)) return -5;
+            nanoseconds = (1000000000ULL + (uint64_t)rate.QuadPart - 1) / (uint64_t)rate.QuadPart;
+        } else return -38;
+        if (b) {
+            if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;
+            uintptr_t values[] = {(uintptr_t)(nanoseconds / 1000000000), (uintptr_t)(nanoseconds % 1000000000)};
+            memcpy((void *)b, values, sizeof(values));
+        }
+        return 0;
+    }
     if (number == SYS_CLOCK_GETTIME) {
-        if (a > 1) return -38;
+        if (a != 0 && a != 1 && a != 5 && a != 6) return -38;
         if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;
         uint64_t ticks, frequency;
-        if (!a) {
+        if (a == 0 || a == 5) {
             FILETIME time; GetSystemTimeAsFileTime(&time);
             ticks = (((uint64_t)time.dwHighDateTime << 32) | time.dwLowDateTime) - 116444736000000000ULL;
             frequency = 10000000;

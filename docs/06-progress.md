@@ -132,3 +132,11 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 最新 `python tools/probe_game.py --preload --timeout 3` 继续越过 maps 阶段，随后暴露 `nr=266`、`nr=270`、`nr=331`、`nr=42` 四个 syscall gap，并以 `0xc0000096` 结束；packed DP2 ELF 的适配仍是部分适配。因此本阶段只证明 maps 缺口已解决，不代表 DP2、Lua、Frida、game 服务或最终验收通过。探测未强制清理。
 
 证据见 [proc maps](evidence/p1-proc-maps.json)。开发环境为 Windows 10 x64 10.0.19044；构建、原始 ELF 哈希、命令、强制清理状态和后续 syscall 缺口均记录在证据文件中。
+
+## 2026-11-13 · i386 启动 syscall 路径
+
+本阶段沿 DP2 preload 的最新 trace 补齐 i386 `clock_getres`、`pipe2`、`pipe` 和当前线程 `tgkill`。匿名管道使用 Windows pipe，支持 close-on-exec、nonblock、`FIOCLEX`、`FIONBIO` 和空管道读取的 `EAGAIN`；`clock_getres` 返回 Linux 对应时钟分辨率；`tgkill` 只覆盖当前 runtime 进程和当前 guest 线程，其他目标明确返回错误。`eventfd/eventfd2` 保持明确 `ENOSYS`，让 glibc 使用已观察到的 pipe fallback。
+
+双架构文件、入口、syscall、VM、ELF 映射、加载器、网络和 STUN 回归均通过。最新 `python tools/probe_game.py --preload --timeout 3` 中此前的 4 个 syscall gap 已全部消失，也没有新的 gap 或 unhandled exception；进程运行到 3 秒观察窗口结束后被清理，尚未出现业务初始化标记，因此不代表 DP2、Lua、Frida、game 服务或最终验收通过。
+
+证据见 [i386 启动 syscall](evidence/p1-i386-startup-syscalls.json)。开发环境为 Windows 10 x64 10.0.19044；强制清理、原始输入哈希、构建哈希和未支持的 eventfd 限制均已记录。

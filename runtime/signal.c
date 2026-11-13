@@ -3,11 +3,11 @@
 #include <string.h>
 
 #ifdef _WIN64
-enum {ACTION = 13, MASK = 14, KILL = 62};
+enum {ACTION = 13, MASK = 14, KILL = 62, TGKILL = 234};
 #define PC(c) ((c)->Rip)
 #define SP(c) ((c)->Rsp)
 #else
-enum {ACTION = 174, MASK = 175, KILL = 37};
+enum {ACTION = 174, MASK = 175, KILL = 37, TGKILL = 270};
 #define PC(c) ((c)->Eip)
 #define SP(c) ((c)->Esp)
 #endif
@@ -15,6 +15,12 @@ enum {ACTION = 174, MASK = 175, KILL = 37};
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
     NrThread *thread = nr_current();
     uintptr_t a = args[0], b = args[1], c = args[2];
+    if (number == TGKILL) {
+        if (!a || !b || a != GetCurrentProcessId() || b != thread->tid) { *result = -3; return 1; }
+        if (c > 64) { *result = -22; return 1; }
+        if (c) run->signal_pending |= 1ULL << (c - 1);
+        *result = 0; return 1;
+    }
     if (number == ACTION) {
         if (args[3] != 8 || !a || a > 64 || (b && (a == 9 || a == 19))) { *result = -22; return 1; }
         size_t bytes = 3 * sizeof(uintptr_t) + 8;

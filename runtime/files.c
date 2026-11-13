@@ -13,6 +13,7 @@ static intptr_t file_error(void) {
         case ERROR_INVALID_HANDLE: return -9;
         case ERROR_DIRECTORY: return -20;
         case ERROR_ALREADY_EXISTS: case ERROR_FILE_EXISTS: return -17;
+        case ERROR_BROKEN_PIPE: return -32;
         default: return -5;
     }
 }
@@ -355,6 +356,30 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
+#ifdef _WIN64
+    enum {PIPE = 22, PIPE2 = 293, EVENTFD = 284, EVENTFD2 = 290};
+#else
+    enum {PIPE = 42, PIPE2 = 331, EVENTFD = 323, EVENTFD2 = 328};
+#endif
+    if (number == PIPE || number == PIPE2) {
+        if (!nr_memory(a, 2 * sizeof(int32_t), 1)) { *result = -14; return 1; }
+        uintptr_t flags = number == PIPE2 ? b : 0;
+        if (flags & ~(uintptr_t)0x80800) { *result = -38; return 1; }
+        unsigned read_fd = 0, write_fd;
+        while (read_fd < 256 && run->file_access[read_fd]) ++read_fd;
+        for (write_fd = read_fd + 1; write_fd < 256 && run->file_access[write_fd]; ++write_fd) {}
+        if (write_fd >= 256) { *result = -24; return 1; }
+        HANDLE reader, writer;
+        if (!CreatePipe(&reader, &writer, NULL, 4096)) { *result = file_error(); return 1; }
+        run->files[read_fd] = reader; run->files[write_fd] = writer;
+        run->file_access[read_fd] = 1; run->file_access[write_fd] = 2;
+        run->descriptor_flags[read_fd] = run->descriptor_flags[write_fd] = (flags & 0x80000) != 0;
+        run->nonblock[read_fd] = run->nonblock[write_fd] = (flags & 0x800) != 0;
+        int32_t fds[] = {(int32_t)read_fd, (int32_t)write_fd};
+        memcpy((void *)a, fds, sizeof(fds));
+        *result = 0; return 1;
+    }
+    if (number == EVENTFD || number == EVENTFD2) { *result = -38; return 1; }
     int legacy = 0;
 #ifndef _WIN64
     if (number == 221) number = FCNTL;
@@ -376,6 +401,16 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     if (number == IOCTL && a < 256 && run->file_access[a] && run->file_access[a] != 4 && b == 0x5401) {
         *result = -25; /* TCGETS on a regular file/pipe is ENOTTY. */
         return 1;
+    }
+    if (number == IOCTL && a < 256 && run->files[a] && run->file_access[a] != 4) {
+        if (b == 0x5451) { /* FIOCLEX */
+            run->descriptor_flags[a] = 1; *result = 0; return 1;
+        }
+        if (b == 0x5421) { /* FIONBIO */
+            if (!nr_memory(c, 4, 0)) { *result = -14; return 1; }
+            uint32_t mode; memcpy(&mode, (const void *)c, 4);
+            run->nonblock[a] = mode != 0; *result = 0; return 1;
+        }
     }
     if (number == READLINK) {
         char path[4096];
@@ -634,8 +669,16 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (!(run->file_access[a] & 1)) { *result = -9; return 1; }
         if (c > 0x7ffff000) c = 0x7ffff000;
         if (!nr_memory(b, c, 1)) { *result = -14; return 1; }
+        if (run->nonblock[a] && c) {
+            DWORD available = 0;
+            if (!PeekNamedPipe(file, NULL, 0, NULL, &available, NULL)) {
+                *result = file_error(); return 1;
+            }
+            if (!available) { *result = -11; return 1; }
+        }
         DWORD count = 0;
-        *result = ReadFile(file, (void *)b, (DWORD)c, &count, NULL) ? (intptr_t)count : file_error();
+        *result = ReadFile(file, (void *)b, (DWORD)c, &count, NULL) ? (intptr_t)count :
+                  GetLastError() == ERROR_BROKEN_PIPE ? 0 : file_error();
     }
     return 1;
 }
