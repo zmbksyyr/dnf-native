@@ -30,9 +30,9 @@ static volatile word received;
 static void handler(int signal) { received = (word)signal; }
 
 #ifdef __x86_64__
-enum {WRITE = 1, WRITEV = 20, BRK = 12, EXIT = 60};
+enum {WRITE = 1, WRITEV = 20, BRK = 12, EXIT = 60, GETRLIMIT = 97, SETRLIMIT = 160};
 #else
-enum {WRITE = 4, WRITEV = 146, BRK = 45, EXIT = 1};
+enum {WRITE = 4, WRITEV = 146, BRK = 45, EXIT = 1, GETRLIMIT = 191, SETRLIMIT = 75};
 #endif
 
 static void check(int condition, word line) {
@@ -55,6 +55,14 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(WRITEV, 1, 1, 1) == -14);
     CHECK(call(WRITEV, 1, (word)v, (word)-1) == -22);
     CHECK(call(WRITEV, 1, (word)v, 3) == 10);
+
+    word limits[2] = {1, 1};
+    CHECK(call(GETRLIMIT, 4, (word)limits, 0) == 0 && limits[0] == 0 && limits[1] == 0);
+    CHECK(call(SETRLIMIT, 4, (word)limits, 0) == 0);
+    limits[0] = 1;
+    CHECK(call(SETRLIMIT, 4, (word)limits, 0) == -22);
+    limits[1] = 1;
+    CHECK(call(SETRLIMIT, 4, (word)limits, 0) == -38);
 
     word base = (word)call(BRK, 0, 0, 0);
     CHECK(base != 0 && (base & 4095) == 0);

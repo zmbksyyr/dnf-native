@@ -161,15 +161,25 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
 #else
     if (number == 75) {
 #endif
-        /* RLIMIT_CORE is queried by the original TSS startup path. The
-           Windows host keeps the guest limit in its ABI boundary only. */
-        if (a != 3 && a != 4 && a != 7) return -38;
         if (!nr_memory(b, 2 * sizeof(uintptr_t), 0)) return -14;
-        return 0;
+        uintptr_t limits[2]; memcpy(limits, (const void *)b, sizeof(limits));
+        if (limits[0] > limits[1]) return -22;
+        /* Only the current enforced limits can be retained. Core files are
+           disabled; stack/fd resizing and Linux core generation are unsupported. */
+        uintptr_t limit;
+        if (a == 3) limit = NR_STACK_BYTES;
+        else if (a == 4) limit = 0;
+        else if (a == 7) limit = 256;
+        else return -38;
+        if (limits[0] == limit && limits[1] == limit) return 0;
+        fprintf(stderr, "setrlimit unsupported resource=%llu soft=%llu hard=%llu\n",
+                (unsigned long long)a, (unsigned long long)limits[0], (unsigned long long)limits[1]);
+        return -38;
     }
     if (number == SYS_GETRLIMIT) {
         uintptr_t limit;
         if (a == 3) limit = NR_STACK_BYTES;
+        else if (a == 4) limit = 0;
         else if (a == 7) limit = 256;
         else return -38;
         if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;

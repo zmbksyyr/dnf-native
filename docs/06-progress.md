@@ -94,3 +94,4 @@ Linux 库从官方 CentOS 7.9 元数据导入 glibc、libgcc、libstdc++、zlib 
 原版 i386 game 在 Windows 10 x64 10.0.19044 上观察 180 秒，无 syscall gap；较短复现中 TSS 日志出现 `DPBillAdapter reload successful` 和 `In AntibotInterface::Initialize, rc=0`，私有 root 生成 `dev/shm/sec/tss_sdk_bus_1` 与 `dev/shm/TSS_43_1.STAT`。此前唯一目录缺口 `getdents64 nr=220` 已补齐。长观察仍保留 AF_UNIX、部分 socket option 和超长 socket timeout 的诊断；这些路径当前未宣称完整支持。
 
 本阶段仍不等于服务就绪：game 观察由超时清理，业务初始化只记录到本次 probe 实际出现的标记；DP2/Lua/Frida、完整服务互通、Win7/Win11 和最终交付包继续等待后续阶段。
+补充复测：修正目录游标后，`20261113T113748756047Z`的 180 秒观察同时记录了 TSS `rc=0`、`Init GlobalData`、`Init HistoryLog`、`InitRDARScriptStringManager`，并进入 `Loading Monsters`；syscall gap 仍为空。长观察仍保留上段列出的网络诊断。

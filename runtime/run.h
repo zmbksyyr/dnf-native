@@ -46,6 +46,7 @@ typedef struct {
     HANDLE files[256];
     unsigned char file_access[256];
     unsigned char descriptor_flags[256];
+    uint64_t directory_offset[256];
     unsigned char flock_mode[256];
     uintptr_t sockets[256];
     unsigned char nonblock[256];

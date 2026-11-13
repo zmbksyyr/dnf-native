@@ -1,38 +1,44 @@
 {
-  "recorded_utc": "2026-11-13T10:56:00Z",
+  "recorded_utc": "2026-11-13T11:41:00Z",
   "os": "Windows-10-10.0.19044-SP0",
   "scope": "P1 runtime file mappings and the original game TSS shared-memory startup path; not service acceptance",
   "implementation": {
-    "runtime\\files.c": "78af1574fc7514a09e7a04a19d0334e703ba919f08ab7b67f6713ce85a0ac828",
+    "runtime\\files.c": "5aa5ec1d946c171e0005ca8273557aa9a1aba7e4e1b59c80bf7def12a1b0ad69",
     "runtime\\vm.c": "da0cffa45565a3b4ad76724efd2aa976395eca205fbc0f0d421239de5c4ef656",
-    "runtime\\run.c": "a7a3f3efa09529ccda3b0b9cf7999773a27deed52cea02415cd6775198026842",
-    "runtime\\run.h": "0fe82665d97076e7388485974f980a3eb6ab0616b4d212b978e2da59a7058a5e",
-    "tests\\files.c": "88509cc1ef313f0b26a1ad81e9f5ae998428b18563c369e6351dbc64a2c503a5",
-    "tools\\test_files.py": "56704cea422e31f2f60e0c6cf51d5a04e24802d9656b4bdc51a2c3e6a63caca4",
+    "runtime\\run.c": "5feab3a0ab0c126266d932eb49bd852855588bd31f0ccb922a73b72f8fa5592e",
+    "runtime\\run.h": "8a97171b0fbcf26c5189154f8bf7646a029ca8fad5d5f980b1458b96ea8982c9",
+    "tests\\files.c": "cb454af68a9cfadf250c8e8003dc155bb055a64b8899109c5fb13ab63059ef0b",
+    "tools\\test_files.py": "6587f3279414f13d061af8d0d71ed464051f19e87585637f9ba7aa2cc588581e",
     "tools\\probe_game.py": "4dd0bb708328c7919f85fc77c72d831cb341948f9a56b8d2f9d1a94edff07eee",
     "host_sha256": {
-      "i686": "6cbe13f4c853efc31df250b52f3f6c8a309f9a6e11dc267faf776ccb360d413a",
-      "x86_64": "264ba8212172cdefb0981abc87e5c55c24024851e89a5d2809fbd9962082ce5a"
+      "i686": "9dceeb681732d2eb6b2abb104281329ab3abcef6403bcb36ae7826aa9ec03502",
+      "x86_64": "d28183567fd5175bec83a4eaad9b7f300c6374cd2e4c75721fd09cc8c7137069"
     }
   },
   "checks": {
     "python tools/build.py": "passed",
     "python tools/test.py": "passed: 19 original fixed-address mappings and 4 rejection checks",
-    "python tools/test_entry.py": "passed: both architectures",
+    "python tools/test_entry.py": "passed: both architectures, including RLIMIT and syscall fixtures",
     "python tools/test_ld.py": "passed: usage and missing-program checks for both architectures",
     "python tools/test_vm.py": "passed: both architectures",
-    "python tools/test_files.py": "passed: shared file write survives close/unmap/reopen on both architectures",
+    "python tools/test_files.py": "passed: pagination/EOF/rewind, stable directory records, file identity, and live shared aliases on both architectures",
     "python tools/test_net.py": "passed: both architectures",
     "python tools/test_stun.py": "passed: 50 verified UDP responses",
     "python tools/probe_manager.py": "passed: initialization markers present, no syscall gaps"
   },
   "original_game": {
     "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
-    "probe": "build/probes/20261113T105126421477Z/game",
-    "elapsed_seconds": 180.121,
+    "probe": "build/probes/20261113T113748756047Z/game",
+    "elapsed_seconds": 180.136,
     "forced_cleanup": true,
     "syscall_gaps": [],
-    "initialization_markers": ["All DB Open Success", "Init Query Table Success"],
+    "initialization_markers": [
+      "All DB Open Success",
+      "Init Query Table Success",
+      "Init GlobalData Success",
+      "Init HistoryLog Success",
+      "InitRDARScriptStringManager Success"
+    ],
     "runtime_gaps": [
       "network unsupported nr=102 op=1",
       "network unsupported nr=102 op=14",
@@ -40,7 +46,7 @@
       "socket timeout unsupported seconds=31536000 microseconds=0"
     ],
     "tss_shared_memory": {
-      "probe": "build/probes/20261113T104536822019Z/game",
+      "probe": "build/probes/20261113T113748756047Z/game",
       "plugin_marker": "DPBillAdapter reload successful",
       "antibot_marker": "In AntibotInterface::Initialize, rc=0",
       "shared_files": [
@@ -49,7 +55,8 @@
       ],
       "directory_gap_before_fix": "syscall gap nr=220",
       "directory_gap_after_fix": []
-    }
+    },
+    "loading_marker": "Loading Monsters"
   },
   "limitations": [
     "The game observation was stopped by the probe timeout and does not establish service readiness.",

@@ -72,6 +72,28 @@ static uint64_t time_ns(FILETIME time) {
     return ticks > 116444736000000000ULL ? (ticks - 116444736000000000ULL) * 100 : 0;
 }
 
+static intptr_t file_identity(HANDLE file, BY_HANDLE_FILE_INFORMATION *info, uint64_t *inode) {
+    if (!GetFileInformationByHandle(file, info)) return file_error();
+    *inode = ((uint64_t)info->nFileIndexHigh << 32) | info->nFileIndexLow;
+    wchar_t filesystem[32];
+    if (!GetVolumeInformationByHandleW(file, NULL, 0, NULL, NULL, NULL, filesystem, 32)) return file_error();
+    /* NTFS uses the upper 16 bits of a file reference for its reuse sequence. */
+    if (!wcscmp(filesystem, L"NTFS")) *inode &= 0x0000ffffffffffffULL;
+    return 0;
+}
+
+static intptr_t seek_file(NrRun *run, uintptr_t fd, LONGLONG offset, DWORD method, LARGE_INTEGER *position) {
+    BY_HANDLE_FILE_INFORMATION info;
+    if (GetFileInformationByHandle(run->files[fd], &info) && (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+        if (method != FILE_BEGIN || offset < 0) return -38;
+        run->directory_offset[fd] = (uint64_t)offset;
+        position->QuadPart = offset;
+        return 0;
+    }
+    LARGE_INTEGER distance; distance.QuadPart = offset;
+    return SetFilePointerEx(run->files[fd], distance, position, method) ? 0 : file_error();
+}
+
 static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
 #ifdef _WIN64
     enum {BYTES = 144};
@@ -84,13 +106,8 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
     uint64_t inode = 9;
     uint32_t mode = 0020666;
     if (file) {
-        if (!GetFileInformationByHandle(file, &info)) return file_error();
-        inode = ((uint64_t)info.nFileIndexHigh << 32) | info.nFileIndexLow;
-        wchar_t filesystem[32];
-        if (!GetVolumeInformationByHandleW(file, NULL, 0, NULL, NULL, NULL, filesystem, 32)) return file_error();
-        /* NTFS file references combine a 48-bit MFT record with a 16-bit reuse
-           sequence. Use the record as the inode, retaining real 32-bit overflow. */
-        if (!wcscmp(filesystem, L"NTFS")) inode &= 0x0000ffffffffffffULL;
+        intptr_t error = file_identity(file, &info, &inode);
+        if (error) return error;
         mode = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? 0040555 : 0100444;
     } else {
         /* The runtime's /dev/urandom is a character device, backed by CNG. */
@@ -138,9 +155,9 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
     return 0;
 }
 
-static intptr_t statfs_file(HANDLE file, const wchar_t *input, uintptr_t destination) {
+static intptr_t statfs_file(NrRun *run, HANDLE file, const wchar_t *input, uintptr_t destination) {
 #ifdef _WIN64
-    (void)file; (void)input; (void)destination;
+    (void)run; (void)file; (void)input; (void)destination;
     return -38;
 #else
     if (!nr_memory(destination, 64, 1)) return -14;
@@ -150,13 +167,20 @@ static intptr_t statfs_file(HANDLE file, const wchar_t *input, uintptr_t destina
         if (!n || n >= 32768) return file_error();
     } else if (!input || wcslen(input) >= 32768) return -36;
     else wcscpy(path, input);
+    if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) return file_error();
     if (!GetVolumePathNameW(path, volume, 32768)) return file_error();
     ULARGE_INTEGER available, total, free_bytes;
     if (!GetDiskFreeSpaceExW(volume, &available, &total, &free_bytes)) return file_error();
     unsigned char output[64] = {0};
     uint64_t blocks = total.QuadPart / 4096, free_blocks = free_bytes.QuadPart / 4096;
-    wchar_t *shm = wcsstr(path, L"\\dev\\shm");
-    uint32_t type = shm && (!shm[8] || shm[8] == L'\\') ? 0x01021994 : 0x5346544e;
+    int error = nr_path(run, "/dev/shm", volume);
+    if (error) return error;
+    const wchar_t *normalized = !wcsncmp(path, L"\\\\?\\", 4) ? path + 4 : path;
+    size_t shm_length = wcslen(volume);
+    /* /dev/shm is a guest IPC namespace backed by real shared file sections.
+       Expose its type for glibc discovery; capacity comes from the backing volume. */
+    uint32_t type = !_wcsnicmp(normalized, volume, shm_length) &&
+                    (!normalized[shm_length] || normalized[shm_length] == L'\\') ? 0x01021994 : 0x5346544e;
     uint32_t values[] = {
         type, 4096, blocks > UINT32_MAX ? UINT32_MAX : (uint32_t)blocks,
         free_blocks > UINT32_MAX ? UINT32_MAX : (uint32_t)free_blocks,
@@ -173,6 +197,9 @@ static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, u
     if (fd >= 256 || !run->files[fd]) return -9;
     if (capacity > 65536) capacity = 65536;
     if (!nr_memory(destination, capacity, 1)) return -14;
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(run->files[fd], &info)) return file_error();
+    if (!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) return -20;
     wchar_t path[32768], pattern[32768];
     DWORD n = GetFinalPathNameByHandleW(run->files[fd], path, 32768, FILE_NAME_NORMALIZED);
     if (!n || n >= 32768) return file_error();
@@ -182,22 +209,31 @@ static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, u
     HANDLE search = FindFirstFileW(pattern, &entry);
     if (search == INVALID_HANDLE_VALUE) return file_error();
     unsigned char output[65536] = {0};
-    size_t used = 0, index = 0;
+    size_t used = 0, index = 0, skip = (size_t)run->directory_offset[fd];
     do {
+        ++index;
+        if (index <= skip) continue;
         char name[4096];
         int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, entry.cFileName, -1,
                                         name, sizeof(name), NULL, NULL);
         if (!bytes) { FindClose(search); return -36; }
         size_t reclen = (19u + (size_t)bytes + 7u) & ~(size_t)7u;
-        if (reclen > capacity - used) break;
-        uint64_t inode = ++index;
+        if (reclen > capacity - used) {
+            if (!used) { FindClose(search); return -22; }
+            break;
+        }
+        /* FindFirstFileW does not expose Linux d_ino; keep a stable per-open
+           enumeration identity while stat/fstat provide the real file ID. */
+        uint64_t inode = index;
         uint64_t offset = index;
         uint16_t record_length = (uint16_t)reclen;
         memcpy(output + used, &inode, 8); memcpy(output + used + 8, &offset, 8);
         memcpy(output + used + 16, &record_length, 2);
-        output[used + 18] = (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 4 : 8;
+        output[used + 18] = entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT ? 0 :
+                           entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? 4 : 8;
         memcpy(output + used + 19, name, (size_t)bytes);
         used += reclen;
+        run->directory_offset[fd] = index;
     } while (FindNextFileW(search, &entry));
     FindClose(search);
     memcpy((void *)destination, output, used);
@@ -222,8 +258,10 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         LARGE_INTEGER offset, position;
         offset.QuadPart = (LONGLONG)(((uint64_t)b << 32) | c);
         if (args[4] > 2) *result = -22;
-        else if (!SetFilePointerEx(run->files[a], offset, &position, (DWORD)args[4])) *result = file_error();
-        else { memcpy((void *)args[3], &position.QuadPart, 8); *result = 0; }
+        else {
+            *result = seek_file(run, a, offset.QuadPart, (DWORD)args[4], &position);
+            if (!*result) memcpy((void *)args[3], &position.QuadPart, 8);
+        }
         return 1;
     }
 #endif
@@ -278,12 +316,12 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         wchar_t path[32768];
         *result = guest_path(run, a, path);
         if (*result) return 1;
-        *result = statfs_file(NULL, path, b);
+        *result = statfs_file(run, NULL, path, b);
         return 1;
     }
     if (number == FSTATFS) {
         if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
-        *result = statfs_file(run->files[a], NULL, b);
+        *result = statfs_file(run, run->files[a], NULL, b);
         return 1;
     }
     if (number == GETDENTS) {
@@ -365,22 +403,31 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (fd == 256) { *result = -24; return 1; }
         DWORD desired = (b & 3) != 1 ? GENERIC_READ : 0;
         if (b & 3) desired |= b & 0x400 ? FILE_APPEND_DATA : GENERIC_WRITE;
-        DWORD creation = b & 0x40 ? (b & 0x80 ? CREATE_NEW : b & 0x200 ? CREATE_ALWAYS : OPEN_ALWAYS) : b & 0x200 ? TRUNCATE_EXISTING : OPEN_EXISTING;
-        HANDLE file = CreateFileW(path, desired, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, creation, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        DWORD creation = b & 0x40 ? (b & 0x80 ? CREATE_NEW : OPEN_ALWAYS) : OPEN_EXISTING;
+        DWORD flags = FILE_FLAG_BACKUP_SEMANTICS | ((b & 0x20000) ? FILE_FLAG_OPEN_REPARSE_POINT : 0);
+        HANDLE file = CreateFileW(path, desired, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, creation, flags, NULL);
         if (file == INVALID_HANDLE_VALUE) {
             *result = file_error();
             fprintf(stderr, "open failed path=%ls flags=0x%llx errno=%lld\n", path, (unsigned long long)b, (long long)*result);
             return 1;
         }
-        if (b & 0x10000) {
+        if (b & (0x10000 | 0x20000)) {
             BY_HANDLE_FILE_INFORMATION info;
-            if (!GetFileInformationByHandle(file, &info) || !(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            if (!GetFileInformationByHandle(file, &info)) {
+                *result = file_error(); CloseHandle(file); return 1;
+            }
+            if ((b & 0x20000) && (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+                CloseHandle(file); *result = -40; return 1;
+            }
+            if ((b & 0x10000) && !(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
                 CloseHandle(file); *result = -20; return 1;
             }
         }
+        if ((b & 0x200) && !SetEndOfFile(file)) { *result = file_error(); CloseHandle(file); return 1; }
         run->files[fd] = file;
         run->file_access[fd] = (b & 3) == 0 ? 1 : (b & 3) == 1 ? 2 : 3;
         run->descriptor_flags[fd] = (b & 0x80000) != 0;
+        run->directory_offset[fd] = 0;
         *result = fd;
         return 1;
     }
@@ -405,13 +452,14 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     if (!file) { *result = -9; return 1; }
     if (number == CLOSE) {
         *result = CloseHandle(file) ? 0 : file_error();
-        if (!*result) { run->files[a] = NULL; run->file_access[a] = 0; run->descriptor_flags[a] = 0; run->flock_mode[a] = 0; }
+        if (!*result) { run->files[a] = NULL; run->file_access[a] = 0; run->descriptor_flags[a] = 0; run->directory_offset[a] = 0; run->flock_mode[a] = 0; }
     } else if (number == FSTAT) {
         *result = stat_file(file, b, legacy);
     } else if (number == LSEEK) {
         LARGE_INTEGER offset, position;
         offset.QuadPart = (intptr_t)b;
-        *result = c > 2 ? -22 : SetFilePointerEx(file, offset, &position, (DWORD)c) ? (intptr_t)position.QuadPart : file_error();
+        *result = c > 2 ? -22 : seek_file(run, a, offset.QuadPart, (DWORD)c, &position);
+        if (!*result) *result = (intptr_t)position.QuadPart;
     } else {
         if (!(run->file_access[a] & 1)) { *result = -9; return 1; }
         if (c > 0x7ffff000) c = 0x7ffff000;
