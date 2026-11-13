@@ -156,6 +156,17 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
         }
         return number == SYS_TIME ? (intptr_t)seconds : 0;
     }
+#ifdef _WIN64
+    if (number == 160) {
+#else
+    if (number == 75) {
+#endif
+        /* RLIMIT_CORE is queried by the original TSS startup path. The
+           Windows host keeps the guest limit in its ABI boundary only. */
+        if (a != 3 && a != 4 && a != 7) return -38;
+        if (!nr_memory(b, 2 * sizeof(uintptr_t), 0)) return -14;
+        return 0;
+    }
     if (number == SYS_GETRLIMIT) {
         uintptr_t limit;
         if (a == 3) limit = NR_STACK_BYTES;

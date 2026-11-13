@@ -32,6 +32,7 @@ typedef struct {
     size_t size;
     unsigned char *mapped_pages; /* NULL means the entire guest range is mapped. */
     HANDLE source;
+    HANDLE section; /* Real shared file view; NULL for VirtualAlloc regions. */
     NrElf image;
 } NrVm;
 

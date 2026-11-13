@@ -138,11 +138,77 @@ static intptr_t stat_file(HANDLE file, uintptr_t destination, int legacy) {
     return 0;
 }
 
+static intptr_t statfs_file(HANDLE file, const wchar_t *input, uintptr_t destination) {
+#ifdef _WIN64
+    (void)file; (void)input; (void)destination;
+    return -38;
+#else
+    if (!nr_memory(destination, 64, 1)) return -14;
+    wchar_t path[32768], volume[32768];
+    if (file) {
+        DWORD n = GetFinalPathNameByHandleW(file, path, 32768, FILE_NAME_NORMALIZED);
+        if (!n || n >= 32768) return file_error();
+    } else if (!input || wcslen(input) >= 32768) return -36;
+    else wcscpy(path, input);
+    if (!GetVolumePathNameW(path, volume, 32768)) return file_error();
+    ULARGE_INTEGER available, total, free_bytes;
+    if (!GetDiskFreeSpaceExW(volume, &available, &total, &free_bytes)) return file_error();
+    unsigned char output[64] = {0};
+    uint64_t blocks = total.QuadPart / 4096, free_blocks = free_bytes.QuadPart / 4096;
+    wchar_t *shm = wcsstr(path, L"\\dev\\shm");
+    uint32_t type = shm && (!shm[8] || shm[8] == L'\\') ? 0x01021994 : 0x5346544e;
+    uint32_t values[] = {
+        type, 4096, blocks > UINT32_MAX ? UINT32_MAX : (uint32_t)blocks,
+        free_blocks > UINT32_MAX ? UINT32_MAX : (uint32_t)free_blocks,
+        available.QuadPart / 4096 > UINT32_MAX ? UINT32_MAX : (uint32_t)(available.QuadPart / 4096),
+        UINT32_MAX, UINT32_MAX, 0, 0, 255, 4096, 0
+    };
+    memcpy(output, values, sizeof(values));
+    memcpy((void *)destination, output, sizeof(output));
+    return 0;
+#endif
+}
+
+static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, uintptr_t capacity) {
+    if (fd >= 256 || !run->files[fd]) return -9;
+    if (capacity > 65536) capacity = 65536;
+    if (!nr_memory(destination, capacity, 1)) return -14;
+    wchar_t path[32768], pattern[32768];
+    DWORD n = GetFinalPathNameByHandleW(run->files[fd], path, 32768, FILE_NAME_NORMALIZED);
+    if (!n || n >= 32768) return file_error();
+    if ((size_t)n + 2 >= 32768) return -36;
+    wcscpy(pattern, path); pattern[n] = L'\\'; pattern[n + 1] = L'*'; pattern[n + 2] = 0;
+    WIN32_FIND_DATAW entry;
+    HANDLE search = FindFirstFileW(pattern, &entry);
+    if (search == INVALID_HANDLE_VALUE) return file_error();
+    unsigned char output[65536] = {0};
+    size_t used = 0, index = 0;
+    do {
+        char name[4096];
+        int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, entry.cFileName, -1,
+                                        name, sizeof(name), NULL, NULL);
+        if (!bytes) { FindClose(search); return -36; }
+        size_t reclen = (19u + (size_t)bytes + 7u) & ~(size_t)7u;
+        if (reclen > capacity - used) break;
+        uint64_t inode = ++index;
+        uint64_t offset = index;
+        uint16_t record_length = (uint16_t)reclen;
+        memcpy(output + used, &inode, 8); memcpy(output + used + 8, &offset, 8);
+        memcpy(output + used + 16, &record_length, 2);
+        output[used + 18] = (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 4 : 8;
+        memcpy(output + used + 19, name, (size_t)bytes);
+        used += reclen;
+    } while (FindNextFileW(search, &entry));
+    FindClose(search);
+    memcpy((void *)destination, output, used);
+    return (intptr_t)used;
+}
+
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
     int legacy = 0;
@@ -206,6 +272,22 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (!SetFilePointerEx(run->files[a], zero, &old, FILE_CURRENT)) { *result = file_error(); return 1; }
         *result = SetFilePointerEx(run->files[a], length, NULL, FILE_BEGIN) && SetEndOfFile(run->files[a]) ? 0 : file_error();
         if (!SetFilePointerEx(run->files[a], old, NULL, FILE_BEGIN) && !*result) *result = file_error();
+        return 1;
+    }
+    if (number == STATFS) {
+        wchar_t path[32768];
+        *result = guest_path(run, a, path);
+        if (*result) return 1;
+        *result = statfs_file(NULL, path, b);
+        return 1;
+    }
+    if (number == FSTATFS) {
+        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        *result = statfs_file(run->files[a], NULL, b);
+        return 1;
+    }
+    if (number == GETDENTS) {
+        *result = getdents_file(run, a, b, c);
         return 1;
     }
     if (number == OPENAT) {
@@ -276,7 +358,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             return 1;
         }
         if ((b & 3) == 3) { *result = -22; return 1; }
-        if (b & ~(uintptr_t)(3 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x8000 | 0x80000 | 0x10000)) { *result = -38; return 1; }
+        if (b & ~(uintptr_t)(3 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x8000 | 0x80000 | 0x10000 | 0x20000)) { *result = -38; return 1; }
         if ((b & 0x200) && !(b & 3)) { *result = -38; return 1; }
         unsigned fd;
         for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}

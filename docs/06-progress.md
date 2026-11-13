@@ -84,3 +84,13 @@ Linux 库从官方 CentOS 7.9 元数据导入 glibc、libgcc、libstdc++、zlib 
 当前仍只验证 Windows 10 x64 开发机；Win7/Win11、Frida 双向 hook、完整 Lua/DP2、19 服务互通、GUI、CRT 依赖闭包、离线包体积和最终业务链均未验收。生成物、原始资产、数据库和日志继续留在忽略目录。
 
 本阶段摘要证据见 [runtime、game 与 MySQL](evidence/p1-runtime-game-mysql.json)。其中 900 秒 game 观察使用的宿主哈希与最终回归构建哈希分别记录：最后补充了实际普通文件 TCGETS 的 ENOTTY 返回语义，未将后续构建身份冒充前次长时间观察。完整可复现证据仍由上述工具生成到 `build/`。
+
+## 2026-11-13 · 文件共享映射、TSS 共享内存与目录读取
+
+本阶段提交补齐了 game 实际触发的最小文件路径：i386 `statfs/fstatfs` 的布局和 `/dev/shm` 的 tmpfs 类型、`O_NOFOLLOW` 打开标志、真实 `MAP_SHARED` 文件视图、`getdents64` 目录读取以及 `setrlimit` 查询。共享映射使用 Windows file mapping section，解除映射时释放 view 和 section；普通私有文件映射仍保持 ELF 依赖快照的限定。
+
+独立双架构文件样件通过：映射文件后写入内容，关闭 fd、解除映射并重新打开仍读到相同内容，文件长度为 4096。`python tools/test.py`、`test_vm.py`、`test_files.py`、`test_net.py`、`test_entry.py`、`test_ld.py`、`test_stun.py` 和 `probe_manager.py` 均通过。证据见 [文件、共享映射与 TSS](evidence/p1-shared-files-and-shm.json)。
+
+原版 i386 game 在 Windows 10 x64 10.0.19044 上观察 180 秒，无 syscall gap；较短复现中 TSS 日志出现 `DPBillAdapter reload successful` 和 `In AntibotInterface::Initialize, rc=0`，私有 root 生成 `dev/shm/sec/tss_sdk_bus_1` 与 `dev/shm/TSS_43_1.STAT`。此前唯一目录缺口 `getdents64 nr=220` 已补齐。长观察仍保留 AF_UNIX、部分 socket option 和超长 socket timeout 的诊断；这些路径当前未宣称完整支持。
+
+本阶段仍不等于服务就绪：game 观察由超时清理，业务初始化只记录到本次 probe 实际出现的标记；DP2/Lua/Frida、完整服务互通、Win7/Win11 和最终交付包继续等待后续阶段。

@@ -12,12 +12,28 @@ static result call(word n, word a, word b, word c) {
     return r;
 }
 
+static result call6(word n, word a, word b, word c, word d, word e, word f) {
+    result r;
+#ifdef __x86_64__
+    register word fourth __asm__("r10") = d;
+    register word fifth __asm__("r8") = e;
+    register word sixth __asm__("r9") = f;
+    __asm__ volatile("syscall" : "=a"(r) : "a"(n), "D"(a), "S"(b), "d"(c),
+                     "r"(fourth), "r"(fifth), "r"(sixth) : "rcx", "r11", "memory");
+#else
+    register word sixth __asm__("ebp") = f;
+    __asm__ volatile("int $0x80" : "=a"(r) : "a"(n), "b"(a), "c"(b), "d"(c),
+                     "S"(d), "D"(e), "r"(sixth) : "memory");
+#endif
+    return r;
+}
+
 #ifdef __x86_64__
 enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, FCNTL=72, TRUNCATE=77, EXIT=60,
-      FLOCK=73, IOCTL=16, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
+      FLOCK=73, IOCTL=16, MMAP=9, MUNMAP=11, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
 enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, FCNTL=221, TRUNCATE=194, EXIT=1,
-      FLOCK=143, IOCTL=54, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
+      FLOCK=143, IOCTL=54, MMAP=192, MUNMAP=91, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
 static void check(int condition, word line) {
@@ -86,6 +102,18 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(CLOSE, fd, 0, 0) == 0);
     CHECK(call(READ, fd, (word)random, 1) == -9);
     CHECK(call(OPEN, (word)"/dev/urandom", 1, 0) == -38);
+
+    fd = call(OPEN, (word)"/shared", 2 | 0x40 | 0x200, 0);
+    CHECK(fd >= 0 && call(TRUNCATE, fd, 4096, 0) == 0);
+    word shared = (word)call6(MMAP, 0, 4096, 3, 1, (word)fd, 0);
+    CHECK(shared && shared < (word)-4095);
+    ((volatile unsigned char *)shared)[0] = 's';
+    ((volatile unsigned char *)shared)[1] = 'h';
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
+    CHECK(call6(MUNMAP, shared, 4096, 0, 0, 0, 0) == 0);
+    fd = call(OPEN, (word)"/shared", 0, 0);
+    CHECK(fd >= 0 && call(READ, fd, (word)data, 2) == 2 && data[0] == 's' && data[1] == 'h');
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
     CHECK(call(WRITE, 1, (word)"files-ok\n", 9) == 9);
     call(EXIT, 42, 0, 0);
     __builtin_unreachable();

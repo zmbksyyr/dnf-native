@@ -71,9 +71,11 @@ def main():
         process = subprocess.run(command, capture_output=True, timeout=20)
         inode = int.from_bytes(process.stdout[inode_offset:inode_offset + 8], "little")
         content = (instance / "sample").read_bytes()
+        shared = (instance / "shared").read_bytes()
         passed = (process.returncode == 42 and len(process.stdout) == size + 9 and
                   process.stdout[size:] == b"files-ok\n" and inode == identity["expected_inode"] and
-                  content == b"abcd\0\0\0\0\0" and not (instance / "dev/urandom").exists())
+                  content == b"abcd\0\0\0\0\0" and shared[:2] == b"sh" and len(shared) == 4096 and
+                  not (instance / "dev/urandom").exists())
         records.append({"arch": arch, "build": build, "command": command, "fixture_sha256": sha,
                         "host_sha256": hashlib.sha256(host.read_bytes()).hexdigest(), **identity,
                         "guest_inode": inode, "exit_code": process.returncode,

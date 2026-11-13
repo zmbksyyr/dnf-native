@@ -39,16 +39,18 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
 #endif
     if (!length || length > SIZE_MAX - 4095 || (args[2] & ~7u) || (offset & 4095)) return -22;
     length = (length + 4095) & ~(size_t)4095;
-    if (flags & ~(uintptr_t)(2 | 0x10 | 0x20 | 0x800 | 0x4000 | 0x20000)) {
+    if (flags & ~(uintptr_t)(1 | 2 | 0x10 | 0x20 | 0x800 | 0x4000 | 0x20000)) {
         fprintf(stderr, "mmap unsupported flags=0x%llx\n", (unsigned long long)flags); return -38;
     }
-    if (!(flags & 2)) return -38;
+    if ((flags & 3) != 1 && (flags & 3) != 2) return -22;
     if (flags & 0x10) {
+        if (!(flags & 2)) return -38;
         if (address & 4095) return -22;
         NrVm *v = NULL;
         for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
             if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
         if (!v) return -38;
+        if (v->section) return -38;
         if (!(flags & 0x20) && (!v->image.file || fd >= 256 || !run->files[fd] || !v->source)) return -38;
         if (!(flags & 0x20)) {
             BY_HANDLE_FILE_INFORMATION a, b;
@@ -74,14 +76,37 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
     if (!v) { fputs("mmap guest region table exhausted\n", stderr); return -12; }
     if (flags & 0x20) {
-        if (args[2] & 4) return -38;
+        if ((flags & 1) || (args[2] & 4)) return -38;
         v->base = VirtualAlloc(NULL, length, MEM_RESERVE | (args[2] ? MEM_COMMIT : 0), protect(args[2]));
         if (!v->base) return -12;
         v->size = length;
         return (intptr_t)v->base;
     }
-    /* Deliberately restricted to immutable ELF dependency snapshots. This
-       does not implement general file mmap, shared mappings or lazy COW. */
+    if (flags & 1) {
+        /* The original TSS path maps a small, already sized shared file at
+           offset zero. Use a real Windows view so aliases/processes share
+           pages and writes, rather than pretending a private copy is shared. */
+        if ((args[2] & 4) || (offset & 65535)) return -38;
+        if (fd >= 256 || !run->files[fd]) return -9;
+        if (!(run->file_access[fd] & 1) || ((args[2] & 2) && !(run->file_access[fd] & 2))) return -13;
+        LARGE_INTEGER size;
+        if (!GetFileSizeEx(run->files[fd], &size)) return -5;
+        if (size.QuadPart <= 0 || offset >= (uint64_t)size.QuadPart ||
+            args[1] > (uint64_t)size.QuadPart - offset) return -38;
+        int writable = (run->file_access[fd] & 2) != 0;
+        HANDLE section = CreateFileMappingW(run->files[fd], NULL, writable ? PAGE_READWRITE : PAGE_READONLY, 0, 0, NULL);
+        if (!section) return -5;
+        void *base = MapViewOfFile(section, writable ? FILE_MAP_WRITE : FILE_MAP_READ,
+                                   (DWORD)(offset >> 32), (DWORD)offset, (SIZE_T)args[1]);
+        if (!base) { CloseHandle(section); return -12; }
+        DWORD old;
+        if (!VirtualProtect(base, length, protect(args[2]), &old)) {
+            UnmapViewOfFile(base); CloseHandle(section); return -13;
+        }
+        v->base = base; v->size = length; v->section = section;
+        return (intptr_t)base;
+    }
+    /* Private file mappings remain limited to immutable ELF dependency snapshots. */
     if (offset || fd >= 256 || !run->files[fd]) return -38;
     wchar_t path[32768];
     DWORD n = GetFinalPathNameByHandleW(run->files[fd], path, 32768, FILE_NAME_NORMALIZED);
@@ -120,7 +145,7 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
     if (number == MADVISE) {
         if (!v || !mapped(v, address, length)) *result = -12;
-        else if (args[2] != 4 || v->image.file) *result = -38;
+        else if (args[2] != 4 || v->image.file || v->section) *result = -38;
         else if (!nr_memory(address, length, 1)) *result = -38;
         else if (!VirtualFree((void *)address, length, MEM_DECOMMIT)) *result = -12;
         else *result = VirtualAlloc((void *)address, length, MEM_COMMIT, PAGE_READWRITE) ? 0 : -12;
@@ -129,13 +154,17 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     if (number == MUNMAP) {
         if (!v) { *result = -38; return 1; }
         if (address == (uintptr_t)v->base && length == v->size) {
-            if (v->image.file) nr_elf_close(&v->image);
+            if (v->section) {
+                if (!UnmapViewOfFile(v->base)) { *result = -22; return 1; }
+                CloseHandle(v->section);
+            } else if (v->image.file) nr_elf_close(&v->image);
             else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
             if (v->source) CloseHandle(v->source);
             if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
             memset(v, 0, sizeof(*v));
             *result = 0;
         } else {
+            if (v->section) { *result = -38; return 1; }
             if (!v->mapped_pages) {
                 size_t bytes = (v->size / 4096 + 7) / 8;
                 v->mapped_pages = HeapAlloc(GetProcessHeap(), 0, bytes);
@@ -171,7 +200,7 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
         }
         *result = 0; return 1;
     }
-    if (v && !v->image.file && args[2] && !VirtualAlloc((void *)address, length, MEM_COMMIT, protect(args[2]))) {
+    if (v && !v->image.file && !v->section && args[2] && !VirtualAlloc((void *)address, length, MEM_COMMIT, protect(args[2]))) {
         *result = -12; return 1;
     }
     *result = VirtualProtect((void *)address, length, protect(args[2]), &old) ? 0 : -12;

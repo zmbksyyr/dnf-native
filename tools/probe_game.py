@@ -29,6 +29,10 @@ def main():
         shutil.copytree(ROOT / ".local/sysroot/i686" / name, instance / name)
     shutil.copytree(ROOT / "originals/dp123/usr/local/share/GeoIP", instance / "usr/local/share/GeoIP")
     (instance / "tmp").mkdir()
+    # POSIX shm_open names are resolved below /dev/shm. Keep the isolated
+    # root's standard shared-memory directory present for the original TSS
+    # startup path.
+    (instance / "dev/shm/sec").mkdir(parents=True)
     for name in ["libnxencryption.so", "libGeoIP.so.1"]:
         shutil.copy2(ROOT / "originals/dp123/lib" / name, instance / "lib" / name)
     original = ROOT / "originals/dp123/home/neople/game"
