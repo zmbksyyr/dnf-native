@@ -1,0 +1,255 @@
+{
+  "recorded_date": "2026-11-13",
+  "resources": [
+    {
+      "id": "S01",
+      "requested_url": "https://gabi.xinuos.com/elf/07-pheader.html",
+      "final_url": "https://gabi.xinuos.com/elf/07-pheader.html",
+      "http_status": 200,
+      "bytes": 43314,
+      "sha256": "91787676e5dcbec67e3a9415cd43944aac9e7ed57515b81a36c3f8c1c0dce2e1",
+      "excerpts": [
+        "or future use. Table 7.1 Segment Types, p_type ¶ Name Value PT_NULL 0 PT_LOAD 1 PT_DYNAMIC 2 PT_INTERP 3 PT_NOTE 4 PT_SHLIB 5 PT_PHDR 6 PT_TLS 7 PT_LOOS 0x60000000 PT_HIOS 0x6fffffff PT_LOPROC 0x70000000 PT_HIPROC 0x7fffffff PT_NULL The array element is unused; other members’ values are undefined.\nThis type lets the program header tabl",
+        "efined.\nThis type lets the program header table have ignored entries. PT_LOAD The array element specifies a loadable segment,\ndescribed by p_filesz and p_memsz .\nThe bytes from the file are mapped to the\nbeginning of the memory segment.\nIf the segment’s memory size ( p_memsz )\nis larger than the file size ( p_filesz ),\nthe “extra” byte",
+        "L 0 PT_LOAD 1 PT_DYNAMIC 2 PT_INTERP 3 PT_NOTE 4 PT_SHLIB 5 PT_PHDR 6 PT_TLS 7 PT_LOOS 0x60000000 PT_HIOS 0x6fffffff PT_LOPROC 0x70000000 PT_HIPROC 0x7fffffff PT_NULL The array element is unused; other members’ values are undefined.\nThis type lets the program header table have ignored entries. PT_LOAD The array element specifies a loa",
+        "rogram.\nIf it is present, it must precede any loadable segment entry. PT_TLS The array element specifies the Thread-Local Storage template.\nImplementations need not support this program table entry.\nSee Section 7.7, Thread-Local Storage , for more information. PT_LOOS through PT_HIOS Values in this inclusive range\nare reserved for ope"
+      ]
+    },
+    {
+      "id": "S02",
+      "requested_url": "https://refspecs.linuxfoundation.org/elf/abi386-4.pdf",
+      "final_url": "https://refspecs.linuxfoundation.org/elf/abi386-4.pdf",
+      "http_status": 200,
+      "bytes": 7443,
+      "sha256": "4b337d683de7bc7a9efcfd5ed4c51ec175b3442d031fcad267fc7b882aadb956",
+      "excerpts": [],
+      "validation": "HTTP 200 is not enough: 7443-byte response not accepted as validated PDF evidence"
+    },
+    {
+      "id": "S03",
+      "requested_url": "https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf",
+      "final_url": "https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf",
+      "http_status": 200,
+      "bytes": 7443,
+      "sha256": "f8819307bc5207b6dda7da9c01a44b680ccf628ae6deeda15f3543056c494711",
+      "excerpts": [],
+      "validation": "HTTP 200 is not enough: 7443-byte response not accepted as validated PDF evidence"
+    },
+    {
+      "id": "S04",
+      "requested_url": "https://man7.org/linux/man-pages/man2/syscall.2.html",
+      "final_url": "https://man7.org/linux/man-pages/man2/syscall.2.html",
+      "http_status": 200,
+      "bytes": 24986,
+      "sha256": "a99ba3727d3f044308c1d272bd0b0bb17d5a812a1a53ec965771fecb7c7c80a1",
+      "excerpts": [
+        "ckfin    excpt 0x0             P0      R0   -    -\n       i386        int $0x80             eax     eax  edx  -\n       ia64        break 0x100000        r15     r8   r9   r10      1, 6\n       loongarch   syscall 0             a7      a0   -    -\n       m68k        trap #0               d0      d0   -    -\n       microblaze  brki r14,8   ",
+        "tile        swint1                R10     R00  -    R01      1\n       x86-64      syscall               eax     rax  rdx  -        5\n       x32         syscall               eax     rax  rdx  -        5\n       xtensa      syscall               a2      a2   -    -\n\n       Notes:\n\n       [1]  On a few architectures, a register is used a",
+        "ded \"unified\" ABI.\n\n       [5]  The x32 ABI shares syscall table with x86-64 ABI, but there\n            are some nuances:\n\n            •  In order to indicate that a system call is called under\n               the x32 ABI, an additional bit, __X32_SYSCALL_BIT , is\n               bitwise ORed with the system call number.  The ABI used b"
+      ]
+    },
+    {
+      "id": "S05",
+      "requested_url": "https://www.akkadia.org/drepper/tls.pdf",
+      "final_url": "https://www.akkadia.org/drepper/tls.pdf",
+      "http_status": 200,
+      "bytes": 491943,
+      "sha256": "3b4ea5e96b93a6b740bc1add4d321e2227acec0bfd8a220102319e2dc2290722",
+      "excerpts": []
+    },
+    {
+      "id": "S06",
+      "requested_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc",
+      "final_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc",
+      "http_status": 200,
+      "bytes": 65556,
+      "sha256": "576a7479fabd7e0fb4bfe77288464371ea6e28e5e4b2155841d788ebbf7971cc",
+      "excerpts": [
+        " the specified address is rounded down to the nearest multiple of the allocation granularity. If the memory is already reserved and is being committed, the address is rounded down to the next page boundary. To determine the size of a page and the allocation granularity on the host computer, use the GetSystemInfo function. If this parameter is NULL , ",
+        "wn to the next page boundary. To determine the size of a page and the allocation granularity on the host computer, use the GetSystemInfo function. If this parameter is NULL , the system determines where to allocate the region. If this address is within an enclave that you have not initialized by calling InitializeEnclave , VirtualAlloc allocates a pa",
+        "rve and commit pages in one step, call VirtualAlloc with MEM_COMMIT | MEM_RESERVE . Attempting to commit a specific address range by specifying MEM_COMMIT without MEM_RESERVE and a non- NULL lpAddress fails unless the entire range has already been reserved. The  resulting error code is ERROR_INVALID_ADDRESS . An attempt to commit a page th",
+        "g to commit a specific address range by specifying MEM_COMMIT without MEM_RESERVE and a non- NULL lpAddress fails unless the entire range has already been reserved. The  resulting error code is ERROR_INVALID_ADDRESS . An attempt to commit a page that is already committed does not cause the function to fail. This means that you can commit p"
+      ]
+    },
+    {
+      "id": "S07",
+      "requested_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile",
+      "final_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile",
+      "http_status": 200,
+      "bytes": 65713,
+      "sha256": "ef37e188ad94f3a25a0e0df5d213c80fb0f891bc38c63204449e414054445fe2",
+      "excerpts": [
+        "fset within the file mapping. They must also match the virtual memory\nallocation granularity of the system. That is, the offset must be a multiple of the VirtualAlloc allocation granularity. To\nobtain the VirtualAlloc memory allocation granularity of the system, use the GetSystemInfo function, which fills in the members of\na SYSTEM_INFO structure. [i",
+        "he system. That is, the offset must be a multiple of the VirtualAlloc allocation granularity. To\nobtain the VirtualAlloc memory allocation granularity of the system, use the GetSystemInfo function, which fills in the members of\na SYSTEM_INFO structure. [in] dwNumberOfBytesToMap The number of bytes of a file mapping to map to the view. All bytes must ",
+        "OR, you can combine the values above with these values. Value Meaning FILE_MAP_COPY A copy-on-write view of the file is mapped. The file mapping object must have been created with PAGE_READONLY , PAGE_EXECUTE_READ , PAGE_WRITECOPY , PAGE_EXECUTE_WRITECOPY , PAGE_READWRITE , or PAGE_EXECUTE_READWRITE protection. When a process writes to a cop"
+      ]
+    },
+    {
+      "id": "S08",
+      "requested_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2",
+      "final_url": "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2",
+      "http_status": 200,
+      "bytes": 74814,
+      "sha256": "991c1541e917d4ebfa45a9439c28308b4720e7dc1e9e81e25330746aec1da264",
+      "excerpts": [
+        " PAGE_READWRITE,\n        &param, 1);\n} Requirements Requirement Value Minimum supported client Windows 10 [desktop apps only] Minimum supported server Windows Server 2016 [desktop apps only] Target Platform Windows Header memoryapi.h (include Windows.h) Library onecore.lib DLL Kernel32.dll See also Memory Management Functions ReadProcessMemory Virtual "
+      ]
+    },
+    {
+      "id": "S09",
+      "requested_url": "https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitonaddress",
+      "final_url": "https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitonaddress",
+      "http_status": 200,
+      "bytes": 54702,
+      "sha256": "ecf4124748e16190efade524e51fd100a9861cf4e4b057f78740d6449a7d851f",
+      "excerpts": [
+        "      CapturedValue = g_TargetValue;\n} Requirements Requirement Value Minimum supported client Windows 8 [desktop apps | UWP apps] Minimum supported server Windows Server 2012 [desktop apps | UWP apps] Target Platform Windows Header synchapi.h (include Windows.h) Library Synchronization.lib DLL API-MS-Win-Core-Synch-l1-2-0.dll See also WakeByAddressAll"
+      ]
+    },
+    {
+      "id": "S10",
+      "requested_url": "https://learn.microsoft.com/en-us/windows/win32/debug/vectored-exception-handling",
+      "final_url": "https://learn.microsoft.com/en-us/windows/win32/debug/vectored-exception-handling",
+      "http_status": 200,
+      "bytes": 48492,
+      "sha256": "fe13fb106baa4ab3f25d42cc3a06e9cd6eabb4c16854000a3407b5c5ef554909",
+      "excerpts": [
+        "e called in the order that they were added, after the debugger gets a first chance notification, but before the system begins unwinding the stack. To add a vectored continue handler, use the AddVectoredContinueHandler function. To remove this handler, use the RemoveVectoredContinueHandler function. To add a vectored exception handler, use t",
+        "ored handlers are called in the order that they were added, after the debugger gets a first chance notification, but before the system begins unwinding the stack. To add a vectored continue handler, use the AddVectoredContinueHandler function. To remove this handler, use the RemoveVectoredContinueHandler function. To add a vectored exce"
+      ]
+    },
+    {
+      "id": "S11",
+      "requested_url": "https://frida.re/docs/gadget/",
+      "final_url": "https://frida.re/docs/gadget/",
+      "http_status": 200,
+      "bytes": 57319,
+      "sha256": "2d6f664e2d40a108da9b9e87d9986077f563365103f643467381fe8353f71b9a",
+      "excerpts": [
+        "n Gadget Hacking Stalker Presentations Functions Messages iOS Android Windows macOS Linux iOS Android JavaScript Frida CLI frida-ps frida-trace frida-discover frida-ls-devices frida-kill gum-graft JavaScript API C API Gum API Core API Swift API Go API Bridges Best Practices Troubleshooting Building Footprint GSoC Ideas 2015 GSoD Ideas ",
+        "alker Presentations Tutorials Functions Messages iOS Android Examples Windows macOS Linux iOS Android JavaScript Tools Frida CLI frida-ps frida-trace frida-discover frida-ls-devices frida-kill gum-graft API Reference JavaScript API C API Gum API Core API Swift API Go API Bridges Miscellaneous Best Practices Troubleshooting Building Foo",
+        "ES Gadget gets kickstarted as soon as the dynamic linker executes its constructor\nfunction. It supports four different interactions depending on your use-case, where the Listen interaction is the default. You can override this by adding a\nconfiguration file. The file should be named exactly like the Gadget binary but\nwith .config as its fi",
+        "da.Gadget . In order to achieve early instrumentation we let Gadget’s constructor function\nblock until you either attach() to the process, or call resume() after going\nthrough the usual spawn() -> attach() -> …apply instrumentation… steps.\nThis means that existing CLI tools like frida-trace work\nthe same ways you’re already using them. If "
+      ]
+    },
+    {
+      "id": "S12",
+      "requested_url": "https://frida.re/docs/javascript-api/",
+      "final_url": "https://frida.re/docs/javascript-api/",
+      "http_status": 200,
+      "bytes": 498363,
+      "sha256": "eaf77784b619d2a360b3fad8029e25d2e92f0e93ec79446ee78c61d9ad0b7cb6",
+      "excerpts": [
+        "t float double int8 uint8 int16 uint16 int32 uint32 int64 uint64 bool Supported ABIs default Windows 32-bit: sysv stdcall thiscall fastcall mscdecl Windows 64-bit: win64 UNIX x86: sysv unix64 UNIX ARM: sysv vfp new NativeFunction(address, returnType, argTypes[, options]) : just like\nthe previous constructor, but where the fourth argument, opt",
+        "ocess.arch : property containing the string ia32 , x64 , arm or arm64 Process.platform : property containing the string windows , darwin , linux , freebsd , qnx , or barebone Process.pageSize : property containing the size of a virtual memory page\n(in bytes) as a number. This is used to make your scripts more portable. Process.pointerSize : pro"
+      ]
+    },
+    {
+      "id": "S13",
+      "requested_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/windows-installation.html",
+      "final_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/windows-installation.html",
+      "http_status": 200,
+      "bytes": 18654,
+      "sha256": "1aee02a37db683bcce5413d1b0de22a4e17a1f8c1e001ccad14635444d19bf40",
+      "excerpts": [
+        "Community 5.7 Server requires the Microsoft\n      Visual C++ 2019 Redistributable Package to run on Windows\n      platforms. Users should make sure the package has been installed\n      on the system before installing the server. The package is\n      available at the Microsoft\n      Download Center . This requirement changed over time: MySQL 5.",
+        "5.7.39 require both, and only the Microsoft\n      Visual C++ 2019 Redistributable Package is required as of MySQL\n      5.7.40. MySQL is available for Microsoft Windows, for both 32-bit and 64-bit\n    versions. For supported Windows platform information, see https://www.mysql.com/support/supportedplatforms/database.html . Important If your ope",
+        "stributable Package is required as of MySQL\n      5.7.40. MySQL is available for Microsoft Windows, for both 32-bit and 64-bit\n    versions. For supported Windows platform information, see https://www.mysql.com/support/supportedplatforms/database.html . Important If your operating system is Windows 2008 R2 or Windows 7 and you\n      d",
+        "nt If your operating system is Windows 2008 R2 or Windows 7 and you\n      do not have Service Pack 1 (SP1) installed, MySQL 5.7\n      regularly restarts with the following message in the MySQL server\n      error log file: mysqld got exception 0xc000001d This error message occurs because you are also using a CPU that\n      does not suppor"
+      ]
+    },
+    {
+      "id": "S14",
+      "requested_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/data-directory-initialization.html",
+      "final_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/data-directory-initialization.html",
+      "http_status": 200,
+      "bytes": 38198,
+      "sha256": "1764b7e3410179c2f2075f30709982fe92216389f71c1317de03fc1450818549",
+      "excerpts": [
+        "r creates it. If the data directory exists but is not empty (that is,\n                it contains files or subdirectories), the server exits\n                after producing an error message: [ERROR] --initialize specified but the data directory exists. Aborting. In this case, remove or rename the data directory and\n                try ag",
+        "   connect to the server. For example: bin/mysqld --initialize --user=mysql For important information about the command, especially\n            regarding command options you might use, see Data Directory Initialization Procedure .\n            For details about how the server performs initialization,\n            see Server Actions During Dat",
+        "ialize the data directory, invoke mysqld with the --initialize or --initialize-insecure option,\n        depending on whether you want the server to generate a random\n        initial password for the 'root'@'localhost' account, or to create that account with no password: Use --initialize for “ secure by default ” installation (that is,\n     "
+      ]
+    },
+    {
+      "id": "S15",
+      "requested_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/mysqldump.html",
+      "final_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/mysqldump.html",
+      "http_status": 200,
+      "bytes": 199060,
+      "sha256": "f5d8d8e048eee030c6e5dbee44b8ebb6b3fc33567560fb0a31152fdbe35b72c2",
+      "excerpts": [
+        "    system tables which use the non-transactional MyISAM storage\n        engine, and this combination is not permitted when GTIDs are\n        enabled. Performance and Scalability Considerations mysqldump advantages include the convenience\n        and flexibility of viewing or even editing the output before\n        restoring. You can c",
+        "InnoDB tables, or if you have a mix of InnoDB and MyISAM tables, consider using the mysqlbackup command of the MySQL Enterprise Backup product.\n            (Available as part of the Enterprise subscription.) It\n            provides the best performance for InnoDB backups with minimal disruption; it can also back up tables\n            ",
+        "R for dumped\n        triggers, LOCK TABLES if the --single-transaction option is\n        not used, and (as of MySQL 5.7.31) PROCESS if the --no-tablespaces option is\n        not used. Certain options might require other privileges as\n        noted in the option descriptions. To reload a dump file, you must have the privileges required to\n        ex",
+        "name for shared-memory connections (Windows only) --single-transaction Issue a BEGIN SQL statement before dumping data from server --skip-add-drop-table Do not add a DROP TABLE statement before each CREATE TABLE statement --skip-add-locks Do not add locks --skip-comments Do not add comments to dump file --skip-compact Do not produce more compact ou",
+        "ments --result-file Direct output to a given file --routines Dump stored routines (procedures and functions) from dumped databases --secure-auth Do not send passwords to server in old (pre-4.1) format Yes --server-public-key-path Path name to file containing RSA public key --set-charset Add SET NAMES default_character_set to output --set-",
+        " the table\n            by loading the dump file). --routines , -R Command-Line Format --routines Include stored routines (procedures and functions) for the\n            dumped databases in the output. This option requires the SELECT privilege for the mysql.proc table. The output generated by using --routines contains CREATE PROCEDURE and C"
+      ]
+    },
+    {
+      "id": "S16",
+      "requested_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/identifier-case-sensitivity.html",
+      "final_url": "https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/identifier-case-sensitivity.html",
+      "http_status": 200,
+      "bytes": 17169,
+      "sha256": "5dd2247610ae582111efc443d46fcccaed5cde6c6116b9313ad5b3146c561ae3",
+      "excerpts": [
+        "eans such names are\n        not case-sensitive in Windows, but are case-sensitive in most\n        varieties of Unix. One notable exception is macOS, which is\n        Unix-based but uses a default file system type (HFS+) that is\n        not case-sensitive. However, macOS also supports UFS volumes,\n        which are case-sensitive just a",
+        "are case-sensitive on Unix, but not so\n        on Windows or macOS. The following statement would not work on\n        Unix, because it refers to the alias both as a and as A : mysql> SELECT col_name FROM tbl_name AS a WHERE a. col_name = 1 OR A. col_name = 2; However, this same statement is permitted on Windows. To avoid\n        proble",
+        "n 1.6.1, “MySQL Extensions to Standard SQL” . The lower_case_table_names system\n        variable also affects how the server handles identifier case\n        sensitivity, as described later in this section. Note Although database, table, and trigger names are not\n          case-sensitive on some platforms, you should not refer to one\n          of thes",
+        "disk and used in\n        MySQL is affected by the lower_case_table_names system\n        variable, which you can set when starting mysqld . lower_case_table_names can take\n        the values shown in the following table. This variable does not affect case sensitivity of trigger\n        identifiers. On Unix, the default value of lower_case_table_names "
+      ]
+    },
+    {
+      "id": "S17",
+      "requested_url": "https://learn.microsoft.com/en-us/cpp/windows/universal-crt-deployment?view=msvc-170",
+      "final_url": "https://learn.microsoft.com/en-us/cpp/windows/universal-crt-deployment?view=msvc-170",
+      "http_status": 200,
+      "bytes": 53739,
+      "sha256": "827253fc6a23b4069ba393208c60af58a2b8688bfbdd817bde3b128f02a05306",
+      "excerpts": [
+        "istributable for Windows 7 will only install onto Windows 7 SP1, not Windows 7 RTM. The Universal CRT is a fundamental dependency of the C++ libraries. The Visual C++ Redistributable (VCRedist) installs the initial version of the Universal CRT (version 10.0.10240) on machines that don't already have one installed. This version is sufficient ",
+        "ating systems that are still in extended support. Local deployment of the Universal CRT is supported, with some restrictions. Central deployment The preferred method to centrally install the Universal CRT is to use Microsoft Windows Update. The Universal CRT is a Recommended update for all supported Microsoft Windows operating systems, so by de",
+        "ndows 10 Anniversary Update (version 10.0.14393). Local deployment Local deployment of the Universal CRT is supported, but not recommended for both performance and security reasons. The DLLs for local deployment are included as part of the Windows SDK, in the Windows Kits\\10\\Redist\\ucrt\\DLLs subdirectory, by computer architecture. The DLLs requ",
+        "base.dll and a set of APISet forwarder DLLs named api-ms-win-*.dll . The set of DLLs required on each operating system varies. It's highly recommended that you include all of the DLLs when you deploy locally. There are two restrictions on local deployment to be aware of: On Windows 10 and Windows 11, the Universal CRT in the system direct"
+      ]
+    },
+    {
+      "id": "S18",
+      "requested_url": "https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170",
+      "final_url": "https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170",
+      "http_status": 200,
+      "bytes": 60136,
+      "sha256": "3aa26aefe75728aab636e7ea5474b35256faf95a95879a899ed74800ecd9b262",
+      "excerpts": [
+        "ntime Redistributable package, merge modules, and individual binaries is limited to licensed Visual Studio users and is subject to Microsoft Software License Terms. When you deploy an application, you must also deploy the files that are required to support it. If Microsoft provides any of these files, check whether you're permitted to redistribute",
+        "time files? Go to the latest supported Visual C++ Redistributable downloads page. Redistributable files and licensing Distribution of the Visual C++ Runtime Redistributable package, merge modules, and individual binaries is limited to licensed Visual Studio users and is subject to Microsoft Software License Terms. When you deploy an applicatio",
+        "ported Visual C++ Redistributable downloads page. Redistributable files and licensing Distribution of the Visual C++ Runtime Redistributable package, merge modules, and individual binaries is limited to licensed Visual Studio users and is subject to Microsoft Software License Terms. When you deploy an application, you must also deploy the file"
+      ]
+    },
+    {
+      "id": "S19",
+      "requested_url": "https://frida.re/news/2025/05/17/frida-17-0-0-released/",
+      "final_url": "https://frida.re/news/2025/05/17/frida-17-0-0-released/",
+      "http_status": 200,
+      "bytes": 56177,
+      "sha256": "20599f252f91802fffb83ce18381fa928e726388ef00bb0c13e6dbf942505558",
+      "excerpts": [
+        "Module.getBaseAddress() Module.findExportByName() Module.getExportByName() Module.findSymbolByName() Module.getSymbolByName() These are all straight-forward to migrate away from. But first, let’s cover the odd one out: Module . getSymbolByName ( null , ' open ' ) This is now accomplished like this: Module . getGlobalExportByName ( ' open ' ) For the ",
+        " Module.findBaseAddress() Module.getBaseAddress() Module.findExportByName() Module.getExportByName() Module.findSymbolByName() Module.getSymbolByName() These are all straight-forward to migrate away from. But first, let’s cover the odd one out: Module . getSymbolByName ( null , ' open ' ) This is now accomplished like this: Module . getGlobalExportByN"
+      ]
+    },
+    {
+      "id": "S20",
+      "requested_url": "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-winx64.zip",
+      "final_url": "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-winx64.zip",
+      "request_method": "HEAD",
+      "http_status": 200,
+      "content_length": 352891656,
+      "last_modified": "Wed, 11 Oct 2023 10:35:06 GMT",
+      "content_type": "application/zip",
+      "limitation": "No body downloaded; no archive integrity or authenticity verified"
+    }
+  ]
+}

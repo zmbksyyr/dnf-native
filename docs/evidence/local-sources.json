@@ -1,0 +1,54 @@
+{
+  "recorded_date": "2026-11-13",
+  "scope": "Read-only local sources; no source or binary imported from references",
+  "sources": [
+    {
+      "path": "DNF原生运行_需求整理.md",
+      "bytes": 5341,
+      "sha256": "8d9ed003bbafbb7332969aa464024eebbd0fc511ebb424bd79333ecfafdbfbbd",
+      "role": "user requirements"
+    },
+    {
+      "path": "dnf-winport/源码_dnf-winport_20261111.zip",
+      "bytes": 59827474,
+      "sha256": "58539cf82f4dc0357400e6201bb6986ccd4099871f1c24e5647ed9132e1f47e3",
+      "role": "read-only reference source archive"
+    },
+    {
+      "path": "dnf-winport/src_dnf-winport_20261111/dnf-winport/README.md",
+      "bytes": 5014,
+      "sha256": "46110a6dd59fc26b17e7197044510341141af85f76690956098ed367a319681f",
+      "role": "read-only reference README"
+    },
+    {
+      "path": "dnf-winport/src_dnf-winport_20261111/dnf-winport/LICENSE",
+      "bytes": 21288,
+      "sha256": "616cfe2a42f376776d08de3c361320e0e10d27388495d331d586540d05a59f8e",
+      "role": "reference license"
+    },
+    {
+      "path": "dnf-winport/src_dnf-winport_20261111/dnf-winport/rednf/README.md",
+      "bytes": 4808,
+      "sha256": "bc72309d17dbe6f5c1d2e85aa5ae8f4f64243f2f8a092f913dc6f034852bdb31",
+      "role": "read-only reference README"
+    },
+    {
+      "path": "dnf-winport/src_dnf-winport_20261111/dnf-winport/rednf/LICENSE",
+      "bytes": 21288,
+      "sha256": "616cfe2a42f376776d08de3c361320e0e10d27388495d331d586540d05a59f8e",
+      "role": "reference license"
+    },
+    {
+      "path": "x/dnf-native-runtime/README.md",
+      "bytes": 7483,
+      "sha256": "096d3694be1998c594cfeb4a20bae0cdcb13d41c06789c952eb105c869424e5c",
+      "role": "historical assertions, not new acceptance"
+    },
+    {
+      "path": "x/dnf-win-runtime/README.md",
+      "bytes": 7073,
+      "sha256": "3b016d3f293c6a57ac49bc7570ef6103b4f6223a2bd63b3e4538f9e20dbb6bf6",
+      "role": "historical assertions, not new acceptance"
+    }
+  ]
+}

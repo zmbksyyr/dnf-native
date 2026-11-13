@@ -6,5 +6,7 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 
 - [工作纪律](AGENTS.md)：仅约束工作行为。
 - [用户需求原文](docs/requirements.md)：从工作区需求文件逐字节归档，作为需求基线。
+- [资源调研](docs/01-resource-research.md)：本地原包、公开规范、依赖与包体风险。
+- [静态证据](docs/evidence/resource-inventory.json)与[网络来源](docs/evidence/web-resources.json)：本轮重新生成的记录。
 
 仓库与上级目录中的输入包、`dnf-winport/`、`opendnf-win-jbz69/`、`x/` 独立。原始资产和构建产物不进入 Git。
