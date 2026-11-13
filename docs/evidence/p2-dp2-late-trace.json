@@ -1,0 +1,54 @@
+{
+  "recorded_utc": "2026-11-13T16:48:20Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Original i386 game with original DP2 preload and private isolated MySQL; delayed syscall trace only; no service readiness claim",
+  "command": "python build/run_game_db.py --preload --trace --timeout 60",
+  "diagnostic": {
+    "trace_delay_ms": 30000,
+    "diagnostic_only": true,
+    "delay_used_to_avoid_trace_startup_perturbation": true
+  },
+  "probe": "build/probes/20261113T164741279468Z/game",
+  "stdout_sha256": "6c120c8d437148cb364cdf37904ea9fc94f6f5fd0dd652bd4906d79f43b8fdc1",
+  "stderr_sha256": "063738277de080da35928e595849df5c87a1e96af4224010364b15a000e08bdb",
+  "stderr_lines": 7967,
+  "syscall_counts_after_delay": {
+    "3": 5544,
+    "5": 322,
+    "192": 305,
+    "6": 288,
+    "91": 284,
+    "197": 281,
+    "54": 273,
+    "45": 190,
+    "13": 72,
+    "125": 19,
+    "163": 13,
+    "174": 13,
+    "4": 7,
+    "265": 4,
+    "195": 3,
+    "33": 2,
+    "39": 1,
+    "75": 1,
+    "102": 1,
+    "106": 1,
+    "140": 1,
+    "191": 1,
+    "224": 1,
+    "254": 1,
+    "295": 1
+  },
+  "observations": [
+    "stdout reached Server key Check OK before the sampled interval.",
+    "No syscall gap, runtime gap, or unhandled exception was emitted.",
+    "The sampled tail repeatedly read fd 14 in 4096-byte chunks after opening dp2/lua/df/game/symbols/records.lua (22,535,240 bytes), interleaved with brk/mmap/mprotect and known loader calls.",
+    "The final sampled boundary is guest Lua/DP2 symbol-record loading and internal execution; no missing syscall was evidenced, so no runtime fallback was added."
+  ],
+  "limitations": [
+    "Windows 10 x64 10.0.19044 only.",
+    "The process was stopped by the 60-second observation timeout.",
+    "This does not prove service readiness, plugin acceptance, complete Lua/Frida behavior, or final delivery acceptance.",
+    "Private database credentials and database contents are excluded."
+  ]
+}
