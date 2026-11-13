@@ -1,0 +1,54 @@
+{
+  "recorded_utc": "20261113T162451286331Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Original i386 game startup with the original DP2 preload chain; no service readiness or plugin acceptance",
+  "implementation": {
+    "runtime/adapt.c": "ff00de6930f4dd2f22ce92bfd7fbeec629075b25967961d04bf445976e47257f",
+    "runtime/files.c": "4b4375f61680b51d8e7239f7c9532cc1005e584cf1de8c06d314512e93ff0c0b",
+    "runtime/net.c": "d61f20f7e81c4c59868bd4f883610406ecbfe494770323b55d97e77c929fc3ad",
+    "runtime/run.c": "5a0e217d2cc3a1a24e2c867dd1b4f8fe40a7bb5fe545ebbc7d6e0cba96c0dcf2",
+    "runtime/run.h": "1f563b74b418447bc2e871efa346e61444e85f1f78a065d7c9d0514630b2ac09",
+    "runtime/vm.c": "6d5a14e149fd37d3fad8e4aea07cd3e59d07ca97c050f9cd9f682b487e896285",
+    "build/i686/dnf-host.exe": "a0a41d2c67720b20a5b632454b06d66fe6307b4da7d293e616b16b62b7b96d24",
+    "build/x86_64/dnf-host.exe": "ffd59dbf8a9a2da2e10a026a097ec6a161d89f08cc5d382054f35297eed0adc0"
+  },
+  "command": "python tools/probe_game.py --preload --timeout 120",
+  "probe": "build/probes/20261113T162451286331Z/game",
+  "host_sha256": "a0a41d2c67720b20a5b632454b06d66fe6307b4da7d293e616b16b62b7b96d24",
+  "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+  "elapsed_seconds": 120.121,
+  "exit_code": 1,
+  "forced_cleanup": true,
+  "syscall_gaps": [],
+  "runtime_gaps": [],
+  "initialization_markers": [],
+  "checks": {
+    "frida_libc_location": "Frida libc lookup passed through the real startup auxv snapshot",
+    "executable_anonymous_mmap": "i386 anonymous executable page allocation and protection path passed",
+    "i386_credentials": "UID/GID query paths reached without a syscall gap",
+    "regular_file_and_pipe_poll": "poll path reached without a syscall gap",
+    "fcntl64": "F_GETFL/F_SETFL path reached without a syscall gap",
+    "af_unix": "AF_UNIX socket creation returns EAFNOSUPPORT for the unsupported Windows socket subset",
+    "frida_adaptation": "Frida AES inline data and PadLock XSHA256 instruction were explicitly identified by ELF hash and location"
+  },
+  "inputs": {
+    "game_elf": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "dp2_libdp2_so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+    "dp2_preload": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72"
+  },
+  "logs": {
+    "stderr.log": {
+      "bytes": 42539,
+      "sha256": "5360306907e22daea9e7c46f766f1108cef06dca5e61a503caebaeebb4e02905"
+    },
+    "stdout.log": {
+      "bytes": 642,
+      "sha256": "071fae879feee6346af682021a3013c2aedd13c0220a8e3e2dc223d50c14fc5e"
+    }
+  },
+  "limitations": [
+    "The process was stopped by the 120-second observation timeout; no business initialization marker appeared.",
+    "This evidence proves startup reached the observed DP2/Frida path without new gaps, not service readiness, database acceptance, complete plugin behavior, or final acceptance.",
+    "The result is from Windows 10 x64 10.0.19044 and is not an OS compatibility claim."
+  ]
+}

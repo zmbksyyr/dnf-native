@@ -42,6 +42,8 @@ typedef struct {
     uintptr_t stack_low, stack_high;
     uintptr_t heap_base, heap_break;
     size_t heap_committed;
+    uintptr_t auxv_address;
+    size_t auxv_size;
     wchar_t root[32768];
     char cwd[4096];
     HANDLE files[256];

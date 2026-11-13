@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-enum { NR_URANDOM = 16, NR_MAPS = 17 };
+enum { NR_URANDOM = 16, NR_MAPS = 17, NR_AUXV = 18 };
 
 static intptr_t file_error(void) {
     switch (GetLastError()) {
@@ -335,7 +335,7 @@ static char *maps_text(NrRun *run, size_t *size) {
 }
 
 static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, int legacy) {
-    if (fd >= 256 || run->file_access[fd] != NR_MAPS) return -9;
+    if (fd >= 256 || (run->file_access[fd] != NR_MAPS && run->file_access[fd] != NR_AUXV)) return -9;
     if (!nr_memory(destination, legacy ? 64 : sizeof(void *) == 8 ? 144 : 96, 1)) return -14;
     unsigned char bytes[144] = {0};
 #ifdef _WIN64
@@ -451,11 +451,17 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FCNTL) {
-        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM && run->file_access[a] != NR_MAPS)) { *result = -9; return 1; }
+        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM &&
+                         run->file_access[a] != NR_MAPS && run->file_access[a] != NR_AUXV)) { *result = -9; return 1; }
         if (b == 1) *result = run->descriptor_flags[a];
         else if (b == 2 && !(c & ~1u)) { run->descriptor_flags[a] = (unsigned char)c; *result = 0; }
-        else if (run->file_access[a] == NR_URANDOM && b == 3) *result = run->nonblock[a] ? 0x800 : 0;
-        else if (run->file_access[a] == NR_URANDOM && b == 4 && !(c & ~(uintptr_t)0x800)) {
+        else if (b == 3) {
+            uintptr_t access = run->file_access[a] == NR_URANDOM || run->file_access[a] == NR_MAPS ||
+                               run->file_access[a] == NR_AUXV ? 0 :
+                               run->file_access[a] == 1 ? 0 : run->file_access[a] == 2 ? 1 : 2;
+            *result = (intptr_t)(access | (run->nonblock[a] ? 0x800 : 0));
+        }
+        else if (b == 4 && !(c & ~(uintptr_t)0x800)) {
             run->nonblock[a] = (c & 0x800) != 0; *result = 0;
         }
         else *result = -38;
@@ -517,6 +523,25 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             run->synthetic_sizes[fd] = bytes;
             run->synthetic_offsets[fd] = 0;
             run->file_access[fd] = NR_MAPS;
+            run->descriptor_flags[fd] = (b & 0x80000) != 0;
+            *result = fd;
+            return 1;
+        }
+        if (number == OPEN && !wcscmp(path + wcslen(run->root), L"\\proc\\self\\auxv")) {
+            if (b & ~(uintptr_t)(0x8000 | 0x80000) || !run->auxv_address || !run->auxv_size) { *result = -13; return 1; }
+            unsigned fd;
+            for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
+            if (fd == 256) { *result = -24; return 1; }
+            unsigned char *text = HeapAlloc(GetProcessHeap(), 0, run->auxv_size);
+            if (!text || !nr_memory(run->auxv_address, run->auxv_size, 0)) {
+                if (text) HeapFree(GetProcessHeap(), 0, text);
+                *result = -12; return 1;
+            }
+            memcpy(text, (const void *)run->auxv_address, run->auxv_size);
+            run->synthetic_files[fd] = (char *)text;
+            run->synthetic_sizes[fd] = run->auxv_size;
+            run->synthetic_offsets[fd] = 0;
+            run->file_access[fd] = NR_AUXV;
             run->descriptor_flags[fd] = (b & 0x80000) != 0;
             *result = fd;
             return 1;
@@ -627,7 +652,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         }
         return 1;
     }
-    if (a < 256 && run->file_access[a] == NR_MAPS) {
+    if (a < 256 && (run->file_access[a] == NR_MAPS || run->file_access[a] == NR_AUXV)) {
         if (number == CLOSE) {
             HeapFree(GetProcessHeap(), 0, run->synthetic_files[a]);
             run->synthetic_files[a] = NULL; run->synthetic_sizes[a] = 0; run->synthetic_offsets[a] = 0;

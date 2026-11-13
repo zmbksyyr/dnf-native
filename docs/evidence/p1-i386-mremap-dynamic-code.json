@@ -17,7 +17,7 @@
   "initialization_markers": [],
   "next_blocker": {
     "kind": "ELF executable-section decode",
-    "sha256": "8ca458e422deead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+    "sha256": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
     "section": 12,
     "file_offset": "0xca46c0",
     "remaining_bytes": 2146087,

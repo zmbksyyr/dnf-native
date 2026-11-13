@@ -226,6 +226,18 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
         return -38;
     }
 #else
+    if (number == 158) {
+        Sleep(0);
+        return 0;
+    }
+    if (number == 199 || number == 200 || number == 201 || number == 202)
+        return 1000;
+    if (number == 209 || number == 211) {
+        if (!nr_memory(a, 4, 1) || !nr_memory(b, 4, 1) || !nr_memory(c, 4, 1)) return -14;
+        uint32_t uid = 1000;
+        memcpy((void *)a, &uid, 4); memcpy((void *)b, &uid, 4); memcpy((void *)c, &uid, 4);
+        return 0;
+    }
     if (number == 243) {
         if (!nr_memory(a, 16, 1)) return -14;
         uint32_t descriptor[4];
@@ -235,6 +247,15 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
         nr_current()->tls_base = descriptor[1];
         memcpy((void *)a, descriptor, sizeof(descriptor));
         return 0;
+    }
+    if (number == 172) {
+        /* The loader probes dumpability during startup. */
+        if (a == 3) return b <= 1 ? 0 : -22;
+        return -38;
+    }
+    if (number == 242) {
+        /* The observed io_cancel probe has no valid AIO context. */
+        return -22;
     }
 #endif
 #ifdef _WIN64
@@ -472,6 +493,8 @@ static DWORD WINAPI start_guest(void *argument) {
     *out++ = env_lang;
     *out++ = 0;
     memcpy(out, aux, sizeof(aux));
+    run->auxv_address = (uintptr_t)out;
+    run->auxv_size = sizeof(aux);
     fprintf(stderr, "enter guest bits=%zu entry=0x%llx stack=0x%llx argc=%d\n",
             sizeof(void *) * 8, (unsigned long long)(run->interpreter.allocation ? run->interpreter.entry : program->entry),
             (unsigned long long)stack, run->argc);

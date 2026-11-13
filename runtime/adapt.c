@@ -23,6 +23,35 @@ static int trap_compare(const void *left, const void *right) {
     return a->pc > b->pc ? 1 : a->pc < b->pc ? -1 : 0;
 }
 
+static size_t frida_inline_data_end(const NrElf *elf, const NrElfSection *section, size_t offset) {
+    /* This exact Frida build embeds AES tables in .text before the next function. */
+    if (strcmp(elf->sha256, "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239") == 0 &&
+        section->addr == 0x7c000 && section->offset == 0x7c000) {
+        if (offset >= 0xc286c0 && offset < 0xc29300) return 0xc29300;
+        if (offset >= 0xc29d40 && offset < 0xc2a940) return 0xc2a940;
+        if (offset >= 0xc2e5c0 && offset < 0xc2e9c0) return 0xc2e9c0;
+        if (offset >= 0xc32280 && offset < 0xc332c0) return 0xc332c0;
+        if (offset >= 0xc344c0 && offset < 0xc34580) return 0xc34580;
+        if (offset >= 0xc3a700 && offset < 0xc3a7c0) return 0xc3a7c0;
+        if (offset >= 0xc3aac0 && offset < 0xc3ac20) return 0xc3ac20;
+        if (offset >= 0xc42300 && offset < 0xc425e0) return 0xc425e0;
+        if (offset >= 0xcd0000 && offset < 0xcf509c) return 0xcf509c;
+        if (offset >= 0xcf8700 && offset < 0xcf89f1) return 0xcf89f1;
+        if (offset >= 0xcfa923 && offset < 0xcfaa00) return 0xcfaa00;
+        if (offset >= 0xd0eac0 && offset < 0xd0fb10) return 0xd0fb10;
+    }
+    return 0;
+}
+
+static size_t frida_padlock_instruction_end(const NrElf *elf, const NrElfSection *section, size_t offset) {
+    /* Zydis 4.1.1 omits the PadLock XSHA256 /r=e0 form used by this build. */
+    if (strcmp(elf->sha256, "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239") == 0 &&
+        section->addr == 0x7c000 && section->offset == 0x7c000 && offset == 0xc4307a &&
+        memcmp(elf->file + section->offset + offset, "\xf3\x0f\xa6\xe0", 4) == 0)
+        return offset + 4;
+    return 0;
+}
+
 int nr_adapt(NrElf *elf, const char **error) {
     NrElfHeader *h = elf->header;
     *error = "execution adaptation currently requires valid executable sections";
@@ -88,6 +117,20 @@ int nr_adapt(NrElf *elf, const char **error) {
             ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
             if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, elf->file + section->offset + offset,
                                                      (size_t)section->size - offset, &instruction, operands))) {
+                size_t instruction_end = frida_padlock_instruction_end(elf, section, offset);
+                if (instruction_end) {
+                    fprintf(stderr, "confirmed Frida PadLock XSHA256 instruction sha256=%s section=%u file_offset=0x%llx bytes=%zu\n",
+                            elf->sha256, s, (unsigned long long)(section->offset + offset), instruction_end - offset);
+                    offset = instruction_end;
+                    continue;
+                }
+                size_t data_end = frida_inline_data_end(elf, section, offset);
+                if (data_end) {
+                    fprintf(stderr, "confirmed Frida AES inline data sha256=%s section=%u file_offset=0x%llx bytes=%zu\n",
+                            elf->sha256, s, (unsigned long long)(section->offset + offset), data_end - offset);
+                    offset = data_end;
+                    continue;
+                }
                 *error = "undecodable executable section; adaptation stopped";
                 fprintf(stderr, "decode gap sha256=%s section=%u pc=0x%llx file_offset=0x%llx remaining=%llu\n", elf->sha256, s,
                         (unsigned long long)(elf->bias + section->addr + offset),

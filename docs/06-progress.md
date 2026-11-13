@@ -112,7 +112,6 @@ Linux 库从官方 CentOS 7.9 元数据导入 glibc、libgcc、libstdc++、zlib 
 
 证据见 [SIOCGIFHWADDR](evidence/p1-sio-ifhwaddr.json)。
 
-
 ## 2026-11-13 ? `/proc/self/exe` ? packed ELF ????
 
 ???? DP2 ??????????? `readlink` ???`/proc/self/exe` ?? guest `run->argv[0]`???????????????? NUL??????? guest ????? Linux ?????i686 ? x86_64 ????????
@@ -145,6 +144,16 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 
 沿带私有 MySQL 的原版 game + DP2 preload 复测，实际缺口是 i386 `mremap`（nr=163），而不是此前观察到的 `/proc/self/fd/8` 或 `/etc/localtime` 打开失败。runtime 为匿名映射补齐同进程可移动扩展、缩小和内容复制，并允许已映射匿名页按真实 `mprotect` 请求切换为可执行权限；只接受本次 trace 出现的 `MREMAP_MAYMOVE` 组合。独立 i386 VM 样件现在同时验证扩展后内容保留和匿名页执行，x86_64 行为保持原路径。
 
-清理后的双架构构建通过 `test.py`、`test_vm.py`、`test_files.py`、`test_net.py`、`test_entry.py`、`test_ld.py`、`test_stun.py` 和 `probe_manager.py`。同一台 Windows 10 x64 10.0.19044 上，game 复测运行约 63 秒、无 syscall gap，继续进入 Lua/Frida 加载；当前下一停止点是 Frida ELF（SHA-256 `8ca458e422deead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239`）section 12 的 Zydis 解码失败，guest 以 2 退出。没有跳过该检查或伪造插件加载成功。
+清理后的双架构构建通过 `test.py`、`test_vm.py`、`test_files.py`、`test_net.py`、`test_entry.py`、`test_ld.py`、`test_stun.py` 和 `probe_manager.py`。同一台 Windows 10 x64 10.0.19044 上，game 复测运行约 63 秒、无 syscall gap，继续进入 Lua/Frida 加载；当前下一停止点是 Frida ELF（SHA-256 `8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239`）section 12 的 Zydis 解码失败，guest 以 2 退出。没有跳过该检查或伪造插件加载成功。
 
 证据见 [i386 mremap 与动态代码](evidence/p1-i386-mremap-dynamic-code.json)。本阶段仍不代表 DP2、Frida、game 服务就绪或最终验收通过；Win7/Win11、完整 Lua/Frida 双向调用、服务互通、GUI 和交付包仍未验收。
+
+## 2026-11-13 · DP2 preload 启动路径与 Frida 可执行页
+
+本阶段沿上一阶段的 i386 game + 原版 DP2 preload 真实启动路径补齐最小缺口。Frida 通过启动栈中的真实 auxv 快照定位 libc；runtime 增加 `/proc/self/auxv` 只读快照、i386 UID/GID 查询、`sched_yield`、普通文件和管道 `poll`、`fcntl64(F_GETFL/F_SETFL)`，并让匿名 `mmap(PROT_EXEC/PROT_RWX)` 保留其真实可执行权限。AF_UNIX socket 在当前 Windows socket 子集之外，明确返回 `EAFNOSUPPORT`。
+
+对当前 Frida ELF（SHA-256 `8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239`），适配器只按已核对的 section、文件偏移和指令字节跳过 AES 内嵌数据及 PadLock XSHA256 指令；没有放宽一般 ELF 解码失败的处理。
+
+双架构构建及 `test.py`、`test_vm.py`、`test_files.py`、`test_net.py`、`test_entry.py`、`test_ld.py`、`test_stun.py`、`probe_manager.py` 均通过。当前宿主执行 `python tools/probe_game.py --preload --timeout 120`，运行 120.121 秒后按探测器清理，退出码为 1；syscall gap 和 runtime gap 均为空，未出现业务初始化标记。该结果说明启动路径已越过本阶段观测到的缺口并进入 DP2/Frida 路径，不代表服务就绪、数据库验收、插件完整行为或最终交付验收。
+
+证据见 [DP2 preload 探测](evidence/p2-dp2-preload.json)。开发环境仍为 Windows 10 x64 10.0.19044；Win7/Win11、完整 Lua/Frida 双向调用、19 服务互通、GUI、正常停服和最终交付包继续等待后续阶段。

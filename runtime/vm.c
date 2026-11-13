@@ -101,7 +101,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
     if (!v) { fputs("mmap guest region table exhausted\n", stderr); return -12; }
     if (flags & 0x20) {
-        if ((flags & 1) || (args[2] & 4)) return -38;
+        if (flags & 1) return -38;
         v->base = VirtualAlloc(NULL, length, MEM_RESERVE | (args[2] ? MEM_COMMIT : 0), protect(args[2]));
         if (!v->base) return -12;
         v->size = length;

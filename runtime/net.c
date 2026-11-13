@@ -147,7 +147,20 @@ static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
         int fd = entries[i].fd;
         if (fd < 0) continue;
         if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
-        if (run->file_access[fd] != 4 || (entries[i].events & ~(1 | 2 | 4 | 64 | 256))) return -38;
+        if (entries[i].events & ~(1 | 2 | 4 | 64 | 256)) return -38;
+        if (run->file_access[fd] != 4) {
+            /* Regular files are immediately ready on Linux. Pipes use the
+               same result for the startup poll path; blocking reads still
+               retain their normal ReadFile behavior. */
+            short ready_events = 0;
+            if ((run->file_access[fd] & 1) && (entries[i].events & (1 | 2 | 64)))
+                ready_events |= entries[i].events & (1 | 2 | 64);
+            if ((run->file_access[fd] & 2) && (entries[i].events & (4 | 256)))
+                ready_events |= entries[i].events & (4 | 256);
+            entries[i].revents = ready_events;
+            if (ready_events) ++ready;
+            continue;
+        }
         polls[count].fd = (SOCKET)run->sockets[fd];
         polls[count].events = 0; polls[count].revents = 0;
         if (entries[i].events & (1 | 64)) polls[count].events |= POLLRDNORM;
@@ -275,6 +288,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     if (!operation && ((number != CLOSE && number != IOCTL && number != FCNTL && number != READ && number != WRITE) || fd >= 256 || run->file_access[fd] != 4)) return 0;
     if (operation == 1) {
+        if (args[0] == 1) { *result = -97; return 1; } /* AF_UNIX is outside the Windows socket subset. */
         if (args[0] != AF_INET || ((args[1] & 15) != SOCK_DGRAM && (args[1] & 15) != SOCK_STREAM) ||
             (args[1] & ~(uintptr_t)(15 | 0x800 | 0x80000))) { *result = -38; return 1; }
         static int initialized;
