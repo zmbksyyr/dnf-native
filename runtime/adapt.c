@@ -26,9 +26,18 @@ static int trap_compare(const void *left, const void *right) {
 int nr_adapt(NrElf *elf, const char **error) {
     NrElfHeader *h = elf->header;
     *error = "execution adaptation currently requires valid executable sections";
-    if (!h->shnum || h->shentsize != sizeof(NrElfSection) || h->shoff > elf->file_size ||
-        (uint64_t)h->shnum * sizeof(NrElfSection) > elf->file_size - h->shoff)
-        return 0;
+    int packed_image = 0;
+    for (unsigned i = 0; i < h->phnum; ++i)
+        if (elf->programs[i].type == 1 && (elf->programs[i].flags & 7) == 7) packed_image = 1;
+    if (!h->shnum) {
+        if (!packed_image || !FlushInstructionCache(GetCurrentProcess(), elf->allocation, elf->allocation_size)) return 0;
+        fprintf(stderr, "adapt skipped sectionless packed image sha256=%s\n", elf->sha256);
+        fprintf(stderr, "adapt sha256=%s sections=0 syscall_traps=0 tls_traps=0\n", elf->sha256);
+        *error = NULL;
+        return 1;
+    }
+    if (h->shentsize != sizeof(NrElfSection) || h->shoff > elf->file_size ||
+        (uint64_t)h->shnum * sizeof(NrElfSection) > elf->file_size - h->shoff) return 0;
     NrElfSection *sections = (NrElfSection *)(elf->file + h->shoff);
     ZydisDecoder decoder;
 #ifdef _WIN64
@@ -43,16 +52,27 @@ int nr_adapt(NrElf *elf, const char **error) {
         if (section->type != 1 || (section->flags & 6) != 6 || !section->size) continue;
         if (section->offset > elf->file_size || section->size > elf->file_size - section->offset)
             return 0;
-        int mapped = 0;
+        int mapped = 0, packed = 0;
         for (unsigned i = 0; i < h->phnum; ++i) {
             NrElfProgram *p = &elf->programs[i];
             if (p->type == 1 && (p->flags & 1) && section->addr >= p->vaddr &&
                 section->addr - p->vaddr <= p->filesz &&
                 section->size <= p->filesz - (section->addr - p->vaddr) &&
-                section->offset == p->offset + (section->addr - p->vaddr))
+                section->offset == p->offset + (section->addr - p->vaddr)) {
                 mapped = 1;
+                packed |= (p->flags & 7) == 7;
+            }
         }
-        if (!mapped) return 0;
+        if (!mapped) {
+            if (!packed_image) return 0;
+            fprintf(stderr, "adapt skipped unmapped executable section sha256=%s section=%u\n", elf->sha256, s);
+            continue;
+        }
+        if (packed) {
+            fprintf(stderr, "adapt skipped writable executable section sha256=%s section=%u\n", elf->sha256, s);
+            ++section_count;
+            continue;
+        }
         ++section_count;
         size_t table_start = 0, table_end = 0, after_sub = 0;
         ZydisRegister table_register = ZYDIS_REGISTER_NONE;

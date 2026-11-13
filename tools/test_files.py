@@ -72,9 +72,9 @@ def main():
         identity = native_inode(instance / "sample")
         sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
         host = ROOT / "build" / arch / "dnf-host.exe"
-        command = [str(host), "--root", str(instance), "0" * 64, "--run", str(fixture), sha, "files"]
+        command = [str(host), "--root", str(instance), "0" * 64, "--run", str(fixture), sha, "/proc-test"]
         peer_sha = hashlib.sha256(peer_fixture.read_bytes()).hexdigest()
-        peer_command = [str(host), "--root", str(instance), "0" * 64, "--run", str(peer_fixture), peer_sha, "files-peer"]
+        peer_command = [str(host), "--root", str(instance), "0" * 64, "--run", str(peer_fixture), peer_sha, "/proc-test"]
         with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             initial = process.stdout.read(size + 13)
             peer = subprocess.run(peer_command, capture_output=True, timeout=20)

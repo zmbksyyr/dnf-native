@@ -29,10 +29,10 @@ static result call6(word n, word a, word b, word c, word d, word e, word f) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, FCNTL=72, TRUNCATE=77, EXIT=60,
+enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, EXIT=60,
       FLOCK=73, IOCTL=16, MMAP=9, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
-enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, FCNTL=221, TRUNCATE=194, EXIT=1,
+enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, EXIT=1,
       FLOCK=143, IOCTL=54, MMAP=192, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
@@ -68,6 +68,14 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(WRITE, 1, (word)"peer-ok\n", 8) == 8);
 #else
     unsigned char stat[STAT_BYTES], other[STAT_BYTES], random[128], data[9];
+    unsigned char executable[16];
+    for (unsigned i = 0; i < sizeof(executable); ++i) executable[i] = 0x7f;
+    CHECK(call(READLINK, (word)"/proc/self/exe", (word)executable, sizeof(executable)) == 10);
+    CHECK(executable[0] == '/' && executable[1] == 'p' && executable[2] == 'r' && executable[3] == 'o' &&
+          executable[4] == 'c' && executable[5] == '-' && executable[6] == 't' && executable[7] == 'e' &&
+          executable[8] == 's' && executable[9] == 't' && executable[10] == 0x7f);
+    CHECK(call(READLINK, (word)"/proc/self/exe", 1, 0) == 0);
+    CHECK(call(READLINK, (word)"/proc/self/exe", 1, 1) == -14);
     result fd = call(OPEN, (word)"/sample", 2, 0);
     CHECK(fd >= 0);
     CHECK(call(IOCTL, fd, 0x5401, (word)stat) == -25);

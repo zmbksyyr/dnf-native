@@ -242,9 +242,9 @@ static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, u
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
     int legacy = 0;
@@ -267,6 +267,26 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
 #endif
     if (number == IOCTL && a < 256 && run->file_access[a] && run->file_access[a] != 4 && b == 0x5401) {
         *result = -25; /* TCGETS on a regular file/pipe is ENOTTY. */
+        return 1;
+    }
+    if (number == READLINK) {
+        char path[4096];
+        size_t length = 0;
+        while (length < sizeof(path)) {
+            if (!nr_memory(a + length, 1, 0)) { *result = -14; return 1; }
+            path[length] = ((const char *)a)[length];
+            if (!path[length]) break;
+            ++length;
+        }
+        if (length == sizeof(path)) { *result = -36; return 1; }
+        if (strcmp(path, "/proc/self/exe")) { *result = -2; return 1; }
+        const char *target = run->argv[0];
+        size_t target_length = strlen(target);
+        if (!c) { *result = 0; return 1; }
+        if (!nr_memory(b, c, 1)) { *result = -14; return 1; }
+        size_t copied = target_length < c ? target_length : c;
+        memcpy((void *)b, target, copied);
+        *result = (intptr_t)copied;
         return 1;
     }
     if (number == FLOCK) {
