@@ -16,6 +16,12 @@ MONITOR_SHA256 = "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6
 # Independently derived from this ELF's disassembly. Preserve all addresses and
 # file length. The input remains read-only; omit --fix-udp-stop to reproduce it.
 UDP_STOP_PATCHES = [
+    {"address": "0x08062877", "offset": 0x1a877,
+     "before": "c6400400", "after": "c6400401",
+     "purpose": "Initialize the application loop flag before stop callbacks can run."},
+    {"address": "0x08063fa4", "offset": 0x1bfa4,
+     "before": "c6400401", "after": "90909090",
+     "purpose": "Preserve a stop request received during application Load."},
     {"address": "0x0805aa4c", "offset": 0x12a4c,
      "before": "8b45088944240cc7442408b8aa0508c744240400000000",
      "after": "c64008018944240cc7442408b8aa050883642404009090",
