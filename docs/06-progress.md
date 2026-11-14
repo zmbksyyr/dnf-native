@@ -283,3 +283,13 @@ Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE
 独立诊断捕获原版 libuv 的 uv_dlclose（0xcd30）调用 dlclose，返回点为模块偏移 0xcd64。关闭 Frida 的实际调用来自该封装；不能把 libuv 的模块身份误记为 libdp2game。原版 frida.config 没有 teardown 字段，而 [Frida 官方 Gadget 文档](https://frida.re/docs/gadget/)明确说明默认 minimal 不会停止内部线程，需要卸载时应使用 full，这与此前解除映射后仍有线程执行的现场一致。
 
 只在私有配置设置 teardown=full 后，短失败路径仍返回 125，但异常变为主线程执行地址 0；诊断栈的返回地址落在原版 libdp2game 的偏移 0x345516。替换成仅含空 init/dispose 的自编 JS 同样复现，因此新异常不依赖原版业务脚本。未解决后续空调用，full 仅作为探测器的显式诊断选项，不修改默认输入配置或宣称停服修复。证据见 [Frida teardown 对照](evidence/p2-frida-teardown-diagnostic.json)。
+
+## 2026-11-14 · libuv 定时器 abort 与 epoll 管道
+
+继续定位返回 134 时发现可在资源加载前独立复现的问题：自编 Lua 在原版 DP2/luv 中创建真实一次性定时器，回调触发并关闭定时器后，uv.run 登记内部管道时调用 i386 epoll_ctl（nr=255），runtime 原先仅接受 socket，将该有效管道返回 EBADF，原版 libuv 随即调用 abort。旧正式宿主重复返回 134；同一双架构自编 ELF 在登记第一个管道时均停在第 48 行。
+
+最小修复将现有 poll 的管道和 socket 等待逻辑提取为同一个内部函数，epoll 复用这套实际就绪查询和截止时间处理，不增加依赖。epoll_ctl 接受有效管道；普通文件等不可监视对象返回 EPERM。没有伪造登记或忽略 libuv 的失败。独立构建的原版 DP2/luv 定时器现已触发、关闭并正常返回，测试 guest 自行退出 42，无强制回收或 gap；此样件不加载 Frida，也不进入完整 game 资源初始化。
+
+新增双架构 ELF 核对空管道超时、64 位事件数据、MOD/DEL、UDP socket 与管道混合等待、HUP、关闭 fd 后注销，以及外部 Windows 管道延迟写入唤醒。双架构全部通过，同一独立构建的 poll、TCP、入口/信号、加载器及原版 channel、relay 协议回归也通过。正式宿主仍由此前完整诊断运行使用，未覆盖正在运行的映像；完整 game 的 abort 调用栈及新构建的自然启动结果另行记录，不能以短样件通过宣称整体问题已解决。
+
+证据见 [epoll 管道与原版 luv 定时器](evidence/p2-epoll-pipe-luv.json)。仅实测 Windows 10 x64 10.0.19044，EPOLLET/ONESHOT 等仍未支持。

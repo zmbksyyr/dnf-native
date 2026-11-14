@@ -154,19 +154,16 @@ static intptr_t pipe_events(NrRun *run, unsigned fd, short requested) {
     return events;
 }
 
-static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
-    struct { int32_t fd; int16_t events, revents; } entries[256];
-    if (args[1] > 256) return -22;
-    size_t bytes = (size_t)args[1] * sizeof(entries[0]);
-    if (!nr_memory(args[0], bytes, 1)) return -14;
-    memcpy(entries, (const void *)args[0], bytes);
+typedef struct { int32_t fd; int16_t events, revents; } NrPoll;
+
+static intptr_t poll_descriptors(NrRun *run, NrPoll *entries, unsigned length, int timeout) {
     ULONGLONG start = GetTickCount64();
-    int timeout = (int)args[2], ready;
+    int ready;
     for (;;) {
         WSAPOLLFD polls[256]; unsigned indices[256]; ULONG count = 0;
         int has_pipes = 0;
         ready = 0;
-        for (unsigned i = 0; i < args[1]; ++i) {
+        for (unsigned i = 0; i < length; ++i) {
             entries[i].revents = 0;
             int fd = entries[i].fd;
             if (fd < 0) continue;
@@ -217,7 +214,17 @@ static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
         }
         if (ready || expired) break;
     }
-    memcpy((void *)args[0], entries, bytes);
+    return ready;
+}
+
+static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
+    NrPoll entries[256];
+    if (args[1] > 256) return -22;
+    size_t bytes = (size_t)args[1] * sizeof(entries[0]);
+    if (!nr_memory(args[0], bytes, 1)) return -14;
+    memcpy(entries, (const void *)args[0], bytes);
+    intptr_t ready = poll_descriptors(run, entries, (unsigned)args[1], (int)args[2]);
+    if (ready >= 0) memcpy((void *)args[0], entries, bytes);
     return ready;
 }
 
@@ -225,27 +232,22 @@ static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uint
     if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
     size_t capacity = maximum > 256 ? 256 : maximum;
     if (!nr_memory(address, capacity * 12, 1)) return -14;
-    WSAPOLLFD polls[256]; unsigned fds[256]; ULONG count = 0;
+    NrPoll polls[256]; unsigned count = 0;
     for (unsigned fd = 0; fd < 256; ++fd) {
-        if (!watches[fd].used || run->file_access[fd] != 4) continue;
-        polls[count].fd = (SOCKET)run->sockets[fd]; polls[count].events = 0; polls[count].revents = 0;
-        if (watches[fd].events & 1) polls[count].events |= POLLRDNORM;
-        if (watches[fd].events & 4) polls[count].events |= POLLWRNORM;
-        fds[count++] = fd;
+        if (!watches[fd].used) continue;
+        polls[count].fd = (int32_t)fd;
+        polls[count].events = (int16_t)(watches[fd].events & 5);
+        polls[count++].revents = 0;
     }
-    if (!count) { Sleep(milliseconds == -1 ? INFINITE : (DWORD)milliseconds); return 0; }
-    int ready = WSAPoll(polls, count, milliseconds > INT_MAX ? INT_MAX : (int)milliseconds);
-    if (ready == SOCKET_ERROR) return socket_error();
+    intptr_t ready = poll_descriptors(run, polls, count, milliseconds > INT_MAX ? INT_MAX : (int)milliseconds);
+    if (ready < 0) return ready;
     intptr_t written = 0;
-    for (ULONG i = 0; i < count && (size_t)written < capacity; ++i) {
-        uint32_t events = 0;
-        if (polls[i].revents & (POLLRDNORM | POLLRDBAND)) events |= 1;
-        if (polls[i].revents & POLLWRNORM) events |= 4;
-        if (polls[i].revents & POLLERR) events |= 8;
-        if (polls[i].revents & (POLLHUP | POLLNVAL)) events |= 16;
+    for (unsigned i = 0; i < count && (size_t)written < capacity; ++i) {
+        uint32_t events = (uint32_t)polls[i].revents & 29;
+        if (polls[i].revents & 32) events |= 16;
         if (!events) continue;
         unsigned char *out = (unsigned char *)address + written * 12;
-        memcpy(out, &events, 4); memcpy(out + 4, &watches[fds[i]].data, 8); ++written;
+        memcpy(out, &events, 4); memcpy(out + 4, &watches[polls[i].fd].data, 8); ++written;
     }
     return written;
 }
@@ -283,7 +285,11 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         if (input[0] >= 256 || run->file_access[input[0]] != 8) { *result = -9; return 1; }
         NrWatch *watches = run->epolls[input[0]];
         if (number == EP_WAIT) { *result = epoll_wait(run, watches, input[1], input[2], (intptr_t)input[3]); return 1; }
-        if (input[2] >= 256 || run->file_access[input[2]] != 4) { *result = -9; return 1; }
+        if (input[2] >= 256 || !run->file_access[input[2]]) { *result = -9; return 1; }
+        if (run->file_access[input[2]] != 4 &&
+            (!run->files[input[2]] || GetFileType(run->files[input[2]]) != FILE_TYPE_PIPE)) {
+            *result = -1; return 1;
+        }
         NrWatch *watch = &watches[input[2]];
         if (input[1] == 2) { *result = watch->used ? 0 : -2; watch->used = 0; return 1; }
         if (input[1] != 1 && input[1] != 3) { *result = -22; return 1; }

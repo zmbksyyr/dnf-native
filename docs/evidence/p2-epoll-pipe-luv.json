@@ -1,0 +1,317 @@
+{
+  "recorded_utc": "2026-11-14T03:17:56.438885+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "source_base_commit": "8f94f25",
+  "scope": "Pipe/socket epoll primitives and original DP2/luv timer interface; full game abort correlation and post-fix startup pending.",
+  "sources": {
+    "runtime/net.c": "a704bfb08a995afac9fc603fda18f00b118fe128cd43ace0be4d9236e6d62c2f",
+    "tests/epoll.c": "c699b0de732e2130215374e100e2c577be9f7e5d1223e945d27f0dbd6dc9321c",
+    "tests/luv_timer.lua": "a0a119a1333aca8e98a344c32b4fefcabcd66f97fcdc70ebc05040b1a340a7b6",
+    "tools/test_epoll.py": "91d104a44fc0a6d21e40c325b6d8043a4ffe936c03e44dcb82ce5e197f3c086c",
+    "tools/test_luv.py": "b497ddb18ba625a2bcf1b036e5326e31ab20ea73ced86868190b79bf4ef58ad3"
+  },
+  "normative_sources": [
+    "https://man7.org/linux/man-pages/man2/epoll_ctl.2.html",
+    "https://man7.org/linux/man-pages/man2/epoll_wait.2.html"
+  ],
+  "old_epoll": [
+    {
+      "arch": "i686",
+      "host_sha256": "be8ec8893e1950a11ce8fddbddd69ce1c9d27ebdbc54e18df2bef7f487c37e46",
+      "fixture_sha256": "ad65c0797e148ff16496e1febbd3c138ebaa802e539be57f03d38c72e99d05c0",
+      "exit_code": 48,
+      "stderr": "adapt sha256=ad65c0797e148ff16496e1febbd3c138ebaa802e539be57f03d38c72e99d05c0 sections=1 syscall_traps=0 tls_traps=0\r\nenter guest bits=32 entry=0x80490f0 stack=0x66ffb40 argc=1\r\n"
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "cc6b6e38a7e9687562c574d4999ab8c91907ed76e39e48036cdf7e26cec6178b",
+      "fixture_sha256": "a95447291d4ec4e752926947c5c6a61ce28a8978414ff58c444dfe2669bbb041",
+      "exit_code": 48,
+      "stderr": "adapt sha256=a95447291d4ec4e752926947c5c6a61ce28a8978414ff58c444dfe2669bbb041 sections=1 syscall_traps=78 tls_traps=0\r\nenter guest bits=64 entry=0x401160 stack=0x452d7ff610 argc=1\r\n"
+    }
+  ],
+  "old_luv": {
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "be8ec8893e1950a11ce8fddbddd69ce1c9d27ebdbc54e18df2bef7f487c37e46",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 134,
+    "forced_cleanup": false,
+    "elapsed_seconds": 27.935,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "e348d03419d27791ebad07109c7b50928e3a577665db42b4e7cbaf2a9b3d1e7d",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "a0a119a1333aca8e98a344c32b4fefcabcd66f97fcdc70ebc05040b1a340a7b6",
+      "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+    },
+    "syscall_gaps": [],
+    "runtime_gaps": [],
+    "recorded_utc": "2026-11-14T03:15:43.095254+00:00",
+    "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+    "probe": "build\\probes\\20261114T031514362788Z\\game",
+    "command": [
+      "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tools\\probe_game.py",
+      "--preload",
+      "--timeout",
+      "60",
+      "--host",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+      "--lua-script",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tests\\luv_timer.lua"
+    ],
+    "markers": [
+      "dnf-native-luv-timer-fired"
+    ],
+    "passed": false,
+    "log_sha256": {
+      "stdout.log": "22d8d2028679ba361333e87b42a996fbce079eb80a7201b149c4f373b5140885",
+      "stderr.log": "41077e004a21fb81e3edb82dcb0d76a783be84abaf48b6f8447d6839b5e8e0c3"
+    }
+  },
+  "fixed_luv": {
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 42,
+    "forced_cleanup": false,
+    "elapsed_seconds": 28.118,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "e348d03419d27791ebad07109c7b50928e3a577665db42b4e7cbaf2a9b3d1e7d",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "a0a119a1333aca8e98a344c32b4fefcabcd66f97fcdc70ebc05040b1a340a7b6",
+      "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+    },
+    "syscall_gaps": [],
+    "runtime_gaps": [],
+    "recorded_utc": "2026-11-14T03:16:12.036306+00:00",
+    "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+    "probe": "build\\probes\\20261114T031543250497Z\\game",
+    "command": [
+      "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tools\\probe_game.py",
+      "--preload",
+      "--timeout",
+      "60",
+      "--host",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\staged\\i686\\dnf-host.exe",
+      "--lua-script",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tests\\luv_timer.lua"
+    ],
+    "markers": [
+      "dnf-native-luv-timer-fired",
+      "dnf-native-luv-loop-returned"
+    ],
+    "passed": true,
+    "log_sha256": {
+      "stdout.log": "bcbd142528797a4ef5f25cc47ba8aa24801837d473ea463384ca4704a2d87649",
+      "stderr.log": "76b62411e9e7c6f9cb721f4373592d1dafcde01cc016bab7c7e0442c650d4b13"
+    }
+  },
+  "fixed_epoll": [
+    {
+      "arch": "i686",
+      "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+      "fixture_sha256": "ad65c0797e148ff16496e1febbd3c138ebaa802e539be57f03d38c72e99d05c0",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "checks": {
+        "udp_request": true,
+        "marker": "epoll-wait\n"
+      },
+      "stdout": "epoll-wait\npipe-epoll-ok\n",
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "43fa14cb9e385cce17c28cb42c0120fff66f25b1696c083b26b61d58bf076d1f",
+      "fixture_sha256": "a95447291d4ec4e752926947c5c6a61ce28a8978414ff58c444dfe2669bbb041",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "checks": {
+        "udp_request": true,
+        "marker": "epoll-wait\n"
+      },
+      "stdout": "epoll-wait\npipe-epoll-ok\n",
+      "passed": true
+    }
+  ],
+  "observed_failure": {
+    "probe": "build/probes/20261114T030830982926Z/game",
+    "lua_fixture": "build/luv-timer.lua",
+    "exit_code": 134,
+    "forced_cleanup": false,
+    "syscall_gaps": [],
+    "last_epoll_operation": "i386 epoll_ctl(epfd=3, EPOLL_CTL_ADD, pipefd=6, event)",
+    "last_signal": "tgkill(self, self, SIGABRT)",
+    "stderr_sha256": "b01102c3b19d8a9edca31431e141141f334e85fd446e12adeec269dceadc2019"
+  },
+  "regression": {
+    "poll": {
+      "recorded_utc": "2026-11-14T03:13:31.366651+00:00",
+      "results": [
+        {
+          "arch": "i686",
+          "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "43fa14cb9e385cce17c28cb42c0120fff66f25b1696c083b26b61d58bf076d1f",
+          "exit_code": 42,
+          "passed": true
+        }
+      ]
+    },
+    "net": {
+      "recorded_utc": "2026-11-14T03:13:32.634098+00:00",
+      "results": [
+        {
+          "arch": "i686",
+          "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "arch": "i686",
+          "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "43fa14cb9e385cce17c28cb42c0120fff66f25b1696c083b26b61d58bf076d1f",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "43fa14cb9e385cce17c28cb42c0120fff66f25b1696c083b26b61d58bf076d1f",
+          "exit_code": 42,
+          "passed": true
+        }
+      ]
+    },
+    "entry": {
+      "recorded_utc": "2026-11-14T03:13:33.164676+00:00",
+      "results": [
+        {
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "exit_code": 126,
+          "passed": true
+        },
+        {
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "exit_code": 126,
+          "passed": true
+        },
+        {
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "exit_code": 42,
+          "passed": true
+        }
+      ]
+    },
+    "ld-start": {
+      "recorded_utc": "2026-11-14T03:13:33.279952+00:00",
+      "results": [
+        {
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "exit_code": 127,
+          "passed": true
+        }
+      ]
+    },
+    "channel": {
+      "recorded_utc": "20261114T031333379901Z",
+      "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+      "elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "checks": {
+        "negative_handshake": true,
+        "positive_responses": 32,
+        "fragmented_request": true,
+        "coalesced_requests": true
+      },
+      "error": null,
+      "gaps": [],
+      "exit_code": 0,
+      "forced_cleanup": false
+    },
+    "relay": {
+      "recorded_utc": "20261114T031347832365Z",
+      "host_sha256": "be8ec8893e1950a11ce8fddbddd69ce1c9d27ebdbc54e18df2bef7f487c37e46",
+      "elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "checks": {
+        "registered_peers": 2,
+        "tcp_messages": 32,
+        "udp_disconnect": true,
+        "other_peer_preserved": true,
+        "fragmented_request": true,
+        "coalesced_requests": true
+      },
+      "error": null,
+      "gaps": [],
+      "exit_code": 0,
+      "forced_cleanup": false
+    }
+  },
+  "reproduction": [
+    "python tools/build.py",
+    "python tools/test_epoll.py",
+    "python tools/test_luv.py",
+    "python tools/test_poll.py",
+    "python tools/test_net.py",
+    "python tools/test_entry.py",
+    "python tools/test_ld.py",
+    "python tools/test_channel.py",
+    "python tools/test_relay.py"
+  ],
+  "limitations": [
+    "Staged build: canonical host is still used by the earlier original game diagnostic.",
+    "Full natural game startup and shutdown are not accepted by these fixtures.",
+    "No EPOLLET, ONESHOT, nested epoll or complete Linux epoll semantics acceptance.",
+    "Windows 10 x64 10.0.19044 only."
+  ]
+}
