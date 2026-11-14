@@ -20,6 +20,101 @@ from test_channel import request_stop
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def start_core(instance, db, services):
+    from probe_monitor import private_elf, UDP_STOP_PATCHES
+    entries = [("manager", "manager", "nofork"), ("dbmw_guild", "dbmw_gld_siroco", "nofork"),
+               ("dbmw_mnt", "dbmw_mnt_siroco", "nofork"), ("dbmw_stat", "dbmw_stat_siroco", "nofork"),
+               ("monitor", "mnt_siroco", "nofork"), ("guild", "gld_siroco", "nofork"),
+               ("statics", "stat_siroco", "nofork"), ("coserver", "coserver", "nofork"),
+               ("community", "community", "nofork"), ("auction", "auction_siroco", "run"),
+               ("point", "point_siroco", "run"), ("channel", "channel", "run"),
+               ("relay", "relay_200", "run"), ("stun", "test", None)]
+    for name, config_name, action in entries:
+        private = instance / "core" / name
+        arch = "x86_64" if name == "stun" else "i686"
+        for directory in (["lib64", "usr"] if name == "stun" else ["lib", "usr"]):
+            shutil.copytree(ROOT / ".local/sysroot" / arch / directory, private / directory)
+        guest = private / "home/neople" / name
+        shutil.copytree(ROOT / "originals/dp123/home/neople" / name, guest)
+        for directory in ["log", "pid"]:
+            (guest / directory).mkdir(exist_ok=True)
+        for config in (guest / "cfg").glob("*.cfg"):
+            text = config.read_text(encoding="utf-8")
+            text = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "127.0.0.1", text)
+            if name in ["channel", "relay"]:
+                text = re.sub(r"(?m)^max_client\s*=.*$", "max_client = 16", text)
+            fields = []
+            if name.startswith("dbmw") and config.stem == config_name:
+                fields = [("master_db_" + key, value) for key, value in
+                          [("ip", "host"), ("port", "port"), ("acc", "user"), ("pwd", "password"), ("name", "database")]]
+            elif name in ["auction", "point"] and config.stem == config_name:
+                fields = [(prefix + "_" + key, value) for prefix in ["game_db", "auction_db"]
+                          for key, value in [("ip", "host"), ("port", "port"), ("acc", "user"), ("pwd", "password")]]
+            for field, key in fields:
+                text, count = re.subn(r"(?m)^" + field + r"[^\S\r\n]*=.*$",
+                                      lambda match: field + " = " + str(db[key]), text)
+                if count != 1:
+                    raise RuntimeError("Original configuration field not found: " + field)
+            config.write_text(text, encoding="utf-8")
+        elf = guest / ("df_dbmw_r" if name.startswith("dbmw") else "df_" + name + "_r")
+        original_sha = sha(elf)
+        if name == "monitor":
+            private_elf(ROOT / "originals/dp123/home/neople/monitor/df_monitor_r", elf)
+        arguments = [config_name] + ([action] if action else [])
+        if name in ["auction", "point"]:
+            arguments = ["./cfg/" + config_name + ".cfg", "run", "./" + elf.name]
+        host = ROOT / "build" / arch / "dnf-host.exe"
+        ld = private / ("lib64" if name == "stun" else "lib") / "ld-2.17.so"
+        command = [str(host), "--root", str(private), sha(ld), "--env", "HOME=/home/neople", "--cwd",
+                   "/home/neople/" + name, "--run", str(elf), sha(elf), "/home/neople/" + name + "/" + elf.name, *arguments]
+        record = {"name": name, "host_sha256": sha(host), "original_elf_sha256": original_sha,
+                  "executed_elf_sha256": sha(elf), "arguments": arguments,
+                  "configuration_sha256": {str(p.relative_to(guest)): sha(p)
+                                            for p in sorted((guest / "cfg").rglob("*")) if p.is_file()}}
+        if name == "monitor":
+            record["patches"] = UDP_STOP_PATCHES
+        with (private / "stdout.private.log").open("wb") as out, (private / "stderr.log").open("wb") as err:
+            process = subprocess.Popen(command, stdout=out, stderr=err)
+        services.append((process, private, record))
+        print("Core started", name, "pid", process.pid, flush=True)
+        try:
+            process.wait(timeout=20 if name in ["auction", "point"] else 1)
+        except subprocess.TimeoutExpired:
+            continue
+        raise RuntimeError(name + " exited before game startup")
+
+
+def stop_core(services):
+    for process, private, record in reversed(services):
+        record["forced_cleanup"] = False
+        record["exited_before_stop"] = process.poll() is not None
+        if process.poll() is None:
+            signal = 12 if record["name"] in ["auction", "point", "community"] else 15
+            record["stop_signal"] = signal
+            request_stop(process.pid, signal)
+            if record["name"] == "stun":
+                # Default SIGTERM is observed once its blocking recv wakes.
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as wake:
+                    wake.sendto(b"\x01", ("127.0.0.1", 2311))
+            try:
+                process.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                record["forced_cleanup"] = True
+                process.terminate()
+                process.wait(timeout=5)
+        record["exit_code"] = process.returncode
+        stderr = (private / "stderr.log").read_text(encoding="utf-8", errors="replace")
+        stdout = (private / "stdout.private.log").read_text(encoding="utf-8", errors="replace")
+        record["gaps"] = [line for line in stderr.splitlines()
+                          if any(t in line for t in ["syscall gap", "unhandled exception", "unsupported", "exhausted"])]
+        markers = ["DBMW_ALL_DB Open Success", "Application Init() Success!", "Application Load() Success!",
+                   "Application End!", "Server Terminated", "Guild And Guild Member DB Save Success!",
+                   "Community Server(IP:127.0.0.1, PORT:31100)", "Recv SIGTERM signal", "Application Stop!"]
+        record["markers"] = [marker for marker in markers if marker in stdout]
+        record["logs"] = {name: sha(private / name) for name in ["stderr.log", "stdout.private.log"]}
+        print("Core exit", record["name"], process.returncode, "forced", record["forced_cleanup"], flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database-source", type=Path, required=True,
@@ -31,9 +126,13 @@ def main():
                         help="Request SIGUSR2 after observing the original startup marker for this long")
     parser.add_argument("--script-db", action="store_true",
                         help="Run only the original JS init_db interface check, then exit 42")
+    parser.add_argument("--core", action="store_true",
+                        help="Observe the other 14 core services alongside bridge/game; requires log review, not business acceptance")
     args = parser.parse_args()
     if args.script_db and args.stop_after_started is not None:
         parser.error("--script-db exits before natural game startup")
+    if args.core and args.script_db:
+        parser.error("--core requires natural game startup")
     source = args.database_source.resolve()
     # Both ports are fixed by the current original bridge/game configuration.
     for port in [3306, 7000]:
@@ -78,6 +177,11 @@ def main():
                "host_sha256": sha(host), "bridge_sha256": sha(elf),
                "scope": "Original JS database interface only" if args.script_db else "Original game startup observation; no business acceptance"}
     database = bridge = None
+    core_services = []
+    if args.core:
+        receipt["core_services"] = []
+        receipt["core_configuration"] = {"addresses": "loopback", "channel_relay_max_client": 16,
+                                         "monitor": "private UDP shutdown patch", "stun": "test mode; default signal exit"}
     try:
         command = [str(mysqlbin / "mysqld.exe"), "--no-defaults", "--basedir=" + str(mysqlbin.parent),
                    "--datadir=" + str(dbroot / "data"), "--lower-case-table-names=1", "--character-set-server=latin1",
@@ -147,6 +251,15 @@ def main():
             config = dbroot / "game-db.json"
             config.write_text(json.dumps(db), encoding="utf-8")
             command += ["--db-config", str(config)]
+        if args.core:
+            month = sql("SELECT DATE_FORMAT(NOW(),'%Y%m');").decode("ascii").strip()
+            receipt["monthly_history_tables"] = []
+            for schema in ["taiwan_cain_auction_gold", "taiwan_cain_auction_cera"]:
+                for table in ["auction_history", "auction_history_buyer"]:
+                    name = schema + "." + table + "_" + month
+                    sql("CREATE TABLE IF NOT EXISTS " + name + " LIKE " + schema + "." + table + ";")
+                    receipt["monthly_history_tables"].append(name)
+            start_core(instance, db, core_services)
         print("Private game chain:", instance, flush=True)
         subprocess.run(command, cwd=ROOT, check=True)
         probe = json.loads((ROOT / "build/game-probe.json").read_text(encoding="utf-8"))
@@ -167,6 +280,9 @@ def main():
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:
+        stop_core(core_services)
+        if args.core:
+            receipt["core_services"] = [record for process, private, record in core_services]
         if bridge:
             if bridge.poll() is None:
                 request_stop(bridge.pid)
@@ -181,6 +297,7 @@ def main():
             if database.poll() is None:
                 result = subprocess.run([str(mysqlbin / "mysqladmin.exe"), *options, "shutdown"], capture_output=True, timeout=15)
                 receipt["mysql_shutdown_exit_code"] = result.returncode
+                (dbroot / "shutdown.private.log").write_bytes(result.stdout + result.stderr)
                 try:
                     database.wait(timeout=20)
                 except subprocess.TimeoutExpired:
@@ -193,6 +310,9 @@ def main():
         print("Chain receipt:", instance / "receipt.json", flush=True)
     if receipt.get("error"):
         raise SystemExit(receipt["error"])
+    if any(record["exited_before_stop"] or record["forced_cleanup"] or record["gaps"]
+           for process, private, record in core_services):
+        raise SystemExit("Core peer observation has failures; inspect its receipt and application logs")
 
 
 if __name__ == "__main__":

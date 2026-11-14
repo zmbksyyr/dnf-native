@@ -397,3 +397,13 @@ Windows 兼容接口不能替换仍打开的目标文件，独立 Windows 对照
 仅对私有 zerg ELF 的 0x080775d5 起 49 字节调整顺序，将原本的统计清理调用移到 reactor/timer 清理之后；修正移动指令的相对 call，保留全部清理、函数大小及其余字节。补丁先核对原版 SHA-256 和旧字节，记录新字节与执行哈希；原件不变，省略 --fix-cleanup-order 即恢复未修补对照。反汇编核对新的统计清理位于 0x08077601。正式探测复测三个组件均 SIGTERM 自行返回 0，无强制回收、无 runtime gap，原始 zerg 哈希复核不变。
 
 该结果仅证明已观察的初始化/退出和 gunner 的真实 TCP 连接。原路由仍引用缺少的 9001 端点，type 31 与本地 zerg 共用 9000，且 watchdog 缺 /proc/<pid>/stat、restrict.txt 缺失等提示仍保留；没有宣称完整 TSS 拓扑、反外挂业务或可选性已验收。证据见 [安全组件清理顺序](evidence/p3-security-cleanup-order.json)，复现 `python tools/probe_security.py --host build/staged/i686/dnf-host.exe --local-routes --fix-cleanup-order --observe-seconds 10`。仅实测 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · 首次 16 服务联合启动与停止观察
+
+同一私有 MySQL 上同时运行 core 的 16 个原版服务，monitor 使用已记录的私有 UDP 停服补丁。game 加载原版 DP2/Lua/JS/Frida/PVF，1280.542 秒出现自然启动标记和原版 Lua 加载/执行成功；再观察 120.054 秒，SIGUSR2 后三项关服标记齐全，Frida dispose、DP2 unload，game 自行返回 0，总计 1460.043 秒。其余 14 个 peer 在各自停止请求前均仍存活，全部自行退出，无强制回收、无 peer runtime gap。guild 实际记录 Accept GameServer 并在停止时完成数据库保存标记；这些局部事件不能替代完整服务互通。
+
+bridge 脚本响应逐字节匹配原件，返回 0。MySQL 服务器和 mysqladmin 本次均返回 0，停库输出为空，源私有数据库逐文件身份未变。本轮 channel/relay 容量为 16，所有私有服务地址为 loopback，当月拍卖表在副本按原模板创建。STUN 使用原版 test 模式，SIGTERM 加一字节 UDP 唤醒后本次实际返回 0，没有额外应用清理标记；不沿用此前预计的 143，也不把它写成完整清理验收。
+
+game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）fallback；另反复出现 network unsupported nr=102 op=15，具体 socket option 未被旧日志记录。因此本轮只计联合自然启动和停止观察，完整互通仍未通过。后续静态定位发现 game 的 getsockopt 调用除频道代理的 SO_RCVBUF 外，其余位于非阻塞连接/MonitorTcpThread，使用 SOL_SOCKET/SO_ERROR；实际动态调用细节和修复另行验证，不能将推断记为已修复。
+
+证据见 [16 服务联合观察](evidence/p3-core-co-run.json)。tools/probe_game_chain.py 新增 --core 复用本轮准备和停止步骤，并记录 peer 退出、配置和 monitor 补丁；核心标记仍须结合应用日志审阅。复现 `python tools/probe_game_chain.py --database-source <停止的私有恢复库> --core --dp2-cleanup --stop-after-started 120 --timeout 2100`。仅验证 Windows 10 x64 10.0.19044，客户端、GUI、MySQL 单文件和交付包仍未验收。

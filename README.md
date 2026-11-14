@@ -80,3 +80,5 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 `python tools/test_file_sync.py --hosts build/staged` 核对 rename 的实际替换和打开目标时的明确限制，以及关闭原 fd 后的共享文件 MS_SYNC 与落盘字节。`python tools/probe_security.py --host build/staged/i686/dnf-host.exe` 在新副本观察原版安全三件套，收集应用文件日志和 runtime 缺口并停止本次进程；它不以退出码 0 证明初始化成功，也不计安全组件业务验收。当前原配置中的监控/配置中心依赖仍未满足，详见实施记录。
 
 安全组件的本地路由及停服对照使用 `python tools/probe_security.py --host build/staged/i686/dnf-host.exe --local-routes --fix-cleanup-order --observe-seconds 10`。这两个选项分别修改私有配置和校验后调整私有 zerg ELF 的清理顺序；receipt 保留修改前后哈希与补丁，输入原件不变。原路由尚有未提供的依赖，不等于完整安全业务通过。
+
+`python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --core --dp2-cleanup --stop-after-started 120 --timeout 2100` 观察完整 core 16 服务的联合启动/停止。私有地址使用 loopback，channel/relay 测试容量为 16，monitor 应用已记录的私有 UDP 停服补丁。receipt 与应用日志共同用于审阅；首次运行仍暴露 game getsockopt 缺口，不计完整互通或客户端验收。
