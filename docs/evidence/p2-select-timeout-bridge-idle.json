@@ -1,0 +1,130 @@
+{
+  "recorded_utc": "2026-11-14T03:44:37.030818+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "source_base_commit": "8407022",
+  "scope": "Linux select timeout normalization; original bridge idle observation and protocol regression.",
+  "root_cause": {
+    "original_bridge_sleep": "LinuxSystem::sleep(int) at 0x080508cc, caller App::run at 0x08050676",
+    "original_request": "select(0, NULL, NULL, NULL, {tv_sec=0, tv_usec=10000000})",
+    "old_result": "EINVAL before waiting, original caller ignores error and loops",
+    "linux_behavior": "Carry tv_usec / 1000000 into seconds and use the remainder as microseconds.",
+    "additional_timer_observation": "A timeout return must zero timeval even when GetTickCount64 rounds elapsed time below the requested microseconds."
+  },
+  "normative_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/v2.6.32/fs/select.c",
+      "sha256": "79a0b999248822f12f3a305c86e9ee67dc6f155f1471174c42f3601f8d2aae37",
+      "basis": "SYSCALL_DEFINE5(select) timeout conversion; behavior independently reimplemented."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/v3.10/fs/select.c",
+      "sha256": "1dc81a9705954f5d0cb17c1f07ad9a45bd5a7cf55dd5ec5a2a1da134e0a9dc85",
+      "basis": "SYSCALL_DEFINE5(select) timeout conversion; behavior independently reimplemented."
+    }
+  ],
+  "sources": {
+    "runtime/net.c": "caf546ac1e5111f5dad2cf3a58c1c3f756ea11f02db8492af2c76342f85b90fd",
+    "tests/poll.c": "b53ef23b275e5bf3381f330ce161540050d608d8ca782e60b310b347df18ef7a",
+    "tools/test_poll.py": "6c71176e3cf8bf1602c090591e90f79a793137fcfae7adc0a235ff0c67998655"
+  },
+  "old_fixtures": [
+    {
+      "arch": "i686",
+      "host_sha256": "c830c112551f23d50d56d7ef8c3760a5e9889c986277184431aebd7137c0b78c",
+      "fixture_sha256": "2a933be373f6c789273a6989ec8772e17a87a5800c57c23dfaa0b968b04eb34c",
+      "exit_code": 48,
+      "forced_cleanup": false,
+      "passed": false
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "dce5dc49ad6c19bfdf35176b3a074a780c1103df5bba362e697319deec2252c7",
+      "fixture_sha256": "f614562691515071bda2fee3ab845523c169fa119066b46b4bb64fe6205ec56f",
+      "exit_code": 48,
+      "forced_cleanup": false,
+      "passed": false
+    }
+  ],
+  "fixed_fixtures": [
+    {
+      "arch": "i686",
+      "host_sha256": "246e85ba24fd277a6814b9127873ab5770bad54ce691a2ffd4beda15335f04ab",
+      "fixture_sha256": "2a933be373f6c789273a6989ec8772e17a87a5800c57c23dfaa0b968b04eb34c",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "cdf425a7e968452be4d34a60221aab1b972c95f29ae35453e0290c992685649f",
+      "fixture_sha256": "f614562691515071bda2fee3ab845523c169fa119066b46b4bb64fe6205ec56f",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "passed": true
+    }
+  ],
+  "original_bridge_before": {
+    "recorded_utc": "20261114T034039619898Z",
+    "probe": "build\\probes\\20261114T034039619898Z\\bridge",
+    "host_sha256": "c830c112551f23d50d56d7ef8c3760a5e9889c986277184431aebd7137c0b78c",
+    "elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+    "checks": {
+      "different_version": true,
+      "same_version": true,
+      "fragmented_version": true,
+      "coalesced_requests": true,
+      "script_responses": 4
+    },
+    "idle_observation": {
+      "max_client": 16,
+      "process_id": 1116,
+      "elapsed_seconds": 3.0001335999986622,
+      "cpu_seconds": 3.078125
+    },
+    "gaps": [],
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "log_sha256": {
+      "mysql.private.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr.log": "24c620b6d73994cab9dac965ab759915d345532a459aa30db5946390a24c9bbf",
+      "stdout.private.log": "4d825a38d4233172541a0065a25f16da708820f93b08b22afa5234ef98631410"
+    }
+  },
+  "original_bridge_after": {
+    "recorded_utc": "20261114T034308573327Z",
+    "probe": "build\\probes\\20261114T034308573327Z\\bridge",
+    "host_sha256": "246e85ba24fd277a6814b9127873ab5770bad54ce691a2ffd4beda15335f04ab",
+    "elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+    "checks": {
+      "different_version": true,
+      "same_version": true,
+      "fragmented_version": true,
+      "coalesced_requests": true,
+      "script_responses": 4
+    },
+    "idle_observation": {
+      "max_client": 16,
+      "process_id": 9376,
+      "elapsed_seconds": 3.0002655000134837,
+      "cpu_seconds": 0.078125
+    },
+    "gaps": [],
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "log_sha256": {
+      "mysql.private.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr.log": "5850bc239eacd5063f8d9b7085bb5d402a96eb34236e314f6d4df6d13e84d8af",
+      "stdout.private.log": "319c41b01203a96413ae08c481954cb39a0d4e0e0d57b3415527f55023b92bee"
+    }
+  },
+  "commands": [
+    "python tools/build.py",
+    "python tools/test_poll.py",
+    "python tools/test_bridge.py --db-config PRIVATE_CONNECTION_JSON --port 7002"
+  ],
+  "limitations": [
+    "Fixed fixtures and bridge use separate staged hosts while the epoll-fix natural game observation continues on its original host.",
+    "Bridge idle measurements use private max_client=16 copies and a three-second no-client window; not a long-duration workload.",
+    "Only Windows 10 x64 10.0.19044. Not complete service or game acceptance."
+  ]
+}

@@ -102,8 +102,12 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     if (args[4]) {
         if (!nr_memory(args[4], 2 * sizeof(uintptr_t), 1)) return -14;
         intptr_t input[2]; memcpy(input, (const void *)args[4], sizeof(input));
-        if (input[0] < 0 || input[0] > LONG_MAX || input[1] < 0 || input[1] >= 1000000) return -22;
-        timeout.tv_sec = (long)input[0]; timeout.tv_usec = (long)input[1]; wait = &timeout;
+        if (input[0] < 0 || input[1] < 0) return -22;
+        /* Linux select carries excess tv_usec into seconds. Original bridge
+           uses this form for its ten-second main-loop sleep. */
+        uint64_t seconds = (uint64_t)input[0] + (uint64_t)input[1] / 1000000;
+        if (seconds > LONG_MAX) return -22;
+        timeout.tv_sec = (long)seconds; timeout.tv_usec = (long)(input[1] % 1000000); wait = &timeout;
     }
     int count;
     if (!sets[0].fd_count && !sets[1].fd_count && !sets[2].fd_count) {
@@ -128,7 +132,7 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     if (args[4]) {
         uint64_t microseconds = (uint64_t)timeout.tv_sec * 1000000 + timeout.tv_usec;
         uint64_t used = (GetTickCount64() - start) * 1000;
-        if (used >= microseconds) microseconds = 0; else microseconds -= used;
+        if (!count || used >= microseconds) microseconds = 0; else microseconds -= used;
         uintptr_t output[] = {(uintptr_t)(microseconds / 1000000), (uintptr_t)(microseconds % 1000000)};
         memcpy((void *)args[4], output, sizeof(output));
     }

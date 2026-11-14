@@ -295,3 +295,13 @@ Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE
 后续完整诊断运行在 1286.188 秒返回 134，实际 abort 返回地址同样是原版 `libuv.so+0x19661`。原版反汇编确认该地址紧随 `uv__io_poll` 的 epoll_ctl 非 EEXIST 错误分支，和短样件一致。修复构建中附加 Frida 的短定时器也自行返回 42，耗时 29.392 秒；正式宿主重建后的无 Frida 定时器检查返回 42，耗时 25.372 秒，无强制回收或 gap。完整修复构建已启动新的 game、bridge、私有 MySQL 联合观察，其自然启动结果仍待本轮结束后记录。
 
 证据见 [epoll 管道与原版 luv 定时器](evidence/p2-epoll-pipe-luv.json)。仅实测 Windows 10 x64 10.0.19044，EPOLLET/ONESHOT 等仍未支持。
+
+## 2026-11-14 · select 微秒进位与 bridge 空转
+
+完整 game 观察期间，外部只读采样发现原版 bridge 主循环持续占用 CPU，活动栈落在 `App::run`、`LinuxSystem::sleep` 和 select。原版 `0x080508cc` 将十秒等待写成 `{tv_sec=0, tv_usec=10000000}`；runtime 原先拒绝大于等于一百万的微秒值，立即返回 EINVAL，原调用方忽略错误后反复重试。核对 Linux v2.6.32、v3.10 的 select 超时转换后，仅修改现有转换：微秒按一百万向秒进位。没有给应用加固定延时、修改原版 ELF 或新增依赖。
+
+双架构样件在旧宿主均复现错误；修复后确实等待一秒并返回 0，同时核对剩余 timeval 清零和负微秒值拒绝。复测还发现 GetTickCount64 的粒度会让已超时请求偶尔留下一个微秒，因此在实际返回超时时直接把剩余值清零。原有管道 poll、背压、HUP 和外部写入唤醒继续通过；同一阶段的双架构 TCP、epoll 检查也通过。
+
+原版 bridge 采用独立 loopback 端口 7002、相同私有 MySQL 和 max_client=16 副本作对照。三秒无客户端窗口中，旧宿主消耗 3.078125 秒进程 CPU，最终修复宿主消耗 0.078125 秒；版本相同/不同、拆包/连包、四次完整频道脚本响应都通过，两者均响应 SIGTERM 后自行返回 0。此数据只证明本次空转消除，不代表长期负载或完整业务通过。正在运行的 game 联合观察保留原宿主，因此这组修复先在独立 `build/staged/` 构建验证。
+
+证据见 [select 超时与 bridge 空转](evidence/p2-select-timeout-bridge-idle.json)。正式构建后可用 `python tools/test_poll.py` 复现；已有正式宿主运行时可传 `--hosts build/staged`。仅验证 Windows 10 x64 10.0.19044。

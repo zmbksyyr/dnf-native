@@ -1,5 +1,6 @@
-"""Verify pipe poll readiness, backpressure, hangup and a delayed external write."""
+"""Verify select timeout normalization and real pipe poll state/wakeups."""
 
+import argparse
 import datetime
 import hashlib
 import json
@@ -15,6 +16,9 @@ BIN = ROOT / ".local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin"
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--hosts", type=Path, default=ROOT / "build", help="Directory containing i686/x86_64 hosts")
+    args = parser.parse_args()
     env = dict(os.environ)
     env["PATH"] = str(BIN) + os.pathsep + env.get("PATH", "")
     records = []
@@ -27,7 +31,7 @@ def main():
                  "-Wall", "-Wextra", "-Werror", "-Wl,--image-base=" + base, "-Wl,-e,_start",
                  str(ROOT / "tests/poll.c"), "-o", str(fixture)]
         subprocess.run(build, env=env, check=True)
-        host = ROOT / "build" / arch / "dnf-host.exe"
+        host = args.hosts.resolve() / arch / "dnf-host.exe"
         sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
         command = [str(host), "--run", str(fixture), sha, "poll-fixture"]
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -61,9 +65,9 @@ def main():
                         "host_sha256": hashlib.sha256(host.read_bytes()).hexdigest(),
                         "fixture_sha256": sha, "exit_code": process.returncode, "forced_cleanup": forced,
                         "stdout": stdout.decode("utf-8", "replace"), "stderr": stderr, "passed": passed})
-        print(arch, "pipe poll", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
+        print(arch, "select timeout / pipe poll", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "os": platform.platform(), "scope": "Own Linux pipe fixtures and external Windows pipe writer; not service acceptance",
+              "os": platform.platform(), "scope": "Own Linux select/pipe fixtures and external Windows pipe writer; not service acceptance",
               "results": records}
     (ROOT / "build/poll-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(record["passed"] for record in records):
