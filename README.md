@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。安全初始化的数据库已接入 15 个辅助服务和原版 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致；单文件已增加原生逻辑备份、冷副本还原、切换失败自动回滚和未完成切换恢复，并完成独立实测。原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。安全初始化的数据库已接入 15 个辅助服务和原版 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致；单文件已增加原生逻辑备份、冷副本还原、切换失败自动回滚和未完成切换恢复，并完成独立实测。自研 Win32 GUI 的数据库操作已通过真实控件测试，原版服务管理、插件配置、原始客户端业务、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -99,4 +99,6 @@ mysql-standalone.exe restore INSTANCE BACKUP_DIRECTORY
 mysql-standalone.exe recover INSTANCE
 ```
 
-维护过程使用官方本机共享内存协议并禁用 TCP。诊断已复现官方命名管道发送大 SQL 时断连，共享内存通过对应请求；没有修改官方 PE。复核用 `python tools/test_mysql_maintenance.py --exe build/mysql-standalone/mysql-standalone.exe --database-source PRIVATE_SECURE_INSTANCE`。DNF 停服协调、GUI 接入、密码迁移、跨实例还原和断电验收仍待完成。
+维护过程使用官方本机共享内存协议并禁用 TCP。诊断已复现官方命名管道发送大 SQL 时断连，共享内存通过对应请求；没有修改官方 PE。复核用 `python tools/test_mysql_maintenance.py --exe build/mysql-standalone/mysql-standalone.exe --database-source PRIVATE_SECURE_INSTANCE`。DNF 停服协调、GUI 中的服务编排、密码迁移、跨实例还原和断电验收仍待完成。
+
+原生 GUI：先构建当前 MySQL 单文件，再运行 `python tools/build_gui.py`；生成 `build/gui/DNF-Native.exe` 及相邻的 `mysql-standalone.exe`。启动 `DNF-Native.exe --instance PRIVATE_INSTANCE`，可选择实例、安全初始化、启动/停止、备份、还原和恢复未完成操作。启动会核对本次进程标记、UUID 及真实 SQL/TLS 响应；关闭正在运行的窗口会正常停库。`python tools/test_gui.py` 通过真实窗口控件执行上述操作并保存私有截图和证据。当前 GUI 仅管理数据库，19 个原版服务及插件配置尚未接入；不是完整发布包。

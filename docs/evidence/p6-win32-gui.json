@@ -1,0 +1,143 @@
+{
+  "recorded_utc": "2026-11-14T09:03:52.069017+00:00",
+  "scope": "Self-developed Win32 GUI against the native single-EXE MySQL controller: instance selection, asynchronous initialization/start/stop, SQL identity/TLS verification, corrupt backup failure, backup/restore, cold recovery and owned child lifecycle. No original service orchestration or gameplay acceptance.",
+  "build": {
+    "gui_sha256": "c7d188f530f9f8ef16bf77e6d9a4b13252670946541b089bd38f98f76f39e95b",
+    "gui_bytes": 854528,
+    "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+    "mysql_bytes": 15958528,
+    "gui_build_receipt_sha256": "0249c2f87ddc977d87160000df530185e3bb8ba13b43283802b98e22409d8f50",
+    "gui_sources": {
+      "delivery/controller_gui.cpp": "0d9dea95fb056bfadb66addb887492b7d38f7563a9a42f2e4f02790d4d4c3402",
+      "delivery/controller_gui.manifest": "5e1724adbe22642744ce26760deb3c686ad820897dc6feb942183e98ba9a802c",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+      "tools/build_gui.py": "da110694526ac66e80c5e3fef1571e7081314e667e3b081ea58ab35513c0989d"
+    },
+    "normal_imports": {
+      "machine": "x86_64",
+      "import_dlls": [
+        "USER32.dll",
+        "GDI32.dll",
+        "SHELL32.dll",
+        "ole32.dll",
+        "ADVAPI32.dll",
+        "msvcrt.dll",
+        "KERNEL32.dll"
+      ],
+      "note": "Normal imports only; not delay-load/runtime closure"
+    },
+    "mysql_sources": {
+      "delivery/mysql_standalone.cpp": "faa4449e23540824bf8342457bb3f193d43ec7be0312095df8ba3c443327b1c7",
+      "delivery/mysql_operations.h": "96cee73fe98219f07d13d683fb71f88e75b3fee55f7927a4f4e404dc954d36f0",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e"
+    },
+    "mysql_build_receipt_sha256": "f5e3ed94dbd177631da62eacc53f5124eb666ac54c9480120a2bdc62e4e2729d"
+  },
+  "probe": {
+    "path": "build/probes/20261114T090235644970Z/gui",
+    "receipt_sha256": "c59df371eddb75dbce148672fc8aa518c94af3f23a6946647086c33f166cab80",
+    "result": {
+      "recorded_utc": "20261114T090235644970Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T090235644970Z\\gui",
+      "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle; no original service GUI or gameplay acceptance.",
+      "gui_sha256": "c7d188f530f9f8ef16bf77e6d9a4b13252670946541b089bd38f98f76f39e95b",
+      "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+      "script_sha256": "9a11ae34906c35e419c1e93485b07f2f47757328fd07296b3fd368d0a4d97256",
+      "checks": {
+        "instance_path_can_be_cleared_and_selected_again": true,
+        "initialize_window_response_ms": 0.098,
+        "gui_secure_initialization": true,
+        "gui_start_checks_sql_identity_and_tls": true,
+        "different_uuid_on_same_port_does_not_stop_first_instance": true,
+        "gui_normal_shutdown": true,
+        "backup_window_response_ms": 0.087,
+        "busy_close_waits_without_canceling_backup": true,
+        "gui_corrupt_restore_reports_error_without_data_writes": true,
+        "restore_window_response_ms": 0.118,
+        "gui_backup_and_restore_native_results": true,
+        "restored_rows_and_removed_extra_schema": true,
+        "close_window_normally_stops_owned_database": true,
+        "gui_process_exit_code": 0,
+        "gui_pending_restore_blocks_start_and_recovery_restores_cold_data": true
+      },
+      "forced_cleanup": false,
+      "running_screenshot_sha256": "7f896ccf0f7e5ccedbde6a82312728861ce87d27287f1b14026cae2e72f09bb8",
+      "backup_sql_sha256": "2bb7bddee53f11b7a7107266f757695ab2dee4036ba66c98d95bc37e773a7042",
+      "restored_screenshot_sha256": "40e16308bb8d6d759fe00c66b9d1323fe51b17be6c6523cd39c7723abecdfd21",
+      "limits": [
+        "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
+        "GUI currently manages MySQL only; original service orchestration, plugins, password editing and level selection remain pending.",
+        "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
+        "No final complete offline ZIP or gameplay acceptance."
+      ]
+    }
+  },
+  "checks": {
+    "instance_path_can_be_cleared_and_selected_again": true,
+    "initialize_window_response_ms": 0.098,
+    "gui_secure_initialization": true,
+    "gui_start_checks_sql_identity_and_tls": true,
+    "different_uuid_on_same_port_does_not_stop_first_instance": true,
+    "gui_normal_shutdown": true,
+    "backup_window_response_ms": 0.087,
+    "busy_close_waits_without_canceling_backup": true,
+    "gui_corrupt_restore_reports_error_without_data_writes": true,
+    "restore_window_response_ms": 0.118,
+    "gui_backup_and_restore_native_results": true,
+    "restored_rows_and_removed_extra_schema": true,
+    "close_window_normally_stops_owned_database": true,
+    "gui_process_exit_code": 0,
+    "gui_pending_restore_blocks_start_and_recovery_restores_cold_data": true
+  },
+  "limits": [
+    "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
+    "GUI currently manages MySQL only; original service orchestration, plugins, password editing and level selection remain pending.",
+    "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
+    "No final complete offline ZIP or gameplay acceptance.",
+    "GUI service list/start-stop, plugin/Frida controls, level switching and application password editing remain unimplemented.",
+    "Tests exercise the real database GUI in developer Windows 10 only; no clean Win7/10/11 package acceptance."
+  ],
+  "test_sources": {
+    "tools/test_gui.py": "9a11ae34906c35e419c1e93485b07f2f47757328fd07296b3fd368d0a4d97256",
+    "tools/test_mysql_maintenance.py": "e6d03a16f6df48f122e10eee914c8dcd46606492248fab80c18d7df9b2b9b382"
+  },
+  "native_maintenance_regression": {
+    "probe": "build/probes/20261114T085736105530Z/mysql-maintenance",
+    "receipt_sha256": "c2677883bac026bc4bdd26f2d2ae2d317cf5ca06ccb16cdf8c95e8ef8db4c49c",
+    "exit_code": 0,
+    "checks": {
+      "running_instance_refused": true,
+      "native_full_logical_backup": true,
+      "corrupt_backup_refused_without_data_writes": true,
+      "failed_sql_import_preserved_active_database": true,
+      "native_shadow_restore_byte_exact": true,
+      "innodb_myisam_binary_rows_and_extra_schema_removal": true,
+      "accounts_routines_events_and_triggers_restored": true,
+      "cold_snapshot_and_logical_prebackup_retained": true,
+      "automatic_rollback_after_original_datadir_rename": true,
+      "rename_window_recovery": [
+        "before_rename",
+        "between_renames",
+        "after_activation"
+      ],
+      "owned_server_exits_when_wrapper_is_terminated": true
+    },
+    "source_data_unchanged": true,
+    "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a"
+  },
+  "automation_corrections": [
+    {
+      "probe": "build/probes/20261114T085327032735Z/gui",
+      "issue": "The verifier observed status text before the same GUI completion handler re-enabled controls; wait for the actual control enable state."
+    },
+    {
+      "probe": "build/probes/20261114T085355291189Z/gui",
+      "issue": "The verifier passed a local pointer in cross-process BFFM_SETSELECTION; fixed the automation to allocate the folder path in its own GUI process, because WM_USER messages do not marshal buffers."
+    },
+    {
+      "probe": "build/probes/20261114T085649017889Z/gui",
+      "issue": "GetWindowText does not read a foreign EDIT control; fixed the verifier to use marshaled WM_GETTEXT. The captured GUI log was populated."
+    }
+  ]
+}
