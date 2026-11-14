@@ -1,0 +1,35 @@
+{
+  "recorded_utc": "2026-11-14T05:00:00Z",
+  "scope": "Runtime select socket readiness and concurrent close policy; original DBMW regression",
+  "finding": {
+    "trigger": "A DBMW worker closes a listening socket while another thread is in select. Winsock wakes select with a stale ready count; the original guest then reads its already -1 socket descriptor and crashes at 0x08058634.",
+    "original_evidence": "build/probes/20261114T044912841390Z/dbmw (private diagnostic run)",
+    "policy": "The runtime publishes INVALID_SOCKET before closesocket and returns -EBADF when a monitored slot changed during the wait. It does not report a stale positive ready count or empty ready sets."
+  },
+  "implementation": {
+    "source": "runtime/net.c",
+    "test_source": "tests/select_close.c",
+    "test": "tools/test_select_close.py --hosts build/staged",
+    "staged_hosts": {
+      "i686_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+      "x86_64_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d"
+    }
+  },
+  "results": {
+    "i686": {"exit_code": 42, "attempts": 5, "passed": true},
+    "x86_64": {"exit_code": 42, "attempts": 5, "passed": true},
+    "original_dbmw": {
+      "probe": "build/probes/20261114T050055134280Z/dbmw",
+      "instances": ["dbmw_guild", "dbmw_mnt", "dbmw_stat"],
+      "exit_codes": [1, 1, 1],
+      "normal_cleanup_markers": true,
+      "forced_cleanup": false,
+      "mysql_exit_code": 0,
+      "database_source_unchanged": true
+    }
+  },
+  "limits": [
+    "Cross-thread close/select is unspecified by Linux; EBADF is this runtime's explicit policy for the observed Windows stale-wakeup case.",
+    "No complete 16-service or client business acceptance."
+  ]
+}

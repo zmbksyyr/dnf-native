@@ -351,3 +351,11 @@ bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。�
 bridge 完整频道脚本响应匹配原文件，并自行返回 0。MySQL 日志记录 InnoDB 正常关闭和 Shutdown complete，服务器返回 0，无强制回收，源私有库逐文件身份不变。停库辅助命令 mysqladmin 返回 1，旧探测器未保留其 stderr，故不把辅助命令计为成功；该问题不影响已经取得的 game 正常关服证据。仍记录 msync（144）、inotify（291/332）探测 fallback，未声明这些调用已经实现。
 
 证据见 [game 完整关服](evidence/p2-game-clean-shutdown.json)。复现命令为 `python tools/probe_game_chain.py --database-source <停止的私有恢复库> --dp2-cleanup --stop-after-started 120 --timeout 2100`。本次使用含 SIGUSR2 修复的原宿主，后续零入口与 select 修复不混入本轮构建结论。通过范围是 game、bridge、私有数据库的自然启动及正常关服，实测系统仍为 Windows 10 x64 10.0.19044；16 服务就绪、客户端业务、GUI、最终包和另外两个系统均未验收。
+
+## 2026-11-14 · DBMW 并发关闭 socket
+
+三个原版 DBMW 的停服崩溃根因已确认：一个线程关闭监听 socket 时，Winsock 唤醒另一个线程的 select；runtime 原先返回了 stale ready count，而 guest 按已被原版改写为 -1 的 fd 重建集合，在 `TCPSocket::pollReadEvent()+0xf2` 访问越界。修复在关闭前发布 INVALID_SOCKET，select 返回后检查监视槽位是否改变并返回 `-EBADF`；结果集合按快照重建，避免空集合配正数。
+
+双架构自编 ELF 样件五次并发关闭均以 42 退出，验证 fd 集合、读写计数、关闭策略和 EBADF。修复后的三个原版 DBMW 均完成 11 个数据库连接、网络线程、加载和 SIGTERM 清理标记后自行返回 1；反汇编确认原版 main 在正常 Clear 后固定返回 1。stderr 无 runtime gap、无强制回收，私有 MySQL 返回 0，源库身份不变。
+
+证据见 [DBMW 并发关闭](evidence/p2-select-close.json)，复现 `python tools/test_select_close.py` 与 `python tools/probe_dbmw.py --database-source <停止的私有恢复库>`。本轮修复已由正式双架构构建完成；只验证 DBMW 初始化与停服，不宣称 DBMW 业务协议、16 服务或客户端验收。

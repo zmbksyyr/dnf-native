@@ -85,6 +85,7 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     if (args[0] > 256) return -22;
     size_t bytes = ((args[0] + sizeof(uintptr_t) * 8 - 1) / (sizeof(uintptr_t) * 8)) * sizeof(uintptr_t);
     unsigned char bits[3][32] = {{0}};
+    SOCKET sockets[256] = {0};
     fd_set sets[3];
     for (unsigned i = 0; i < 3; ++i) {
         FD_ZERO(&sets[i]);
@@ -94,7 +95,9 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
         for (unsigned fd = 0; fd < args[0]; ++fd) {
             if (!(bits[i][fd / 8] & (1u << (fd % 8)))) continue;
             if (run->file_access[fd] != 4) return -9;
-            FD_SET((SOCKET)run->sockets[fd], &sets[i]);
+            sockets[fd] = (SOCKET)run->sockets[fd];
+            if (sockets[fd] == INVALID_SOCKET) return -9;
+            FD_SET(sockets[fd], &sets[i]);
         }
     }
     struct timeval timeout, *wait = NULL;
@@ -122,12 +125,21 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
         count = 0;
     } else count = select(0, &sets[0], &sets[1], &sets[2], wait);
     if (count == SOCKET_ERROR) return socket_error();
+    /* Winsock can report readiness when another thread closes a socket.
+       Reject that stale result before returning guest descriptor sets. */
+    for (unsigned fd = 0; fd < args[0]; ++fd)
+        if (((bits[0][fd / 8] | bits[1][fd / 8] | bits[2][fd / 8]) & (1u << (fd % 8))) &&
+            (run->file_access[fd] != 4 || (SOCKET)run->sockets[fd] != sockets[fd])) return -9;
+    count = 0;
     for (unsigned i = 0; i < 3; ++i) {
         if (!args[i + 1]) continue;
-        memset(bits[i], 0, bytes);
-        for (unsigned fd = 0; fd < args[0]; ++fd)
-            if (run->file_access[fd] == 4 && FD_ISSET((SOCKET)run->sockets[fd], &sets[i])) bits[i][fd / 8] |= (unsigned char)(1u << (fd % 8));
-        memcpy((void *)args[i + 1], bits[i], bytes);
+        unsigned char output[32] = {0};
+        for (unsigned fd = 0; fd < args[0]; ++fd) {
+            unsigned char bit = (unsigned char)(1u << (fd % 8));
+            if (!(bits[i][fd / 8] & bit)) continue;
+            if (FD_ISSET(sockets[fd], &sets[i])) { output[fd / 8] |= bit; ++count; }
+        }
+        memcpy((void *)args[i + 1], output, bytes);
     }
     if (args[4]) {
         uint64_t microseconds = (uint64_t)timeout.tv_sec * 1000000 + timeout.tv_usec;
@@ -362,11 +374,15 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         *result = r == SOCKET_ERROR ? socket_io_error() : r; return 1;
     }
     if (number == CLOSE && !operation) {
+        /* Publish the closing state before closesocket wakes a blocked select.
+           Keep the slot occupied until its remaining state has been cleared. */
+        InterlockedExchangePointer((PVOID volatile *)&run->sockets[fd], (PVOID)INVALID_SOCKET);
         *result = closesocket(s) == 0 ? 0 : socket_error();
         if (!*result) {
-            run->file_access[fd] = 0; run->sockets[fd] = 0; run->nonblock[fd] = 0;
+            run->nonblock[fd] = 0;
             run->receive_timeout[fd] = run->send_timeout[fd] = 0;
-        }
+            run->file_access[fd] = 0;
+        } else run->sockets[fd] = (uintptr_t)s;
         return 1;
     }
     if (number == FCNTL && !operation) {
