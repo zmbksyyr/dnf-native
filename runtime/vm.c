@@ -99,7 +99,20 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     }
     NrVm *v = NULL;
     for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
-    if (!v) { fputs("mmap guest region table exhausted\n", stderr); return -12; }
+    if (!v) {
+        size_t reserved = 0, live_pages = 0, partial = 0;
+        for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
+            NrVm *region = &run->vm[i]; reserved += region->size;
+            if (region->mapped_pages) {
+                ++partial;
+                for (size_t page = 0; page < region->size / 4096; ++page)
+                    live_pages += (region->mapped_pages[page / 8] >> (page % 8)) & 1;
+            } else live_pages += region->size / 4096;
+        }
+        fprintf(stderr, "mmap guest region table exhausted slots=%u partial=%zu reserved=%zu live=%zu\n",
+                NR_VM_SLOTS, partial, reserved, live_pages * 4096);
+        return -12;
+    }
     if (flags & 0x20) {
         if (flags & 1) return -38;
         v->base = VirtualAlloc(NULL, length, MEM_RESERVE | (args[2] ? MEM_COMMIT : 0), protect(args[2]));

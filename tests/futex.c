@@ -42,6 +42,15 @@ static struct Worker workers[9];
 extern result spawn(word stack, word parent_tid, word tls, word child_tid);
 
 __attribute__((noreturn)) void child_main(struct Worker *worker) {
+    for (unsigned i = 0; i < 2000; ++i) {
+        word self;
+#ifdef __x86_64__
+        __asm__ volatile("movq %%fs:0, %0" : "=r"(self));
+#else
+        __asm__ volatile("movl %%gs:0, %0" : "=r"(self));
+#endif
+        CHECK(self == (word)worker->tls);
+    }
     CHECK(futex(&first, 128, 0, 0, 0, 0) == 0);
     __atomic_store_n(&worker->done, 1, __ATOMIC_SEQ_CST);
     call(EXIT, 0, 0, 0, 0, 0, 0);

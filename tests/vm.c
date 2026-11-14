@@ -84,6 +84,16 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         CHECK(*(volatile unsigned char *)(trimmed + 8 * page) == (unsigned char)i);
         CHECK(UNMAP(trimmed + 8 * page, 8 * page) == 0);
     }
+    word regions[1500];
+    for (unsigned i = 0; i < 1500; ++i) {
+        regions[i] = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);
+        CHECK(regions[i] && regions[i] < (word)-4095);
+        *(volatile unsigned char *)regions[i] = (unsigned char)i;
+    }
+    for (unsigned i = 0; i < 1500; ++i) {
+        CHECK(*(volatile unsigned char *)regions[i] == (unsigned char)i);
+        CHECK(UNMAP(regions[i], page) == 0);
+    }
 
 #ifndef __x86_64__
     word remap = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);

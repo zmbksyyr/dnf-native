@@ -519,7 +519,6 @@ int nr_run(NrRun *run) {
     if (!run->usr2_event) return 1;
     run->thread_count = 1;
     run->threads[0].tid = GetCurrentProcessId();
-    if (!nr_thread_init(run)) return 1;
     run->signal_code = VirtualAlloc(NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (!run->signal_code) return 1;
     memcpy(run->signal_code, "\x0f\x0b", 2);

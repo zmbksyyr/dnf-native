@@ -110,7 +110,8 @@ def copy_service_resources(output, db, bridge_password, peers_only=False):
         if not optional and name != "stun":
             section["pid_file"] = guest_dir + "/pid/" + config_name + ".pid"
         if name == "game":
-            section.update(env1="LD_PRELOAD=/dp2/libdp2pre.so", env2="LD_LIBRARY_PATH=/dp2/lib:/home/neople/game")
+            section.update(env1="LD_PRELOAD=/dp2/libdp2pre.so",
+                           env2="LD_LIBRARY_PATH=/lib/i686/nosegneg:/dp2/lib:/home/neople/game")
         section.update({"arg" + str(i): value for i, value in enumerate(arguments)})
         ini[name] = section
         records.append({"name": name, "original_elf_sha256": original_sha, "executed_elf_sha256": sha256(elf),

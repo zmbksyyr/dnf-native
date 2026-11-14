@@ -1,5 +1,7 @@
 #include "run.h"
 #include <string.h>
+#include <winternl.h>
+#include <stdio.h>
 
 static DWORD thread_key = TLS_OUT_OF_INDEXES;
 static CRITICAL_SECTION wait_lock;
@@ -7,9 +9,17 @@ typedef struct Waiter { struct Waiter *next; uintptr_t address; HANDLE event; } 
 static Waiter *waiters;
 
 NrThread *nr_current(void) { return thread_key == TLS_OUT_OF_INDEXES ? NULL : TlsGetValue(thread_key); }
+DWORD nr_thread_tls_slot(void) { return thread_key; }
+__attribute__((noreturn, force_align_arg_pointer)) void nr_tls_uninitialized(void) {
+    fputs("unimplemented guest TLS site: TLS base is not initialized\n", stderr);
+    ExitProcess(126);
+}
 void nr_thread_attach(NrThread *thread) {
     if (!thread->tid) thread->tid = GetCurrentThreadId();
     if (!TlsSetValue(thread_key, thread)) ExitProcess(124);
+#ifndef _WIN64
+    if (thread_key < TLS_MINIMUM_AVAILABLE && NtCurrentTeb()->TlsSlots[thread_key] != thread) ExitProcess(124);
+#endif
 }
 int nr_thread_init(NrRun *run) {
     (void)run;

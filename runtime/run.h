@@ -3,7 +3,8 @@
 
 #include "elf.h"
 
-#define NR_VM_SLOTS 1024
+/* The original game without DP2's allocator needs over 1024 live mappings. */
+#define NR_VM_SLOTS 4096
 
 typedef struct {
     uint32_t events;
@@ -83,6 +84,7 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
 int nr_deliver_signal(NrRun *run, CONTEXT *context);
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 NrThread *nr_current(void);
+DWORD nr_thread_tls_slot(void);
 int nr_thread_init(NrRun *run);
 void nr_thread_attach(NrThread *thread);
 int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *context, intptr_t *result);

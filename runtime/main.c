@@ -15,7 +15,7 @@ static char *utf8(const wchar_t *value) {
 }
 
 int wmain(int argc, wchar_t **argv) {
-    NrRun run = {0};
+    static NrRun run;
     wchar_t *root = NULL, *ld_hash = NULL, *cwd = NULL;
     while (argc >= 3) {
         if (argc >= 4 && !wcscmp(argv[1], L"--root")) {
@@ -57,6 +57,7 @@ int wmain(int argc, wchar_t **argv) {
         return 1;
     }
     if (execute) {
+        if (!nr_thread_init(&run)) return 1;
         for (unsigned i = 0; i < elf->header->phnum; ++i) {
             if (elf->programs[i].type == 3) {
                 wchar_t path[32768];

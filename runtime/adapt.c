@@ -1,8 +1,79 @@
 #include "elf.h"
 #include <Zydis/Decoder.h>
+#include <Zydis/Encoder.h>
+#include <winternl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _WIN64
+DWORD nr_thread_tls_slot(void);
+void nr_tls_uninitialized(void);
+
+/* Absolute GS reads dominate glibc's thread/canary checks. Read our per-thread
+   pointer from the SDK TEB layout, then execute the same instruction natively.
+   Other TLS operands keep the existing exception path. */
+static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *instruction,
+                      const ZydisDecodedOperand *operands) {
+    DWORD slot = nr_thread_tls_slot();
+    if (slot >= TLS_MINIMUM_AVAILABLE || instruction->length < 5 || instruction->address_width != 32 ||
+        instruction->operand_count_visible != 2 ||
+        (instruction->mnemonic != ZYDIS_MNEMONIC_MOV && instruction->mnemonic != ZYDIS_MNEMONIC_XOR &&
+         instruction->mnemonic != ZYDIS_MNEMONIC_CMP)) return 0;
+    unsigned memory = operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY ? 0 : 1;
+    const ZydisDecodedOperand *operand = &operands[memory];
+    if (operand->type != ZYDIS_OPERAND_TYPE_MEMORY || operand->mem.segment != ZYDIS_REGISTER_GS ||
+        operand->mem.base != ZYDIS_REGISTER_NONE || operand->mem.index != ZYDIS_REGISTER_NONE ||
+        (operand->actions & ZYDIS_OPERAND_ACTION_MASK_WRITE) || operand->size != 32) return 0;
+    unsigned scratch = 1; /* ECX, or EDX if the original instruction uses ECX. */
+    for (unsigned i = 0; i < 2; ++i) {
+        if (operands[i].type != ZYDIS_OPERAND_TYPE_REGISTER) continue;
+        if (operands[i].reg.value == ZYDIS_REGISTER_ESP || operands[i].size != 32) return 0;
+        if (operands[i].reg.value == ZYDIS_REGISTER_ECX) scratch = 2;
+    }
+    ZydisEncoderRequest request;
+    if (!ZYAN_SUCCESS(ZydisEncoderDecodedInstructionToEncoderRequest(instruction, operands, 2, &request))) return 0;
+    request.prefixes &= ~ZYDIS_ATTRIB_HAS_SEGMENT;
+    request.operands[memory].mem.base = scratch == 1 ? ZYDIS_REGISTER_ECX : ZYDIS_REGISTER_EDX;
+    unsigned char code[64];
+    code[0] = (unsigned char)(0x50 + scratch); /* PUSH scratch preserves flags. */
+    code[1] = 0x9c;
+    code[2] = 0x64; code[3] = 0x8b; code[4] = (unsigned char)(5 | (scratch << 3));
+    uint32_t tls_offset = (uint32_t)offsetof(TEB, TlsSlots) + slot * 4;
+    memcpy(code + 5, &tls_offset, 4);
+    code[9] = 0x8b; code[10] = (unsigned char)((scratch << 3) | scratch); /* NrThread.tls_base is first. */
+    code[11] = 0x85; code[12] = (unsigned char)(0xc0 | (scratch << 3) | scratch);
+    code[13] = 0x74; /* Uninitialized TLS retains the existing explicit failure. */
+    code[15] = 0x9d;
+    ZyanUSize length = 15;
+    if (!ZYAN_SUCCESS(ZydisEncoderEncodeInstruction(&request, code + 16, &length))) return 0;
+    size_t bytes = 16 + length;
+    code[bytes++] = (unsigned char)(0x58 + scratch);
+    code[bytes++] = 0xe9;
+    NrCodePage *page = elf->tls_pages;
+    if (!page || sizeof(page->code) - page->used < bytes + 11) {
+        page = VirtualAlloc(NULL, sizeof(*page), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        if (!page) return 0;
+        page->next = elf->tls_pages; elf->tls_pages = page;
+    }
+    unsigned char *target = page->code + page->used;
+    uint32_t back = (uint32_t)(pc + instruction->length - (uintptr_t)(target + bytes + 4));
+    memcpy(code + bytes, &back, 4); bytes += 4;
+    code[14] = (unsigned char)(bytes - 15);
+    code[bytes++] = 0x9d; code[bytes++] = (unsigned char)(0x58 + scratch); code[bytes++] = 0xe9;
+    uint32_t failure = (uint32_t)((uintptr_t)nr_tls_uninitialized - (uintptr_t)(target + bytes + 4));
+    memcpy(code + bytes, &failure, 4); bytes += 4;
+    memcpy(target, code, bytes); page->used += bytes;
+    DWORD old, ignored;
+    if (!VirtualProtect((void *)pc, instruction->length, PAGE_EXECUTE_READWRITE, &old)) return 0;
+    unsigned char jump[15]; memset(jump, 0x90, instruction->length); jump[0] = 0xe9;
+    uint32_t displacement = (uint32_t)((uintptr_t)target - (pc + 5));
+    memcpy(jump + 1, &displacement, 4);
+    memcpy((void *)pc, jump, instruction->length);
+    if (!VirtualProtect((void *)pc, instruction->length, old, &ignored)) return -1;
+    return 1;
+}
+#endif
 
 static uintptr_t got_address(const NrElf *elf) {
     for (unsigned i = 0; i < elf->header->phnum; ++i) {
@@ -74,7 +145,7 @@ int nr_adapt(NrElf *elf, const char **error) {
 #else
     ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
 #endif
-    size_t capacity = 0, tls_count = 0, syscall_count = 0, section_count = 0;
+    size_t capacity = 0, tls_count = 0, direct_count = 0, syscall_count = 0, section_count = 0;
     uintptr_t got = got_address(elf);
     for (unsigned s = 0; s < h->shnum; ++s) {
         NrElfSection *section = &sections[s];
@@ -183,6 +254,17 @@ int nr_adapt(NrElf *elf, const char **error) {
 #endif
             if (tls || syscall) {
                 if (instruction.length < 2) return 0;
+#ifndef _WIN64
+                if (tls) {
+                    uintptr_t pc = elf->bias + (uintptr_t)section->addr + offset;
+                    if (memcmp((const void *)pc, elf->file + section->offset + offset, instruction.length)) {
+                        *error = "TLS instruction changed before adaptation"; return 0;
+                    }
+                    int direct = direct_tls(elf, pc, &instruction, operands);
+                    if (direct < 0) return 0;
+                    if (direct) { ++direct_count; offset += instruction.length; continue; }
+                }
+#endif
                 if (elf->trap_count == capacity) {
                     capacity = capacity ? capacity * 2 : 128;
                     void *memory = elf->traps ? HeapReAlloc(GetProcessHeap(), 0, elf->traps, capacity * sizeof(NrTrap)) :
@@ -205,10 +287,15 @@ int nr_adapt(NrElf *elf, const char **error) {
         }
     }
     if (!section_count) return 0;
+    for (NrCodePage *page = elf->tls_pages; page; page = page->next) {
+        DWORD old;
+        if (!VirtualProtect(page, sizeof(*page), PAGE_EXECUTE_READ, &old) ||
+            !FlushInstructionCache(GetCurrentProcess(), page->code, page->used)) return 0;
+    }
     if (elf->trap_count > 1) qsort(elf->traps, elf->trap_count, sizeof(*elf->traps), trap_compare);
     if (!FlushInstructionCache(GetCurrentProcess(), elf->allocation, elf->allocation_size)) return 0;
-    fprintf(stderr, "adapt sha256=%s sections=%zu syscall_traps=%zu tls_traps=%zu\n",
-            elf->sha256, section_count, syscall_count, tls_count);
+    fprintf(stderr, "adapt sha256=%s sections=%zu syscall_traps=%zu tls_traps=%zu tls_direct=%zu\n",
+            elf->sha256, section_count, syscall_count, tls_count, direct_count);
     *error = NULL;
     return 1;
 }

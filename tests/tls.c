@@ -84,6 +84,36 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         : "=r"(flags_ok) : : "memory", "cc");
     CHECK(flags_ok == 1 && tls[0] == 0);
 
+#ifndef __x86_64__
+    /* Absolute glibc-style reads must preserve unrelated registers and MOV
+       flags; CMP/XOR must publish the real CPU flags. ECX forces a different
+       scratch register from the EAX/EDX cases. */
+    tls[2] = 0x7fa53c19;
+    for (word i = 0; i < 200000; ++i) {
+        word loaded, preserved = i + 21, ok;
+        __asm__ volatile(
+            "xorl %%ecx, %%ecx\n\tstc\n\t"
+            "movl %%gs:8, %%ecx\n\t"
+            "jnc 1f\n\tjnz 1f\n\t"
+            "xorl %%gs:8, %%ecx\n\t"
+            "jnz 1f\n\tjc 1f\n\t"
+            "cmpl $0x7fa53c19, %%gs:8\n\t"
+            "jnz 1f\n\t"
+            "movl $1, %1\n\tjmp 2f\n1:\tmovl $0, %1\n2:"
+            : "=&c"(loaded), "=&r"(ok), "+d"(preserved) : : "memory", "cc");
+        CHECK(loaded == 0 && ok == 1 && preserved == i + 21);
+    }
+    /* The direct path must read the current TLS base on every execution. */
+    word other[8] = {0}; other[2] = 0x13579bdf;
+    for (word i = 0; i < 8; ++i) {
+        descriptor[1] = (unsigned)(word)((i & 1) ? tls : other);
+        CHECK(call(243, (word)descriptor, 0, 0) == 0);
+        word loaded;
+        __asm__ volatile("movl %%gs:8, %0" : "=a"(loaded));
+        CHECK(loaded == ((i & 1) ? tls[2] : other[2]));
+    }
+#endif
+
     /* Register-based addressing changes on each iteration; no stale address. */
     for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
         word offset = (i & 1) * sizeof(word), value = i + 10, loaded;

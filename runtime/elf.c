@@ -54,7 +54,6 @@ done:
 int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int require_entry, const char **error) {
     HANDLE input = INVALID_HANDLE_VALUE;
     LARGE_INTEGER size;
-    DWORD count = 0;
     memset(elf, 0, sizeof(*elf));
     *error = "cannot read ELF";
     input = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
@@ -62,11 +61,15 @@ int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int 
         size.QuadPart < (LONGLONG)sizeof(NrElfHeader) || size.QuadPart > NR_MAX_IMAGE)
         goto fail;
     elf->file_size = (size_t)size.QuadPart;
-    elf->file = HeapAlloc(GetProcessHeap(), 0, elf->file_size);
-    if (!elf->file || !ReadFile(input, elf->file, (DWORD)elf->file_size, &count, NULL) ||
-        count != elf->file_size)
-        goto fail;
-    CloseHandle(input);
+    /* Keep immutable input bytes in a shared, read-only file view instead of
+       a second private heap copy in every service process. Retaining the
+       read-only handle also prevents writes while the ELF is in use. */
+    HANDLE section = CreateFileMappingW(input, NULL, PAGE_READONLY, 0, 0, NULL);
+    if (!section) goto fail;
+    elf->file = MapViewOfFile(section, FILE_MAP_READ, 0, 0, 0);
+    CloseHandle(section);
+    if (!elf->file) goto fail;
+    elf->file_handle = input;
     input = INVALID_HANDLE_VALUE;
     *error = "ELF SHA-256 mismatch";
     if (!file_hash(elf) || (expected_hash && (strlen(expected_hash) != 64 || _stricmp(elf->sha256, expected_hash))))
@@ -184,8 +187,14 @@ fail:
 }
 
 void nr_elf_close(NrElf *elf) {
+    while (elf->tls_pages) {
+        NrCodePage *next = elf->tls_pages->next;
+        VirtualFree(elf->tls_pages, 0, MEM_RELEASE);
+        elf->tls_pages = next;
+    }
     if (elf->allocation) VirtualFree(elf->allocation, 0, MEM_RELEASE);
-    if (elf->file) HeapFree(GetProcessHeap(), 0, elf->file);
+    if (elf->file) UnmapViewOfFile(elf->file);
+    if (elf->file_handle) CloseHandle(elf->file_handle);
     if (elf->traps) HeapFree(GetProcessHeap(), 0, elf->traps);
     memset(elf, 0, sizeof(*elf));
 }

@@ -45,8 +45,15 @@ typedef struct {
 #endif
 } NrElfProgram;
 
+typedef struct NrCodePage {
+    struct NrCodePage *next;
+    size_t used;
+    unsigned char code[4096 - sizeof(void *) - sizeof(size_t)];
+} NrCodePage;
+
 typedef struct {
     unsigned char *file;
+    HANDLE file_handle;
     size_t file_size;
     NrElfHeader *header;
     NrElfProgram *programs;
@@ -56,6 +63,7 @@ typedef struct {
     char sha256[65];
     NrTrap *traps;
     size_t trap_count;
+    NrCodePage *tls_pages;
 } NrElf;
 
 int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int require_entry, const char **error);
