@@ -187,3 +187,13 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 同一正式宿主的 120 秒复测实际出现 `Frida Init Stage:early`、`setup success`、`set function success` 和 `frida main, args =`，并进入全部业务库连接成功、查询表、`GlobalData` 和 `HistoryLog` 初始化。后续暴露 i386 `lstat64`、`inotify_init` 和 `inotify_init1` 缺口；该次仍由超时清理，MySQL 正常停库，尚不构成完整 Frida 双向调用、game 就绪或最终验收。
 
 证据见 [管道等待、加载器锁与 HOME 复测](evidence/p2-pipe-poll-readiness.json)。临时诊断均从忽略目录中的源码副本构建，正式 runtime 无诊断改动，宿主已恢复；验证环境仍仅为 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · lstat 与原版 Frida 脚本重载
+
+本阶段补齐原版 Frida 实际触发的 i386 `lstat64`，以及同一元数据路径的 x86_64 `lstat`。普通文件和目录通过不跟随重解析点的 Windows handle 获取真实身份、大小和时间；Windows junction 等重解析点的 POSIX 元数据暂不支持，明确失败。双架构样件验证普通文件、目录、缺失路径、无效输出地址，以及 `stat` 跟随 junction、`lstat` 明确拒绝的区别。实现提交为 `ae6c8e4`，全部既有回归再次通过。
+
+使用默认 guest `HOME` 的 180 秒原版 game + DP2 复测中，`lstat64` 缺口消失，出现 Frida early setup、函数设置成功及 `frida main`，game 继续到 `InitRDARScriptStringManager Success`。在观察到原版 main 标记后，仅向私有副本的原版 JS 追加一条 `console.log`，1.253 秒内出现该标记及 `Frida Init Stage:late`，证明原版脚本的监控与重新执行路径实际工作。原始 JS、ELF、PVF、字体及其他输入哈希均已复核；没有修改原始资产。
+
+`inotify_init`/`inotify_init1` 仍明确返回 `ENOSYS` 并记录 gap，当前 GLib 的文件轮询路径已满足本次脚本重载验证，因此未增加 inotify 机制。该次无其他 syscall gap、runtime gap 或未处理异常；DataManager 初始化仍未完成，进程在观察超时后清理，MySQL 正常退出。此结果不等于完整 JS/Lua 双向调用、全部 hook、game 就绪或最终验收。
+
+证据见 [lstat 与原版脚本重载](evidence/p2-lstat-frida-reload.json)。本阶段仅验证 Windows 10 x64 10.0.19044；19 服务互通、完整插件语义、Win7/Win11、GUI 和最终交付仍未完成。
