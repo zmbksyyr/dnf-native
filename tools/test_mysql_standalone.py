@@ -138,6 +138,14 @@ ConvertTo-Json -InputObject @($results) -Compress
             raise RuntimeError("TLS cipher is absent")
         receipt["tls_cipher"] = tls[1]
         checks["query_write_read_over_tls"] = True
+        # Original game INSERTs omit zero-date columns and rely on the source
+        # MySQL mode's range handling. Default 5.7 strict mode rejects them.
+        sql("CREATE TABLE native_probe.legacy_dates(id INT PRIMARY KEY,"
+            "last_play_time DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',"
+            "legacy_byte TINYINT UNSIGNED NOT NULL);"
+            "INSERT INTO native_probe.legacy_dates(id,legacy_byte) VALUES(1,300);")
+        assert sql("SELECT last_play_time,legacy_byte FROM native_probe.legacy_dates;").strip() == b"0000-00-00 00:00:00\t255"
+        checks["original_sql_mode_accepts_legacy_game_inserts"] = True
         dump = instance / "数据库备份.sql"
         invoke("mysqldump", options + ["--databases", "native_probe", "--routines", "--events", "--triggers",
                                        "--hex-blob", "--result-file=" + str(dump)])

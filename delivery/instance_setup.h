@@ -188,6 +188,11 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         for (const char *placeholder : {"Public IP", "UDP IP"}) if (text.find(placeholder) != std::string::npos) {
             replace_all(text, placeholder, "127.0.0.1"); changed = true;
         }
+        // Without this setting the original game treats local clients as
+        // monitoring probes and closes their sockets before authentication.
+        if (path.rfind(L"i686\\home\\neople\\game\\cfg\\", 0) == 0 && text.find("system_monitoring_ip") == std::string::npos) {
+            text += "\nsystem_monitoring_ip = 0.0.0.0\n"; changed = true;
+        }
         if (changed) write_private(target, text, CREATE_ALWAYS);
     }
     for (const wchar_t *path : {L"i686\\tmp",L"i686\\dev\\shm\\sec",L"service-logs"}) directory(instance + L"\\" + path);
@@ -215,6 +220,10 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     // Keep permissions at the application's existing schema boundary. This is
     // independent from the generated private root maintenance credential.
     for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'dnf_game'@'127.0.0.1';";
+    // Original stored routines use this definer. Keep their definitions intact;
+    // the locked account is only an execution identity, never a login account.
+    query += "CREATE USER 'game'@'%' IDENTIFIED BY '" + instance_secret(24) + "' ACCOUNT LOCK;"
+             "GRANT ALL ON taiwan_cain.* TO 'game'@'%';GRANT ALL ON taiwan_billing.* TO 'game'@'%';";
     query += "CREATE USER 'dnf_bridge'@'127.0.0.1' IDENTIFIED BY '" + bridge + "';GRANT SELECT ON d_channel.* TO 'dnf_bridge'@'127.0.0.1';"
              "CREATE USER 'dnf_frida'@'127.0.0.1' IDENTIFIED BY '" + frida + "';CREATE DATABASE frida;"
              "GRANT ALL ON d_taiwan.* TO 'dnf_frida'@'127.0.0.1';GRANT ALL ON frida.* TO 'dnf_frida'@'127.0.0.1';"
@@ -229,6 +238,8 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     std::wstring monthly;
     for (const wchar_t *schema : {L"taiwan_cain_auction_gold",L"taiwan_cain_auction_cera"}) for (const wchar_t *table : {L"auction_history",L"auction_history_buyer"})
         monthly += L"CREATE TABLE IF NOT EXISTS " + std::wstring(schema) + L"." + table + L"_" + decode(month) + L" LIKE " + schema + L"." + table + L";";
+    monthly += L"CREATE TABLE IF NOT EXISTS taiwan_cain_log.log_response_time_" + decode(month) +
+               L" LIKE taiwan_cain_log.log_response_time_202004;";
     if (sql(exe, instance, monthly.c_str()).code) throw std::runtime_error("Prepare monthly application tables failed");
     for (const wchar_t *name : {L"dbmw_guild\\cfg\\dbmw_gld_siroco.cfg",L"dbmw_mnt\\cfg\\dbmw_mnt_siroco.cfg",L"dbmw_stat\\cfg\\dbmw_stat_siroco.cfg",
                                L"game\\cfg\\siroco11.cfg",L"auction\\cfg\\auction_siroco.cfg",L"point\\cfg\\point_siroco.cfg"}) {

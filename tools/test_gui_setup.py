@@ -106,14 +106,21 @@ def main():
             config = (instance / "i686/home/neople" / name).read_text(encoding="utf-8")
             assert "Public IP" not in config and "UDP IP" not in config, name
             assert "127.0.0.1" in config, name
+            if name.startswith("game/"):
+                assert re.search(r"(?m)^system_monitoring_ip\s*=\s*0\.0\.0\.0\s*$", config), name
         checks["original_advertised_address_placeholders_are_local"] = True
         screenshot(window, probe / "created.png")
         click(window, 111); ready(window, "数据库 SQL 检查通过")
         schemas = query("SELECT TABLE_SCHEMA,COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY TABLE_SCHEMA ORDER BY TABLE_SCHEMA;")
         counts = {line.split("\t")[0]: int(line.split("\t")[1]) for line in schemas.decode("ascii").splitlines()}
         record["application_table_counts"] = counts
-        assert len(counts) == 18 and sum(counts.values()) == 605
+        assert len(counts) == 18 and sum(counts.values()) == 606
         checks["original_eighteen_schemas_and_current_month_tables"] = True
+        assert query("SELECT @@sql_mode;").strip() == b"NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+        assert query("SELECT account_locked FROM mysql.user WHERE User='game' AND Host='%';").strip() == b"Y"
+        query("CALL taiwan_cain.sp_game_channel();")
+        assert not query("SELECT PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE=CONCAT(CHAR(39),'game',CHAR(39),'@',CHAR(39),'%',CHAR(39)) AND PRIVILEGE_TYPE<>'USAGE';").strip()
+        checks["original_stored_routine_runs_with_locked_schema_definer"] = True
         game_cfg = (instance / "i686/home/neople/game/cfg/siroco11.cfg").read_text(encoding="utf-8")
         encoded = re.search(r"(?m)^master_db_pwd\s*=\s*([0-9a-f]{48})", game_cfg)[1]
         assert query("SELECT COUNT(*) FROM d_taiwan.db_connect WHERE db_ip<>'127.0.0.1' OR db_port<>3306 OR db_userid<>'dnf_game' OR db_passwd<>'" + encoded + "';").strip() == b"0"

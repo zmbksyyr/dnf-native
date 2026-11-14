@@ -77,6 +77,12 @@ def copy_service_resources(output, db, bridge_password, peers_only=False):
             text = path.read_text(encoding="utf-8")
             text = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "127.0.0.1", text)
             text = text.replace("Public IP", "127.0.0.1").replace("UDP IP", "127.0.0.1")
+            if name == "game":
+                # Original game drops monitoring peers before client auth.
+                # A local client must not match its default 127.0.0.1 peer.
+                text = re.sub(r"(?m)^system_monitoring_ip\s*=.*$", "system_monitoring_ip = 0.0.0.0", text)
+                if not re.search(r"(?m)^system_monitoring_ip\s*=", text):
+                    text += "\nsystem_monitoring_ip = 0.0.0.0\n"
             if name == "channel":
                 text = re.sub(r"(?m)^this_ip\s*=.*$", "this_ip = 127.0.0.1", text)
             if name in ["channel", "relay"]:
@@ -144,6 +150,10 @@ def prepare(output, database_source, mysql, peers_only=False):
         text, count = re.subn(r"(?m)^port=\d+", "port=3306", text)
         if count != 1:
             raise RuntimeError("Source database port setting is missing")
+        if name == "server.cnf":
+            text = re.sub(r"(?m)^sql_mode\s*=.*$", "sql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION", text)
+            if not re.search(r"(?m)^sql_mode\s*=", text):
+                text += "\nsql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n"
         (output / name).write_text(text, encoding="utf-8")
     db = json.loads((source / "game-db.json").read_text(encoding="utf-8"))
     db["port"] = 3306
@@ -174,6 +184,8 @@ def prepare(output, database_source, mysql, peers_only=False):
                 time.sleep(0.1)
         sql("CREATE USER 'dnf_bridge'@'127.0.0.1' IDENTIFIED BY '" + bridge_password +
             "'; GRANT SELECT ON d_channel.* TO 'dnf_bridge'@'127.0.0.1'; UPDATE d_taiwan.db_connect SET db_ip='127.0.0.1',db_port=3306;")
+        sql("CREATE USER 'game'@'%' IDENTIFIED BY '" + secrets.token_hex(24) + "' ACCOUNT LOCK;"
+            "GRANT ALL ON taiwan_cain.* TO 'game'@'%';GRANT ALL ON taiwan_billing.* TO 'game'@'%';")
         script = (ROOT / "originals/dp123/dp2/df_game_r.js").read_text(encoding="utf-8")
         quote = lambda value: "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
         user = re.search(r"var db_account_ptr = Memory.allocUtf8String\('([^']*)'\)", script)[1]
@@ -185,6 +197,8 @@ def prepare(output, database_source, mysql, peers_only=False):
         for schema in ["taiwan_cain_auction_gold", "taiwan_cain_auction_cera"]:
             for table in ["auction_history", "auction_history_buyer"]:
                 sql("CREATE TABLE IF NOT EXISTS " + schema + "." + table + "_" + month + " LIKE " + schema + "." + table + ";")
+        sql("CREATE TABLE IF NOT EXISTS taiwan_cain_log.log_response_time_" + month +
+            " LIKE taiwan_cain_log.log_response_time_202004;")
     finally:
         if server and server.poll() is None:
             try:
