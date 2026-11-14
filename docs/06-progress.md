@@ -555,3 +555,11 @@ ELF 原始字节改用只读文件视图，省去每进程的私有堆复制。�
 最终 GUI 与 ZIP 成员字节一致。首次创建专项在中文/空格/括号路径中通过损坏资源拒绝、非空目录保留、原始种子逐字节往返、每实例独立账号、15 个 peer 协议及原版 Frida 数据库接口；成功后清除暂存种子和模板，所有进程正常停止，无强制清理。此后从该实例复制并通过完整插件专项。ZIP CRC 通过；尚未执行独立干净系统上的解压验收。
 
 审阅程序位于 `build/review/DNF-Native.exe`，样件位于 `build/review/native-local-resources.zip`。按用户要求清除已完成实验的可重建大副本，先归档并校验诊断，再保留小型 receipt、六个最新完整验证目录及当前产物，build 约 8.51 GiB；输入原件、工具链和源码未动。详情见[压缩资源方案](07-local-package.md)及[来源、检查和清理证据](evidence/p7-local-package.json)。当前停在审阅点，不将样件视为已完成客户端业务、core/full 分包或三系统正式发布验收。
+
+## 2026-11-14 · 客户端 PVF 启动现场与后续工作
+
+继续推进用户授权的 jbz69 客户端与配套 PVF，复现原版 game 在物品动画模板初始化期间的崩溃。现场确认查找 `equipment/character/atswordman.lay` 返回 end 后被原版代码继续解引用；直接原因及证据见[兼容边界](08-compatibility-and-performance.md)和[脱敏记录](evidence/p8-client-pvf-startup.json)。尚未完成客户端登录、进图或存档，模板缺失的来源仍待核对。诊断只作用于私有宿主，输入原件与原版 ELF 未修改，进程正常收回。
+
+独立客户端约 13.2 GiB，后续验证复用这一份。再次归档旧实验日志并校验 ZIP，清除已完成的四组旧 probe、重复冷实例和三份重复 MySQL 构建，释放约 5.3 GiB，build 约 17.4 GiB。清单保存在 `build/cleanup-client-stage-receipt.json`；当前故障现场、一个冷实例、最终插件实例和审阅包保留。
+
+用户追加 GUI 布局改善与原版日志查看要求。后续在本项目 Win32 GUI 内完成，保持原生实现与逐阶段提交；仍需独立验证原始 stdout/stderr、应用自身日志与数据库日志的查看及刷新。

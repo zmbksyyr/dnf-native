@@ -1,0 +1,29 @@
+{
+  "recorded_utc": "2026-11-14T12:20:15.251613+00:00",
+  "scope": "Actual original ELF startup with the user-authorized current jbz69 client PVF; no client business acceptance. Private diagnostic host only; no original inputs modified.",
+  "game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+  "pvf_sha256": "dc444c3429a44c19419dba83c8b1c30e4263371afa528ba90430fda2f598e1e2",
+  "pvf_bytes": 237024513,
+  "client_started": false,
+  "outcome": "Original game crashed during equipment initialization, before ready. Owned GUI, peers and MySQL closed normally.",
+  "diagnostic": {
+    "original_function": "setEquipmentAniScriptLay",
+    "original_find_address": "0x089c1d1b",
+    "snprintf_call": "0x089c1eb4",
+    "missing_key": "equipment/character/atswordman.lay",
+    "observed_map_entries": 10,
+    "find_result_relative_to_map": 4,
+    "map_end_relative_to_map": 4,
+    "stack_return": "0x089c1eb9",
+    "fault_function": "glibc strchrnul scanning snprintf format",
+    "explanation": "Original code dereferences the failed map lookup without checking end; it treats unrelated bytes after the map header as a string pointer. Failure seen repeatedly with this PVF. Why this template was absent is not yet established; no blanket client incompatibility claim."
+  },
+  "read_only_reference": {
+    "file": "D:\\cache\\dnf-runtime\\dnf-winport\\src_dnf-winport_20261111\\dnf-winport\\rednf\\remake\\source\\DNFServer\\GameServer\\Game\\STEquipmentScript\\setEquipmentAniScriptLay_1.inc",
+    "sha256": "2bc9af55bb21a4cfc1d78acf206479e16e1fe6a102a053bc0e086d7cb88c06e0",
+    "use": "Semantic cross-check of failed find dereference after direct original ELF disassembly and runtime capture; no implementation or patches copied."
+  },
+  "private_logs": "build/probes/20261114T120516758431Z/client-game/instance/service-logs",
+  "diagnostic_script": ".local/build_client_diagnostic.py",
+  "normal_host_restored": true
+}
