@@ -197,3 +197,29 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 `inotify_init`/`inotify_init1` 仍明确返回 `ENOSYS` 并记录 gap，当前 GLib 的文件轮询路径已满足本次脚本重载验证，因此未增加 inotify 机制。该次无其他 syscall gap、runtime gap 或未处理异常；DataManager 初始化仍未完成，进程在观察超时后清理，MySQL 正常退出。此结果不等于完整 JS/Lua 双向调用、全部 hook、game 就绪或最终验收。
 
 证据见 [lstat 与原版脚本重载](evidence/p2-lstat-frida-reload.json)。本阶段仅验证 Windows 10 x64 10.0.19044；19 服务互通、完整插件语义、Win7/Win11、GUI 和最终交付仍未完成。
+
+## 2026-11-14 · 原版 Lua/JS 双向调用与真实 game hook
+
+实现提交 `3041574` 增加本项目自编 Lua/JS 样件，在原版 game、DP2、Lua、Frida 中执行，两次独立进程均通过。Lua→JS→Lua 的 32 轮嵌套调用严格检查整数、浮点数、字符串、Lua state 指针及返回值；同时检查 `frida.main` 参数和返回值 1401。
+
+样件从真实 `CEnvironment` 实例调用原地址 `0x08106ce0` 的 `get_server_group`，验证 hook 的 onEnter/onLeave、修改返回值、detach、原返回值及原指令字节恢复。实测 `original=0 hooked=64 restored=0`；脚本执行时配置尚未加载，因此基线是实际读取的 0，不能用后续配置值 3 代替。两次均由 guest `os.exit(42)` 正常结束，宿主返回 42，约 27 秒，无强制回收。
+
+证据见 [原版桥接与 game hook](evidence/p2-original-frida-bridge.json)。这验证了 G3 的上述接口子集，不代表完整原版脚本、并发回调、补丁冲突、game 业务或整个 P1/P2 退出通过。默认原版脚本的重载仍由上一阶段证据单独覆盖。
+
+## 2026-11-14 · monitor UDP 停服顺序
+
+原版 monitor 使用私有 loopback 配置补齐自身 `server_str.xml` 后，可完成 Application Init/Load；异常发生在停服阶段。诊断显示主线程调用 UDP `stop` 后立即析构对象，没有调用 `join`，而 UDP worker 仍进入 `RecvFromClient`，在 `0x08050422` 解引用已清空的 handler 指针。单次 SIGTERM 由主线程接收的现场同样复现，因此没有修改 runtime 的线程、futex 或信号分发来掩盖应用顺序问题。
+
+仅加入 join 会等待阻塞的 UDP 接收；worker 还会在启动延时后重新置位运行标志，覆盖提前停止。实现提交 `6263d98` 增加 `tools/probe_monitor.py --fix-udp-stop`：核对原版 SHA-256 和三处旧字节，仅生成私有 ELF 副本，在 pthread_create 前设置运行标志，移除 UDP 延时后的覆盖；停服时清除标志、关闭并置无效接收 fd、join，最后析构。文件长度和原虚拟地址保持不变，省略选项即可运行未修正原件；原始资产始终只读。
+
+诊断现场实际记录到 worker exit/clear_tid、主线程 futex 返回、随后析构。正式宿主四次复测覆盖启动 5 秒和 12 秒后停止，均完整出现停服标记并移除 PID 文件，无异常和强制清理。原版目标在 Application Stop 后返回 1；stop 辅助进程成功发出 SIGTERM 后仍主动抛出 `CDNFException`，返回 134，两个值均如实保留。启动 2 秒后停止仍有超时，未计通过。缺少的 DBMW/manager peer 连接明确被拒绝；未验证注册、心跳或服务就绪。
+
+证据见 [monitor UDP 停服](evidence/p2-monitor-udp-stop.json)。此补丁只覆盖当前哈希原版 monitor 在本机 Windows 10 x64 的已测停服路径，尚未并入产品启动器；其他服务和系统不能外推。
+
+## 2026-11-14 · game 物品加载进度与 20 分钟复测
+
+原版 game + 原版 DP2/Lua/Frida/脚本在私有 MySQL 副本上复测 1200.146 秒，实际越过 `Loading Items Success`，继续完成 Avatar Roulette、RandomOption、Quests、Characters、Disjoints 和 Advance Altar 加载。没有新增 runtime gap 或未处理异常；仍仅记录已知的 inotify 两项缺口。`Init DataManager Success` 尚未出现，游戏按观察时限清理，MySQL 正常退出，不能宣称 game 就绪。
+
+物品阶段由外部只读 Win32 采样定位，实际 guest 调用链包含 `CItemList::load_item_files`、`ImportEquipmentScript`、装备动画处理及字符串分配/析构。再按原版反汇编读取加载函数的迭代器，并独立枚举不可变的装备索引树，核对该表共 72,779 项；采样得到 56 个不同物品 ID，位次从 56,126 推进到 56,461。这证明该窗口仍在推进物品解析，不是此前怀疑的锁等待，因此没有添加猜测性的 futex fallback 或 TLS 缓存。
+
+原版日志先输出 Loading Items 的时间前缀，再执行工作并追加 Success，故该行的 `01:08:42` 不能作为完成时间；后续 `01:25:59` 的新加载行才给出物品完成的上界。证据见 [game 物品加载](evidence/p2-game-item-loading.json)。当前主要未完成项仍为 DataManager 后续初始化、完整业务链及服务互通。
