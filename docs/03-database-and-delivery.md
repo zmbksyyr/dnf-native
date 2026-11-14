@@ -104,7 +104,22 @@ GUI 使用 Win32 控件与 C++ 消息循环，调用实例控制器，不加载�
 
 整体启动先取得数据库 SQL 身份，再依清单发起服务进程；整体停止逆序请求原版信号，等待全部自有服务退出后才停库。有服务存活时禁用数据库停止、备份、还原及实例切换；维护前仍需用户先整体停止，尚未一键协调停服和恢复运行。某个服务停止超时则保留剩余依赖和数据库供诊断，启动中失败也保留已启动的自有进程。原版前台 CApplication 正常退出后会留下 PID 文件；仅当自有进程已退出、文件内容仍匹配该 PID 时清理。返回码继续原样显示，部分原版前台服务完成清理后本来就返回 1。
 
-当前开发期用 `tools/prepare_service_instance.py` 从原版输入、固定用户库和已停止的安全种子复制新实例；它拒绝覆盖已有目录，并检查源数据库未变。运行准备完成的实例时不需要 Python。实例布局为数据库的 `data/`、两个配置文件，与 `services.ini`、`hosts/{i686,x86_64}/`、两个架构资源根和 `service-logs/` 并列。没有把参考工程的配置或程序接入此路径。该准备工具还不是产品首次资源导入流程，完整离线 ZIP 也尚未制作。
+GUI 已实现从相邻 `resources/` 创建游戏实例：先校验资源清单与逻辑种子，要求目标目录为空，复制服务与用户库，再通过单文件安全初始化数据库。使用已验证的 977716 字节应用种子导入原始 18 库/601 表，重新导出必须与种子 SHA-256 相同，随后才设置本实例的账号和配置。账号分为维护 root、应用库范围的 game、只读频道库的 bridge、原版脚本需要的 Frida；四种口令分别随机生成，原版配置编码从哈希锁定的原版 DBMW ELF 读取材料并由本项目独立实现。按数据库当前月份从原表创建四张拍卖历史表，未修改种子或原始输入。游戏实例使用原版 bridge 要求的数据库端口 3306。
+
+复制、导入或配置失败会保留 `instance.pending` 和私有日志，界面禁止启动未完成实例；不覆盖现有内容，也不自动删除失败数据。成功后正常停库，最后写入 `services.ini` 并移除未完成标记，默认仍为 core 16 服务。没有相邻资源清单时保留数据库独立初始化入口。资源构建时保留原版 channel/relay 容量，开发探测使用的 16 连接配置不会成为产品模板。
+
+开发机准备本阶段样件（`PRIVATE_APPLICATION.sql` 是已验证的应用逻辑种子，不含源系统账号）：
+
+```powershell
+python tools/build_gui.py --mysql-exe build/mysql-gui/mysql-standalone.exe --build-dir build/gui-setup
+python tools/build_service_resources.py --output build/gui-setup/resources --seed PRIVATE_APPLICATION.sql --seed-sha256 d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198
+python tools/test_gui_setup.py
+build/gui-setup/DNF-Native.exe
+```
+
+`build_service_resources.py` 仅在开发构建时使用。运行时只需同目录的 `DNF-Native.exe`、`mysql-standalone.exe`、`resources/`，通过“创建实例”完成准备，无需 Python 或其他工程目录。本阶段未裁剪资源共 1308 个文件、667534605 字节，包含可选安全资源；不是满足 core/full 分包及 ≤210 MB 要求的最终 ZIP。证据见 [GUI 首次创建](evidence/p6-gui-instance-setup.json)。
+
+开发诊断仍可用 `tools/prepare_service_instance.py` 从原版输入、固定用户库和已停止的安全种子复制新实例；它拒绝覆盖已有目录，并检查源数据库未变。实例布局为数据库的 `data/`、两个配置文件，与 `services.ini`、`hosts/{i686,x86_64}/`、两个架构资源根和 `service-logs/` 并列。没有把参考工程的配置或程序接入此路径。
 
 复现开发期服务界面（3306 和原版服务端口须空闲，`PRIVATE_SEED` 为已停止的安全测试种子）：
 

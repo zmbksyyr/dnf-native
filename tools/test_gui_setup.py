@@ -1,0 +1,177 @@
+"""Create native game instances using only two delivered EXEs and local resources."""
+
+import argparse
+import ctypes as c
+import datetime
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import shutil
+import socket
+import subprocess
+import time
+
+from bootstrap import sha256
+from probe_mysql import tree_identity
+from probe_core_protocols import channel, relay, stun
+from test_gui import user, windows, wait_for, click, ready, status, responsive, screenshot
+from test_gui_services import rows, select
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--gui", type=Path, default=ROOT / "build/gui-setup/DNF-Native.exe")
+    args = parser.parse_args()
+    source = args.gui.resolve(strict=True).parent
+    with socket.socket() as available:
+        available.bind(("127.0.0.1", 3306))
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    probe = ROOT / "build/probes" / stamp / "gui-setup"
+    delivery = probe / "本地 程序(1)"
+    delivery.mkdir(parents=True)
+    for name in ["DNF-Native.exe", "mysql-standalone.exe"]:
+        shutil.copy2(source / name, delivery / name)
+    shutil.copytree(source / "resources", delivery / "resources")
+    source_before = tree_identity(source / "resources")
+    copied_before = tree_identity(delivery / "resources")
+    assert source_before == copied_before
+    env = dict(os.environ)
+    env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
+    for key in ["MYSQL_HOME", "MYSQL_PWD", "MYSQL_TCP_PORT"]:
+        env.pop(key, None)
+    record = {"recorded_utc": stamp, "os": platform.platform(),
+              "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+              "gui_sha256": sha256(delivery / "DNF-Native.exe"), "mysql_sha256": sha256(delivery / "mysql-standalone.exe"),
+              "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False}
+    checks = record["checks"]
+    instance = probe / "游戏 实例(1)"
+    process = subprocess.Popen([str(delivery / "DNF-Native.exe"), "--instance", str(instance)], env=env)
+    window = None
+    saved_elf = None
+    modified = delivery / "resources/hosts/i686/dnf-host.exe"
+    lua = js = None
+    lua_before = js_before = None
+
+    def target(path):
+        text = c.create_unicode_buffer(str(path))
+        user.SendMessageW(user.GetDlgItem(window, 101), 0x000C, 0, c.addressof(text))
+
+    def query(text, root=instance):
+        result = subprocess.run([str(delivery / "mysql-standalone.exe"), "mysql", str(root), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names"],
+                                input=text.encode("ascii"), capture_output=True, env=env, timeout=30)
+        if result.returncode:
+            (probe / "query-error.private.log").write_bytes(result.stdout + result.stderr)
+            raise RuntimeError("Native instance SQL failed; private query log retained")
+        return result.stdout
+
+    try:
+        window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "main window")
+        saved_elf = modified.read_bytes()
+        broken = bytearray(saved_elf); broken[-1] ^= 1; modified.write_bytes(broken)
+        click(window, 110)
+        wait_for(lambda: status(window).startswith("操作失败"), "changed local resource rejection")
+        assert not instance.exists()
+        checks["changed_resource_rejected_before_instance_writes"] = True
+        modified.write_bytes(saved_elf); saved_elf = None
+        occupied = probe / "已有 文件(keep)"
+        occupied.mkdir(); sentinel = occupied / "keep.txt"; sentinel.write_bytes(b"existing user content\x00\xff")
+        before = tree_identity(occupied)
+        target(occupied); click(window, 110)
+        wait_for(lambda: status(window).startswith("操作失败"), "nonempty directory rejection")
+        assert tree_identity(occupied) == before
+        checks["existing_nonempty_directory_unchanged"] = True
+        target(instance); click(window, 110)
+        wait_for(lambda: (instance / "instance.pending").exists(), "native copy starts")
+        checks["copy_and_initialize_window_response_ms"] = responsive(window)
+        ready(window, "游戏实例创建完成", 240)
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 111)), "created instance controls")
+        assert len(rows(window)) == 19 and not (instance / "instance.pending").exists()
+        assert not (instance / "seed.sql").exists()
+        checks["native_first_run_creates_nineteen_service_instance"] = True
+        seed_sha = sha256(delivery / "resources/seed.sql")
+        assert any(path.stat().st_size == (delivery / "resources/seed.sql").stat().st_size and sha256(path) == seed_sha
+                   for path in (instance / ".mysql").glob("gui-*.private.log"))
+        checks["import_reexport_matches_complete_original_seed_bytes"] = True
+        screenshot(window, probe / "created.png")
+        click(window, 111); ready(window, "数据库 SQL 检查通过")
+        schemas = query("SELECT TABLE_SCHEMA,COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY TABLE_SCHEMA ORDER BY TABLE_SCHEMA;")
+        counts = {line.split("\t")[0]: int(line.split("\t")[1]) for line in schemas.decode("ascii").splitlines()}
+        record["application_table_counts"] = counts
+        assert len(counts) == 18 and sum(counts.values()) == 605
+        checks["original_eighteen_schemas_and_current_month_tables"] = True
+        game_cfg = (instance / "i686/home/neople/game/cfg/siroco11.cfg").read_text(encoding="utf-8")
+        encoded = re.search(r"(?m)^master_db_pwd\s*=\s*([0-9a-f]{48})", game_cfg)[1]
+        assert query("SELECT COUNT(*) FROM d_taiwan.db_connect WHERE db_ip<>'127.0.0.1' OR db_port<>3306 OR db_userid<>'dnf_game' OR db_passwd<>'" + encoded + "';").strip() == b"0"
+        checks["original_credential_encoding_matches_connection_table"] = True
+        checks["game_account_has_no_global_grants"] = not query("SELECT PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE=CONCAT(CHAR(39),'dnf_game',CHAR(39),'@',CHAR(39),'127.0.0.1',CHAR(39)) AND PRIVILEGE_TYPE<>'USAGE';").strip()
+        first_accounts = query("SELECT User,Host,authentication_string FROM mysql.user WHERE User IN ('root','dnf_game','dnf_bridge','dnf_frida') ORDER BY User,Host;")
+        for index in range(15):
+            select(window, index); click(window, 221)
+            ready(window, rows(window)[index].split()[0] + "：进程运行中", 30)
+        time.sleep(25)
+        assert sum("进程运行中" in row for row in rows(window)) == 15
+        checks["native_initialized_fifteen_original_peers"] = True
+        checks["channel_protocol"] = channel(7001)
+        checks["relay_and_actual_monitor_protocol"] = relay(True)
+        checks["stun_protocol"] = stun()
+        print("Native GUI first run: original seed, generated accounts and 15-peer protocols passed", flush=True)
+        # Exercise the original init_db implementation with the newly generated
+        # Frida account. This fixture intentionally exits before natural game load.
+        lua, js = instance / "i686/dp2/df_game_r.lua", instance / "i686/dp2/df_game_r.js"
+        lua_before, js_before = lua.read_bytes(), js.read_bytes()
+        js.write_bytes(js_before + b"\nvar savedInit=rpc.exports.init; rpc.exports.init=function(){ savedInit.apply(this,arguments); init_db(); if(mysql_d_taiwan===null || mysql_frida===null || api_MySQL_exec(mysql_frida,'SELECT 1')!==1) throw new Error('Original script database test failed'); console.log('dnf-native-original-script-db-ok'); };\n")
+        lua.write_text("local frida=require('df.frida'); frida.load(); print('dnf-native-original-script-db-returned'); os.exit(42)\n", encoding="ascii")
+        select(window, 15); click(window, 221)
+        wait_for(lambda: "已退出" in rows(window)[15], "Frida database fixture exit", 60)
+        assert "代码 42" in rows(window)[15]
+        assert query("SHOW TABLES FROM frida;").decode("ascii").splitlines() == ["data", "dgnfinishtime", "init_sp_tp"]
+        checks["original_frida_database_interface_with_generated_account"] = True
+        lua.write_bytes(lua_before); js.write_bytes(js_before); lua_before = js_before = None
+        click(window, 224); ready(window, "服务进程已退出，数据库已停止", 150)
+        assert not list((instance / "i686").rglob("*.pid"))
+        checks["all_owned_peers_and_database_stopped_normally"] = True
+        second = probe / "游戏 实例(2)"
+        target(second); click(window, 110); ready(window, "游戏实例创建完成", 240)
+        click(window, 111); ready(window, "数据库 SQL 检查通过")
+        second_accounts = query("SELECT User,Host,authentication_string FROM mysql.user WHERE User IN ('root','dnf_game','dnf_bridge','dnf_frida') ORDER BY User,Host;", second)
+        first_rows, second_rows = first_accounts.splitlines(), second_accounts.splitlines()
+        assert len(first_rows) == len(second_rows) == 4
+        assert all(a.split(b"\t")[:2] == b.split(b"\t")[:2] and a.split(b"\t")[2] != b.split(b"\t")[2] for a,b in zip(first_rows,second_rows))
+        checks["all_four_account_secrets_differ_between_instances"] = True
+        user.PostMessageW(window, 0x10, 0, 0); process.wait(timeout=90)
+        assert process.returncode == 0
+        checks["second_instance_normal_close"] = True
+        checks["delivery_resources_unchanged"] = tree_identity(delivery / "resources") == copied_before
+        checks["source_resources_unchanged"] = tree_identity(source / "resources") == source_before
+        assert all(value is not False for value in checks.values())
+        record["first_instance"] = str(instance.relative_to(ROOT))
+        record["second_instance"] = str(second.relative_to(ROOT))
+    except Exception as error:
+        record["error"] = type(error).__name__ + ": " + str(error)
+    finally:
+        if saved_elf is not None:
+            modified.write_bytes(saved_elf)
+        if lua_before is not None:
+            lua.write_bytes(lua_before); js.write_bytes(js_before)
+        if process.poll() is None:
+            if window:
+                user.PostMessageW(window, 0x10, 0, 0)
+            try:
+                process.wait(timeout=240)
+            except subprocess.TimeoutExpired:
+                record["forced_cleanup"] = True
+                subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=15)
+                process.wait(timeout=10)
+        record["exit_code"] = process.returncode
+        (probe / "receipt.json").write_text(json.dumps(record, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
+        print("Native GUI setup receipt:", probe / "receipt.json", flush=True)
+    if record.get("error") or record["forced_cleanup"]:
+        raise SystemExit(json.dumps(record.get("error", "forced cleanup"), ensure_ascii=True))
+
+
+if __name__ == "__main__":
+    main()

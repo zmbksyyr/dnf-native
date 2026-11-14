@@ -34,14 +34,14 @@ def main():
     source = ROOT / "delivery/controller_gui.cpp"
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-mwindows", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               str(source), str(obj), "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-o", str(output)]
+               str(source), str(obj), "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
     target = work / "mysql-standalone.exe"
     if mysql != target:
         shutil.copy2(mysql, target)
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", Path(__file__)]},
+                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/instance_setup.h", Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql.parent / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 和自研 Win32 GUI 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。GUI 已接入 19 项服务清单、单项/整体启停、进程状态和所选服务日志；安全三件套完整拓扑仍待验收。安全初始化的数据库已接入原版服务和 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致；单文件与 GUI 已提供原生逻辑备份、冷副本还原、切换失败自动回滚和未完成切换恢复。插件配置、密码编辑、产品首次资源导入、原始客户端业务、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 和自研 Win32 GUI 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。GUI 已接入 19 项服务清单、单项/整体启停、进程状态和所选服务日志，并能从相邻本地资源创建新游戏实例，无需在运行时调用 Python。首次创建导入原始 18 个应用库并逐字节核对，再生成独立的服务账号；新实例的 15 个 peer、channel/relay/STUN 协议和 Frida 数据库接口已通过本机检查。原始 18 库、601 张表的备份还原逐字节一致；单文件与 GUI 已提供原生逻辑备份、冷副本还原、切换失败自动回滚和未完成切换恢复。安全三件套完整拓扑、插件配置、密码编辑、原始客户端业务、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -99,6 +99,8 @@ mysql-standalone.exe restore INSTANCE BACKUP_DIRECTORY
 mysql-standalone.exe recover INSTANCE
 ```
 
-维护过程使用官方本机共享内存协议并禁用 TCP。诊断已复现官方命名管道发送大 SQL 时断连，共享内存通过对应请求；没有修改官方 PE。复核用 `python tools/test_mysql_maintenance.py --exe build/mysql-standalone/mysql-standalone.exe --database-source PRIVATE_SECURE_INSTANCE`。DNF 停服协调、GUI 中的服务编排、密码迁移、跨实例还原和断电验收仍待完成。
+维护过程使用官方本机共享内存协议并禁用 TCP。诊断已复现官方命名管道发送大 SQL 时断连，共享内存通过对应请求；没有修改官方 PE。复核用 `python tools/test_mysql_maintenance.py --exe build/mysql-standalone/mysql-standalone.exe --database-source PRIVATE_SECURE_INSTANCE`。自动停服维护及重启、密码迁移、跨实例还原和断电验收仍待完成。
 
-原生 GUI：先构建当前 MySQL 单文件，再运行 `python tools/build_gui.py`；生成 `build/gui/DNF-Native.exe` 及相邻的 `mysql-standalone.exe`。启动 `DNF-Native.exe --instance PRIVATE_INSTANCE`，可选择实例、安全初始化、启动/停止、备份、还原和恢复未完成操作。启动会核对本次进程标记、UUID 及真实 SQL/TLS 响应；关闭正在运行的窗口会正常停库。`python tools/test_gui.py` 通过真实窗口控件执行上述操作并保存私有截图和证据。当前 GUI 仅管理数据库，19 个原版服务及插件配置尚未接入；不是完整发布包。
+原生 GUI：先构建当前 MySQL 单文件，再运行 `python tools/build_gui.py`；生成 `build/gui/DNF-Native.exe` 及相邻的 `mysql-standalone.exe`。启动 `DNF-Native.exe --instance PRIVATE_INSTANCE`，可选择实例、启停原版服务及数据库、备份、还原和恢复未完成操作。启动数据库会核对本次进程标记、UUID 及真实 SQL/TLS 响应；关闭窗口会正常停止自有服务和数据库。`python tools/test_gui.py` 检查无资源目录时的数据库控件，`tools/test_gui_services.py` 检查已准备实例的服务操作。
+
+本阶段首启产物位于 `build/gui-setup/`，其中 `resources/` 由开发构建工具从原版输入、固定用户库与已验证逻辑种子准备。将两个 EXE 与该目录一同复制后，GUI 的“创建实例”会复制本地资源、初始化 MySQL、导入应用库并生成服务配置；整个运行流程使用原生程序。复现命令见[数据库和 GUI 方案](docs/03-database-and-delivery.md)，专项验证为 `python tools/test_gui_setup.py`。这仍是未裁剪的本地资源样件，尚非最终离线 ZIP。

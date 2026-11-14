@@ -34,34 +34,8 @@ ENTRIES = [
 ]
 
 
-def prepare(output, database_source, mysql, peers_only=False):
-    output, source, mysql = output.resolve(), database_source.resolve(strict=True), mysql.resolve(strict=True)
-    # Bridge's original DB connection uses port 3306. Do not redirect another instance.
-    with socket.socket() as available:
-        available.bind(("127.0.0.1", 3306))
-    before = tree_identity(source / "data")
-    output.mkdir(parents=True, exist_ok=False)
-    env = dict(os.environ)
-    env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
-    for name in ["MYSQL_HOME", "MYSQL_PWD", "MYSQL_TCP_PORT"]:
-        env.pop(name, None)
-    account = subprocess.check_output(["whoami.exe"], env=env, text=True).strip()
-    subprocess.run(["icacls.exe", str(output), "/inheritance:r", "/grant:r", account + ":(OI)(CI)F"],
-                   env=env, capture_output=True, check=True)
-    shutil.copytree(source / "data", output / "data")
-    if before != tree_identity(output / "data"):
-        raise RuntimeError("Private database copy differs from source")
-    for name in ["server.cnf", "client.private.cnf"]:
-        text = (source / name).read_text(encoding="utf-8")
-        text, count = re.subn(r"(?m)^port=\d+", "port=3306", text)
-        if count != 1:
-            raise RuntimeError("Source database port setting is missing")
-        (output / name).write_text(text, encoding="utf-8")
-    db = json.loads((source / "game-db.json").read_text(encoding="utf-8"))
-    db["port"] = 3306
-    record = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "scope": "Private original service instance; not minimized packaging, security topology or gameplay acceptance.",
-              "source_database": before, "peers_only": peers_only, "services": [], "forced_cleanup": False}
+def copy_service_resources(output, db, bridge_password, peers_only=False):
+    records = []
     for arch in ["i686", "x86_64"]:
         root = output / arch
         for folder in (["lib", "usr"] if arch == "i686" else ["lib64", "usr"]):
@@ -81,7 +55,6 @@ def prepare(output, database_source, mysql, peers_only=False):
     settings = json.loads(config.read_text(encoding="utf-8")); settings["teardown"] = "full"
     config.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     shutil.copytree(ROOT / "originals/dp123/home/neople/secsvr", root / "home/neople/secsvr")
-    bridge_password = secrets.token_hex(16)
     ini = configparser.ConfigParser(interpolation=None)
     ini["services"] = {"version": "1", "count": str(len(ENTRIES))}
     for index, (name, config_name, action, signal) in enumerate(ENTRIES):
@@ -140,10 +113,43 @@ def prepare(output, database_source, mysql, peers_only=False):
             section.update(env1="LD_PRELOAD=/dp2/libdp2pre.so", env2="LD_LIBRARY_PATH=/dp2/lib:/home/neople/game")
         section.update({"arg" + str(i): value for i, value in enumerate(arguments)})
         ini[name] = section
-        record["services"].append({"name": name, "original_elf_sha256": original_sha, "executed_elf_sha256": sha256(elf),
+        records.append({"name": name, "original_elf_sha256": original_sha, "executed_elf_sha256": sha256(elf),
                                    "host_sha256": sha256(output / section["host"]), "loader_sha256": sha256(loader), "patches": patches})
     with (output / "services.ini").open("w", encoding="utf-16") as file:
         ini.write(file)
+    return records
+
+
+def prepare(output, database_source, mysql, peers_only=False):
+    output, source, mysql = output.resolve(), database_source.resolve(strict=True), mysql.resolve(strict=True)
+    # Bridge's original DB connection uses port 3306. Do not redirect another instance.
+    with socket.socket() as available:
+        available.bind(("127.0.0.1", 3306))
+    before = tree_identity(source / "data")
+    output.mkdir(parents=True, exist_ok=False)
+    env = dict(os.environ)
+    env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
+    for name in ["MYSQL_HOME", "MYSQL_PWD", "MYSQL_TCP_PORT"]:
+        env.pop(name, None)
+    account = subprocess.check_output(["whoami.exe"], env=env, text=True).strip()
+    subprocess.run(["icacls.exe", str(output), "/inheritance:r", "/grant:r", account + ":(OI)(CI)F"],
+                   env=env, capture_output=True, check=True)
+    shutil.copytree(source / "data", output / "data")
+    if before != tree_identity(output / "data"):
+        raise RuntimeError("Private database copy differs from source")
+    for name in ["server.cnf", "client.private.cnf"]:
+        text = (source / name).read_text(encoding="utf-8")
+        text, count = re.subn(r"(?m)^port=\d+", "port=3306", text)
+        if count != 1:
+            raise RuntimeError("Source database port setting is missing")
+        (output / name).write_text(text, encoding="utf-8")
+    db = json.loads((source / "game-db.json").read_text(encoding="utf-8"))
+    db["port"] = 3306
+    record = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "scope": "Private original service instance; not minimized packaging, security topology or gameplay acceptance.",
+              "source_database": before, "peers_only": peers_only, "services": [], "forced_cleanup": False}
+    bridge_password = secrets.token_hex(16)
+    record["services"] = copy_service_resources(output, db, bridge_password, peers_only)
     # Adapt the copied application's connection table and bridge account. Source stays cold.
     server = None
     def sql(query):

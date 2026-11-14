@@ -45,11 +45,13 @@ static std::wstring unique_name() {
 struct ToolResult { DWORD code; std::wstring log; std::string output; };
 
 static HANDLE launch_tool(const std::wstring &exe, const std::wstring &instance,
-                          const std::vector<std::wstring> &arguments, const std::wstring &log) {
+                          const std::vector<std::wstring> &arguments, const std::wstring &log,
+                          const std::wstring &input_path = L"") {
     directory(instance + L"\\.mysql");
     File output = private_file(log);
     SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
-    File input(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &security, OPEN_EXISTING, 0, nullptr));
+    File input(CreateFileW(input_path.empty() ? L"NUL" : input_path.c_str(), GENERIC_READ,
+                           FILE_SHARE_READ, &security, OPEN_EXISTING, 0, nullptr));
     std::wstring command = quote(exe);
     for (const auto &argument : arguments) command += L" " + quote(argument);
     STARTUPINFOW startup = {};
@@ -71,9 +73,10 @@ static DWORD exit_code(HANDLE process) {
 }
 
 static ToolResult run_tool(const std::wstring &exe, const std::wstring &instance,
-                           const std::vector<std::wstring> &arguments, DWORD timeout = INFINITE) {
+                           const std::vector<std::wstring> &arguments, DWORD timeout = INFINITE,
+                           const std::wstring &input_path = L"") {
     std::wstring log = instance + L"\\.mysql\\" + unique_name() + L".private.log";
-    HANDLE process = launch_tool(exe, instance, arguments, log);
+    HANDLE process = launch_tool(exe, instance, arguments, log, input_path);
     DWORD waited = WaitForSingleObject(process, timeout);
     if (waited != WAIT_OBJECT_0) {
         // This wrapper owns its official child through the SFX's Job. This
@@ -150,12 +153,14 @@ static void stop_database(HWND window, const std::wstring &exe, const std::wstri
         throw std::runtime_error("Database did not record a normal complete shutdown");
 }
 
-struct Result { bool success = false, stopped = false; Session started; std::wstring status, details; };
+#include "instance_setup.h"
+
+struct Result { bool success = false, stopped = false, created = false; Session started; std::wstring status, details; };
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, status = nullptr, output = nullptr;
     HFONT font = nullptr;
-    std::wstring exe, initial, current;
+    std::wstring exe, initial, current, resources;
     Session session;
     std::vector<Service> services;
     HANDLE service_job = nullptr;
@@ -196,13 +201,14 @@ struct App {
         }
         bool active = services_running();
         bool initialized = !current.empty() && present(current + L"\\data\\auto.cnf");
-        bool pending = !current.empty() && present(current + L"\\restore.pending");
+        bool restore_pending = !current.empty() && present(current + L"\\restore.pending");
+        bool pending = restore_pending || (!current.empty() && present(current + L"\\instance.pending"));
         for (int id : {INSTANCE, BROWSE, PORT}) EnableWindow(GetDlgItem(window, id), !active && !session.process && (id != PORT || !initialized));
         EnableWindow(GetDlgItem(window, INITIALIZE), !busy && !session.process && !current.empty() && !initialized && !pending);
         EnableWindow(GetDlgItem(window, START), !busy && !session.process && initialized && !pending);
         EnableWindow(GetDlgItem(window, STOP), session.process && !active);
         for (int id : {BACKUP, RESTORE}) EnableWindow(GetDlgItem(window, id), !active && !session.process && initialized && !pending);
-        EnableWindow(GetDlgItem(window, RECOVER), !busy && !session.process && pending);
+        EnableWindow(GetDlgItem(window, RECOVER), !busy && !active && !session.process && restore_pending);
         for (int id : {FOLDER, LOGS}) EnableWindow(GetDlgItem(window, id), !busy && !current.empty());
         LRESULT index = SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_GETCURSEL, 0, 0);
         bool selected = index >= 0 && static_cast<size_t>(index) < services.size();
@@ -221,25 +227,32 @@ struct App {
         }
         current = full_path(value);
         services = load_services(current); show_services();
+        SetWindowTextW(GetDlgItem(window, INITIALIZE), present(resources + L"\\resources.ini") ? L"创建实例" : L"初始化");
         bool initialized = present(current + L"\\data\\auto.cnf");
         if (present(current + L"\\server.cnf")) {
             std::string config = read_file(current + L"\\server.cnf");
             size_t at = config.find("\nport=");
             if (at != std::string::npos) SetWindowTextW(port, decode(config.substr(at + 6, config.find_first_of("\r\n", at + 6) - at - 6)).c_str());
         }
-        SetWindowTextW(status, present(current + L"\\restore.pending") ? L"需要恢复未完成的还原" : initialized ? L"已选择实例，可启动数据库" : L"尚未初始化数据库");
+        SetWindowTextW(status, present(current + L"\\instance.pending") ? L"实例创建未完成，请查看日志并选择新的空目录" : present(current + L"\\restore.pending") ? L"需要恢复未完成的还原" : initialized ? L"已选择实例，可启动数据库" : L"尚未初始化数据库");
         controls();
     }
     void action(int id, const std::wstring &target = L"", int selected = -1) {
         current = full_path(window_text(path));
-        const std::wstring instance = current, tool = exe, port_text = window_text(port);
+        const std::wstring instance = current, tool = exe, port_text = window_text(port), assets = resources;
         const Session owned = session;
         busy = true; controls();
         SetWindowTextW(status, L"正在执行操作…");
-        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected] {
+        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets] {
             auto result = std::make_unique<Result>();
             try {
-                if (id == ALL_START || id == ALL_STOP || id == ELF_START || id == ELF_STOP) {
+                if (id == INITIALIZE && present(assets + L"\\resources.ini")) {
+                    if (port_text != L"3306") throw std::runtime_error("Original bridge requires database port 3306 for a game instance");
+                    create_game_instance(window, tool, assets, instance, result->started);
+                    result->created = true;
+                    result->status = L"游戏实例创建完成，数据库已停止";
+                    result->details = result->status + L"\r\n已核对原始应用库逐字节导出，服务账号分别生成。";
+                } else if (id == ALL_START || id == ALL_STOP || id == ELF_START || id == ELF_STOP) {
                     if (id == ALL_START && !owned.process) result->started = start_database(window, tool, instance);
                     if (id == ALL_START || id == ALL_STOP) {
                         if (id == ALL_START) {
@@ -366,6 +379,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->worker.join(); app->busy = false;
             if (result->stopped && app->session.process) { CloseHandle(app->session.process); app->session = {}; }
             if (result->started.process) app->session = result->started;
+            if (result->created) app->services = load_services(app->current);
             app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls();
             if (app->closing && result->success && !app->session.process && !app->services_running()) PostMessageW(window, WM_CLOSE, 0, 0);
             else app->closing = false;
@@ -442,6 +456,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         wchar_t module[32768]; require(GetModuleFileNameW(nullptr, module, 32768) != 0, "Find native application directory");
         std::wstring folder(module); folder.resize(folder.find_last_of(L'\\'));
         state.exe = folder + L"\\mysql-standalone.exe";
+        state.resources = folder + L"\\resources";
         state.initial = folder + L"\\instances\\default";
         int count; wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
         require(args != nullptr, "Read application arguments");

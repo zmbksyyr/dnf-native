@@ -1,0 +1,368 @@
+{
+  "recorded_utc": "2026-11-14T10:10:43.261633+00:00",
+  "scope": "Native GUI first creation from local original resources and verified application seed, generated accounts, original peer protocols and Frida database interface. No complete natural game load in this test, client gameplay or final release acceptance.",
+  "base_commit": "fa84083b0d6b5f60d3926d0a0b938dddcab67eee",
+  "build": {
+    "gui_bytes": 940544,
+    "gui_sha256": "0b6f4a085c84c0206d9c267509b7e1a85b97009eaf920d4a55f922a09090aaef",
+    "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+    "build_receipt_sha256": "050870e6febd171787a8d1cc5732ab937111d6bce0852dab12a48e7e91185aa4",
+    "sources": {
+      "delivery/controller_gui.cpp": "a97087bcd66d4ac2dfccaaf613302971aa3ad35e4ca90b4ae3939f6657d373c6",
+      "delivery/controller_gui.manifest": "5e1724adbe22642744ce26760deb3c686ad820897dc6feb942183e98ba9a802c",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+      "delivery/service_processes.h": "afccea2f1edf34e06d34877ae1768d53079437fa012494cb21ec714b1deb23e8",
+      "delivery/instance_setup.h": "2d1ef667a70107b082e3b8087a936752a0d6d1edb330d104f11cc9ec31ed84aa",
+      "tools/build_gui.py": "f4e93adbceea086c203c594b9c0975b2931d6564c2284eb3adbf44128c2d8374"
+    },
+    "normal_imports": {
+      "machine": "x86_64",
+      "import_dlls": [
+        "USER32.dll",
+        "GDI32.dll",
+        "SHELL32.dll",
+        "ole32.dll",
+        "ADVAPI32.dll",
+        "WS2_32.dll",
+        "bcrypt.dll",
+        "msvcrt.dll",
+        "KERNEL32.dll"
+      ],
+      "note": "Normal imports only; not delay-load/runtime closure"
+    }
+  },
+  "local_resources": {
+    "receipt_sha256": "14ff956502317b3895bee7bee8710d32da88b4d9c1e75a67c9cb3081f5250a08",
+    "recorded_utc": "2026-11-14T10:02:05.347472+00:00",
+    "scope": "Untrimmed local first-run templates; not a minimized offline release or license/source closure.",
+    "resource_count": 1308,
+    "raw_bytes": 667534605,
+    "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+    "manifest_sha256": "23799a15e317077af1b4dc14e2c7972f8464501f9741b088998504eae90b84da",
+    "services": [
+      {
+        "name": "bridge",
+        "original_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+        "executed_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "manager",
+        "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+        "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "dbmw_guild",
+        "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "dbmw_mnt",
+        "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "dbmw_stat",
+        "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "monitor",
+        "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+        "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": [
+          {
+            "address": "0x08062877",
+            "offset": 108663,
+            "before": "c6400400",
+            "after": "c6400401",
+            "purpose": "Initialize the application loop flag before stop callbacks can run."
+          },
+          {
+            "address": "0x08063fa4",
+            "offset": 114596,
+            "before": "c6400401",
+            "after": "90909090",
+            "purpose": "Preserve a stop request received during application Load."
+          },
+          {
+            "address": "0x0805aa4c",
+            "offset": 76364,
+            "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+            "after": "c64008018944240cc7442408b8aa050883642404009090",
+            "purpose": "Set running before pthread_create; preserve its original arguments."
+          },
+          {
+            "address": "0x080973ce",
+            "offset": 324558,
+            "before": "c6400801",
+            "after": "90909090",
+            "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+          },
+          {
+            "address": "0x08064042",
+            "offset": 114754,
+            "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+            "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+            "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+          },
+          {
+            "address": "0x080a635a",
+            "offset": 385882,
+            "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+            "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+            "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+          }
+        ]
+      },
+      {
+        "name": "guild",
+        "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+        "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "statics",
+        "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+        "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "coserver",
+        "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+        "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "community",
+        "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+        "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "auction",
+        "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+        "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "point",
+        "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+        "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "channel",
+        "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+        "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "relay",
+        "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+        "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "stun",
+        "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+        "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+        "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+        "loader_sha256": "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+        "patches": []
+      },
+      {
+        "name": "game",
+        "original_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "executed_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "zergsvr",
+        "original_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+        "executed_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "secagent",
+        "original_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+        "executed_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      },
+      {
+        "name": "gunnersvr",
+        "original_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+        "executed_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "patches": []
+      }
+    ],
+    "sources": {
+      "tools/build_service_resources.py": "526614cfdb5ee7da58c77d3c6a0bd8622f05377489ed1402a31f3f5285230cd5",
+      "tools/prepare_service_instance.py": "48bb2f37338001639019dd0d608f5c21a123d0eeb3cea3984c08cd32d2b8408a",
+      "runtime/dp2_cleanup.lua": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42"
+    },
+    "seed_bytes": 977716,
+    "sources_record": "Original assets from originals/dp123; fixed CentOS user libraries from .local/sysroot; hosts built in this repository. No reference project build or runtime input.",
+    "password_format_record": "See docs/evidence/p4-mysql-core-integration.json for independent original DBMW instruction analysis. Native encoding uses the same recorded ELF hash and key address; generated credentials are absent from evidence."
+  },
+  "first_creation": {
+    "receipt_path": "build/probes/20261114T100535345388Z/gui-setup/receipt.json",
+    "receipt_sha256": "103a8c5d6ef77ed6cefe32b25392fba499041cf93691b89778aded20c5c27975",
+    "created_screenshot_sha256": "407959bda544043b24efb975adb8a5daa02f3490f466a84b61f080269df63c2f",
+    "result": {
+      "recorded_utc": "20261114T100535345388Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+      "gui_sha256": "0b6f4a085c84c0206d9c267509b7e1a85b97009eaf920d4a55f922a09090aaef",
+      "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+      "script_sha256": "74160962336a15a5fe9faa4e73c9e693cc95561459a37a62fde40761b011d5eb",
+      "checks": {
+        "changed_resource_rejected_before_instance_writes": true,
+        "existing_nonempty_directory_unchanged": true,
+        "copy_and_initialize_window_response_ms": 0.132,
+        "native_first_run_creates_nineteen_service_instance": true,
+        "import_reexport_matches_complete_original_seed_bytes": true,
+        "original_eighteen_schemas_and_current_month_tables": true,
+        "original_credential_encoding_matches_connection_table": true,
+        "game_account_has_no_global_grants": true,
+        "native_initialized_fifteen_original_peers": true,
+        "channel_protocol": {
+          "challenge": true,
+          "positive_responses": 3,
+          "fragmented": true,
+          "coalesced": true
+        },
+        "relay_and_actual_monitor_protocol": {
+          "registered_peers": 2,
+          "bidirectional_messages": 8,
+          "unlogged_accounts_disconnected": [
+            701,
+            702
+          ],
+          "own_auth_response_sent": false
+        },
+        "stun_protocol": {
+          "responses": 5,
+          "address_and_source_ports": true
+        },
+        "original_frida_database_interface_with_generated_account": true,
+        "all_owned_peers_and_database_stopped_normally": true,
+        "all_four_account_secrets_differ_between_instances": true,
+        "second_instance_normal_close": true,
+        "delivery_resources_unchanged": true,
+        "source_resources_unchanged": true
+      },
+      "forced_cleanup": false,
+      "application_table_counts": {
+        "d_channel": 5,
+        "d_guild": 26,
+        "d_taiwan": 109,
+        "d_taiwan_secu": 7,
+        "d_technical_report": 42,
+        "taiwan_billing": 12,
+        "taiwan_cain": 81,
+        "taiwan_cain_2nd": 32,
+        "taiwan_cain_auction_cera": 11,
+        "taiwan_cain_auction_gold": 11,
+        "taiwan_cain_log": 97,
+        "taiwan_cain_web": 17,
+        "taiwan_game_event": 51,
+        "taiwan_login": 44,
+        "taiwan_login_play": 1,
+        "taiwan_mng_manager": 20,
+        "taiwan_prod": 26,
+        "taiwan_se_event": 13
+      },
+      "first_instance": "build\\probes\\20261114T100535345388Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(1)",
+      "second_instance": "build\\probes\\20261114T100535345388Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(2)",
+      "exit_code": 0
+    }
+  },
+  "database_gui_regression": {
+    "receipt_path": "build/probes/20261114T100757962690Z/gui/receipt.json",
+    "receipt_sha256": "f96ad7d800ae972b4e8150e51c88b3e5ff273fd182096a6ffc0c6a14a6869daa",
+    "result": {
+      "recorded_utc": "20261114T100757962690Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T100757962690Z\\gui",
+      "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle; no original service GUI or gameplay acceptance.",
+      "gui_sha256": "0b6f4a085c84c0206d9c267509b7e1a85b97009eaf920d4a55f922a09090aaef",
+      "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+      "script_sha256": "08993afd8873ce19b498bad09355af8436332ba8ca2b867487a0b8867735be9a",
+      "checks": {
+        "instance_path_can_be_cleared_and_selected_again": true,
+        "initialize_window_response_ms": 0.092,
+        "gui_secure_initialization": true,
+        "gui_start_checks_sql_identity_and_tls": true,
+        "different_uuid_on_same_port_does_not_stop_first_instance": true,
+        "gui_normal_shutdown": true,
+        "backup_window_response_ms": 0.075,
+        "busy_close_waits_without_canceling_backup": true,
+        "gui_corrupt_restore_reports_error_without_data_writes": true,
+        "restore_window_response_ms": 0.122,
+        "gui_backup_and_restore_native_results": true,
+        "restored_rows_and_removed_extra_schema": true,
+        "close_window_normally_stops_owned_database": true,
+        "gui_process_exit_code": 0,
+        "gui_pending_restore_blocks_start_and_recovery_restores_cold_data": true
+      },
+      "forced_cleanup": false,
+      "running_screenshot_sha256": "db568eb57240e8f12fa350311a8046f3a1f1a82f1a70ada65cad66eaa5711620",
+      "backup_sql_sha256": "fc581dc01f77084277b0f1633ebc1f7e5fe598946a69ec1b00f7e3d68696ad9e",
+      "restored_screenshot_sha256": "a6e32fcb8bb3360d313379c078e8753dbad5fe229385b101f93f0cacc52613fc",
+      "limits": [
+        "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
+        "This probe exercises MySQL controls; original service orchestration is verified separately. Plugin, password and level controls remain pending.",
+        "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
+        "No final complete offline ZIP or gameplay acceptance."
+      ]
+    }
+  },
+  "prior_core_natural_startup_evidence": "docs/evidence/p6-gui-services.json; this phase does not repeat or broaden that result.",
+  "limits": [
+    "Windows 10 10.0.19044 development machine only. PATH limited to System32 is not a clean machine, ordinary-user or disconnected-network acceptance.",
+    "Resources are untrimmed, contain optional security assets, and are not the core/full release ZIP or proof of the 210 MB target.",
+    "First creation verifies 15 peers and a Frida fixture returning 42 before natural game resource load; no game-client business acceptance.",
+    "Full security topology, plugin switches, password editing, level replacement, coordinated maintenance restart, crash takeover and Win7/11 remain pending."
+  ]
+}
