@@ -335,3 +335,11 @@ bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。�
 新增独立编写的 runtime/dp2_cleanup.lua，通过既有停服回调提前关闭 luv 句柄并处理 close 回调；probe_game.py 的显式 --dp2-cleanup 仅在私有副本追加该脚本，并将 Gadget teardown 设为 full。正式文件复测返回 1，耗时 48.102 秒。没有跳过原版数据库错误、修改原版机器码、禁止 munmap 或强制成功退出。仍存在已知的 inotify 探测 fallback（i386 291/332），本次未将其扩成新的实现。
 
 证据见 [DP2 清理对照](evidence/p2-dp2-cleanup.json)。这解除的是短失败退出路径，尚不等于完整服务正常停服。联合探测器现可在原版启动标记后观察指定秒数，再发送跨进程 SIGUSR2，并要求原版关服标记和退出码 0。完整 game、bridge、私有 MySQL 的 --dp2-cleanup --stop-after-started 120 复测已启动，结果另行记录。
+
+## 2026-11-14 · 标准共享库的零入口
+
+此前自编 Lua C 模块因 ELF e_entry=0 被拒绝，只能临时指定导出函数为入口。根因是 nr_elf_open 对进程、解释器和共享库统一要求可执行入口。现由三个调用点明确是否要执行入口：进程和 PT_INTERP 要求非零、位于可执行 PT_LOAD 内的入口；仅映射的 ET_DYN 可省略入口，非零错误入口继续拒绝。沿原有验证路径增加一个参数，没有改用其他 loader 或放宽映射边界。
+
+自编 i386/x64 共享库均由标准链接器生成 e_entry=0，通过上游 glibc 的 dlopen 实际执行构造函数、调用导出并运行析构，双方返回 42；修复前均在 dlopen 失败。错误非零 DSO 入口、将零入口库当程序运行、零入口 PT_INTERP 均拒绝。负例同时发现旧宿主可能将解释器 ELF 头当入口执行，该行为现已在映射前拒绝。独立构建上的双架构入口/信号、上游 ld.so，以及原版 19 ELF 原址映射和原有四项拒绝检查通过。
+
+证据见 [共享库零入口](evidence/p2-shared-entry.json)，复现命令为 `python tools/build.py`、`python tools/test_shared_entry.py`。本轮为避免覆盖联合复测正在使用的正式宿主，使用 build/staged 独立构建并传 --hosts build/staged。联合 game 自然启动/关服观察仍使用包含 SIGUSR2 修复的正式宿主，不将两组构建混用为同一验收结果。

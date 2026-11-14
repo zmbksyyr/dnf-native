@@ -47,7 +47,7 @@ int wmain(int argc, wchar_t **argv) {
     if (root && (!GetFullPathNameW(root, 32768, run.root, NULL) || wcslen(run.root) >= 32767)) return 2;
     NrElf *elf = &run.program;
     const char *error;
-    if (!nr_elf_open(elf, argv[2], expected, &error)) {
+    if (!nr_elf_open(elf, argv[2], expected, execute, &error)) {
         fprintf(stderr, "ELF validation failed: %s\n", error);
         return 1;
     }
@@ -66,7 +66,7 @@ int wmain(int argc, wchar_t **argv) {
                     fputs("PT_INTERP requires --root ROOT INTERPRETER_SHA256\n", stderr);
                     nr_elf_close(elf); return 1;
                 }
-                if (!nr_elf_open(&run.interpreter, path, hash, &error) || !nr_elf_map(&run.interpreter, &error) ||
+                if (!nr_elf_open(&run.interpreter, path, hash, 1, &error) || !nr_elf_map(&run.interpreter, &error) ||
                     !nr_adapt(&run.interpreter, &error)) {
                     fprintf(stderr, "interpreter load failed: %s\n", error ? error : "Windows memory operation failed");
                     nr_elf_close(&run.interpreter); nr_elf_close(elf); return 1;

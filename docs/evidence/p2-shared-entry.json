@@ -1,0 +1,170 @@
+{
+  "recorded_utc": "2026-11-14T04:37:00.812182+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Self-built DSO through upstream glibc: constructor/export/destructor, bad DSO entry and required executable entries. No game acceptance.",
+  "results": [
+    {
+      "arch": "i686",
+      "case": "dlopen-zero",
+      "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+      "program_sha256": "eabd5d070595f8f44053f9665042417c96275d97dddf4edb142edbdbe5ab3bb6",
+      "dso_sha256": "1b3aec9b11970dfa92337b1feeca15ce76f1b4f142e3f2c0ea66502344a67766",
+      "exit_code": 42,
+      "passed": true
+    },
+    {
+      "arch": "i686",
+      "case": "dlopen-invalid",
+      "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+      "program_sha256": "2ec521c7d2fe84a169526f77af4799dd875e2c4021c751e8999c3659f5bc691a",
+      "dso_sha256": "4426c8627d1fa7b74bffab87b9b1064554d0f676f8ed97dc99b8c33fa26660eb",
+      "exit_code": 42,
+      "passed": true
+    },
+    {
+      "arch": "i686",
+      "case": "zero-process-entry",
+      "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "arch": "i686",
+      "case": "zero-interpreter-entry",
+      "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "case": "dlopen-zero",
+      "host_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d",
+      "program_sha256": "f0360cf22d2a655665aad95af974753431f7edd5ed9d3e540c0e4d5e2d47ddd0",
+      "dso_sha256": "1df06d34f04b641310589a26f3ed2a4e09d88ca47f32aaeeccec5da1e3416c6a",
+      "exit_code": 42,
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "case": "dlopen-invalid",
+      "host_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d",
+      "program_sha256": "841838286f974c1a324cde1e97c808615635c3422a4297ec9d17ec238a5a9749",
+      "dso_sha256": "8751aeb61c56be7c3595d003a6eb0dd701d2de23abf3c9a68989db12a866a471",
+      "exit_code": 42,
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "case": "zero-process-entry",
+      "host_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "case": "zero-interpreter-entry",
+      "host_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d",
+      "exit_code": 1,
+      "passed": true
+    }
+  ],
+  "before": {
+    "recorded_utc": "2026-11-14T04:36:22.763132+00:00",
+    "results": [
+      {
+        "arch": "i686",
+        "case": "dlopen-zero",
+        "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+        "program_sha256": "eabd5d070595f8f44053f9665042417c96275d97dddf4edb142edbdbe5ab3bb6",
+        "dso_sha256": "1b3aec9b11970dfa92337b1feeca15ce76f1b4f142e3f2c0ea66502344a67766",
+        "exit_code": 28,
+        "passed": false
+      },
+      {
+        "arch": "i686",
+        "case": "dlopen-invalid",
+        "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+        "program_sha256": "2ec521c7d2fe84a169526f77af4799dd875e2c4021c751e8999c3659f5bc691a",
+        "dso_sha256": "4426c8627d1fa7b74bffab87b9b1064554d0f676f8ed97dc99b8c33fa26660eb",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "case": "zero-process-entry",
+        "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+        "exit_code": 1,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "case": "zero-interpreter-entry",
+        "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+        "exit_code": 125,
+        "passed": false
+      },
+      {
+        "arch": "x86_64",
+        "case": "dlopen-zero",
+        "host_sha256": "d0531d8a44e4f7c4ac910ee7373173a55063d8bc580674dff5b7a4d48464caa0",
+        "program_sha256": "f0360cf22d2a655665aad95af974753431f7edd5ed9d3e540c0e4d5e2d47ddd0",
+        "dso_sha256": "1df06d34f04b641310589a26f3ed2a4e09d88ca47f32aaeeccec5da1e3416c6a",
+        "exit_code": 28,
+        "passed": false
+      },
+      {
+        "arch": "x86_64",
+        "case": "dlopen-invalid",
+        "host_sha256": "d0531d8a44e4f7c4ac910ee7373173a55063d8bc580674dff5b7a4d48464caa0",
+        "program_sha256": "841838286f974c1a324cde1e97c808615635c3422a4297ec9d17ec238a5a9749",
+        "dso_sha256": "8751aeb61c56be7c3595d003a6eb0dd701d2de23abf3c9a68989db12a866a471",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "zero-process-entry",
+        "host_sha256": "d0531d8a44e4f7c4ac910ee7373173a55063d8bc580674dff5b7a4d48464caa0",
+        "exit_code": 1,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "zero-interpreter-entry",
+        "host_sha256": "d0531d8a44e4f7c4ac910ee7373173a55063d8bc580674dff5b7a4d48464caa0",
+        "exit_code": 3221225477,
+        "passed": false
+      }
+    ]
+  },
+  "root_cause": "All ELF input roles previously required an executable entry; normal shared libraries have e_entry=0. Entry requirements now come from the program/interpreter/library call site.",
+  "reproduction": [
+    "python tools/build.py",
+    "python tools/test_shared_entry.py"
+  ],
+  "staged_reproduction": [
+    "python build/build_staged.py (local output-path variant of tools/build.py)",
+    "python tools/test_shared_entry.py --hosts build/staged"
+  ],
+  "regressions": {
+    "entry-checks.json": {
+      "receipt_sha256": "43e5a8c08b58bda37f1cc2587ef1a26ba54ed5d7592e3d1215c5ac2e91461f92",
+      "cases": 7,
+      "failures": []
+    },
+    "ld-start-checks.json": {
+      "receipt_sha256": "e76f686d4eb29e6902f7c2c64dab4b2e92dae51168e484f9325d5da2ec4683ee",
+      "cases": 4,
+      "failures": []
+    },
+    "map-checks.json": {
+      "receipt_sha256": "814bce1eb9f19f81d522f2dcc90eb636abcacd52be0bd0bd616272f2383333f5",
+      "cases": 23,
+      "failures": []
+    }
+  },
+  "limitations": [
+    "Independent staged Windows 10 x64 10.0.19044 build; the running full game chain uses the earlier production host.",
+    "Self-built DSO primitive; no new game/plugin business acceptance."
+  ]
+}

@@ -137,7 +137,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     DWORD n = GetFinalPathNameByHandleW(run->files[fd], path, 32768, FILE_NAME_NORMALIZED);
     if (!n || n >= 32768) return -5;
     const char *error;
-    if (!nr_elf_open(&v->image, path, NULL, &error)) return -38;
+    if (!nr_elf_open(&v->image, path, NULL, 0, &error)) return -38;
     if (v->image.header->type != 3 || v->image.low || length > v->image.allocation_size ||
         !nr_elf_map(&v->image, &error) || !nr_adapt(&v->image, &error)) {
         fprintf(stderr, "ELF dependency snapshot failed: %s\n", error ? error : "unsupported extent");

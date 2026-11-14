@@ -58,7 +58,7 @@ typedef struct {
     size_t trap_count;
 } NrElf;
 
-int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, const char **error);
+int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int require_entry, const char **error);
 int nr_elf_map(NrElf *elf, const char **error);
 void nr_elf_close(NrElf *elf);
 int nr_adapt(NrElf *elf, const char **error);

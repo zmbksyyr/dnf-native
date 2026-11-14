@@ -51,7 +51,7 @@ done:
     return ok;
 }
 
-int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, const char **error) {
+int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int require_entry, const char **error) {
     HANDLE input = INVALID_HANDLE_VALUE;
     LARGE_INTEGER size;
     DWORD count = 0;
@@ -109,7 +109,9 @@ int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, cons
             entry_found = 1;
     }
     *error = "ELF has no bounded executable entry";
-    if (low == UINT64_MAX || high <= low || high - low > NR_MAX_IMAGE || !entry_found)
+    /* e_entry may be zero for a DSO; programs and PT_INTERP need a real entry. */
+    if (low == UINT64_MAX || high <= low || high - low > NR_MAX_IMAGE ||
+        (require_entry && !h->entry) || (!entry_found && (require_entry || h->type != 3 || h->entry)))
         goto fail;
     SYSTEM_INFO info;
     GetSystemInfo(&info);
