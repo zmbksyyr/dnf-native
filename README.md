@@ -39,6 +39,7 @@ python tools/test_vm.py
 python tools/test_files.py
 python tools/test_net.py
 python tools/test_channel.py
+python tools/test_relay.py
 python tools/import_mysql.py
 python tools/probe_mysql.py
 ```
@@ -54,3 +55,5 @@ python tools/test_bridge.py --db-config build/bridge-db.private.json --game-prox
 ```
 
 该检查核对版本相同/不同、拆包/连包和逐字节频道脚本响应。`--game-proxy` 通过原版 DP2/Frida 调用原版 game 的频道代理，并核对实际落盘的脚本和版本；测试在资源初始化之前主动退出，不计完整 game 启动或业务验收。bridge 通过 runtime SIGTERM 事件自行退出。
+
+relay 检查需要 TCP 7200、UDP 8200 空闲，使用原版 PVP 模式和独立的 16 连接配置。两个自编测试连接登记后，核对双向二进制转发、拆包/连包，再通过 UDP S2S 控制报文定向断开一个连接，并验证另一个连接仍可收发。测试不包含原版 monitor 对接或客户端 PVP 业务；结束时通过 runtime SIGTERM 事件请求退出。

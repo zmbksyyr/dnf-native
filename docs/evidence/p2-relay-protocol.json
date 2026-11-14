@@ -1,0 +1,65 @@
+{
+  "recorded_utc": "2026-11-14T02:21:47.766214+00:00",
+  "protocol_check": {
+    "recorded_utc": "20261114T022006379590Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T022006379590Z\\relay",
+    "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers; no original monitor/game/client acceptance.",
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+      "--root",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T022006379590Z\\relay",
+      "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "--env",
+      "HOME=/home/neople",
+      "--cwd",
+      "/home/neople/relay",
+      "--run",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T022006379590Z\\relay\\home\\neople\\relay\\df_relay_r",
+      "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "/home/neople/relay/df_relay_r",
+      "relay_200",
+      "run"
+    ],
+    "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+    "elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+    "ld_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+    "config_sha256": "b103fdbbc81c64c9dd460b3c612819730dc6a3b672d571c76366a2df43f77e60",
+    "checks": {
+      "registered_peers": 2,
+      "tcp_messages": 32,
+      "udp_disconnect": true,
+      "other_peer_preserved": true,
+      "fragmented_request": true,
+      "coalesced_requests": true
+    },
+    "error": null,
+    "gaps": [],
+    "exit_code": 0,
+    "sigterm_event_sent": true,
+    "forced_cleanup": false,
+    "log_sha256": {
+      "stderr.log": "949e038c4a529f958595558c8b1aa5102e49bc0ca14e1f19ff7e8daa8d82ce25",
+      "stdout.log": "2c9e60fadf5a634f2abc8420ad95d2ca5333deea2cab5440598ee11ef46f545c"
+    }
+  },
+  "source_sha256": "ffaa6c392bdd8456e8c59622bafb86eef77b375aaa160222b88fbeec209b483f",
+  "runtime_source_changed": false,
+  "static_protocol_basis": {
+    "TCPHandlerRelay_dispatch": "0x0805b958: register ID 0; forward ID 1; nonzero account registration",
+    "RelayService_relayToTCP": "0x08051b76: set ID to 3, look up recipient at offset 8, send original size bytes",
+    "TCPUser_onPacketParse": "0x0805d02e: 12-byte header and uint16 size at offset 2",
+    "UDPHandlerS2S_dispatch": "0x0805e406: ID 2500 and result 0 disconnect account at offset 10",
+    "PVP_startup": "0x08051514: PVP UDP worker uses the S2S port and S2S handler"
+  },
+  "reproduction": [
+    "python tools/test_relay.py"
+  ],
+  "limitations": [
+    "Own loopback peers; no original monitor, game or client acceptance.",
+    "Private copy uses max_client=16; no full capacity or stress acceptance.",
+    "PVP mode exposes S2S UDP 8200; UDP data forwarding is not tested.",
+    "Normal process return is recorded; full worker cleanup is not separately asserted.",
+    "Windows 10 x64 10.0.19044 only."
+  ]
+}

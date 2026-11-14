@@ -253,3 +253,9 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 `--game-proxy` 再通过原版 DP2/Frida 调用原版 game 的 CmmChannelProxy 构造、Init、SendCheckChannelScript，实际执行原版连接、版本检查、下载和文件写入。测试临时设置自己的 CEnvironment 端口并恢复，不改原版指令或函数结果；落盘的频道脚本和版本分别与原始文件、数据库值一致，测试 game 自行返回 42，无强制回收或新增 runtime gap，仍有已知 inotify 两项缺口。该接口测试在资源初始化之前主动退出，不能替代自然启动路径或完整 DataManager 验收。完整 game + bridge 联合长观察另行运行，结果尚未写入本节。
 
 接口检查使用另一个私有服务端口 7002，避开长观察使用的 7000；数据库仍为原版固定的 3306。bridge 接收 runtime SIGTERM 事件后自行返回 0，未强制结束。仅实测 Windows 10 x64 10.0.19044；频道脚本导入后的完整 game 初始化、服务业务、Win7/Win11 仍未通过。复现条件及命令见 README，证据见 [bridge 与 game 频道代理](evidence/p2-bridge-channel-script.json)。
+
+## 2026-11-14 · relay 实际转发与 S2S 定向断开
+
+`tools/test_relay.py` 从原版 TCPHandlerRelay::dispatch、relayToTCP、UDPHandlerS2S::dispatch 独立确定协议：TCP 报头为两个 16 位值和两个 32 位账号字段，登记 ID 0、转发 ID 1，原版将转发 ID 改为 3 并保留后续字节。自编的两个测试连接先通过各自的回送确认登记，再逐字节核对 32 次双向二进制转发，以及拆包和连包；随后向 UDP 8200 发送原版 ID 2500、结果 0 的 S2S 报文，指定连接确实关闭，另一个连接仍能回送。
+
+本次使用原版 PVP 模式，TCP 7200 和 S2S UDP 8200；没有把未暴露的 UDP 数据转发路径算作通过。独立副本仅将 max_client 改为 16，原版 ELF 和 runtime 均未修改。结束时请求 runtime SIGTERM，原版返回 0，无强制回收或 gap。尚未验证原版 monitor 对接、PVP 客户端业务、满额负载、全部 worker 清理或 Win7/Win11。证据见 [relay 转发协议](evidence/p2-relay-protocol.json)。
