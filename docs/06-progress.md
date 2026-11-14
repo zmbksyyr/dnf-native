@@ -359,3 +359,13 @@ bridge 完整频道脚本响应匹配原文件，并自行返回 0。MySQL 日�
 双架构自编 ELF 样件五次并发关闭均以 42 退出，验证 fd 集合、读写计数、关闭策略和 EBADF。修复后的三个原版 DBMW 均完成 11 个数据库连接、网络线程、加载和 SIGTERM 清理标记后自行返回 1；反汇编确认原版 main 在正常 Clear 后固定返回 1。stderr 无 runtime gap、无强制回收，私有 MySQL 返回 0，源库身份不变。
 
 证据见 [DBMW 并发关闭](evidence/p2-select-close.json)，复现 `python tools/test_select_close.py` 与 `python tools/probe_dbmw.py --database-source <停止的私有恢复库>`。本轮修复已由正式双架构构建完成；只验证 DBMW 初始化与停服，不宣称 DBMW 业务协议、16 服务或客户端验收。
+
+## 2026-11-14 · 六个辅助服务与 DBMW 联合初始化
+
+在同一私有 MySQL 副本上实际运行原版 auction、point、guild、statics、coserver、community 和三个 DBMW。guild 连上原版 DBMW，并在停止时输出 Guild And Guild Member DB Save Success；statics/coserver 完成原版加载和 SIGTERM 清理；community 使用原版 SIGUSR2 停止，自行返回 0。auction/point 采用原版支持的 run 前台动作和短服务名，避免误用 daemon 参数或把服务名当绝对路径。
+
+auction 首次进入实际数据库初始化后返回 9。MySQL 语句历史给出确切原因：原版查询 auction_history_202611，旧种子只有无年月后缀的模板表，错误为 1146。在私有副本内用 CREATE TABLE ... LIKE 原模板创建两个拍卖库当月的 history 和 history_buyer 表后，该错误消失；保留全部原版 ELF 指令、原始数据及真实数据库调用。没有改系统时间、跳过查询或伪造查询结果。
+
+早先五秒观察后停服不能确认拍卖服务已完成初始化；最终探测对 auction/point 各观察 20 秒，并以原版初始化及 Server Terminated 标记核对结果，不把等待时间或端口计为就绪。九服务联合正式复测全部通过：auction/point/community 返回 0，其余原版框架正常返回 1；全部无强制回收、无 runtime gap，MySQL 返回 0，源库身份不变。停止按依赖倒序执行，guild 先于 DBMW。community 前台模式未创建 daemon PID 文件，因此停止时有缺少 PID 文件的删除提示，不隐藏此差异。
+
+证据见 [辅助服务联合初始化](evidence/p3-auxiliary-service-init.json)，复现 `python tools/probe_dbmw.py --database-source <停止的私有恢复库> --auxiliary`。本轮没有增加 runtime 实现；九服务结果只证明已观察的初始化与停止路径。默认 16 个 core 服务现均已有各自的部分实际运行证据，但完整 16 服务联合就绪、请求/数据核对、客户端业务和最终交付仍未验收。

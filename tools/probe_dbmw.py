@@ -1,4 +1,4 @@
-"""Observe three original DBMW instances on an independent private database copy."""
+"""Observe original DBMW and optional auxiliary services on a private database copy."""
 import argparse
 import datetime
 import json
@@ -23,9 +23,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database-source", type=Path, required=True,
                         help="Stopped private restored instance containing data/ and game-db.json")
+    parser.add_argument("--auxiliary", action="store_true",
+                        help="Also observe auction/point/guild/statics/coserver/community initialization and shutdown")
     args = parser.parse_args()
     source = args.database_source.resolve()
-    for port in [3307, 20403, 20203, 20303]:
+    instances = list(INSTANCES)
+    if args.auxiliary:
+        instances += [("auction", "auction_siroco"), ("point", "point_siroco"), ("guild", "gld_siroco"),
+                      ("statics", "stat_siroco"), ("coserver", "coserver"), ("community", "community")]
+    ports = [3307, 20403, 20203, 20303] + ([30803, 30603, 30403, 30503, 30703, 31100] if args.auxiliary else [])
+    for port in ports:
         with socket.socket() as check:
             check.bind(("127.0.0.1", port))
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -39,7 +46,7 @@ def main():
     pipe = "DNFDbmw" + stamp
     options = ["--no-defaults", "--protocol=PIPE", "--socket=" + pipe, "--user=root"]
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(ROOT)),
-               "scope": "Three original DBMW instances: database/thread initialization and SIGTERM cleanup only. No protocol or database business acceptance.",
+               "scope": "Original service initialization and normal cleanup only; no complete service readiness or business acceptance.",
                "database_source": before, "results": []}
     processes, database = [], None
 
@@ -70,9 +77,20 @@ def main():
         else:
             raise RuntimeError("Private MySQL startup timeout")
         sql("UPDATE d_taiwan.db_connect SET db_ip='127.0.0.1', db_port=3307;")
+        if args.auxiliary:
+            # Original auction/point query YYYYMM tables. The old seed has the
+            # templates only; preserve their schema in this private copy.
+            month = sql("SELECT DATE_FORMAT(NOW(),'%Y%m');").decode("ascii").strip()
+            tables = []
+            for schema in ["taiwan_cain_auction_gold", "taiwan_cain_auction_cera"]:
+                for table in ["auction_history", "auction_history_buyer"]:
+                    name = schema + "." + table + "_" + month
+                    sql("CREATE TABLE IF NOT EXISTS " + name + " LIKE " + schema + "." + table + ";")
+                    tables.append(name)
+            receipt["monthly_history_tables"] = tables
         db = json.loads((source / "game-db.json").read_text(encoding="utf-8"))
         db["port"] = 3307
-        for name, configuration in INSTANCES:
+        for name, configuration in instances:
             private = instance / name
             for lib in ["lib", "usr"]:
                 shutil.copytree(ROOT / ".local/sysroot/i686" / lib, private / lib)
@@ -82,34 +100,47 @@ def main():
                 (guest / directory).mkdir(exist_ok=True)
             config = guest / "cfg" / (configuration + ".cfg")
             text = config.read_text(encoding="utf-8")
-            for setting, key in [("ip", "host"), ("port", "port"), ("acc", "user"),
-                                 ("pwd", "password"), ("name", "database")]:
-                text, count = re.subn(r"(?m)^master_db_" + setting + r"[^\S\r\n]*=.*$",
-                                     lambda match: "master_db_" + setting + " = " + str(db[key]), text)
+            fields = []
+            if name.startswith("dbmw"):
+                fields = [("master_db_" + setting, key) for setting, key in
+                          [("ip", "host"), ("port", "port"), ("acc", "user"), ("pwd", "password"), ("name", "database")]]
+            if name in ["auction", "point"]:
+                fields = [(prefix + "_" + setting, key) for prefix in ["game_db", "auction_db"]
+                          for setting, key in [("ip", "host"), ("port", "port"), ("acc", "user"), ("pwd", "password")]]
+            for setting, key in fields:
+                text, count = re.subn(r"(?m)^" + setting + r"[^\S\r\n]*=.*$",
+                                     lambda match: setting + " = " + str(db[key]), text)
                 if count != 1:
                     raise RuntimeError("Original DBMW configuration field not found: " + setting)
             config.write_text(text, encoding="utf-8")
-            host, ld, elf = ROOT / "build/i686/dnf-host.exe", private / "lib/ld-2.17.so", guest / "df_dbmw_r"
+            host, ld = ROOT / "build/i686/dnf-host.exe", private / "lib/ld-2.17.so"
+            elf = guest / ("df_dbmw_r" if name.startswith("dbmw") else "df_" + name + "_r")
+            arguments = [configuration, "nofork"]
+            if name in ["auction", "point"]:
+                # Original argv[3] is a short service name, not an absolute path.
+                arguments = ["./cfg/" + configuration + ".cfg", "run", "./" + elf.name]
             command = [str(host), "--root", str(private), sha(ld), "--env", "HOME=/home/neople", "--cwd",
-                       "/home/neople/" + name, "--run", str(elf), sha(elf), "/home/neople/" + name + "/df_dbmw_r",
-                       configuration, "nofork"]
-            record = {"name": name, "host_sha256": sha(host), "elf_sha256": sha(elf), "config_sha256": sha(config)}
+                       "/home/neople/" + name, "--run", str(elf), sha(elf), "/home/neople/" + name + "/" + elf.name,
+                       *arguments]
+            record = {"name": name, "host_sha256": sha(host), "elf_sha256": sha(elf), "config_sha256": sha(config),
+                      "arguments": arguments}
             receipt["results"].append(record)
             with (private / "stdout.private.log").open("wb") as out, (private / "stderr.log").open("wb") as err:
                 process = subprocess.Popen(command, stdout=out, stderr=err)
             processes.append((process, private, record))
             try:
-                process.wait(timeout=5)
+                process.wait(timeout=20 if name in ["auction", "point"] else 5)
                 raise RuntimeError(name + " exited before the shutdown request")
             except subprocess.TimeoutExpired:
                 pass
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:
-        for process, private, record in processes:
+        for process, private, record in reversed(processes):
             record["forced_cleanup"] = False
             if process.poll() is None:
-                request_stop(process.pid)
+                record["stop_signal"] = 12 if record["name"] in ["auction", "point", "community"] else 15
+                request_stop(process.pid, record["stop_signal"])
                 try:
                     process.wait(timeout=15)
                 except subprocess.TimeoutExpired:
@@ -121,13 +152,26 @@ def main():
             stdout = (private / "stdout.private.log").read_text(encoding="utf-8", errors="replace")
             record["gaps"] = [line for line in stderr.splitlines()
                               if any(marker in line for marker in ["syscall gap", "unhandled exception", "unsupported", "exhausted"])]
-            record["markers"] = [marker for marker in ["DBMW_ALL_DB Open Success", "Application Network Thread Begin() Success!",
-                                                        "Application Load() Success!", "Recv SIGTERM signal", "Thread Free Success!", "Application End!"]
+            name = record["name"]
+            if name.startswith("dbmw"):
+                expected = ["DBMW_ALL_DB Open Success", "Application Network Thread Begin() Success!",
+                            "Application Load() Success!", "Recv SIGTERM signal", "Thread Free Success!", "Application End!"]
+            elif name == "guild":
+                expected = ["Application Init() Success!", "Application OpenTcpService(", "Application Load() Success!",
+                            "Recv SIGTERM signal", "Guild And Guild Member DB Save Success!", "CApplication::Process() Exit"]
+            elif name == "community":
+                expected = ["Community Server(IP:127.0.0.1, PORT:31100)", "Start"]
+            elif name in ["auction", "point"]:
+                expected = ["OK readConfig()", "Server Frame Start Ver1.0", "Server Terminated"]
+            else:
+                expected = ["Application Init() Success!", "Application Load() Success!", "Recv SIGTERM signal", "Application Stop!"]
+            record["markers"] = [marker for marker in expected
                                  if marker in stdout]
             record["logs"] = {name: sha(private / name) for name in ["stderr.log", "stdout.private.log"]}
             # Original main at 0x80637e0 returns 1 even after successful Clear().
-            record["passed"] = (record["exit_code"] == 1 and not record["forced_cleanup"] and
-                                not record["gaps"] and len(record["markers"]) == 6)
+            expected_exit = 0 if name in ["auction", "point", "community"] else 1
+            record["passed"] = (record["exit_code"] == expected_exit and not record["forced_cleanup"] and
+                                not record["gaps"] and len(record["markers"]) == len(expected))
             print(record["name"], "PASS" if record["passed"] else "FAIL", "exit", record["exit_code"], flush=True)
         if database:
             receipt["mysql_forced_cleanup"] = False
@@ -145,7 +189,7 @@ def main():
         receipt["database_source_unchanged"] = before == tree_identity(source / "data")
         (instance / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         print("DBMW receipt:", instance / "receipt.json", flush=True)
-    if (receipt.get("error") or len(receipt["results"]) != 3 or not all(row["passed"] for row in receipt["results"]) or
+    if (receipt.get("error") or len(receipt["results"]) != len(instances) or not all(row["passed"] for row in receipt["results"]) or
             receipt.get("mysql_exit_code") != 0 or receipt.get("mysql_forced_cleanup") or not receipt["database_source_unchanged"]):
         raise SystemExit(receipt.get("error", "DBMW observation failed"))
 
