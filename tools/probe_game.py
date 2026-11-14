@@ -18,14 +18,16 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--timeout", type=float, default=30)
+    parser.add_argument("--host", type=Path, default=ROOT / "build/i686/dnf-host.exe")
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--preload", action="store_true", help="Use the original DP2 preload chain")
     parser.add_argument("--env", action="append", default=[], help="Add a guest NAME=VALUE environment setting")
     parser.add_argument("--lua-script", type=Path, help="Use a test Lua script in the private DP2 copy")
     parser.add_argument("--frida-script", type=Path, help="Use a test JS script in the private DP2 copy")
+    parser.add_argument("--frida-teardown", choices=["minimal", "full"], help="Override Gadget cleanup in the private config")
     parser.add_argument("--db-config", type=Path, help="Private JSON connection settings for an isolated test database")
     args = parser.parse_args()
-    if (args.lua_script or args.frida_script) and not args.preload:
+    if (args.lua_script or args.frida_script or args.frida_teardown) and not args.preload:
         parser.error("Test scripts require --preload")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = ROOT / "build/probes" / stamp / "game"
@@ -62,7 +64,7 @@ def main():
     elf, ld = guest_dir / "df_game_r", instance / "lib/ld-2.17.so"
     # GLib resolves the home directory while Frida is loading on another thread.
     # Supply the guest user's normal HOME instead of triggering NSS dlopen there.
-    command = [str(ROOT / "build/i686/dnf-host.exe"), "--root", str(instance), hashlib.sha256(ld.read_bytes()).hexdigest(),
+    command = [str(args.host.resolve()), "--root", str(instance), hashlib.sha256(ld.read_bytes()).hexdigest(),
                "--env", "HOME=/home/neople",
                "--cwd", "/home/neople/game", "--run", str(elf), hashlib.sha256(elf.read_bytes()).hexdigest(),
                "/home/neople/game/df_game_r", "siroco11", "nofork"]
@@ -71,6 +73,11 @@ def main():
         for source, name in [(args.lua_script, "df_game_r.lua"), (args.frida_script, "df_game_r.js")]:
             if source:
                 shutil.copy2(source, instance / "dp2" / name)
+        if args.frida_teardown:
+            config = instance / "dp2/frida/frida.config"
+            settings = json.loads(config.read_text(encoding="utf-8"))
+            settings["teardown"] = args.frida_teardown
+            config.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
         command[4:4] = ["--env", "LD_PRELOAD=/dp2/libdp2pre.so", "--env", "LD_LIBRARY_PATH=/dp2/lib:/home/neople/game"]
     command[4:4] = [part for value in args.env for part in ["--env", value]]
     env = dict(os.environ)
@@ -96,6 +103,7 @@ def main():
         inputs.extend([instance / "dp2/libdp2pre.so", instance / "dp2/libdp2.so",
                        instance / "dp2/lib/liblua53.so", instance / "dp2/lib/libdp2game.so",
                        instance / "dp2/frida/frida.so",
+                       instance / "dp2/frida/frida.config",
                        instance / "dp2/df_game_r.lua", instance / "dp2/df_game_r.js"])
     result = {"recorded_utc": stamp, "os": platform.platform(), "command": command,
               "host_sha256": hashlib.sha256(Path(command[0]).read_bytes()).hexdigest(),
@@ -110,7 +118,9 @@ def main():
                                       if any(marker in line for marker in ["unsupported", "snapshot failed", "decode gap", "table exhausted", "unimplemented guest"])}),
               "logs": {str(p.relative_to(instance)): {"bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
                        for p in instance.rglob("*") if p.is_file() and (p.suffix == ".log" or "log" in p.parts)}}
-    (ROOT / "build/game-probe.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    receipt = json.dumps(result, indent=2) + "\n"
+    (instance / "receipt.json").write_text(receipt, encoding="utf-8")
+    (ROOT / "build/game-probe.json").write_text(receipt, encoding="utf-8")
     print("Original game:", "exit", process.returncode, "forced cleanup", forced, "gaps", result["syscall_gaps"])
     print("Private logs:", instance)
 

@@ -267,3 +267,19 @@ Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE
 自编双架构 ELF 使用真实 clone 线程，核对比较失败不改变队列、先唤醒再迁移、条件成立/不成立、五种原子运算、移位、有符号参数及 clear_tid 退出。i386、x64 均正常返回 42；同一正式构建的 TLS、入口/信号、原版 channel 握手和 relay 转发回归通过。仅覆盖本进程地址队列；跨进程 futex、PI 和 robust owner-death 等不在本次实现范围。
 
 这两项补齐没有解决 Frida 退出异常。独立诊断构建显示主线程先 munmap Frida 的 0x17ca570 字节映射，另一个线程随后在模块偏移 0x89e3c 发生执行访问异常；代码页已解除提交，栈仍已提交且可读。补齐 futex 后相同短失败路径仍返回 125。因此只将新操作计作原语通过，模块卸载和线程生命周期仍须定位，没有禁止 munmap 或虚假保留映射。证据见 [futex 队列与退出边界](evidence/p2-futex-queues.json)。
+
+## 2026-11-14 · game 自然导入频道脚本与原版 JS 数据库
+
+补齐 bridge 后，第一轮原版 game + 原版 DP2/Lua/Frida/脚本在私有 MySQL 上运行 1304.942 秒，自然取得频道数据、导入频道脚本，继续完成 ChannelType、GameWorld、Login State 初始化，并输出频道启动标记。随后原版 JS 的独立数据库账号认证失败 1045，在 init_db 的 api_MySQL_exec 调用中报 expected a pointer，game 自行返回 134。该次没有未处理访问异常或强制回收；认证错误出现在退出之前，不足以单独证明返回 134 的全部根因。bridge、MySQL 均正常返回 0，输入私有数据库身份不变。
+
+原版 JS 的数据库账号独立于 game master_db 和 d_taiwan.db_connect。只在私有测试库按原始脚本设置该账号，并授予 d_taiwan.*、frida.* 权限后，通过附加测试 RPC 直接调用原版 init_db，SELECT 1 成功，独立 MySQL 查询确认 frida 中实际创建 data、dgnfinishtime、init_sp_tp 三张表；测试 game 自行返回 42，耗时 26.493 秒。该接口测试提前退出，不能代替原始脚本自然运行。配置该账号的完整复测运行 1293.749 秒，再次自然导入频道脚本并推进到 GameWorld、Login State 和频道启动标记；私有 SQL 日志实际记录 JS 连接及建库、三张表创建语句，1045 和 expected a pointer 均未再出现，但进程仍自行返回 134，终止原因尚未定位。bridge、MySQL 均正常返回 0，输入数据库身份不变。
+
+新增 tools/probe_game_chain.py 将数据库逐文件校验复制、私有账号设置、bridge 实际脚本响应、game 启动观察和正常停库串成可复现命令。它要求已有停止的私有恢复测试库及 game-db.json，不改变输入原件；--script-db 明确选择上述接口测试。probe_game.py 另外保存每实例 receipt，避免后续探测覆盖唯一结果，并允许选择诊断宿主和私有 Gadget teardown 配置。正式整理后的 --script-db 命令独立复测通过，game 返回 42、耗时 26.583 秒，三张表查询通过，bridge/MySQL 均返回 0，源库身份不变。
+
+证据见 [game 频道导入与脚本数据库](evidence/p2-game-channel-init-script-db.json)。原版日志的 Success 或启动标记仍不计客户端或完整业务通过，仅实测 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · Frida 卸载配置的诊断对照
+
+独立诊断捕获原版 libuv 的 uv_dlclose（0xcd30）调用 dlclose，返回点为模块偏移 0xcd64。关闭 Frida 的实际调用来自该封装；不能把 libuv 的模块身份误记为 libdp2game。原版 frida.config 没有 teardown 字段，而 [Frida 官方 Gadget 文档](https://frida.re/docs/gadget/)明确说明默认 minimal 不会停止内部线程，需要卸载时应使用 full，这与此前解除映射后仍有线程执行的现场一致。
+
+只在私有配置设置 teardown=full 后，短失败路径仍返回 125，但异常变为主线程执行地址 0；诊断栈的返回地址落在原版 libdp2game 的偏移 0x345516。替换成仅含空 init/dispose 的自编 JS 同样复现，因此新异常不依赖原版业务脚本。未解决后续空调用，full 仅作为探测器的显式诊断选项，不修改默认输入配置或宣称停服修复。证据见 [Frida teardown 对照](evidence/p2-frida-teardown-diagnostic.json)。

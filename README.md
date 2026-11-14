@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化和正常停服；原版 channel 已通过 32 次正确 TCP 握手及拆包、连包检查；原版 bridge 已连接私有 MySQL，版本检查、完整频道脚本响应及原版 game 代理下载接口通过。原版 game 已打开 13 类业务库并进入真实 DataManager 资源加载，完整初始化仍在复测。19 个 ELF 原址映射、双架构 VM/文件/网络/执行原语和官方 MySQL 5.7.44 数据往返检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化和正常停服；原版 channel 已通过 32 次正确 TCP 握手及拆包、连包检查；原版 bridge 已连接私有 MySQL，版本检查、完整频道脚本响应及原版 game 代理下载接口通过。原版 game 已打开 13 类业务库，自然导入频道脚本并推进到 GameWorld 和登录状态初始化，随后仍返回 134，正在定位终止原因。19 个 ELF 原址映射、双架构 VM/文件/网络/执行原语和官方 MySQL 5.7.44 数据往返检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -60,3 +60,12 @@ python tools/test_bridge.py --db-config build/bridge-db.private.json --game-prox
 relay 检查需要 TCP 7200、UDP 8200 空闲，使用原版 PVP 模式和独立的 16 连接配置。两个自编测试连接登记后，核对双向二进制转发、拆包/连包，再通过 UDP S2S 控制报文定向断开一个连接，并验证另一个连接仍可收发。测试不包含原版 monitor 对接或客户端 PVP 业务；结束时通过 runtime SIGTERM 事件请求退出。
 
 futex 检查使用自编双架构 ELF 的实际线程，验证比较失败、队列迁移、条件唤醒及原子字运算；不代表完整 Linux futex 或插件退出通过。原版 Frida 失败退出时仍存在模块解除映射后线程继续执行的异常，详见[实施记录](docs/06-progress.md)。
+
+game 联合观察需要一个已停止的私有恢复测试库，目录包含 `data/` 和 `game-db.json`，且已配置 game 的测试账号及 `d_taiwan.db_connect`。JSON 使用 `probe_game.py --db-config` 的五个连接字段，其中密码为原版 game 使用的编码值。该夹具应基于 `probe_mysql.py` 的恢复副本准备，不使用原始数据库；其本地 named pipe 的 root 管理连接应可用。
+
+```powershell
+python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --timeout 2100
+python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --script-db --timeout 60
+```
+
+联合观察在新的数据库副本中设置 bridge 和原版 JS 各自的账号，实际核对 bridge 脚本响应，再运行原版 game；要求 TCP 3306、7000 空闲。`--script-db` 只检查原版 JS 建库建表接口，随后主动退出 42。所有日志和每实例 receipt 保存在忽略的 `build/probes/`，不得将含连接信息的原始日志提交 Git。两种观察均不计完整业务验收。
