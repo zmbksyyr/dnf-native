@@ -179,6 +179,17 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         require(CopyFileW((resources + L"\\" + path).c_str(), target.c_str(), TRUE), "Copy local game resource");
         if (file_sha256(target) != hash) throw std::runtime_error("Copied game resource identity differs; incomplete instance retained");
     }
+    // The original configs include literal advertised-address placeholders.
+    // Normalize after verifying the copied resources, including older cabinets.
+    for (const auto &[path, hash] : files) {
+        if (path.size() < 4 || path.substr(path.size() - 4) != L".cfg") continue;
+        std::wstring target = instance + L"\\" + path;
+        std::string text = read_file(target); bool changed = false;
+        for (const char *placeholder : {"Public IP", "UDP IP"}) if (text.find(placeholder) != std::string::npos) {
+            replace_all(text, placeholder, "127.0.0.1"); changed = true;
+        }
+        if (changed) write_private(target, text, CREATE_ALWAYS);
+    }
     for (const wchar_t *path : {L"i686\\tmp",L"i686\\dev\\shm\\sec",L"service-logs"}) directory(instance + L"\\" + path);
     // Directory-only runtime paths are absent from a file manifest.
     const wchar_t *names[] = {L"bridge",L"manager",L"dbmw_guild",L"dbmw_mnt",L"dbmw_stat",L"monitor",L"guild",L"statics",L"coserver",L"community",L"auction",L"point",L"channel",L"relay",L"game"};

@@ -1,0 +1,320 @@
+{
+  "recorded_utc": "2026-11-14T13:06:40.792694+00:00",
+  "base_commit": "85f61bb",
+  "gui_build": {
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang++.exe",
+      "-std=c++17",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O2",
+      "-static",
+      "-municode",
+      "-mwindows",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-D_WIN32_WINNT=0x0601",
+      "D:\\cache\\dnf-runtime\\dnf-native\\delivery\\controller_gui.cpp",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\gui-address\\gui-resource.o",
+      "-luser32",
+      "-lgdi32",
+      "-lshell32",
+      "-lole32",
+      "-ladvapi32",
+      "-lws2_32",
+      "-lbcrypt",
+      "-lcabinet",
+      "-o",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\gui-address\\DNF-Native.exe"
+    ],
+    "output_bytes": 1027072,
+    "output_sha256": "28fc397cf5ba6b1522bc07b123734755b2bbd760a515d34cc67fa718d80ba124",
+    "sources": {
+      "delivery/controller_gui.cpp": "9549d05f6f21a704578bb3a301d547f07db6dc877839f68af1ba43363a1acac6",
+      "delivery/controller_gui.manifest": "05ecfb2fbab448566cfbb8d6224a29690b11555d3b73601a3ec007b91c192e89",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+      "delivery/service_processes.h": "4fb6449af2990276f13611619670844704ae703f3da8749bce2b6d29c8030d1a",
+      "delivery/log_view.h": "4d9b28373e9d611cca5ebe3eab8bc38c82640ae2a865316bc15173046cb1cf0b",
+      "delivery/instance_setup.h": "632f8f2ab2e99e1fb0636c8673dd66d2582e711fcac9e4a07273fa6d09af651a",
+      "delivery/resource_cabinet.h": "71291b1c42222e6c3209fb0ca044c4edf6d28d492a2329b15f13d18b56ae6692",
+      "tools/build_gui.py": "12e5331d4c8b69d575d7ad101266b230b1b255b5877a1c45d1499dc777cccdce"
+    },
+    "mysql_sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51",
+    "mysql_build_receipt_sha256": "3bcd4ab6c2c7b219bb9a7c1c201f8323ad45e777021c8e6c6ce2d2493a7727ac",
+    "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance.",
+    "review_copy_from": "build/gui-address/DNF-Native.exe"
+  },
+  "actual_setup_test": {
+    "recorded_utc": "20261114T130321997515Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+    "gui_sha256": "28fc397cf5ba6b1522bc07b123734755b2bbd760a515d34cc67fa718d80ba124",
+    "mysql_sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51",
+    "script_sha256": "d2e3d927ffb0fb42c1adfdeea0c1dfb331c65b8a43788797b97b5a33a18c9586",
+    "checks": {
+      "changed_resource_rejected_before_instance_writes": true,
+      "existing_nonempty_directory_unchanged": true,
+      "copy_and_initialize_window_response_ms": 0.111,
+      "native_first_run_creates_nineteen_service_instance": true,
+      "import_reexport_matches_complete_original_seed_bytes": true,
+      "resource_format": "cabinet",
+      "original_advertised_address_placeholders_are_local": true,
+      "original_eighteen_schemas_and_current_month_tables": true,
+      "original_credential_encoding_matches_connection_table": true,
+      "game_account_has_no_global_grants": true,
+      "native_initialized_fifteen_original_peers": true,
+      "channel_protocol": {
+        "challenge": true,
+        "positive_responses": 3,
+        "fragmented": true,
+        "coalesced": true
+      },
+      "relay_and_actual_monitor_protocol": {
+        "registered_peers": 2,
+        "bidirectional_messages": 8,
+        "unlogged_accounts_disconnected": [
+          701,
+          702
+        ],
+        "own_auth_response_sent": false
+      },
+      "stun_protocol": {
+        "responses": 5,
+        "address_and_source_ports": true
+      },
+      "original_frida_database_interface_with_generated_account": true,
+      "all_owned_peers_and_database_stopped_normally": true,
+      "all_four_account_secrets_differ_between_instances": true,
+      "second_instance_normal_close": true,
+      "delivery_resources_unchanged": true,
+      "source_resources_unchanged": true
+    },
+    "forced_cleanup": false,
+    "application_table_counts": {
+      "d_channel": 5,
+      "d_guild": 26,
+      "d_taiwan": 109,
+      "d_taiwan_secu": 7,
+      "d_technical_report": 42,
+      "taiwan_billing": 12,
+      "taiwan_cain": 81,
+      "taiwan_cain_2nd": 32,
+      "taiwan_cain_auction_cera": 11,
+      "taiwan_cain_auction_gold": 11,
+      "taiwan_cain_log": 97,
+      "taiwan_cain_web": 17,
+      "taiwan_game_event": 51,
+      "taiwan_login": 44,
+      "taiwan_login_play": 1,
+      "taiwan_mng_manager": 20,
+      "taiwan_prod": 26,
+      "taiwan_se_event": 13
+    },
+    "first_instance": "build\\probes\\20261114T130321997515Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(1)",
+    "second_instance": "build\\probes\\20261114T130321997515Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(2)",
+    "exit_code": 0
+  },
+  "private_setup_receipt": "build/probes/20261114T130321997515Z/gui-setup/receipt.json",
+  "actual_address_correction": {
+    "normal_game_stop": true,
+    "changes": [
+      {
+        "path": "i686/home/neople/auction/cfg/bridge.cfg",
+        "before_sha256": "96755361e3e7d11210b9dffc9043091e70bb3e931948b2fabb2789f5f7373708",
+        "after_sha256": "b4c2c4a53a1bbe6284afba4a586196d9ae4e56e141831a949af283e5c4827497",
+        "public_ip_count": 1,
+        "udp_ip_count": 0
+      },
+      {
+        "path": "i686/home/neople/game/cfg/siroco11.cfg",
+        "before_sha256": "d85ffd8a0d1884051d4b8bbde6c4c8eb122489e73306040e73f550f7f5d812f5",
+        "after_sha256": "a45879b52b6498f33bcf46b1f7dcd941641c2e8fed19db177b6f2edea6431190",
+        "public_ip_count": 5,
+        "udp_ip_count": 3
+      },
+      {
+        "path": "i686/home/neople/game/cfg/siroco56.cfg",
+        "before_sha256": "69ac5edf98ba2895b7053e84b8b0387bcbd5ffe7872ef9ec1f4b0915f12fa490",
+        "after_sha256": "c48729d0e920080516e21c9f0fae1eff97dc888e0c694a20da3dfa5f32c28b82",
+        "public_ip_count": 5,
+        "udp_ip_count": 3
+      }
+    ],
+    "channel_advertises_loopback": true,
+    "actual_channel_log_line": "20261114 130220 : Add SGI=4, IP= 127.0.0.1, PORT= 10011, gc_no=3011",
+    "individual_restart_result": "Original monitor rejected duplicate channel 11 and game exited normally. Whole-stack normal restart cleared original registration.",
+    "whole_stack_restarted_normally": true
+  },
+  "client_control": {
+    "scope": "Original native ELF server and user-authorized jbz69 client, both using the unmodified original server-package PVF as a control. Not acceptance of the current jbz69 custom PVF.",
+    "original_game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "both_private_pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+    "startup_seconds": 37.092,
+    "observed_client_ui": "Channel selection with ch.11 and connecting dialog. No game login accepted.",
+    "client_exit_code": 0,
+    "server_exit_code": 0,
+    "forced_cleanup": false,
+    "original_client_critical_hashes_unchanged": true,
+    "desktop_limit": "BitBlt failed with Win32 error 6; GetForegroundWindow returned NULL. Input helper sent no click after foreground check failed."
+  },
+  "requested_pvf_read_only_audit": {
+    "current": {
+      "name": "Script.pvf",
+      "bytes": 237024513,
+      "entries": 439165,
+      "missing_template_strings": [
+        [
+          417658,
+          "equipment/character/atswordman.lay"
+        ],
+        [
+          522089,
+          "equipment/character/dswordman.lay"
+        ],
+        [
+          562415,
+          "equipment/character/atpriest.lay"
+        ]
+      ],
+      "sha256": "dc444c3429a44c19419dba83c8b1c30e4263371afa528ba90430fda2f598e1e2"
+    },
+    "equipment_count": 94583,
+    "equipment_references_to_missing_atswordman_template": 54,
+    "backup_archives": [
+      {
+        "name": "Script.pvf-1793761419206",
+        "bytes": 231244601,
+        "entries": 430445,
+        "missing_template_strings": [
+          [
+            417658,
+            "equipment/character/atswordman.lay"
+          ],
+          [
+            522089,
+            "equipment/character/dswordman.lay"
+          ],
+          [
+            562415,
+            "equipment/character/atpriest.lay"
+          ]
+        ],
+        "sha256": "4d9caf76acf7ee8aef9cbdf77771339b4706cac7adbeeec16eca4c0062b68a80"
+      },
+      {
+        "name": "Script.pvf-1793843915123",
+        "bytes": 234270057,
+        "entries": 434347,
+        "missing_template_strings": [
+          [
+            417658,
+            "equipment/character/atswordman.lay"
+          ],
+          [
+            522089,
+            "equipment/character/dswordman.lay"
+          ],
+          [
+            562415,
+            "equipment/character/atpriest.lay"
+          ]
+        ],
+        "sha256": "382e333731b2f849d3b331b881c9d3cd94a937e5d99b84fee866bf802ce7fad6"
+      },
+      {
+        "name": "Script.pvf-1794135840574",
+        "bytes": 234129217,
+        "entries": 433583,
+        "missing_template_strings": [
+          [
+            417658,
+            "equipment/character/atswordman.lay"
+          ],
+          [
+            522089,
+            "equipment/character/dswordman.lay"
+          ],
+          [
+            562415,
+            "equipment/character/atpriest.lay"
+          ]
+        ],
+        "sha256": "56666936b333ea8b60f4f9fa3e7aba3f108935a37cea196c3584d9160e14a006"
+      },
+      {
+        "name": "Script.pvf-1794425854809",
+        "bytes": 236369973,
+        "entries": 438568,
+        "missing_template_strings": [
+          [
+            417658,
+            "equipment/character/atswordman.lay"
+          ],
+          [
+            522089,
+            "equipment/character/dswordman.lay"
+          ],
+          [
+            562415,
+            "equipment/character/atpriest.lay"
+          ]
+        ],
+        "sha256": "5e147a5b277d7d9cb562cf5d15bba22e97d96b86ee5a065ddfaba8858471cec7"
+      }
+    ],
+    "parser_origin": "Original ELF decrypt loop 0x08ac398b; ImportEquipmentAniScript 0x089c05f8. Tree/data CRC checked.",
+    "private_parser_sha256": "096b9316b47fb33677117620141651c1de492780465394d7ab1a5ba8a23a9d81",
+    "private_references_sha256": "c01bc399387417f56fa05ceb29f18a1a6c1c364722ffe3fa5be654ecee8346ab",
+    "backup_limit": "Missing strings were inspected, but actual equipment references and startup were not tested for each backup."
+  },
+  "package": {
+    "recorded_utc": "2026-11-14T13:06:40.792694+00:00",
+    "scope": "Review sample with native local-address correction and previously tested original-log GUI. Not final core/full split or client gameplay acceptance.",
+    "zip_path": "build/review/native-local-resources.zip",
+    "zip_bytes": 190329738,
+    "zip_sha256": "75ae8cf0a6e7c0a64c7855f6564b88ce64beff939eceac3b4689eaaf75309e01",
+    "zip_crc_passed": true,
+    "member_hashes_passed": true,
+    "files": {
+      "DNF-Native.exe": {
+        "bytes": 1027072,
+        "sha256": "28fc397cf5ba6b1522bc07b123734755b2bbd760a515d34cc67fa718d80ba124"
+      },
+      "mysql-standalone.exe": {
+        "bytes": 15958528,
+        "sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51"
+      },
+      "resources/resources.ini": {
+        "bytes": 368512,
+        "sha256": "5d94dadc4bf3da2cf5968380c55af0e226d2c77c154af877254ff98352c099e8"
+      },
+      "resources/resources.cab": {
+        "bytes": 175429927,
+        "sha256": "153a602c6797e1dadc89f20c91229c4fb8f44a87d5f7a9e442f4467f8c98a90c"
+      }
+    }
+  },
+  "previous_package_sha256": "b798482033b6010d9a610f991b7ae208320caf9d8dc2cb4d8790772748a65ef3",
+  "limits": [
+    "Windows 10 10.0.19044 development system only.",
+    "Actual original channel advertisement is verified; client authentication, dungeon and save remain unverified.",
+    "Current custom jbz69 PVF still fails original game item initialization; the separate control uses the original package PVF.",
+    "No reference executable or source-built replacement server was used. Original inputs and game ELF hashes are unchanged."
+  ],
+  "cleanup": {
+    "recorded_utc": "2026-11-14T13:07:27.904819+00:00",
+    "removed_paths": [
+      "probes/20261114T114843341100Z/gui-setup/\u6e38\u620f \u5b9e\u4f8b(2)",
+      "probes/20261114T130321997515Z/gui-setup/\u6e38\u620f \u5b9e\u4f8b(1)",
+      "gui-address/resources",
+      "probes/20261114T130321997515Z/gui-setup/\u672c\u5730 \u7a0b\u5e8f(1)"
+    ],
+    "removed_file_bytes": 2358991954,
+    "released_bytes_after_archive": 2358007179,
+    "archive": "cleanup-address-stage-diagnostics.zip",
+    "archive_sha256": "95413b2e7f7ee5cce82bcc992bd7c1594ee2849f0622fd88f2a6149b3915789c",
+    "archive_crc_and_member_hashes_passed": true,
+    "retained": "Latest correctly created cold instance 2, active client validation instance and its diagnostics, one independent client copy, final GUI/plugin evidence, review artifacts, source and original inputs."
+  }
+}

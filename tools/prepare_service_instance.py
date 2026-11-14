@@ -76,6 +76,7 @@ def copy_service_resources(output, db, bridge_password, peers_only=False):
         for path in ([] if optional else (guest / "cfg").glob("*.cfg")):
             text = path.read_text(encoding="utf-8")
             text = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "127.0.0.1", text)
+            text = text.replace("Public IP", "127.0.0.1").replace("UDP IP", "127.0.0.1")
             if name == "channel":
                 text = re.sub(r"(?m)^this_ip\s*=.*$", "this_ip = 127.0.0.1", text)
             if name in ["channel", "relay"]:

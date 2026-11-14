@@ -102,6 +102,11 @@ def main():
         checks["resource_format"] = "cabinet" if cabinet else "directory"
         assert not (instance / ".mysql/setup-seed.sql").exists()
         assert not (instance / ".mysql/setup-services.ini").exists()
+        for name in ["game/cfg/siroco11.cfg", "game/cfg/siroco56.cfg", "auction/cfg/bridge.cfg"]:
+            config = (instance / "i686/home/neople" / name).read_text(encoding="utf-8")
+            assert "Public IP" not in config and "UDP IP" not in config, name
+            assert "127.0.0.1" in config, name
+        checks["original_advertised_address_placeholders_are_local"] = True
         screenshot(window, probe / "created.png")
         click(window, 111); ready(window, "数据库 SQL 检查通过")
         schemas = query("SELECT TABLE_SCHEMA,COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY TABLE_SCHEMA ORDER BY TABLE_SCHEMA;")
