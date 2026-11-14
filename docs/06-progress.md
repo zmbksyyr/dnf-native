@@ -175,3 +175,15 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 带私有 MySQL 的原版 game + 原版 DP2 preload 复测运行 240.080 秒，实际映射了 Frida ELF，未产生 syscall gap、runtime gap 或未处理异常，但业务初始化标记仍为空，最终按观察超时清理；MySQL 正常停库。Frida 映射后的外部线程采样仍显示两个活动 CPU 线程，主要位于内存查询和异常处理路径，因此剩余瓶颈尚未解决，不能宣称插件完整可用或服务就绪。下一定位点是 Frida 映射后的具体活动执行链。
 
 证据见 [TLS 原生返回与实际启动复测](evidence/p2-tls-native-return.json)。原始输入哈希已复核，私有数据库及凭据未提交；Win7/Win11、完整 Lua/Frida 双向调用、19 服务互通及交付验收仍未完成。
+
+## 2026-11-14 · 管道 poll 与 Frida 初始化等待
+
+本阶段解决了两个有实测依据的问题。首先，`poll` 把空匿名管道当作普通文件报告可读，导致 GLib/Frida 不断 poll、读取 `EAGAIN` 并重试。runtime 现在使用系统 `NtQueryInformationFile` 查询管道数据、写入额度及关闭状态；管道和 socket 混合等待时每次最多等待 10 ms，并保留原始超时截止。非阻塞管道在 writer 关闭且数据耗尽后返回 EOF。没有新增依赖或通用事件框架，实现提交为 `a132710`。
+
+旧宿主在双架构新样件的第 33 行均复现空管道错误就绪；修复后双架构管道超时、延迟写入唤醒、写满背压、HUP/ERR 和混合 TCP 等待全部通过。现有映射、TLS、入口、VM、文件、网络和加载器回归通过，原版 STUN 的 50 次协议响应及 manager 初始化、SIGTERM 停止也通过。180 秒原版 game + DP2 复测中，映射 Frida 后的 100 次线程采样均未增加 CPU 时间，原先的空转消失，但业务初始化仍未完成。
+
+继续追踪确认：Frida 工作线程在缺少 `HOME` 时通过 `getpwuid_r` 查询用户，NSS 尝试 `dlopen` 并等待主线程持有的加载器锁；主线程同时等待 Frida 初始化。补齐真实 guest 用户的 `HOME=/home/neople` 即解除等待，不需要修改 futex 或绕过加载器锁。game 探测器已默认提供该环境，也允许通过 `--env` 传入 guest 环境，实现提交为 `a0e5e8a`。
+
+同一正式宿主的 120 秒复测实际出现 `Frida Init Stage:early`、`setup success`、`set function success` 和 `frida main, args =`，并进入全部业务库连接成功、查询表、`GlobalData` 和 `HistoryLog` 初始化。后续暴露 i386 `lstat64`、`inotify_init` 和 `inotify_init1` 缺口；该次仍由超时清理，MySQL 正常停库，尚不构成完整 Frida 双向调用、game 就绪或最终验收。
+
+证据见 [管道等待、加载器锁与 HOME 复测](evidence/p2-pipe-poll-readiness.json)。临时诊断均从忽略目录中的源码副本构建，正式 runtime 无诊断改动，宿主已恢复；验证环境仍仅为 Windows 10 x64 10.0.19044。

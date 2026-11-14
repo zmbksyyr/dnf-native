@@ -1,0 +1,375 @@
+{
+  "recorded_utc": "2026-11-14T00:27:42.081635+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "implementation_commit": "a132710",
+  "baseline_commit": "b439019",
+  "scope": "Actual pipe poll readiness, timed waits and external startup observation; no game or complete Frida acceptance",
+  "root_cause": "poll reported empty anonymous pipe read ends as readable. GLib/Frida repeatedly polled, read EAGAIN and retried.",
+  "changes": [
+    "Query anonymous pipe data, write quota and closing state with system NtQueryInformationFile.",
+    "Report Linux POLLIN/POLLOUT only when requested and ready; retain HUP/ERR without a matching requested bit.",
+    "Bound mixed pipe/socket wait slices to 10 milliseconds and keep the original poll deadline.",
+    "Return EOF from a nonblocking pipe read after its writer closes and buffered bytes drain.",
+    "Apply nonblocking PeekNamedPipe only to real pipe handles; no new dependency or general event framework."
+  ],
+  "sources": [
+    "https://man7.org/linux/man-pages/man2/poll.2.html",
+    "https://man7.org/linux/man-pages/man7/pipe.7.html",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_pipe_local_information"
+  ],
+  "baseline_reproduction": [
+    {
+      "arch": "i686",
+      "host_sha256": "03ac577a135fef96b21f81499c81e89cfd40dbe7ce051ca43d8fc04b47c6e7c4",
+      "fixture_sha256": "ae84319c9bd712936476ea72a616b9efcf514f805c725cda23ada47804561a61",
+      "exit_code": 33,
+      "failed_check": "Empty pipe read end must not be readable",
+      "fixture_failure_line": 33
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "6037dbd7fe29f4b93c7d4885fafebe2c3a6fd822db49cb6d17b603ecbb4ebb1b",
+      "fixture_sha256": "3d15bdbd50b00a18a9ba55cff4a31cdf3a380166645ce40f6a98d8f5e4a65eef",
+      "exit_code": 33,
+      "failed_check": "Empty pipe read end must not be readable",
+      "fixture_failure_line": 33
+    }
+  ],
+  "pipe_fixture": {
+    "recorded_utc": "2026-11-14T00:19:06.936984+00:00",
+    "os": "Windows-10-10.0.19044-SP0",
+    "scope": "Own Linux pipe fixtures and external Windows pipe writer; not service acceptance",
+    "results": [
+      {
+        "arch": "i686",
+        "host_sha256": "976dd1ab1881e5767740c6b7bf183a5d983793b97af9ee28a210bc704520ea11",
+        "fixture_sha256": "ae84319c9bd712936476ea72a616b9efcf514f805c725cda23ada47804561a61",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "stdout": "pipe-wait\npipe-poll-ok\n",
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "1e01a17d980d856c6caed357ce64538ae94206067da35826d284e435bbabd5e2",
+        "fixture_sha256": "3d15bdbd50b00a18a9ba55cff4a31cdf3a380166645ce40f6a98d8f5e4a65eef",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "stdout": "pipe-wait\npipe-poll-ok\n",
+        "passed": true
+      }
+    ]
+  },
+  "mixed_socket_and_pipe_fixture": [
+    {
+      "arch": "i686",
+      "host_sha256": "976dd1ab1881e5767740c6b7bf183a5d983793b97af9ee28a210bc704520ea11",
+      "fixture_sha256": "2aee5ddb698a154b27cde1a378fbd594247674c68c0d5a9fdae175ad05c65cae",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "checks": {
+        "poll_empty": 0,
+        "poll_write_count": 1,
+        "poll_write_events": 4,
+        "poll_negative_count": 0,
+        "poll_negative_events": 0,
+        "poll_invalid_count": 1,
+        "poll_invalid_events": 32,
+        "poll_read_count": 1,
+        "poll_read_events": 1,
+        "receive_timeout_result": -11,
+        "receive_timeout_ms": 100,
+        "keepalive_result": 0,
+        "nodelay_result": 0,
+        "timeout_option_result": 0
+      },
+      "passed": true
+    },
+    {
+      "arch": "x86_64",
+      "host_sha256": "1e01a17d980d856c6caed357ce64538ae94206067da35826d284e435bbabd5e2",
+      "fixture_sha256": "b299721f5a4b32a02c85b9e84543ed4bf96592363dd81aa9fe0f38550d925207",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "checks": {
+        "poll_empty": 0,
+        "poll_write_count": 1,
+        "poll_write_events": 4,
+        "poll_negative_count": 0,
+        "poll_negative_events": 0,
+        "poll_invalid_count": 1,
+        "poll_invalid_events": 32,
+        "poll_read_count": 1,
+        "poll_read_events": 1,
+        "receive_timeout_result": -11,
+        "receive_timeout_ms": 110,
+        "keepalive_result": 0,
+        "nodelay_result": 0,
+        "timeout_option_result": 0
+      },
+      "passed": true
+    }
+  ],
+  "native_pipe_queries": {
+    "source": "build/pipe_state.c",
+    "source_sha256": "0cb26347a0794cfa0c39feed8b1b2ca18fe2570807a71a8a039646bb08732b51",
+    "results": [
+      {
+        "arch": "i686",
+        "output": [
+          "empty-reader status=0 state=3 read=0 writequota=4096 in=4096 out=4096 end=1 peek=1 available=0 error=0",
+          "empty-writer status=0 state=3 read=0 writequota=4096 in=4096 out=4096 end=0 peek=0 available=0 error=5",
+          "full-reader status=0 state=3 read=4096 writequota=4096 in=4096 out=4096 end=1 peek=1 available=4096 error=0",
+          "full-writer status=0 state=3 read=0 writequota=0 in=4096 out=4096 end=0 peek=0 available=0 error=5",
+          "closed-writer-buffered-reader status=0 state=4 read=4096 writequota=4096 in=4096 out=4096 end=1 peek=1 available=4096 error=0",
+          "closed-writer-empty-reader status=0 state=4 read=0 writequota=4096 in=4096 out=4096 end=1 peek=0 available=0 error=109",
+          "closed-reader-writer status=0 state=4 read=0 writequota=4096 in=4096 out=4096 end=0 peek=0 available=0 error=5"
+        ]
+      },
+      {
+        "arch": "x86_64",
+        "output": [
+          "empty-reader status=0 state=3 read=0 writequota=4096 in=4096 out=4096 end=1 peek=1 available=0 error=0",
+          "empty-writer status=0 state=3 read=0 writequota=4096 in=4096 out=4096 end=0 peek=0 available=0 error=5",
+          "full-reader status=0 state=3 read=4096 writequota=4096 in=4096 out=4096 end=1 peek=1 available=4096 error=0",
+          "full-writer status=0 state=3 read=0 writequota=0 in=4096 out=4096 end=0 peek=0 available=0 error=5",
+          "closed-writer-buffered-reader status=0 state=4 read=4096 writequota=4096 in=4096 out=4096 end=1 peek=1 available=4096 error=0",
+          "closed-writer-empty-reader status=0 state=4 read=0 writequota=4096 in=4096 out=4096 end=1 peek=0 available=0 error=109",
+          "closed-reader-writer status=0 state=4 read=0 writequota=4096 in=4096 out=4096 end=0 peek=0 available=0 error=5"
+        ]
+      }
+    ]
+  },
+  "regression_commands": [
+    "python tools/test.py",
+    "python tools/test_poll.py",
+    "python tools/test_net.py",
+    "python tools/test_tls.py",
+    "python tools/test_entry.py",
+    "python tools/test_vm.py",
+    "python tools/test_files.py",
+    "python tools/test_ld.py",
+    "python tools/test_stun.py",
+    "python tools/probe_manager.py"
+  ],
+  "regression_results": {
+    "all_passed": true,
+    "original_fixed_address_mappings": 19,
+    "mapping_rejection_checks": 4,
+    "original_stun_verified_udp_responses": 50,
+    "manager_initialization_and_sigterm_shutdown": "passed",
+    "private_receipts": {
+      "map-checks.json": {
+        "path": "build/map-checks.json",
+        "sha256": "021f75337978349b03b497f8f2399cad23cafdb8fa795e4166aa123396b4f346"
+      },
+      "poll-checks.json": {
+        "path": "build/poll-checks.json",
+        "sha256": "230f2c734cb71ca980634eb76edef95fae5166733cbea72dc7af0b36560b31c0"
+      },
+      "net-checks.json": {
+        "path": "build/net-checks.json",
+        "sha256": "cb2991a7f23e9f39dcfaf43f5639153487bcea27173ea1c68f39176b912ceaf9"
+      },
+      "tls-checks.json": {
+        "path": "build/tls-checks.json",
+        "sha256": "3ddd7e828d20b0c658e78e28a0282dfff6d557443dcf1be2bcc42e767d0f32be"
+      },
+      "entry-checks.json": {
+        "path": "build/entry-checks.json",
+        "sha256": "05c2729d63623327fbeb4bd0fa76be6063d3c480f395191d9090415325ae2541"
+      },
+      "vm-checks.json": {
+        "path": "build/vm-checks.json",
+        "sha256": "5c26883fffc454c1499c54b407e2427ad838ed886e076a1e3c638c989a838704"
+      },
+      "files-checks.json": {
+        "path": "build/files-checks.json",
+        "sha256": "5cfe0d2ed84c0eb8841484ea7125842392f57de735cfc9d6932f294354fe7683"
+      },
+      "ld-start-checks.json": {
+        "path": "build/ld-start-checks.json",
+        "sha256": "1711ba97c5dc020776e99e74b29099dd632cc4ecb76d19514d59600049373fe1"
+      },
+      "stun-checks.json": {
+        "path": "build/stun-checks.json",
+        "sha256": "5f27d8eae0ec58b0b06a75ef1ed9193c56a8613f8c66112ba8f40fc3c35fafee"
+      },
+      "manager-probe.json": {
+        "path": "build/manager-probe.json",
+        "sha256": "5ca766d236a093f6829cbd95f57d81ed5d76963f0003f631490f1152e5418aa9"
+      }
+    }
+  },
+  "game_probe": {
+    "recorded_utc": "20261114T001831307845Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "976dd1ab1881e5767740c6b7bf183a5d983793b97af9ee28a210bc704520ea11",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "elapsed_seconds": 180.122,
+    "exit_code": 1,
+    "forced_cleanup": true,
+    "initialization_markers": [],
+    "syscall_gaps": [],
+    "runtime_gaps": [],
+    "command": "python build/run_game_db.py --preload --timeout 180",
+    "probe": "build/probes/20261114T001831307845Z/game",
+    "frida_snapshot_mapped": true,
+    "unhandled_exception": false,
+    "mysql_shutdown_exit_code": 0,
+    "input_hashes": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "9c067c37a6e586a59ebce3d2987642186f24c1092ff06926c20b75d67098d4f5",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2"
+    },
+    "logs": {
+      "stderr.log": {
+        "bytes": 42544,
+        "sha256": "d0dc9bfac1367b367c3851990912e0e2d7a3d38b7eafc087eca3814c9de40b3c"
+      },
+      "stdout.log": {
+        "bytes": 782,
+        "sha256": "8b966bc994dfd9e46291ea2016b66ca573af1fbe2559b819f0b3cb95d85860a1"
+      }
+    }
+  },
+  "post_fix_thread_sampling": {
+    "method": "External i686 helper briefly suspended each target thread and read its control context.",
+    "source": "build/sample_threads.c",
+    "source_sha256": "e6e8ae8038073655ce41bc77ea0fb2b263bb0d4108bb1c44274c04525d6b0098",
+    "receipt": "build/pipe-fixed-thread-samples.txt",
+    "receipt_sha256": "da5947ba549388c4cdf679e71eba0fad95439b20b0f1bb9a9cb74a39efa8b0ff",
+    "iterations": 100,
+    "requested_interval_ms": 100,
+    "threads": {
+      "12956": {
+        "pcs": {
+          "0x77df29fc": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "13696": {
+        "pcs": {
+          "0x77df2d1c": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "13652": {
+        "pcs": {
+          "0x77df29fc": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "9232": {
+        "pcs": {
+          "0x77df29fc": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "12768": {
+        "pcs": {
+          "0x77df2d1c": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "9008": {
+        "pcs": {
+          "0x77df470c": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      },
+      "11256": {
+        "pcs": {
+          "0x77df470c": 100
+        },
+        "cpu_seconds_delta": 0.0,
+        "samples": 100
+      }
+    },
+    "observation": "All sampled guest and host threads had zero additional CPU time. Busy spinning stopped; startup remained blocked."
+  },
+  "limitations": [
+    "Windows 10 x64 10.0.19044 only; Windows 7/11 remain unverified.",
+    "The 10 ms pipe polling interval adds bounded wakeup latency; it is not an IOCP implementation.",
+    "Frida mapping and low CPU use do not prove script loading, hooks, bidirectional calls or game readiness.",
+    "The game probe was stopped by its 180-second timeout; private MySQL shut down normally.",
+    "Private credentials, database contents, original assets and generated output are excluded.",
+    "Supplying HOME resolved the observed NSS/loader wait. Subsequent startup exposed i386 lstat64 and inotify_init/init1 gaps.",
+    "Frida early JS setup and its main callback were reached, but complete hooks and bidirectional script semantics remain unverified.",
+    "All temporary diagnostics were built from copies in ignored build output; runtime sources and final host were restored."
+  ],
+  "home_environment_fix": {
+    "implementation_commit": "a0e5e8a",
+    "root_cause": "With HOME absent, Frida GLib called getpwuid_r from its worker during dlopen initialization. NSS attempted another dlopen and waited for the loader lock held by the main guest thread, which was waiting for Frida initialization.",
+    "change": "Supply the normal guest HOME=/home/neople in the original game probe. Runtime syscall and futex semantics are unchanged.",
+    "diagnostic_probe": "build/probes/20261114T002644071956Z/game",
+    "diagnostic_host_sha256": "d628b8113669293cfc606f0aeed5df9051df8781a321fb598323b196dd679c33",
+    "waiter_guest_tid": 11520,
+    "loader_mutex_address": "0x00a534c4",
+    "loader_mutex_lock_word": 2,
+    "loader_mutex_owner_guest_tid": 1580,
+    "main_guest_tid": 1580,
+    "main_host_thread_id": 8812,
+    "resolved_caller_chain": [
+      "getpwuid_r",
+      "__nss_passwd_lookup2",
+      "__nss_lookup_function",
+      "__libc_dlopen_mode",
+      "_dl_open",
+      "pthread_mutex_lock",
+      "__lll_lock_wait"
+    ],
+    "private_diagnostics": {
+      "build/pipe-thread-diag-stacks.txt": "0c0cbffd282cb5b3cfe287c75b27ffb03aa51387b21864d55c104d14846f541e",
+      "build/loader-lock-owner.txt": "85d6a0a1c9ea6eda1eddf0c1259995d1dfddbc2db070df25c8d270d9c15468fa",
+      "build/diag_poll.py": "6e33ecc6f4e6849bc39cf2deab945955f070ff4cb6f7cb86360827c7bc8597bf",
+      "build/glib-gutils-2.68.4.c": "70de5ec01e1250683beee980f29eb1c0b01eb6546df2fe2dbf25e141f8ac1850"
+    },
+    "source_for_home_lookup": "https://github.com/GNOME/glib/blob/2.68.4/glib/gutils.c",
+    "source_limitation": "Upstream GLib 2.68.4 confirms HOME precedes the user-database fallback; this is behavior research, not an embedded-library version claim.",
+    "probe": {
+      "recorded_utc": "20261114T003014737954Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "976dd1ab1881e5767740c6b7bf183a5d983793b97af9ee28a210bc704520ea11",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "elapsed_seconds": 120.185,
+      "exit_code": 1,
+      "forced_cleanup": true,
+      "initialization_markers": [
+        "All DB Open Success",
+        "Init Query Table Success",
+        "Init GlobalData Success",
+        "Init HistoryLog Success",
+        "InitRDARScriptStringManager Success"
+      ],
+      "syscall_gaps": [
+        "syscall gap nr=196",
+        "syscall gap nr=291",
+        "syscall gap nr=332"
+      ],
+      "runtime_gaps": [],
+      "command": "python build/run_game_db.py --preload --timeout 120 --env HOME=/home/neople",
+      "probe": "build/probes/20261114T003014737954Z/game",
+      "stderr_sha256": "9037770ec3df57ad34f3f013e8d32539fc7491bb898acef2f75bc0257d024e62",
+      "stdout_sha256": "1fe256bb81b2bc568ce6ddd519d294a9084e2c73dc67497a118702b9bd9497f7"
+    },
+    "frida_markers": [
+      "Frida Init Stage:early",
+      "setup success",
+      "set function success",
+      "frida main, args ="
+    ],
+    "full_frida_bidirectional_acceptance": false,
+    "mysql_shutdown_exit_code": 0
+  }
+}
