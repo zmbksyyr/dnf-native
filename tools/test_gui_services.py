@@ -79,6 +79,16 @@ def main():
         select(window, 12); click(window, 222); ready(window, "channel：已退出", 45)
         checks["individual_channel_normal_stop"] = "代码 0" in rows(window)[12]
         click(window, 225)
+        # Application files now have their own live view; select the runtime's
+        # actual stderr explicitly when checking its guest-exit diagnostic.
+        combo = user.GetDlgItem(window, 240)
+        for log_index in range(user.SendMessageW(combo, 0x146, 0, 0)):
+            text = c.create_unicode_buffer(user.SendMessageW(combo, 0x149, log_index, 0) + 1)
+            user.SendMessageW(combo, 0x148, log_index, c.addressof(text))
+            if '标准错误' in text.value:
+                user.SendMessageW(combo, 0x14E, log_index, 0)
+                user.SendMessageW(window, 0x111, 240 | (1 << 16), combo)
+                break
         wait_for(lambda: "guest exit status=0" in title(user.GetDlgItem(window, 206)), "actual service log displayed")
         checks["selected_real_log_visible"] = True
         print("GUI: individual stop and log display passed", flush=True)

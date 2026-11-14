@@ -41,7 +41,7 @@ def main():
         shutil.copy2(mysql, target)
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_cabinet.h", Path(__file__)]},
+                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_cabinet.h", Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql.parent / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

@@ -108,3 +108,5 @@ mysql-standalone.exe recover INSTANCE
 原生 GUI：先构建当前 MySQL 单文件，再运行 `python tools/build_gui.py`；生成 `build/gui/DNF-Native.exe` 及相邻的 `mysql-standalone.exe`。启动 `DNF-Native.exe --instance PRIVATE_INSTANCE`，可选择实例、启停原版服务及数据库、备份、还原和恢复未完成操作。启动数据库会核对本次进程标记、UUID 及真实 SQL/TLS 响应；关闭窗口会正常停止自有服务和数据库。`python tools/test_gui.py` 检查无资源目录时的数据库控件，`tools/test_gui_services.py` 检查已准备实例的服务操作。
 
 本阶段首启产物位于 `build/gui-setup/`，其中 `resources/` 由开发构建工具从原版输入、固定用户库与已验证逻辑种子准备。将两个 EXE 与该目录一同复制后，GUI 的“创建实例”会复制本地资源、初始化 MySQL、导入应用库并生成服务配置；整个运行流程使用原生程序。复现命令见[数据库和 GUI 方案](docs/03-database-and-delivery.md)，专项验证为 `python tools/test_gui_setup.py`。这仍是未裁剪的本地资源样件，尚非最终离线 ZIP。
+
+当前审阅程序和压缩资源 ZIP 位于 `build/review/`。新版界面提供独立的原始日志区域，可直接查看所选服务的应用文件、stdout、stderr 和 MySQL 日志，支持刷新、滚动跟随及编码切换；控制台操作记录单独显示。使用与实际验证见 [GUI 与原版日志](docs/09-gui-and-original-logs.md)，兼容缺口、性能对照和 jbz69 当前 PVF 的启动阻塞见[兼容清单](docs/08-compatibility-and-performance.md)。

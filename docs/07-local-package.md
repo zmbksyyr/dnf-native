@@ -29,7 +29,7 @@ resources/resources.cab
 
 ```powershell
 python tools/build_service_cabinet.py --resources build/review-resources/resources --output build/review/resources
-python tools/build_gui.py --mysql-exe build/mysql-gui/mysql-standalone.exe --build-dir build/review
+python tools/build_gui.py --mysql-exe build/mysql-standalone/mysql-standalone.exe --build-dir build/review
 python tools/test_gui_setup.py --gui build/review/DNF-Native.exe
 ```
 
@@ -40,3 +40,5 @@ python tools/test_gui_setup.py --gui build/review/DNF-Native.exe
 ## 验证边界
 
 该样件保留了当前所有候选资源，包括可选安全文件，尚未完成 core/full addon 的分包、必要文件白名单与第三方随包材料封样。体积实测证明当前完整候选资源能够在门禁内表示；它不证明默认包可玩、19 服务完整拓扑、干净普通用户断网运行或 Win7/10/11 全部通过，也不是正式发布包。
+
+上述 190277074 字节和哈希对应首次压缩样件。后续按用户要求更新原生 GUI 的布局和原版日志查看，同路径 ZIP 的当前成员与哈希另见 [GUI 日志证据](evidence/p8-gui-original-logs.json)；不将旧 GUI 的首启专项改写成新版的独立首启验收。
