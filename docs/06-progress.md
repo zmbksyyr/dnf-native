@@ -387,3 +387,13 @@ Windows 兼容接口不能替换仍打开的目标文件，独立 Windows 对照
 双架构真实 TCP 样件核对连接前 ENOTCONN、连接后对端 loopback IP/端口、截断地址不越界、零容量及错误指针。旧宿主在连接前检查失败，新构建的普通/abortive 关闭四种组合均返回 42；同构建 epoll 管道/socket 和并发 close/select 回归通过。原版 zerg 不再记录 getpeername 缺口，但未修补的停服路径仍在 PC=0 返回 125，因此没有把此原语修复写成服务正常关服。
 
 证据见 [getpeername](evidence/p3-getpeername.json)。工具 test_net.py 现可用 --hosts 指定独立构建。仅实测 Windows 10 x64 10.0.19044，本节与仍使用旧构建的 core 联合观察分开计证。
+
+## 2026-11-14 · 安全组件本地路由与 zerg 清理顺序
+
+原版 Zerg_Server_Config::init 在 0x0807f700 比较 cfgsvr，在 0x0807f77e 比较 cfgfile；后者进入 ServicesConfig::LoadSvrConfig。私有副本选择 cfgfile 后，原版继续明确拒绝 svcid.xml 中重复的 type/id。输入文件的六项实际为三条路由各重复两次；仅合并完全相同项并更新数量，命令行使用原配置服务编号 -t30 -i570011。zerg 因而进入运行循环，原版 gunner 实际记录 connect monitor succ，不再因连接失败提前返回。默认 probe 仍保留原配置，修改由 --local-routes 显式启用。
+
+随后正常 SIGTERM 暴露独立停服异常。诊断宿主捕获 PC=0，栈顶返回 0x080ad575，对应 ZEN_Server_Status::increase_by_statid 在 0x080ad572 通过统计锁虚表偏移 8 调用；上一层为 TCP_Svc_Handler::handle_close。现场锁对象的虚表地址落在已被改写的堆数据，表项为零。核对原版 exit_instance：Comm_Stat_Monitor::clean_instance 位于 reactor/timer 的虚函数清理之前，后者仍触发连接关闭回调。没有把该现场误报成 getpeername 修复失败或任意忽略异常。
+
+仅对私有 zerg ELF 的 0x080775d5 起 49 字节调整顺序，将原本的统计清理调用移到 reactor/timer 清理之后；修正移动指令的相对 call，保留全部清理、函数大小及其余字节。补丁先核对原版 SHA-256 和旧字节，记录新字节与执行哈希；原件不变，省略 --fix-cleanup-order 即恢复未修补对照。反汇编核对新的统计清理位于 0x08077601。正式探测复测三个组件均 SIGTERM 自行返回 0，无强制回收、无 runtime gap，原始 zerg 哈希复核不变。
+
+该结果仅证明已观察的初始化/退出和 gunner 的真实 TCP 连接。原路由仍引用缺少的 9001 端点，type 31 与本地 zerg 共用 9000，且 watchdog 缺 /proc/<pid>/stat、restrict.txt 缺失等提示仍保留；没有宣称完整 TSS 拓扑、反外挂业务或可选性已验收。证据见 [安全组件清理顺序](evidence/p3-security-cleanup-order.json)，复现 `python tools/probe_security.py --host build/staged/i686/dnf-host.exe --local-routes --fix-cleanup-order --observe-seconds 10`。仅实测 Windows 10 x64 10.0.19044。
