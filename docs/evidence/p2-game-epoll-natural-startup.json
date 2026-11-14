@@ -1,0 +1,166 @@
+{
+  "recorded_utc": "2026-11-14T03:59:13.155498+00:00",
+  "source_code_commit": "8407022",
+  "scope": "Original game natural startup after epoll pipe fix; subsequent private Lua reload and self-SIGUSR2 shutdown observation. No client/business or normal shutdown acceptance.",
+  "probe": "build\\probes\\20261114T032657295786Z\\game",
+  "game": {
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "c830c112551f23d50d56d7ef8c3760a5e9889c986277184431aebd7137c0b78c",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "elapsed_seconds": 1785.295,
+    "exit_code": 125,
+    "forced_cleanup": false,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "1d961f95092ebde1652b163217cc4dae6786147845846cf7f5fc931191dc19ab",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "951168b0262494c03743f618b8e9f704db043c4a0c3e5e41ab8e51ccdb64d0aa",
+      "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+    },
+    "syscall_gaps": [
+      "syscall gap nr=291",
+      "syscall gap nr=332"
+    ],
+    "runtime_gaps": [],
+    "logs": {
+      "stderr.log": {
+        "bytes": 95195,
+        "sha256": "2f7c84f9f8b32c379836fe65cec573ba92b5f60a5316deff1aa0c70c144d821c"
+      },
+      "stdout.log": {
+        "bytes": 26909,
+        "sha256": "860acc8063834760a059a9f093a89ee73efa1f94d15edee803e19a81463af7fb"
+      },
+      "tmp\\tss_sdk_11.log": {
+        "bytes": 803,
+        "sha256": "29d2f380a856a87a5b12ac4d3af9cf7bfd642b54f033236665a3c80e56b6565a"
+      },
+      "home\\neople\\game\\dp_0_1_20261114.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "home\\neople\\game\\log\\siroco11\\dp2_2026-11-14.log": {
+        "bytes": 18727,
+        "sha256": "a11e0c83f17c94ee1ce24da4fda495b8459c4b395189873bdc52a81bd08cd2f1"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114-03.history": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.cri": {
+        "bytes": 2117,
+        "sha256": "caeec0fac8e1439d19961449a0f75785140b80cb9b37bd2a05964204c7d9c32b"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.debug": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.error": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.init": {
+        "bytes": 6557,
+        "sha256": "d71eed2dd40a6feb197ca2c6821e9d5684cd8061ac7aa7e05b0a7359bd9b8b70"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.log": {
+        "bytes": 9925,
+        "sha256": "685569de640138fc0d1728f58b4d7f615e6811245dc6df330975efc196b2d1ac"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.money": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "home\\neople\\game\\log\\siroco11\\Log20261114.snap": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "chain": {
+    "database_source": {
+      "files": 1506,
+      "bytes": 266034085,
+      "tree_sha256": "3a45764cc9799cc6f0060b2060e03fd3d958d5f26d3999ee1e45fd40dd353506"
+    },
+    "bridge_script_matches": true,
+    "bridge_exit_code": 0,
+    "mysql_shutdown_exit_code": 0,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "initialization_lines": [
+    "[03:47:36] \t- Init Get Channel Data(channel_info.etc) Success",
+    "[03:47:36] \t- Init Channel Script Success",
+    "[03:47:41] [!] Init DataManager Success",
+    "[03:47:41] [!] Init ChannelType Success",
+    "[03:47:41] [!] Init GameWorld Success",
+    "[03:47:42] [!] Init Login State Success",
+    "[03:48:30] [!] The siroco11 channel 11('ch.11') server has been started successfully."
+  ],
+  "default_lua_first_load_succeeded": true,
+  "private_lua_reload": {
+    "requested_utc": "2026-11-14T03:50:53.064633+00:00",
+    "private_script": "build\\probes\\20261114T032657295786Z\\game\\dp2\\script\\Work_Reload.lua",
+    "before_sha256": "daeb4e3f337a8be40a8ce5c20237109c7f5cd63e08c3257eb493f99d1c161142",
+    "after_sha256": "7fa6e3e4112bdb86e9da48a75e921681654827891ef6e73581114be5ea3b6e6c",
+    "action": "Append own log marker to the private script only, after unmodified natural startup."
+  },
+  "private_lua_reload_marker_observed": true,
+  "original_work_script_sha256": "daeb4e3f337a8be40a8ce5c20237109c7f5cd63e08c3257eb493f99d1c161142",
+  "startup_observation_and_first_stop_request": {
+    "game_probe": "build\\probes\\20261114T032657295786Z\\game",
+    "process_id": 1580,
+    "purpose": "Observe at least 120 seconds beyond the original startup marker, then request guest SIGTERM.",
+    "startup_marker_observed_utc": "2026-11-14T03:48:32.134607+00:00",
+    "post_marker_observation_seconds": 120.03704429999925,
+    "sigterm_requested_utc": "2026-11-14T03:50:32.171735+00:00"
+  },
+  "shutdown_signal_basis": {
+    "original_function": "CShutdowManager::SendShutdownSignal at 0x082a35a6",
+    "kill_call": "0x082a366e sends signal 12",
+    "signal_12_branch": "0x0829f309: enable shutdown, arrange users or OnAllUserLogout",
+    "signal_15_branch": "0x0829f2aa: rdar_terminate and packet-log cleanup; does not stop the main loop"
+  },
+  "private_self_signal": {
+    "requested_utc": "2026-11-14T03:53:55.968216+00:00",
+    "private_script": "build\\probes\\20261114T032657295786Z\\game\\dp2\\script\\Work_Reload.lua",
+    "before_sha256": "7fa6e3e4112bdb86e9da48a75e921681654827891ef6e73581114be5ea3b6e6c",
+    "after_sha256": "7fd95b380fc736ebcf41057dec25edf973bf4369ad3ed92524ee240ca43c7c66",
+    "mechanism": "Own Lua C module invokes getpid and kill(self, SIGUSR2), handled by unchanged original game.",
+    "source_sha256": "1b368d3cf656590b7c686d0987d850e6f7123401e9b313668b253b33c8c5a483",
+    "module_sha256": "aa0d19d33fc206dfa88e429b9db61c98b8af6631ac8c66ddcfa10381d106e0df",
+    "module_entry": "luaopen_native_stop; explicit executable entry required by current loader",
+    "module_rebuilt_utc": "2026-11-14T03:56:13.277635+00:00",
+    "initial_fixture_load_failure": "Default shared-object entry zero was rejected before module initialization; helper rebuilt with explicit executable entry."
+  },
+  "original_sigusr2_observed": true,
+  "shutdown_log_lines": [
+    "[03:56:16] void CShutdowManager::OnAllUserLogout()(12859): ALL USER LOGOUT COMPLETE",
+    "[03:56:16] virtual void NetworkThread::dispatch(void*)(766): RecvThread Terminate",
+    "[03:56:16] virtual void exchange_server::CExchangeServerThread::dispatch(void*)(1154): Exchange Server Thread End!",
+    "[03:56:17] int main(int, char**)(9702): GAME SERVER SHUTDOWN COMPLETE"
+  ],
+  "final_exception": {
+    "line": "unhandled exception code=0xc0000005 pc=0x273b9e3c",
+    "module": "original Frida",
+    "module_offset": "0x89e3c",
+    "interpretation": "Matches the offset from the prior minimal-teardown unload diagnostic. This run did not capture a separate page-state dump."
+  },
+  "limitations": [
+    "The observed host contains the epoll fix; the select normalization fix was tested on separate hosts.",
+    "Natural startup used original ELF/DP2/Lua/Frida/scripts. Private Work_Reload modifications began only after the original startup marker.",
+    "The original SIGUSR2 was invoked from an own Lua C module; cross-process SIGUSR2 is not yet implemented.",
+    "The temporary module was first rejected with ELF entry zero, then successfully loaded with an explicit executable entry. This is a current loader limitation.",
+    "Original JS late-stage reload, matched client gameplay, other required services and Win7/Win11 remain unaccepted.",
+    "No forced cleanup of game, bridge or MySQL; game still exits 125 after its shutdown-complete log."
+  ]
+}

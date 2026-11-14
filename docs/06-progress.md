@@ -305,3 +305,15 @@ Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE
 原版 bridge 采用独立 loopback 端口 7002、相同私有 MySQL 和 max_client=16 副本作对照。三秒无客户端窗口中，旧宿主消耗 3.078125 秒进程 CPU，最终修复宿主消耗 0.078125 秒；版本相同/不同、拆包/连包、四次完整频道脚本响应都通过，两者均响应 SIGTERM 后自行返回 0。此数据只证明本次空转消除，不代表长期负载或完整业务通过。正在运行的 game 联合观察保留原宿主，因此这组修复先在独立 `build/staged/` 构建验证。
 
 证据见 [select 超时与 bridge 空转](evidence/p2-select-timeout-bridge-idle.json)。正式构建后可用 `python tools/test_poll.py` 复现；已有正式宿主运行时可传 `--hosts build/staged`。仅验证 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · epoll 修复后的 game 自然启动与停服边界
+
+完整 game、原版 DP2/Lua/Frida/脚本、原版 bridge 及私有 MySQL 联合运行 1785.295 秒。未修改启动脚本的自然路径完成频道脚本下载/导入、DataManager、ChannelType、GameWorld、Login State，并在 03:48:30 UTC 输出启动标记及原版 Lua 文件加载、执行成功日志。随后继续观察 120.037 秒，未再触发此前 `libuv.so+0x19661` 的 abort。只在启动后的私有 Work_Reload.lua 追加自编日志标记，原版自动重载机制实际执行成功。该结果验证本次启动阻塞解除，不代表客户端业务或完整服务就绪。
+
+首次发送 runtime 的 SIGTERM 后，原版注销频道但继续运行。核对原版 `CShutdowManager::SendShutdownSignal` 和 signal_handler 的跳表确认：game 正常关服使用 SIGUSR2（12），SIGTERM（15）只执行 rdar_terminate 和包日志清理。当前跨进程接口仅支持 15；为检查本次已启动实例，在私有副本通过自编 Lua C 模块调用已有的 `kill(self, 12)`，原版实际输出 `RECV SIGUSR2`、`ALL USER LOGOUT COMPLETE`、收包/交易线程结束及 `GAME SERVER SHUTDOWN COMPLETE`。自编模块最初因默认共享库入口为零被当前 loader 拒绝，显式设置可执行入口后才成功加载；这些测试改动均发生在自然启动和观察之后，没有修改输入原件。
+
+shutdown complete 后仍出现访问异常，地址对应原版 Frida 偏移 `0x89e3c`，game 返回 125，无强制回收。该偏移与先前 minimal 卸载诊断一致，但本次没有重新采集页状态，故不计正常停止。另一组隔离的 full 卸载诊断已确认：DP2 保护代码通过 ret 读取栈中的零地址而异常，并非已经证实的间接空函数调用；零值来源尚未解决，也没有 guest SIGSEGV handler 可以转发。未为此跳过检查、保留已卸载映射或修改默认 Frida 配置。
+
+bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。长观察退出后，正式宿主已按当前源码重新构建，双架构 select/poll、TCP、epoll 及原版 Lua/luv 定时器检查通过。自然启动用的是包含 epoll 修复的原宿主；select 修复另有独立构建和正式构建证据，不混用两者结论。
+
+证据见 [自然启动与停服](evidence/p2-game-epoll-natural-startup.json)、[Frida 卸载诊断](evidence/p2-frida-teardown-diagnostic.json)。下一实际缺口为 game 的跨进程 SIGUSR2、Frida 正常卸载及后续服务互通；共享库零入口是已观察到的 loader 限制。Win7/Win11、客户端业务和最终交付均未验收。

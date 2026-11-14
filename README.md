@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化和正常停服；原版 channel 已通过 32 次正确 TCP 握手及拆包、连包检查；原版 bridge 已连接私有 MySQL，版本检查、完整频道脚本响应及原版 game 代理下载接口通过。原版 game 已打开 13 类业务库，自然导入频道脚本并推进到 GameWorld 和登录状态初始化，随后仍返回 134，正在定位终止原因。19 个 ELF 原址映射、双架构 VM/文件/网络/执行原语和官方 MySQL 5.7.44 数据往返检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：P1 实施中。** 原版 x64 STUN 已完成 UDP 协议往返；manager 初始化和停服、channel TCP 握手、bridge 数据库和频道脚本、relay 转发均有本机实测。已修复原版 libuv 的 epoll 管道登记错误及 bridge 的 select 空转。完整 game 自然启动现已越过返回 134 的旧终止点，完成频道脚本、GameWorld 和登录状态初始化，原版 Lua 热重载通过。停服时原程序写出 shutdown complete 后仍在 Frida 处异常退出 125，尚未解决。19 个 ELF 原址映射及基础原语通过，完整服务业务和 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 

@@ -110,5 +110,17 @@
     "The subsequent null-call root cause is unresolved; full is an opt-in diagnostic config only.",
     "No original file or normal munmap semantics changed.",
     "Windows 10 x64 10.0.19044 only."
-  ]
+  ],
+  "post_dlclose_control_flow": {
+    "probe": "build\\probes\\20261114T033620829749Z\\game",
+    "host_sha256": "467c7675ea617118b27dd24f2b491f02b386a7285f68997c5c4b75fb40de5519",
+    "exit_code": 125,
+    "forced_cleanup": false,
+    "process": "Original game and DP2/Frida with opt-in full teardown, no configured game database.",
+    "guest_sigsegv_handler": "0 at the failure; no guest handler to forward this fault to.",
+    "dynamic_return_site": "libdp2game.so+0x1a7fd5",
+    "last_instruction": "RET reads zero from the guest stack, followed by execute access to address zero.",
+    "interpretation": "This is a return to zero, not a confirmed indirect call to zero. The cause of the zero stack word is unresolved.",
+    "privacy": "Only diagnostic host copy instrumented; no original assets or product runtime behavior altered."
+  }
 }

@@ -126,5 +126,88 @@
     "Fixed fixtures and bridge use separate staged hosts while the epoll-fix natural game observation continues on its original host.",
     "Bridge idle measurements use private max_client=16 copies and a three-second no-client window; not a long-duration workload.",
     "Only Windows 10 x64 10.0.19044. Not complete service or game acceptance."
-  ]
+  ],
+  "formal_verification": {
+    "recorded_utc": "2026-11-14T04:00:20.199234+00:00",
+    "code_commit": "34e0c66",
+    "select_poll": [
+      {
+        "arch": "i686",
+        "host_sha256": "054dca720d7b217138afa579e436362116f31e8ea4412d571a4b0ee6ef70f766",
+        "fixture_sha256": "2a933be373f6c789273a6989ec8772e17a87a5800c57c23dfaa0b968b04eb34c",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "ac58975fe40be5db6a1dc2779559d84a2ecbf8b37f1ff5725e262d3cb01ac721",
+        "fixture_sha256": "f614562691515071bda2fee3ab845523c169fa119066b46b4bb64fe6205ec56f",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      }
+    ],
+    "tcp": [
+      {
+        "arch": "i686",
+        "host_sha256": "054dca720d7b217138afa579e436362116f31e8ea4412d571a4b0ee6ef70f766",
+        "fixture_sha256": "f77b690c5da48bd33df17d7c0b93ab71b7a3a79bed0331a1e128942adab55126",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "host_sha256": "054dca720d7b217138afa579e436362116f31e8ea4412d571a4b0ee6ef70f766",
+        "fixture_sha256": "59d1b98bd81dae7805a29a694f38c278f9792b55d276caa506a7531672a851f1",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "ac58975fe40be5db6a1dc2779559d84a2ecbf8b37f1ff5725e262d3cb01ac721",
+        "fixture_sha256": "d545a6c1973b96a31e3fa3fdecf616d860888850a896a4514283ad8d18cbb93c",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "ac58975fe40be5db6a1dc2779559d84a2ecbf8b37f1ff5725e262d3cb01ac721",
+        "fixture_sha256": "9ead7a7d0744dac4cb325c35ea5c1c035c5dd7a9a31f0cb1655ed966ad78662f",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      }
+    ],
+    "epoll": [
+      {
+        "arch": "i686",
+        "host_sha256": "054dca720d7b217138afa579e436362116f31e8ea4412d571a4b0ee6ef70f766",
+        "fixture_sha256": "dae04616b41689838c5fd7f158ce114cf388016fad486786e095f6b79a99c1fd",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "ac58975fe40be5db6a1dc2779559d84a2ecbf8b37f1ff5725e262d3cb01ac721",
+        "fixture_sha256": "7f68b7cb05a89802db0bef58397d5865d5e41d9299c883422b52b5eb117c9097",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "passed": true
+      }
+    ],
+    "original_luv": {
+      "host_sha256": "054dca720d7b217138afa579e436362116f31e8ea4412d571a4b0ee6ef70f766",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "elapsed_seconds": 25.535,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "passed": true
+    }
+  }
 }
