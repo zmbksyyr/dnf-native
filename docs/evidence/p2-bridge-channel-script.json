@@ -1,0 +1,120 @@
+{
+  "recorded_utc": "2026-11-14T02:14:50.986250+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Original bridge database/version/script interfaces and original game channel-proxy acquisition only. Full natural game initialization and business remain unverified.",
+  "runtime_source_changed": false,
+  "initial_observation": {
+    "instance": "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T020641781188Z\\bridge-chain",
+    "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+    "elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+    "database_source": {
+      "files": 1506,
+      "bytes": 266034085,
+      "tree_sha256": "3a45764cc9799cc6f0060b2060e03fd3d958d5f26d3999ee1e45fd40dd353506"
+    },
+    "bridge_pid": 944,
+    "bridge_exit_code": 0,
+    "mysql_shutdown_exit_code": 0,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "protocol_check": {
+    "recorded_utc": "20261114T021243230999Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T021243230999Z\\bridge",
+    "scope": "Original bridge DB version checks and exact channel-script responses on loopback; no game/client acceptance.",
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+      "--root",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T021243230999Z\\bridge",
+      "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "--env",
+      "HOME=/home/neople",
+      "--cwd",
+      "/home/neople/bridge",
+      "--run",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T021243230999Z\\bridge\\home\\neople\\bridge\\df_bridge_r",
+      "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+      "/home/neople/bridge/df_bridge_r",
+      "bridge",
+      "run"
+    ],
+    "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+    "elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+    "ld_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+    "service_port": 7002,
+    "checks": {
+      "different_version": true,
+      "same_version": true,
+      "fragmented_version": true,
+      "coalesced_requests": true,
+      "script_responses": 4
+    },
+    "script_bytes": 13306,
+    "game_proxy": {
+      "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "elapsed_seconds": 32.096,
+      "syscall_gaps": [
+        "syscall gap nr=291",
+        "syscall gap nr=332"
+      ],
+      "runtime_gaps": [],
+      "probe": "build\\probes\\20261114T021245185094Z\\game",
+      "fixture_sha256": {
+        "channel_proxy.lua": "31c1342308265b73c24bb2abfb68030826ab66de6883ef5259765c349ac48525",
+        "channel_proxy.js": "42ad7e5c6d8c46536257dacbcd5e986906f91b222a84dbe0e71109acaa31f6af"
+      },
+      "script_matches": true,
+      "version_matches": true,
+      "log_sha256": {
+        "stdout.log": "676f56c2e504024f24ec9e58087f72844c762ae109d95fd838094537e6e55ed1",
+        "stderr.log": "b0d0fe5f84f1be7e8f0bf1fd7d7c88d2bde3c41f9ad2d071f0c4e3ae348e877b"
+      },
+      "passed": true
+    },
+    "script_sha256": "6001f103cf575a3e02c2b2cdb1e61ff3a3b06a0cb1d6ea9656bedc224969604f",
+    "error": null,
+    "gaps": [],
+    "exit_code": 0,
+    "sigterm_event_sent": true,
+    "forced_cleanup": false,
+    "log_sha256": {
+      "mysql.private.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr.log": "03abb6711d001db80cf1e955347d10f6db8f77cbb56506e2ae96e59727cff10d",
+      "stdout.private.log": "d5ab25caa68dd8fefc440ffc84af56e31e03493f1b26a6f1a3e19ea669048417"
+    }
+  },
+  "private_database": {
+    "engine": "Official MySQL 5.7.44 Windows x64",
+    "bind": "127.0.0.1:3306",
+    "test_source": "Verified copy of this project's restored private instance; original inputs untouched.",
+    "source_unchanged": true
+  },
+  "static_protocol_basis": {
+    "game_CmmChannelProxy_SendCheckChannelScript": "0x081066ea",
+    "game_tagCS_CHECK_SCRIPT_VERSION": "0x08106c94; category 1, ID 5, 27 bytes",
+    "game_tagCS_GET_SCRIPT": "0x08106c48; category 2, ID 9, 11 bytes",
+    "bridge_onCS_CHECK_SCRIPT_VERSION": "0x08055d9a; response category 0x7c, ID 6, 31 bytes",
+    "bridge_onCS_GET_SCRIPT": "0x08055ffe; response category 0x7c, ID 10, header + script bytes",
+    "bridge_ChannelScript_ReloadScript": "0x08056efe; final newline normalization with preserved length",
+    "bridge_Mysql_logon": "0x080650e0; hardcoded database TCP port 3306",
+    "response_reserved_bytes": "Original constructors leave the last five header bytes uninitialized; these are not asserted."
+  },
+  "reproduction": [
+    "python tools/test_bridge.py --db-config build/bridge-db.private.json --game-proxy"
+  ],
+  "limitations": [
+    "Private MySQL must already be running on port 3306 with the original d_channel fixture data.",
+    "The game proxy fixture calls original code before full game initialization; it does not prove channel script import or gameplay.",
+    "The full original game + bridge observation is still running and is excluded here.",
+    "No Win7 or Win11 result."
+  ],
+  "source_sha256": {
+    "tools/test_bridge.py": "29bcb2bfe1885aa73f1f00e5a3e37419906fbce975bd545d811edb39ac63fedc",
+    "tests/channel_proxy.lua": "31c1342308265b73c24bb2abfb68030826ab66de6883ef5259765c349ac48525",
+    "tests/channel_proxy.js": "42ad7e5c6d8c46536257dacbcd5e986906f91b222a84dbe0e71109acaa31f6af"
+  }
+}

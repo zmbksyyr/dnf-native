@@ -243,3 +243,13 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 原版反汇编确认 `CDataManager::init` 在 `0x0835d2c3` 调用 `CmmChannelProxy::SendCheckChannelScript`；返回失败会直接跳过频道脚本导入。`GameWorld::_GetChannelType` 在自动类型下按 server group/channel number 查询脚本，找不到记录返回 19，`InitChannelType` 据此返回 false。本次独立 game 配置指向 loopback TCP 7000，运行期间没有 bridge peer，故下一步应补齐真实 bridge/频道脚本链路并复测，不强制频道类型或跳过原版检查。dispose 访问异常仍须单独定位，不能只用缺失 peer 解释它。
 
 证据见 [game 频道脚本失败](evidence/p2-game-channel-type-failure.json)。该次使用旧宿主，不混入本阶段 channel 修复构建的测试结果。
+
+## 2026-11-14 · bridge 数据库与原版 game 频道脚本接口
+
+本阶段先补齐实际缺失的 peer 与配置，没有修改 runtime 或跳过 game 检查。原版 bridge 的 `DBMgr::Mysql_logon` 反汇编确认 MySQL 端口固定为 3306；在该端口空闲时，复制已正常关闭的私有恢复库，逐文件核对副本身份，再配置独立测试账号和 loopback 地址。原版 bridge 实际读取 ch_script_version、ch_gc_info、ch_dungeon_data、ch_dungeon_list、ch_server_data，并返回版本检查和 13,306 字节频道脚本。初次观察的 bridge、MySQL 均正常返回 0，无强制回收；输入私有恢复库的前后身份一致。
+
+自编 `tools/test_bridge.py` 根据原版 game 与 bridge 的报文构造函数、版本回调及脚本回调独立确定请求。它通过官方 MySQL 客户端独立读取期望版本，核对版本不同返回 0、相同返回 1，以及分开发送报头、一次发送两个不同请求；四次脚本响应均与原始 channel_info.etc 逐字节一致。原版响应构造函数未初始化报头后五字节，故仅按其实际设置的 category、ID、size 核对，不把这些未定义字节当作 ACK 或协议内容。
+
+`--game-proxy` 再通过原版 DP2/Frida 调用原版 game 的 CmmChannelProxy 构造、Init、SendCheckChannelScript，实际执行原版连接、版本检查、下载和文件写入。测试临时设置自己的 CEnvironment 端口并恢复，不改原版指令或函数结果；落盘的频道脚本和版本分别与原始文件、数据库值一致，测试 game 自行返回 42，无强制回收或新增 runtime gap，仍有已知 inotify 两项缺口。该接口测试在资源初始化之前主动退出，不能替代自然启动路径或完整 DataManager 验收。完整 game + bridge 联合长观察另行运行，结果尚未写入本节。
+
+接口检查使用另一个私有服务端口 7002，避开长观察使用的 7000；数据库仍为原版固定的 3306。bridge 接收 runtime SIGTERM 事件后自行返回 0，未强制结束。仅实测 Windows 10 x64 10.0.19044；频道脚本导入后的完整 game 初始化、服务业务、Win7/Win11 仍未通过。复现条件及命令见 README，证据见 [bridge 与 game 频道代理](evidence/p2-bridge-channel-script.json)。
