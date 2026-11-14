@@ -21,8 +21,12 @@ def main():
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--preload", action="store_true", help="Use the original DP2 preload chain")
     parser.add_argument("--env", action="append", default=[], help="Add a guest NAME=VALUE environment setting")
+    parser.add_argument("--lua-script", type=Path, help="Use a test Lua script in the private DP2 copy")
+    parser.add_argument("--frida-script", type=Path, help="Use a test JS script in the private DP2 copy")
     parser.add_argument("--db-config", type=Path, help="Private JSON connection settings for an isolated test database")
     args = parser.parse_args()
+    if (args.lua_script or args.frida_script) and not args.preload:
+        parser.error("Test scripts require --preload")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = ROOT / "build/probes" / stamp / "game"
     instance.mkdir(parents=True)
@@ -64,6 +68,9 @@ def main():
                "/home/neople/game/df_game_r", "siroco11", "nofork"]
     if args.preload:
         shutil.copytree(ROOT / "originals/dp123/dp2", instance / "dp2")
+        for source, name in [(args.lua_script, "df_game_r.lua"), (args.frida_script, "df_game_r.js")]:
+            if source:
+                shutil.copy2(source, instance / "dp2" / name)
         command[4:4] = ["--env", "LD_PRELOAD=/dp2/libdp2pre.so", "--env", "LD_LIBRARY_PATH=/dp2/lib:/home/neople/game"]
     command[4:4] = [part for value in args.env for part in ["--env", value]]
     env = dict(os.environ)
@@ -86,7 +93,10 @@ def main():
     inputs = [elf, guest_dir / "Script.pvf", guest_dir / "captcha_font/SeoulHangangL.ttf",
               instance / "usr/local/share/GeoIP/GeoIP.dat", guest_dir / "cfg/siroco11.cfg"]
     if args.preload:
-        inputs.extend([instance / "dp2/libdp2pre.so", instance / "dp2/libdp2.so"])
+        inputs.extend([instance / "dp2/libdp2pre.so", instance / "dp2/libdp2.so",
+                       instance / "dp2/lib/liblua53.so", instance / "dp2/lib/libdp2game.so",
+                       instance / "dp2/frida/frida.so",
+                       instance / "dp2/df_game_r.lua", instance / "dp2/df_game_r.js"])
     result = {"recorded_utc": stamp, "os": platform.platform(), "command": command,
               "host_sha256": hashlib.sha256(Path(command[0]).read_bytes()).hexdigest(),
               "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(), "exit_code": process.returncode,
