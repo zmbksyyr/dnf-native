@@ -1,0 +1,265 @@
+{
+  "recorded_utc": "2026-11-14T06:33:20.874280+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Original monitor first-minute counters through real DBMW/MySQL; corrected channel with fifteen original core peers. Game is not launched.",
+  "probe": "build/probes/20261114T062845784998Z/game-chain",
+  "receipt_sha256": "9f5def563a9f5d88f1f8595f36fc7428a184835754738ed602075599c2459003",
+  "probe_script_sha256": "b6f6e14f2cb8ea2bcbd294dc436b23588ef3c1b074891a07dd3094a27890963e",
+  "root_cause": {
+    "constructor": "0x080a62e4 initializes object+0xac and +0xb0 only.",
+    "minute_sender": "0x080a6558 copies object+0xb4 and +0xb8 into login/logout fields, then clears the two counters.",
+    "database_receiver": "0x08083704 reads packet+0x610 and +0x614 into num_login_per_min and num_logout_per_min.",
+    "before": {
+      "probe": "build/probes/20261114T060223011061Z/game-chain",
+      "mysql_error": 1264,
+      "first_login_counter": 110056896,
+      "first_logout_counter": 574452856,
+      "later_counters": 0
+    }
+  },
+  "patch": {
+    "original_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+    "executed_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+    "elf_length": 2461318,
+    "changed_bytes": 130,
+    "outside_patch_ranges_unchanged": true,
+    "patches": [
+      {
+        "address": "0x08062877",
+        "offset": 108663,
+        "before": "c6400400",
+        "after": "c6400401",
+        "purpose": "Initialize the application loop flag before stop callbacks can run."
+      },
+      {
+        "address": "0x08063fa4",
+        "offset": 114596,
+        "before": "c6400401",
+        "after": "90909090",
+        "purpose": "Preserve a stop request received during application Load."
+      },
+      {
+        "address": "0x0805aa4c",
+        "offset": 76364,
+        "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+        "after": "c64008018944240cc7442408b8aa050883642404009090",
+        "purpose": "Set running before pthread_create; preserve its original arguments."
+      },
+      {
+        "address": "0x080973ce",
+        "offset": 324558,
+        "before": "c6400801",
+        "after": "90909090",
+        "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+      },
+      {
+        "address": "0x08064042",
+        "offset": 114754,
+        "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+        "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+        "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+      },
+      {
+        "address": "0x080a635a",
+        "offset": 385882,
+        "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+        "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+        "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+      }
+    ]
+  },
+  "native_initializer_check": {
+    "scope": "Only the original and patched 26-byte initializer in a Windows i686 harness on an object filled with 0xa5; not the whole ELF constructor.",
+    "source": "build/monitor-counter.c",
+    "source_sha256": "14b6b062554656097755848b097f2d212cd87073341baadeb80b02af7707eea5",
+    "results": [
+      {
+        "case": "before",
+        "exit_code": 0,
+        "stdout": "constructor initializer: preserved neighbors and return pointer; counters=00000000,00000000,a5a5a5a5,a5a5a5a5"
+      },
+      {
+        "case": "after",
+        "exit_code": 0,
+        "stdout": "constructor initializer: preserved neighbors and return pointer; counters=00000000,00000000,00000000,00000000"
+      }
+    ]
+  },
+  "database_check": {
+    "statistics_since": "2026-11-14 14:28:48",
+    "rows": {
+      "taiwan_cain": [
+        "2026-11-14 14:29:54\t0\t0\t0\t0",
+        "2026-11-14 14:30:54\t0\t0\t0\t0"
+      ],
+      "taiwan_cain_log": []
+    },
+    "mysql_1264_occurrences": 0
+  },
+  "channel_check": {
+    "tcp_7001_marker": true,
+    "udp_7001_marker": true
+  },
+  "protocols": {
+    "recorded_utc": "2026-11-14T06:30:12.928089+00:00",
+    "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+    "channel_port": 7001,
+    "relay_accounts": [
+      701,
+      702
+    ],
+    "results": {
+      "channel": {
+        "passed": true,
+        "checks": {
+          "challenge": true,
+          "positive_responses": 3,
+          "fragmented": true,
+          "coalesced": true
+        }
+      },
+      "relay": {
+        "passed": true,
+        "checks": {
+          "registered_peers": 2,
+          "bidirectional_messages": 8,
+          "targeted_disconnect": true,
+          "other_peer_preserved": true
+        }
+      },
+      "stun": {
+        "passed": true,
+        "checks": {
+          "responses": 5,
+          "address_and_source_ports": true
+        }
+      }
+    }
+  },
+  "protocol_receipt_sha256": "24a1a041e2a4015ca51fb65d8794b0415500bb573061b6a5cebe5c29fde97fe5",
+  "peer_observation_seconds": 75.0,
+  "peers": [
+    {
+      "name": "manager",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "dbmw_guild",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "dbmw_mnt",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "dbmw_stat",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "monitor",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "guild",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "statics",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "coserver",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "community",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "auction",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "point",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "channel",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "relay",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    },
+    {
+      "name": "stun",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "exited_before_stop": false
+    }
+  ],
+  "bridge": {
+    "bridge_exit_code": 0,
+    "bridge_script_matches": true
+  },
+  "mysql": {
+    "mysql_shutdown_exit_code": 1,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "mysql_server_shutdown_markers": {
+    "normal_shutdown": true,
+    "shutdown_complete": true
+  },
+  "mysql_shutdown_helper_output": "mysqladmin: shutdown failed; error: Lost connection to MySQL server during query",
+  "mysql_logs_sha256": {
+    "server.private.log": "7c4aac276bdf9f5ce1ea294f75bc84be51eae1206be6a4d1a77c856a3dc68c81",
+    "shutdown.private.log": "d79efa22ee407c4872353659c3448f359ffc7485aa4551bc4d656a2ab6991a33"
+  },
+  "limits": [
+    "Idle server counters and own channel/relay/STUN peers only; no live game clients.",
+    "Corrected monitor and channel observed without game; this is not a new complete sixteen-service or business acceptance run.",
+    "mysqladmin returned 1 with a lost-connection error. The independently observed server returned 0 and logged normal shutdown completion; helper success is not asserted.",
+    "Empty-seed application warnings, security topology, Windows 7/11, GUI and offline delivery remain separate."
+  ]
+}

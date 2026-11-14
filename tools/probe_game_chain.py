@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def start_core(instance, db, services):
-    from probe_monitor import private_elf, UDP_STOP_PATCHES
+    from probe_monitor import private_elf, UDP_STOP_PATCHES, STATISTICS_PATCHES
+    monitor_patches = UDP_STOP_PATCHES + STATISTICS_PATCHES
     entries = [("manager", "manager", "nofork"), ("dbmw_guild", "dbmw_gld_siroco", "nofork"),
                ("dbmw_mnt", "dbmw_mnt_siroco", "nofork"), ("dbmw_stat", "dbmw_stat_siroco", "nofork"),
                ("monitor", "mnt_siroco", "nofork"), ("guild", "gld_siroco", "nofork"),
@@ -61,7 +62,7 @@ def start_core(instance, db, services):
         elf = guest / ("df_dbmw_r" if name.startswith("dbmw") else "df_" + name + "_r")
         original_sha = sha(elf)
         if name == "monitor":
-            private_elf(ROOT / "originals/dp123/home/neople/monitor/df_monitor_r", elf)
+            private_elf(ROOT / "originals/dp123/home/neople/monitor/df_monitor_r", elf, monitor_patches)
         arguments = [config_name] + ([action] if action else [])
         if name in ["auction", "point"]:
             arguments = ["./cfg/" + config_name + ".cfg", "run", "./" + elf.name]
@@ -74,7 +75,7 @@ def start_core(instance, db, services):
                   "configuration_sha256": {str(p.relative_to(guest)): sha(p)
                                             for p in sorted((guest / "cfg").rglob("*")) if p.is_file()}}
         if name == "monitor":
-            record["patches"] = UDP_STOP_PATCHES
+            record["patches"] = monitor_patches
         with (private / "stdout.private.log").open("wb") as out, (private / "stderr.log").open("wb") as err:
             process = subprocess.Popen(command, stdout=out, stderr=err)
         services.append((process, private, record))
@@ -130,7 +131,13 @@ def main():
                         help="Run only the original JS init_db interface check, then exit 42")
     parser.add_argument("--core", action="store_true",
                         help="Observe the other 14 core services alongside bridge/game; requires log review, not business acceptance")
+    parser.add_argument("--peers-only-seconds", type=float,
+                        help="Observe bridge and the other 14 core services for a short diagnosis, without game")
     args = parser.parse_args()
+    if args.peers_only_seconds is not None:
+        if args.peers_only_seconds <= 0 or args.script_db or args.stop_after_started is not None:
+            parser.error("--peers-only-seconds requires a positive duration and no game observation options")
+        args.core = True
     if args.script_db and args.stop_after_started is not None:
         parser.error("--script-db exits before natural game startup")
     if args.core and args.script_db:
@@ -178,12 +185,14 @@ def main():
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "database_source": before,
                "host_sha256": sha(host), "bridge_sha256": sha(elf),
                "scope": "Original JS database interface only" if args.script_db else "Original game startup observation; no business acceptance"}
+    if args.peers_only_seconds is not None:
+        receipt["scope"] = "Fifteen original core peers without game; initialization and database diagnosis only"
     database = bridge = None
     core_services = []
     if args.core:
         receipt["core_services"] = []
         receipt["core_configuration"] = {"addresses": "loopback", "channel_relay_max_client": 16,
-                                         "monitor": "private UDP shutdown patch", "stun": "test mode; default signal exit"}
+                                         "monitor": "private UDP shutdown and initial minute counter patches", "stun": "test mode; default signal exit"}
     try:
         command = [str(mysqlbin / "mysqld.exe"), "--no-defaults", "--basedir=" + str(mysqlbin.parent),
                    "--datadir=" + str(dbroot / "data"), "--lower-case-table-names=1", "--character-set-server=latin1",
@@ -261,24 +270,42 @@ def main():
                     name = schema + "." + table + "_" + month
                     sql("CREATE TABLE IF NOT EXISTS " + name + " LIKE " + schema + "." + table + ";")
                     receipt["monthly_history_tables"].append(name)
+            if args.peers_only_seconds is not None:
+                receipt["statistics_since"] = sql("SELECT NOW();").decode("ascii").strip()
             start_core(instance, db, core_services)
         print("Private game chain:", instance, flush=True)
-        subprocess.run(command, cwd=ROOT, check=True)
-        probe = json.loads((ROOT / "build/game-probe.json").read_text(encoding="utf-8"))
-        (instance / "game-receipt.json").write_text(json.dumps(probe, indent=2) + "\n", encoding="utf-8")
-        receipt["game"] = {key: probe[key] for key in ["host_sha256", "elf_sha256", "exit_code", "forced_cleanup",
-                                                      "elapsed_seconds", "syscall_gaps", "runtime_gaps", "dp2_cleanup",
-                                                      "startup_seen_after_seconds", "stop_signal",
-                                                      "observation_after_start_seconds", "shutdown_markers"]}
-        receipt["game"]["probe"] = str(Path(probe["command"][2]).relative_to(ROOT))
-        if args.script_db:
-            receipt["script_db_tables"] = sql("SHOW TABLES FROM frida;").decode("ascii").splitlines()
-            if probe["exit_code"] != 42 or probe["forced_cleanup"] or receipt["script_db_tables"] != ["data", "dgnfinishtime", "init_sp_tp"]:
-                raise RuntimeError("Original JS database interface check failed")
-        elif args.stop_after_started is not None:
-            if (probe["exit_code"] != 0 or probe["forced_cleanup"] or probe["stop_signal"] != 12 or
-                    probe["shutdown_markers"] != ["RECV SIGUSR2", "ALL USER LOGOUT COMPLETE", "GAME SERVER SHUTDOWN COMPLETE"]):
-                raise RuntimeError("Original game did not complete startup and SIGUSR2 shutdown")
+        if args.peers_only_seconds is not None:
+            deadline = time.monotonic() + args.peers_only_seconds
+            while time.monotonic() < deadline:
+                for process, private, record in core_services:
+                    if process.poll() is not None:
+                        raise RuntimeError(record["name"] + " exited during peer observation")
+                time.sleep(0.2)
+            receipt["peer_observation_seconds"] = args.peers_only_seconds
+            receipt["occupation_statistics"] = {}
+            for schema in ["taiwan_cain", "taiwan_cain_log"]:
+                rows = sql("SELECT occ_time,num_occupations_charscreen,num_occupations_seriaroom,"
+                           "num_login_per_min,num_logout_per_min FROM " + schema + ".log_num_occupations "
+                           "WHERE occ_time >= " + quote(receipt["statistics_since"]) +
+                           " ORDER BY occ_time LIMIT 5;")
+                receipt["occupation_statistics"][schema] = rows.decode("ascii").splitlines()
+        else:
+            subprocess.run(command, cwd=ROOT, check=True)
+            probe = json.loads((ROOT / "build/game-probe.json").read_text(encoding="utf-8"))
+            (instance / "game-receipt.json").write_text(json.dumps(probe, indent=2) + "\n", encoding="utf-8")
+            receipt["game"] = {key: probe[key] for key in ["host_sha256", "elf_sha256", "exit_code", "forced_cleanup",
+                                                          "elapsed_seconds", "syscall_gaps", "runtime_gaps", "dp2_cleanup",
+                                                          "startup_seen_after_seconds", "stop_signal",
+                                                          "observation_after_start_seconds", "shutdown_markers"]}
+            receipt["game"]["probe"] = str(Path(probe["command"][2]).relative_to(ROOT))
+            if args.script_db:
+                receipt["script_db_tables"] = sql("SHOW TABLES FROM frida;").decode("ascii").splitlines()
+                if probe["exit_code"] != 42 or probe["forced_cleanup"] or receipt["script_db_tables"] != ["data", "dgnfinishtime", "init_sp_tp"]:
+                    raise RuntimeError("Original JS database interface check failed")
+            elif args.stop_after_started is not None:
+                if (probe["exit_code"] != 0 or probe["forced_cleanup"] or probe["stop_signal"] != 12 or
+                        probe["shutdown_markers"] != ["RECV SIGUSR2", "ALL USER LOGOUT COMPLETE", "GAME SERVER SHUTDOWN COMPLETE"]):
+                    raise RuntimeError("Original game did not complete startup and SIGUSR2 shutdown")
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:

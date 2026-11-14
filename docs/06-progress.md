@@ -431,3 +431,13 @@ game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）
 本轮原版 game 自然启动耗时 1294.301 秒，启动后观察 120.937 秒，随后 SIGUSR2 正常停服，三个关服标记、Frida dispose、DP2 unload 齐全；总计 1475.737 秒，返回 0，无强制回收。此前的 7664 次 socketcall 15 不支持记录降为零，msync 缺口也未再出现。game 仅保留 inotify 332/291 的 ENOSYS fallback，无其他 runtime gap。其余 14 个 peer 均未提前退出，正常完成停止，无 runtime gap 或强制回收；bridge 响应匹配并返回 0，MySQL 及 mysqladmin 均返回 0，源私有库身份不变。
 
 该轮使用 15fee3b 的联跑脚本和包含 SO_ERROR 修复的正式宿主；执行期间后续编辑的脚本不计入本轮。channel 仍是已发现的占位配置，monitor 首次统计写库出现 MySQL 1264；因此本轮仍不计完整互通或业务验收。两项问题分别修正和验证，不能把本轮启动/停服通过写成所有配置已正确。证据见 [SO_ERROR 后的 core 联跑](evidence/p3-core-so-error-co-run.json)。
+
+## 2026-11-14 · monitor 首次统计溢出的根因与修复
+
+完整联跑的 DBMW 首次写 log_num_occupations 时出现 MySQL 1264：登录/退出计数分别为 110056896 和 574452856，后续周期恢复为零。原版 monitor 的 CLoginLogoutStatistics 构造函数只初始化对象偏移 0xac/0xb0，遗漏 0xb4/0xb8；ProcessByMinute 读取遗漏的字段上报，然后才清零，因而首次传出残留内存。问题位于原版对象初始化，不是数据库列宽或 SQL mode。
+
+在原版哈希和旧字节校验后，仅对私有 monitor 副本替换 0x080a635a 起的 26 字节初始化块，显式清零四个计数，保持 ELF 长度、全部函数地址和其他指令布局。指令对照在预填 0xa5 的对象上执行：原块留下两个 a5a5a5a5，补丁清零四项，邻接字段及返回指针保持正确。该对照只验证初始化指令块，不冒充完整 ELF 业务测试。
+
+新增 --peers-only-seconds 复用现有准备/停服步骤，实际运行 bridge 与另外 14 个原版 core 服务，省去 game 自然加载以定位 peer 问题。本轮观察 75 秒，原版 monitor 经真实 DBMW 写入两条新统计，四项计数均为零，未出现原来的 1264。修正后的 channel 实际监听 TCP/UDP 7001，握手、relay 转发与定向断开、STUN 响应全部通过。14 个 peer 均自行退出，无提前退出、runtime gap 或强制回收；bridge 返回 0，源私有库不变。
+
+本次 mysqladmin 返回 1 并报告 shutdown 时连接丢失；实际 MySQL 服务器返回 0，日志完整记录 Normal shutdown 和 Shutdown complete，未强制终止。保留这两项不同结果，不将客户端错误改写为成功。证据见 [monitor 首次统计修复](evidence/p3-monitor-statistics.json)。本轮未运行 game，不计修正后的完整 16 服务或客户端验收；GUI、MySQL 单文件、离线包和 Windows 7/11 仍未完成。

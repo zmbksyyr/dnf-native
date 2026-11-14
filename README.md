@@ -84,3 +84,5 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --core --dp2-cleanup --stop-after-started 120 --timeout 2100` 观察完整 core 16 服务的联合启动/停止。私有地址使用 loopback，channel/relay 测试容量为 16，monitor 应用已记录的私有补丁。SO_ERROR 修复后的自然启动与停服已完成联跑，receipt 与应用日志共同用于审阅；不计完整互通或客户端验收。
 
 联合观察期间可用 `python tools/probe_core_protocols.py --channel-port 7001 --output build/core-protocols.json` 检查现有私有 channel/relay/STUN 实例。该工具使用 relay 测试账号 701/702，核对握手、双向转发、定向断开和 UDP 响应；端口须与实际监听一致。结果仅涵盖自编协议请求。
+
+`python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --peers-only-seconds 75` 只观察 15 个 core peer，记录真实 monitor 统计写库并正常停服，用于辅助服务诊断。该模式不运行 game。monitor 私有副本同时包含已记录的 UDP 停服与首次计数初始化修复；独立 monitor 对照可用 `--fix-statistics` 选择后一项。

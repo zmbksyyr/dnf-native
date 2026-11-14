@@ -35,20 +35,27 @@ UDP_STOP_PATCHES = [
      "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."},
 ]
 
+STATISTICS_PATCHES = [
+    {"address": "0x080a635a", "offset": 0x5e35a,
+     "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+     "after": "8b55088dbaac00000031c0b904000000f3ab89d0" + "90" * 6,
+     "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."},
+]
+
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def private_elf(original, destination):
+def private_elf(original, destination, patches=UDP_STOP_PATCHES):
     data = bytearray(original.read_bytes())
     if hashlib.sha256(data).hexdigest() != MONITOR_SHA256:
-        raise ValueError("UDP stop fix requires the recorded original monitor ELF")
-    for patch in UDP_STOP_PATCHES:
+        raise ValueError("Monitor fix requires the recorded original ELF")
+    for patch in patches:
         before, after = bytes.fromhex(patch["before"]), bytes.fromhex(patch["after"])
         offset = patch["offset"]
         if len(before) != len(after) or data[offset:offset + len(before)] != before:
-            raise ValueError("UDP stop patch bytes differ at " + patch["address"])
+            raise ValueError("Monitor patch bytes differ at " + patch["address"])
         data[offset:offset + len(before)] = after
     destination.write_bytes(data)
     return destination
@@ -57,6 +64,7 @@ def private_elf(original, destination):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fix-udp-stop", action="store_true", help="Apply the checked fix only to a private ELF copy")
+    parser.add_argument("--fix-statistics", action="store_true", help="Initialize the original monitor's omitted minute counters in a private copy")
     parser.add_argument("--stop-after", type=float, default=12, help="Seconds before the original stop command (default: 12)")
     options = parser.parse_args()
     if options.stop_after <= 0:
@@ -77,7 +85,8 @@ def main():
     text = config.read_text(encoding="utf-8")
     config.write_text(re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "127.0.0.1", text), encoding="utf-8")
     original_elf = original / "df_monitor_r"
-    elf = private_elf(original_elf, guest / "df_monitor_r") if options.fix_udp_stop else original_elf
+    patches = (UDP_STOP_PATCHES if options.fix_udp_stop else []) + (STATISTICS_PATCHES if options.fix_statistics else [])
+    elf = private_elf(original_elf, guest / "df_monitor_r", patches) if patches else original_elf
     host, ld = ROOT / "build/i686/dnf-host.exe", instance / "lib/ld-2.17.so"
     command = [str(host), "--root", str(instance), sha(ld), "--env", "HOME=/home/neople",
                "--cwd", "/home/neople/monitor", "--run", str(elf), sha(elf),
@@ -108,7 +117,7 @@ def main():
               "scope": "Original monitor initialization and stop observation; loopback-only private configuration, no DBMW/manager peers or protocol acceptance.",
               "command": command, "host_sha256": sha(host), "ld_sha256": sha(ld),
               "original_elf_sha256": sha(original_elf), "executed_elf_sha256": sha(elf),
-              "patches": UDP_STOP_PATCHES if options.fix_udp_stop else [], "stop_after_seconds": options.stop_after,
+              "patches": patches, "stop_after_seconds": options.stop_after,
               "configuration_sha256": sha(config), "exit_code": process.returncode, "stop_exit_code": stop_code,
               "forced_cleanup": forced, "pid_matches_host": pid_matches, "pid_removed": not pid_file.exists(),
               "markers": markers, "gaps": gaps,
