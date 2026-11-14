@@ -29,10 +29,10 @@ static result call6(word n, word a, word b, word c, word d, word e, word f) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
+enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, LSTAT=6, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
       FLOCK=73, IOCTL=16, MMAP=9, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
-enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
+enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, LSTAT=196, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
       FLOCK=143, IOCTL=54, MMAP=192, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
@@ -122,6 +122,15 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(STAT, (word)"/sample-link", (word)other, 0) == 0);
     CHECK(u64(stat + INODE) == u64(other + INODE));
     CHECK(u64(stat + SIZE) == 6);
+    CHECK(call(LSTAT, (word)"/sample-link", (word)other, 0) == 0);
+    CHECK(u64(stat + INODE) == u64(other + INODE) && u64(other + SIZE) == 6);
+    CHECK((other[MODE + 1] & 0xf0) == 0x80);
+    CHECK(call(LSTAT, (word)"/directory", (word)other, 0) == 0 && (other[MODE + 1] & 0xf0) == 0x40);
+    CHECK(call(LSTAT, (word)"/missing", (word)other, 0) == -2);
+    CHECK(call(LSTAT, (word)"/sample", 1, 0) == -14);
+    /* A Windows junction must not silently return metadata for its target. */
+    CHECK(call(STAT, (word)"/directory-link", (word)other, 0) == 0 && (other[MODE + 1] & 0xf0) == 0x40);
+    CHECK(call(LSTAT, (word)"/directory-link", (word)other, 0) == -38);
     CHECK(call(FCNTL, fd, 2, 1) == 0 && call(FCNTL, fd, 1, 0) == 1);
     CHECK(call(SEEK, fd, 3, 0) == 3);
     CHECK(call(TRUNCATE, fd, 4, 0) == 0);

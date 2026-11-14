@@ -1,6 +1,7 @@
 """Check Linux file ABI and CNG random reads through both native hosts."""
 
 import argparse
+import _winapi
 import ctypes
 import datetime
 import hashlib
@@ -69,6 +70,7 @@ def main():
         os.link(instance / "sample", instance / "sample-link")
         (instance / "directory/beta").mkdir(parents=True)
         (instance / "directory/alpha").write_bytes(b"directory entry")
+        _winapi.CreateJunction(str(instance / "directory"), str(instance / "directory-link"))
         identity = native_inode(instance / "sample")
         sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
         host = ROOT / "build" / arch / "dnf-host.exe"

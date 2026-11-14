@@ -351,9 +351,9 @@ static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, 
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, LSTAT = 6, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, LSTAT = 196, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
 #ifdef _WIN64
@@ -507,7 +507,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (*result > 0) memcpy((void *)a, run->cwd, bytes);
         return 1;
     }
-    if (number == OPEN || number == ACCESS || number == STAT || number == CHDIR || number == MKDIR || number == UNLINK) {
+    if (number == OPEN || number == ACCESS || number == STAT || number == LSTAT || number == CHDIR || number == MKDIR || number == UNLINK) {
         wchar_t path[32768];
         *result = guest_path(run, a, path);
         if (*result) return 1;
@@ -547,7 +547,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             return 1;
         }
         if (!wcscmp(path + wcslen(run->root), L"\\dev\\urandom")) {
-            if (number == STAT) *result = stat_file(NULL, b, legacy);
+            if (number == STAT || number == LSTAT) *result = stat_file(NULL, b, legacy);
             else if (number == ACCESS) *result = b & ~4u ? -38 : 0;
             else if (number != OPEN) *result = -38;
             else if (b & ~(uintptr_t)(0x800 | 0x8000 | 0x80000)) *result = -38;
@@ -587,9 +587,18 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             }
             *result = 0; return 1;
         }
-        if (number == STAT) {
-            HANDLE file = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (number == STAT || number == LSTAT) {
+            DWORD flags = FILE_FLAG_BACKUP_SEMANTICS | (number == LSTAT ? FILE_FLAG_OPEN_REPARSE_POINT : 0);
+            HANDLE file = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, flags, NULL);
             if (file == INVALID_HANDLE_VALUE) { *result = file_error(); return 1; }
+            if (number == LSTAT) {
+                BY_HANDLE_FILE_INFORMATION info;
+                if (!GetFileInformationByHandle(file, &info)) { *result = file_error(); CloseHandle(file); return 1; }
+                if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+                    fprintf(stderr, "lstat reparse point unsupported\n");
+                    *result = -38; CloseHandle(file); return 1;
+                }
+            }
             *result = stat_file(file, b, legacy);
             CloseHandle(file);
             return 1;
