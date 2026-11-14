@@ -1,6 +1,7 @@
 """Create native game instances using only two delivered EXEs and local resources."""
 
 import argparse
+import configparser
 import ctypes as c
 import datetime
 import json
@@ -52,7 +53,10 @@ def main():
     process = subprocess.Popen([str(delivery / "DNF-Native.exe"), "--instance", str(instance)], env=env)
     window = None
     saved_elf = None
-    modified = delivery / "resources/hosts/i686/dnf-host.exe"
+    manifest = configparser.ConfigParser(interpolation=None)
+    manifest.read(delivery / "resources/resources.ini", encoding="utf-16")
+    cabinet = manifest["resources"]["version"] == "2"
+    modified = delivery / ("resources/resources.cab" if cabinet else "resources/hosts/i686/dnf-host.exe")
     lua = js = None
     lua_before = js_before = None
 
@@ -92,10 +96,12 @@ def main():
         assert len(rows(window)) == 19 and not (instance / "instance.pending").exists()
         assert not (instance / "seed.sql").exists()
         checks["native_first_run_creates_nineteen_service_instance"] = True
-        seed_sha = sha256(delivery / "resources/seed.sql")
-        assert any(path.stat().st_size == (delivery / "resources/seed.sql").stat().st_size and sha256(path) == seed_sha
-                   for path in (instance / ".mysql").glob("gui-*.private.log"))
+        seed_sha = manifest["resources"]["seed_sha256"]
+        assert any(sha256(path) == seed_sha for path in (instance / ".mysql").glob("gui-*.private.log"))
         checks["import_reexport_matches_complete_original_seed_bytes"] = True
+        checks["resource_format"] = "cabinet" if cabinet else "directory"
+        assert not (instance / ".mysql/setup-seed.sql").exists()
+        assert not (instance / ".mysql/setup-services.ini").exists()
         screenshot(window, probe / "created.png")
         click(window, 111); ready(window, "数据库 SQL 检查通过")
         schemas = query("SELECT TABLE_SCHEMA,COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY TABLE_SCHEMA ORDER BY TABLE_SCHEMA;")

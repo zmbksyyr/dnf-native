@@ -2,6 +2,7 @@
 #pragma once
 #include <bcrypt.h>
 #include <cstdint>
+#include "resource_cabinet.h"
 
 static std::string file_sha256(const std::wstring &path) {
     BCRYPT_ALG_HANDLE algorithm = nullptr;
@@ -114,7 +115,9 @@ static void checked_sql_file(const std::wstring &exe, const std::wstring &instan
 static void create_game_instance(HWND window, const std::wstring &exe, const std::wstring &resources,
                                  const std::wstring &instance, Session &live) {
     std::wstring manifest = resources + L"\\resources.ini";
-    if (setting(manifest, L"resources", L"version") != L"1") throw std::runtime_error("Local game resources are missing or incompatible");
+    std::wstring version = setting(manifest, L"resources", L"version");
+    bool cabinet = version == L"2";
+    if (version != L"1" && !cabinet) throw std::runtime_error("Local game resources are missing or incompatible");
     unsigned count = GetPrivateProfileIntW(L"resources", L"count", 0, manifest.c_str());
     if (!count) throw std::runtime_error("Local game resource list is empty");
     std::vector<std::pair<std::wstring, std::string>> files;
@@ -123,11 +126,14 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         std::wstring section = L"file" + std::to_wstring(i);
         auto path = resource_path(setting(manifest, section, L"path"));
         std::string hash = ascii(setting(manifest, section, L"sha256"));
-        if (file_sha256(resources + L"\\" + path) != hash) throw std::runtime_error("Local game resource hash differs; instance was not created");
+        if (!cabinet && file_sha256(resources + L"\\" + path) != hash) throw std::runtime_error("Local game resource hash differs; instance was not created");
         files.emplace_back(path, hash);
     }
     std::string seed_hash = ascii(setting(manifest, L"resources", L"seed_sha256"));
-    if (file_sha256(resources + L"\\seed.sql") != seed_hash) throw std::runtime_error("Application seed identity differs");
+    if (cabinet) {
+        if (file_sha256(resources + L"\\resources.cab") != ascii(setting(manifest, L"resources", L"cabinet_sha256")))
+            throw std::runtime_error("Local game cabinet hash differs; instance was not created");
+    } else if (file_sha256(resources + L"\\seed.sql") != seed_hash) throw std::runtime_error("Application seed identity differs");
     if (present(instance)) {
         if (!(GetFileAttributesW(instance.c_str()) & FILE_ATTRIBUTE_DIRECTORY))
             throw std::runtime_error("Instance path must be a directory; existing file was not changed");
@@ -145,7 +151,28 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     LocalFree(security); require(secured, "Protect game instance directory");
     write_private(instance + L"\\instance.pending", "Native game instance creation has not completed. Private diagnostics retained.\n");
     PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在复制游戏资源并安全初始化数据库…"));
-    for (const auto &[path, hash] : files) {
+    std::wstring seed = resources + L"\\seed.sql", service_template = resources + L"\\services.template.ini";
+    if (cabinet) {
+        directory(instance + L"\\.mysql");
+        seed = instance + L"\\.mysql\\setup-seed.sql";
+        service_template = instance + L"\\.mysql\\setup-services.ini";
+        auto target = [&](const std::wstring &path) {
+            return path == L"seed.sql" ? seed : path == L"services.template.ini" ? service_template : instance + L"\\" + path;
+        };
+        std::map<std::string, std::wstring> objects;
+        for (const auto &[path, hash] : files) objects.emplace(hash, target(path));
+        PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在解压并核对本地游戏资源…"));
+        extract_resource_cabinet(resources + L"\\resources.cab", objects);
+        for (const auto &[path, hash] : files) {
+            std::wstring destination = target(path);
+            if (objects.at(hash) != destination) {
+                directory(destination.substr(0, destination.find_last_of(L'\\')));
+                require(CopyFileW(objects.at(hash).c_str(), destination.c_str(), TRUE), "Copy identical resource to original path");
+            }
+            if (file_sha256(destination) != hash) throw std::runtime_error("Extracted game resource identity differs; incomplete instance retained");
+        }
+        if (file_sha256(seed) != seed_hash) throw std::runtime_error("Extracted application seed identity differs");
+    } else for (const auto &[path, hash] : files) {
         if (path == L"seed.sql" || path == L"services.template.ini") continue;
         std::wstring target = instance + L"\\" + path;
         directory(target.substr(0, target.find_last_of(L'\\')));
@@ -164,7 +191,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     if (init.code) throw std::runtime_error("Secure game database initialization failed; private log retained");
     live = start_database(window, exe, instance);
     PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在导入并逐字节核对应用数据库…"));
-    checked_sql_file(exe, instance, resources + L"\\seed.sql");
+    checked_sql_file(exe, instance, seed);
     std::vector<std::wstring> dump{L"mysqldump",instance,L"--defaults-file=client.private.cnf",L"--default-character-set=latin1",L"--lock-all-tables",
         L"--routines",L"--events",L"--triggers",L"--hex-blob",L"--skip-comments",L"--set-gtid-purged=OFF",L"--databases"};
     dump.insert(dump.end(), std::begin(application_schemas), std::end(application_schemas));
@@ -204,7 +231,11 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         std::string text = read_file(path); replace_all(text,entry.second.first,entry.second.second); write_private(path,text,CREATE_ALWAYS);
     }
     stop_database(window, exe, instance, live); CloseHandle(live.process); live = {};
-    require(CopyFileW((resources + L"\\services.template.ini").c_str(), (instance + L"\\services.ini").c_str(), TRUE), "Commit instance service list");
+    require(CopyFileW(service_template.c_str(), (instance + L"\\services.ini").c_str(), TRUE), "Commit instance service list");
+    if (cabinet) {
+        require(DeleteFileW(seed.c_str()), "Remove imported setup seed");
+        require(DeleteFileW(service_template.c_str()), "Remove setup service template");
+    }
     write_private(instance + L"\\instance-setup.txt", "Application seed SHA256=" + seed_hash + "\nImport re-export: byte identical.\nApplication accounts: generated per instance.\nDatabase stopped normally.\n");
     require(DeleteFileW((instance + L"\\instance.pending").c_str()), "Commit completed game instance");
 }
