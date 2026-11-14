@@ -76,3 +76,5 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 `test_epoll.py` 用双架构自编 ELF 核对管道和 UDP socket 的实际混合等待；`test_luv.py` 在原版 game/DP2/Lua/luv 中触发并关闭真实定时器，循环返回后主动退出 42。它们覆盖已复现的 libuv 内部管道登记失败问题，不替代完整 game 或停服验收。已有进程占用正式宿主时，可分别用 `--hosts build/staged`、`--host build/staged/i686/dnf-host.exe` 选择独立构建。
 
 `test_poll.py` 同时验证原版 bridge 所依赖的 select 微秒进位及超时后的剩余时间清零，保留管道实际等待检查；可用 `--hosts build/staged` 选择独立宿主。
+
+`python tools/test_file_sync.py --hosts build/staged` 核对 rename 的实际替换和打开目标时的明确限制，以及关闭原 fd 后的共享文件 MS_SYNC 与落盘字节。`python tools/probe_security.py --host build/staged/i686/dnf-host.exe` 在新副本观察原版安全三件套，收集应用文件日志和 runtime 缺口并停止本次进程；它不以退出码 0 证明初始化成功，也不计安全组件业务验收。当前原配置中的监控/配置中心依赖仍未满足，详见实施记录。

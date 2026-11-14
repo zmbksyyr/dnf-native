@@ -369,3 +369,13 @@ auction 首次进入实际数据库初始化后返回 9。MySQL 语句历史给�
 早先五秒观察后停服不能确认拍卖服务已完成初始化；最终探测对 auction/point 各观察 20 秒，并以原版初始化及 Server Terminated 标记核对结果，不把等待时间或端口计为就绪。九服务联合正式复测全部通过：auction/point/community 返回 0，其余原版框架正常返回 1；全部无强制回收、无 runtime gap，MySQL 返回 0，源库身份不变。停止按依赖倒序执行，guild 先于 DBMW。community 前台模式未创建 daemon PID 文件，因此停止时有缺少 PID 文件的删除提示，不隐藏此差异。
 
 证据见 [辅助服务联合初始化](evidence/p3-auxiliary-service-init.json)，复现 `python tools/probe_dbmw.py --database-source <停止的私有恢复库> --auxiliary`。本轮没有增加 runtime 实现；九服务结果只证明已观察的初始化与停止路径。默认 16 个 core 服务现均已有各自的部分实际运行证据，但完整 16 服务联合就绪、请求/数据核对、客户端业务和最终交付仍未验收。
+
+## 2026-11-14 · secagent 实际暴露的 rename 与 msync
+
+原版安全三件套的私有副本首次运行时，secagent 实际触发 i386 rename（38）和 msync（144）缺口。沿现有路径解析增加 MoveFileEx 替换；共享文件映射保留独立句柄，MS_SYNC 使用 FlushViewOfFile 和 FlushFileBuffers，因此 guest 关闭原 fd 后仍能同步。没有增加依赖或改写原版 ELF。MS_ASYNC/零 flags 使用系统已有脏页异步写回；MS_INVALIDATE 明确返回 ENOSYS，范围目前须落在单个已跟踪 NrVm 映射内。
+
+Windows 兼容接口不能替换仍打开的目标文件，独立 Windows 对照实际返回错误 5。本次对此返回 EACCES 并保留两个文件，没有先删目标再改名来冒充 Linux 原子替换。双架构 ELF 核对已关闭目标的替换、源句柄仍打开、同路径和错误输入，以及打开目标时明确失败；msync 核对关闭原 fd 后同步、部分范围、异步、匿名映射和错误范围，进程结束后逐字节比较磁盘内容。相同最终夹具在旧宿主均失败，新构建均返回 42；文件 ABI、共享映射别名和匿名 VM 回归通过。不能将该范围写成完整 Linux rename/msync 或断电耐久性验收。
+
+正式化的 tools/probe_security.py 复测原版 ELF 和原版配置，secagent 建立 347045468 字节用户共享文件，完成 gamesvr channel、user info manager、dpsdk 配置初始化，SIGTERM 后返回 0，无上述缺口、访问异常或强制回收。原版缺 cfg/restrict.txt，日志明确关闭该限制功能，保留此差异。gunnersvr 虽返回 0，但实际因连接 127.0.0.1:9000 监控服务失败而初始化失败；zergsvr 配置使用空 cfgsvr 地址，返回 183 并记录 init_instance ret=290010039，均不计通过。
+
+证据见 [安全组件文件调用](evidence/p3-security-file-sync.json)。本轮仅验证 Windows 10 x64 10.0.19044；修复在 build/staged 独立构建执行，正在进行的 16 服务联合观察保留旧正式构建，不混用构建结论。安全组件互通、必要性与客户端业务仍待验证。

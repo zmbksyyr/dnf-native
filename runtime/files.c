@@ -351,11 +351,18 @@ static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, 
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, LSTAT = 6, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
+    enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, LSTAT = 6, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, RENAME = 82, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
 #else
-    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, LSTAT = 196, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
+    enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, LSTAT = 196, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, RENAME = 38, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
+    if (number == RENAME) {
+        wchar_t source[32768], destination[32768];
+        *result = guest_path(run, a, source);
+        if (!*result) *result = guest_path(run, b, destination);
+        if (!*result) *result = MoveFileExW(source, destination, MOVEFILE_REPLACE_EXISTING) ? 0 : file_error();
+        return 1;
+    }
 #ifdef _WIN64
     enum {PIPE = 22, PIPE2 = 293, EVENTFD = 284, EVENTFD2 = 290};
 #else

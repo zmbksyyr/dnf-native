@@ -128,6 +128,10 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
         if (!VirtualProtect(base, length, protect(args[2]), &old)) {
             UnmapViewOfFile(base); CloseHandle(section); return -13;
         }
+        if (writable && !DuplicateHandle(GetCurrentProcess(), run->files[fd], GetCurrentProcess(),
+                                         &v->source, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+            UnmapViewOfFile(base); CloseHandle(section); return -5;
+        }
         v->base = base; v->size = length; v->section = section;
         return (intptr_t)base;
     }
@@ -192,22 +196,40 @@ static intptr_t remapping(NrRun *run, const uintptr_t args[6]) {
 
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
 #ifdef _WIN64
-    enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28};
+    enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, MSYNC = 26};
 #else
-    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163};
+    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, MSYNC = 144};
 #endif
     if (number == MMAP) { *result = mapping(run, args); return 1; }
 #ifndef _WIN64
     if (number == MREMAP) { *result = remapping(run, args); return 1; }
 #endif
-    if (number != MPROTECT && number != MUNMAP && number != MADVISE) return 0;
+    if (number != MPROTECT && number != MUNMAP && number != MADVISE && number != MSYNC) return 0;
     uintptr_t address = args[0];
     size_t length = args[1];
+    if (number == MSYNC) {
+        if ((args[2] & ~(uintptr_t)7) || ((args[2] & 5) == 5) || (address & 4095) || length > SIZE_MAX - 4095) {
+            *result = -22; return 1;
+        }
+        if (args[2] & 2) { fputs("msync unsupported MS_INVALIDATE\n", stderr); *result = -38; return 1; }
+        if (!length) { *result = 0; return 1; }
+    }
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
     length = (length + 4095) & ~(size_t)4095;
     NrVm *v = NULL;
     for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
+    if (number == MSYNC) {
+        if (!v || !mapped(v, address, length)) { *result = -12; return 1; }
+        *result = 0;
+        /* Private/anonymous pages have no writeback. Windows already tracks
+           dirty shared pages for asynchronous writeback, as Linux MS_ASYNC does. */
+        if (v->section && (args[2] & 4)) {
+            if (!FlushViewOfFile((const void *)address, length) || (v->source && !FlushFileBuffers(v->source)))
+                *result = -5;
+        }
+        return 1;
+    }
     if (number == MADVISE) {
         if (!v || !mapped(v, address, length)) *result = -12;
         else if (args[2] != 4 || v->image.file || v->section) *result = -38;
