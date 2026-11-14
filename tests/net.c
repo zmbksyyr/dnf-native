@@ -17,7 +17,7 @@ static result call(word n, word a, word b, word c) {
 
 static result net(unsigned operation, word a, word b, word c, word d, word e) {
 #ifdef __x86_64__
-    word number = operation == 1 ? 41 : operation == 3 ? 42 : operation == 15 ? 55 : 54;
+    word number = operation == 1 ? 41 : operation == 3 ? 42 : operation == 7 ? 52 : operation == 15 ? 55 : 54;
     register word r10 __asm__("r10") = d;
     register word r8 __asm__("r8") = e;
     result r;
@@ -50,6 +50,8 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     int report[14] = {0}, one = 1;
     result fd = net(1, 2, 1, 0, 0, 0);
     CHECK(fd >= 0);
+    unsigned char remote[16] = {0}; int remote_length = sizeof(remote);
+    CHECK(net(7, fd, (word)remote, (word)&remote_length, 0, 0) == -107);
     struct { char name[16]; unsigned short family; unsigned char address[14]; } ifr = {"eth0", 0, {0}};
     CHECK(call(IOCTL, fd, 0x8927, (word)&ifr) == 0);
     CHECK(ifr.family == 1 && (ifr.address[0] | ifr.address[1] | ifr.address[2] |
@@ -78,6 +80,16 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(net(14, fd, 1, 13, 1, sizeof(linger)) == -14);
     CHECK(net(14, fd, 1, 13, (word)linger, sizeof(linger)) == 0);
     CHECK(net(3, fd, (word)&address, sizeof(address), 0, 0) == 0);
+    CHECK(net(7, fd, (word)remote, (word)&remote_length, 0, 0) == 0 && remote_length == 16);
+    for (unsigned i = 0; i < 8; ++i) CHECK(remote[i] == ((unsigned char *)&address)[i]);
+    unsigned char short_remote[4] = {0, 0, 0xa5, 0x5a}; remote_length = 2;
+    CHECK(net(7, fd, (word)short_remote, (word)&remote_length, 0, 0) == 0 && remote_length == 16);
+    CHECK(short_remote[0] == 2 && short_remote[1] == 0 && short_remote[2] == 0xa5 && short_remote[3] == 0x5a);
+    remote_length = 0;
+    CHECK(net(7, fd, 0, (word)&remote_length, 0, 0) == 0 && remote_length == 16);
+    remote_length = -1;
+    CHECK(net(7, fd, (word)remote, (word)&remote_length, 0, 0) == -22);
+    CHECK(net(7, fd, (word)remote, 1, 0, 0) == -14);
 
     poll.fd = (int)fd; poll.events = 1; poll.revents = 99;
     report[0] = (int)call(POLL, (word)&poll, 1, 0);

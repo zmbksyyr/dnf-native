@@ -379,3 +379,11 @@ Windows 兼容接口不能替换仍打开的目标文件，独立 Windows 对照
 正式化的 tools/probe_security.py 复测原版 ELF 和原版配置，secagent 建立 347045468 字节用户共享文件，完成 gamesvr channel、user info manager、dpsdk 配置初始化，SIGTERM 后返回 0，无上述缺口、访问异常或强制回收。原版缺 cfg/restrict.txt，日志明确关闭该限制功能，保留此差异。gunnersvr 虽返回 0，但实际因连接 127.0.0.1:9000 监控服务失败而初始化失败；zergsvr 配置使用空 cfgsvr 地址，返回 183 并记录 init_instance ret=290010039，均不计通过。
 
 证据见 [安全组件文件调用](evidence/p3-security-file-sync.json)。本轮仅验证 Windows 10 x64 10.0.19044；修复在 build/staged 独立构建执行，正在进行的 16 服务联合观察保留旧正式构建，不混用构建结论。安全组件互通、必要性与客户端业务仍待验证。
+
+## 2026-11-14 · zerg 实际连接的 getpeername
+
+核对原版 Zerg_Server_Config::init 后确认其支持 cfgfile；私有本地路由探测实际触发 socketcall 7（getpeername）缺口。runtime 沿既有 getsockname/accept 路径调用真实 Winsock getpeername，增加 x64 syscall 52 映射；地址只写调用方容量，保留完整地址长度，拒绝负长度和无效输出。
+
+双架构真实 TCP 样件核对连接前 ENOTCONN、连接后对端 loopback IP/端口、截断地址不越界、零容量及错误指针。旧宿主在连接前检查失败，新构建的普通/abortive 关闭四种组合均返回 42；同构建 epoll 管道/socket 和并发 close/select 回归通过。原版 zerg 不再记录 getpeername 缺口，但未修补的停服路径仍在 PC=0 返回 125，因此没有把此原语修复写成服务正常关服。
+
+证据见 [getpeername](evidence/p3-getpeername.json)。工具 test_net.py 现可用 --hosts 指定独立构建。仅实测 Windows 10 x64 10.0.19044，本节与仍使用旧构建的 core 联合观察分开计证。

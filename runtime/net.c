@@ -323,7 +323,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
 #ifdef _WIN64
     switch (number) {
         case 41: operation = 1; break; case 49: operation = 2; break; case 42: operation = 3; break;
-        case 50: operation = 4; break; case 43: operation = 5; break; case 51: operation = 6; break;
+        case 50: operation = 4; break; case 43: operation = 5; break; case 51: operation = 6; break; case 52: operation = 7; break;
         case 44: operation = 11; break; case 45: operation = 12; break; case 48: operation = 13; break;
         case 54: operation = 14; break; case 55: operation = 15; break; default: break;
     }
@@ -481,17 +481,22 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         int value; memcpy(&value, (const void *)args[3], 4);
         *result = setsockopt(s, SOL_SOCKET, option, (const char *)&value, 4) == 0 ? 0 : socket_error(); return 1;
     }
-    if (operation == 5 || operation == 6) {
+    if (operation == 5 || operation == 6 || operation == 7) {
         struct sockaddr_in address; int bytes = sizeof(address);
-        if (args[1] && (!nr_memory(args[2], 4, 1) || !nr_memory(args[1], 16, 1))) { *result = -14; return 1; }
-        int capacity = 0; if (args[1]) memcpy(&capacity, (const void *)args[2], 4);
+        int capacity = 0, output = operation != 5 || args[1];
+        if (output) {
+            if (!nr_memory(args[2], 4, 1)) { *result = -14; return 1; }
+            memcpy(&capacity, (const void *)args[2], 4);
+            if (capacity < 0) { *result = -22; return 1; }
+            if (capacity > bytes) capacity = bytes;
+            if (capacity && !nr_memory(args[1], (size_t)capacity, 1)) { *result = -14; return 1; }
+        }
         SOCKET accepted = INVALID_SOCKET;
         int r;
         if (operation == 5) { accepted = accept(s, (struct sockaddr *)&address, &bytes); r = accepted == INVALID_SOCKET ? SOCKET_ERROR : 0; }
-        else r = getsockname(s, (struct sockaddr *)&address, &bytes);
+        else r = operation == 6 ? getsockname(s, (struct sockaddr *)&address, &bytes) : getpeername(s, (struct sockaddr *)&address, &bytes);
         if (r == SOCKET_ERROR) { *result = socket_error(); return 1; }
-        if (args[1]) {
-            if (capacity > bytes) capacity = bytes;
+        if (output) {
             if (capacity > 0) memcpy((void *)args[1], &address, (size_t)capacity);
             memcpy((void *)args[2], &bytes, 4);
         }

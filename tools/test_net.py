@@ -1,5 +1,6 @@
 """Verify TCP I/O, poll, receive timeout and real SO_LINGER close behavior."""
 
+import argparse
 import datetime
 import hashlib
 import json
@@ -21,6 +22,9 @@ FIELDS = ["poll_empty", "poll_write_count", "poll_write_events", "poll_negative_
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--hosts", type=Path, default=ROOT / "build")
+    args = parser.parse_args()
     env = dict(os.environ)
     env["PATH"] = str(BIN) + os.pathsep + env.get("PATH", "")
     records = []
@@ -39,7 +43,7 @@ def main():
                      "-DNR_PORT=" + str(port), "-DNR_LINGER_ON=" + str(int(abortive)), "-Wl,--image-base=" + base, "-Wl,-e,_start",
                      str(ROOT / "tests/net.c"), "-o", str(fixture)]
             subprocess.run(build, env=env, check=True)
-            host = ROOT / "build" / arch / "dnf-host.exe"
+            host = args.hosts.resolve() / arch / "dnf-host.exe"
             sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
             command = [str(host), "--run", str(fixture), sha, "net"]
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
