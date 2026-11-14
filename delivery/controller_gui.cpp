@@ -6,7 +6,8 @@
 #include <thread>
 
 enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS,
-       SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS };
+       SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS,
+       DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
@@ -170,6 +171,49 @@ struct App {
     bool services_running() const {
         return std::any_of(services.begin(), services.end(), [](const Service &service) { return running(service); });
     }
+    Service *game_service() {
+        auto found = std::find_if(services.begin(), services.end(), [](const Service &service) { return service.name == L"game"; });
+        return found == services.end() ? nullptr : &*found;
+    }
+    void show_plugins() {
+        const Service *game = game_service();
+        bool dp2 = game && std::find(game->environment.begin(), game->environment.end(), dp2_preload) != game->environment.end();
+        bool frida = dp2 && std::find(game->environment.begin(), game->environment.end(), L"DNF_NATIVE_FRIDA=0") == game->environment.end();
+        SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_SETCHECK, dp2 ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessageW(GetDlgItem(window, FRIDA_ENABLE), BM_SETCHECK, frida ? BST_CHECKED : BST_UNCHECKED, 0);
+    }
+    void save_plugins() {
+        Service *game = game_service();
+        if (!game || running(*game)) throw std::runtime_error("Stop game before changing plugin settings");
+        bool dp2 = SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED;
+        bool frida = dp2 && SendMessageW(GetDlgItem(window, FRIDA_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED;
+        if (dp2 && !frida) {
+            // Keep the original module and its documented -1000 load failure
+            // result. The explicit off setting prevents Gadget loading while
+            // allowing the default Lua entry script to continue running.
+            const std::string guard = "\n    if os.getenv(\"DNF_NATIVE_FRIDA\") == \"0\" then\n"
+                "        logger.info(\"Frida disabled by instance configuration\")\n        return -1000\n    end\n";
+            std::wstring module = game->root + L"\\dp2\\lua\\df\\frida.lua";
+            std::string source = read_file(module);
+            if (source.find(guard) == std::string::npos) {
+                const std::string entry = "function M.load(args, hproc)";
+                size_t at = source.find(entry);
+                if (at == std::string::npos || source.find(entry, at + entry.size()) != std::string::npos)
+                    throw std::runtime_error("Frida module entry differs; plugin settings were not changed");
+                require(CopyFileW(module.c_str(), (module + L".before-native-switch").c_str(), TRUE), "Preserve original instance Frida module");
+                source.insert(at + entry.size(), guard);
+                std::wstring temporary = module + L".native-tmp";
+                write_private(temporary, source);
+                require(MoveFileExW(temporary.c_str(), module.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH), "Save instance Frida switch");
+            }
+        }
+        const wchar_t *mode = !dp2 ? L"off" : frida ? L"frida" : L"lua";
+        require(WritePrivateProfileStringW(L"plugins", L"mode", mode, (current + L"\\services.ini").c_str()), "Save game plugin mode");
+        for (const auto &service : load_services(current)) if (service.name == L"game") game->environment = service.environment;
+        show_plugins(); controls();
+        SetWindowTextW(status, L"插件设置已保存，下次启动 game 生效");
+        append(!dp2 ? L"DP2/Lua 已关闭，Frida 已关闭" : frida ? L"DP2/Lua 已启用，Frida 已启用" : L"DP2/Lua 已启用，Frida 已关闭");
+    }
     void show_services() {
         HWND list = GetDlgItem(window, SERVICE_LIST);
         LRESULT selected = SendMessageW(list, LB_GETCURSEL, 0, 0);
@@ -195,7 +239,7 @@ struct App {
         // The worker may be changing process ownership. Inspect it after join.
         if (busy) {
             for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,FOLDER,LOGS,
-                           SERVICE_LIST,ELF_START,ELF_STOP,ALL_START,ALL_STOP,SERVICE_LOGS})
+                           SERVICE_LIST,ELF_START,ELF_STOP,ALL_START,ALL_STOP,SERVICE_LOGS,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE})
                 EnableWindow(GetDlgItem(window, id), FALSE);
             return;
         }
@@ -218,15 +262,20 @@ struct App {
         EnableWindow(GetDlgItem(window, SERVICE_LOGS), selected && !services[index].out.empty());
         EnableWindow(GetDlgItem(window, ALL_START), !services.empty() && initialized && !pending);
         EnableWindow(GetDlgItem(window, ALL_STOP), active || session.process);
+        const Service *game = game_service();
+        bool editable = game && !running(*game) && !pending;
+        EnableWindow(GetDlgItem(window, DP2_ENABLE), editable);
+        EnableWindow(GetDlgItem(window, FRIDA_ENABLE), editable && SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED);
+        EnableWindow(GetDlgItem(window, PLUGINS_SAVE), editable);
     }
     void load() {
         if (busy || session.process || services_running()) return;
         std::wstring value = window_text(path);
         if (value.empty()) {
-            current.clear(); services.clear(); show_services(); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
+            current.clear(); services.clear(); show_services(); show_plugins(); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
         }
         current = full_path(value);
-        services = load_services(current); show_services();
+        services = load_services(current); show_services(); show_plugins();
         SetWindowTextW(GetDlgItem(window, INITIALIZE), present(resources + L"\\resources.ini") ? L"创建实例" : L"初始化");
         bool initialized = present(current + L"\\data\\auto.cnf");
         if (present(current + L"\\server.cnf")) {
@@ -349,6 +398,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{INITIALIZE,L"初始化"},{START,L"启动"},{STOP,L"停止"},{BACKUP,L"备份…"},{RESTORE,L"还原…"},{RECOVER,L"恢复操作"},{FOLDER,L"实例目录"},{LOGS,L"日志目录"}})
                 control(L"BUTTON", button.second, WS_TABSTOP, button.first);
             control(L"STATIC", L"备份与还原前请停止数据库。操作日志保存在实例目录中。", 0, 205);
+            control(L"BUTTON", L"启用 DP2/Lua", BS_AUTOCHECKBOX | WS_TABSTOP, DP2_ENABLE);
+            control(L"BUTTON", L"启用 Frida", BS_AUTOCHECKBOX | WS_TABSTOP, FRIDA_ENABLE);
+            control(L"BUTTON", L"保存插件设置", WS_TABSTOP, PLUGINS_SAVE);
+            control(L"STATIC", L"停止 game 后修改，下次启动生效", 0, 208);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, 206);
             control(L"STATIC", L"原版服务进程（运行状态不代表业务就绪）", 0, 207);
             control(L"LISTBOX", L"", LBS_NOTIFY | WS_VSCROLL | WS_BORDER | WS_TABSTOP, SERVICE_LIST);
@@ -364,10 +417,12 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             place(201,16,20,80,24); place(INSTANCE,100,16,width-212,30); place(BROWSE,width-100,16,84,30);
             place(202,16,64,135,26); place(203,165,64,45,26); place(PORT,212,60,80,28); place(204,310,64,width-326,26);
             for (int i = 0; i < 8; ++i) place(INITIALIZE+i,16+i*((width-32)/8),104,(width-32)/8-8,34);
-            place(205,16,154,width-32,26); place(207,16,190,width-32,26);
-            place(SERVICE_LIST,16,220,width-200,200);
-            for (int i = 0; i < 5; ++i) place(ELF_START+i,width-172,220+i*40,156,32);
-            place(206,16,436,width-32,height-452);
+            place(205,16,154,width-32,26);
+            place(DP2_ENABLE,16,186,160,28); place(FRIDA_ENABLE,180,186,150,28);
+            place(PLUGINS_SAVE,340,184,140,32); place(208,500,188,width-516,26);
+            place(207,16,226,width-32,26); place(SERVICE_LIST,16,256,width-200,200);
+            for (int i = 0; i < 5; ++i) place(ELF_START+i,width-172,256+i*40,156,32);
+            place(206,16,472,width-32,height-488);
             return 0;
         }
         case WM_GETMINMAXINFO:
@@ -379,7 +434,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->worker.join(); app->busy = false;
             if (result->stopped && app->session.process) { CloseHandle(app->session.process); app->session = {}; }
             if (result->started.process) app->session = result->started;
-            if (result->created) app->services = load_services(app->current);
+            if (result->created) { app->services = load_services(app->current); app->show_plugins(); }
             app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls();
             if (app->closing && result->success && !app->session.process && !app->services_running()) PostMessageW(window, WM_CLOSE, 0, 0);
             else app->closing = false;
@@ -404,7 +459,13 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (id == INSTANCE && HIWORD(wparam) == EN_CHANGE) { if (app->status && app->output) app->load(); return 0; }
             if (id == SERVICE_LIST && HIWORD(wparam) == LBN_SELCHANGE) { if (!app->busy) app->controls(); return 0; }
             if (HIWORD(wparam) != BN_CLICKED || app->busy) return 0;
-            if (id == BROWSE) {
+            if (id == DP2_ENABLE) {
+                if (SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) != BST_CHECKED)
+                    SendMessageW(GetDlgItem(window, FRIDA_ENABLE), BM_SETCHECK, BST_UNCHECKED, 0);
+                app->controls();
+            } else if (id == FRIDA_ENABLE) app->controls();
+            else if (id == PLUGINS_SAVE) app->save_plugins();
+            else if (id == BROWSE) {
                 auto chosen = choose_folder(window, L"选择本地实例目录", app->current);
                 if (!chosen.empty()) { SetWindowTextW(app->path, chosen.c_str()); app->load(); }
             } else if (id == FOLDER || id == LOGS) {

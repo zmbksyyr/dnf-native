@@ -2,6 +2,9 @@
 #pragma once
 #include <winsock2.h>
 #include "win32_files.h"
+#include <algorithm>
+
+static const wchar_t *dp2_preload = L"LD_PRELOAD=/dp2/libdp2pre.so";
 
 struct Service {
     std::wstring name, host, root, cwd, elf, loader_hash, elf_hash, pid_file;
@@ -25,6 +28,9 @@ static std::vector<Service> load_services(const std::wstring &instance) {
     std::vector<Service> services;
     if (GetFileAttributesW(file.c_str()) == INVALID_FILE_ATTRIBUTES) return services;
     if (setting(file, L"services", L"version") != L"1") throw std::runtime_error("Unsupported service instance format");
+    std::wstring plugin_mode = setting(file, L"plugins", L"mode");
+    if (!plugin_mode.empty() && plugin_mode != L"off" && plugin_mode != L"lua" && plugin_mode != L"frida")
+        throw std::runtime_error("Unknown game plugin mode");
     unsigned count = GetPrivateProfileIntW(L"services", L"count", 0, file.c_str());
     if (!count || count > 19) throw std::runtime_error("Invalid service count");
     for (unsigned i = 0; i < count; ++i) {
@@ -52,6 +58,15 @@ static std::vector<Service> load_services(const std::wstring &instance) {
             auto env = get((L"env" + std::to_wstring(j)).c_str());
             if (env.empty()) break;
             service.environment.push_back(env);
+        }
+        if (service.name == L"game" && !plugin_mode.empty()) {
+            auto &env = service.environment;
+            env.erase(std::remove(env.begin(), env.end(), dp2_preload), env.end());
+            env.erase(std::remove_if(env.begin(), env.end(), [](const std::wstring &value) {
+                return value.rfind(L"DNF_NATIVE_FRIDA=", 0) == 0;
+            }), env.end());
+            if (plugin_mode != L"off") env.push_back(dp2_preload);
+            env.push_back(plugin_mode == L"frida" ? L"DNF_NATIVE_FRIDA=1" : L"DNF_NATIVE_FRIDA=0");
         }
         services.push_back(service);
     }

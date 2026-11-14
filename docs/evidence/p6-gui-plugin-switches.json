@@ -1,0 +1,184 @@
+{
+  "recorded_utc": "2026-11-14T11:56:33.269364+00:00",
+  "base_commit": "2fa66fd2b4070250c6992b33499eec93b6915af7",
+  "scope": "Native GUI plugin switches and real Lua/Frida hook/RPC; original game natural startup/shutdown without DP2. Not gameplay or clean multi-OS acceptance.",
+  "build": {
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang++.exe",
+      "-std=c++17",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O2",
+      "-static",
+      "-municode",
+      "-mwindows",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-D_WIN32_WINNT=0x0601",
+      "D:\\cache\\dnf-runtime\\dnf-native\\delivery\\controller_gui.cpp",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\review\\gui-resource.o",
+      "-luser32",
+      "-lgdi32",
+      "-lshell32",
+      "-lole32",
+      "-ladvapi32",
+      "-lws2_32",
+      "-lbcrypt",
+      "-lcabinet",
+      "-o",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\review\\DNF-Native.exe"
+    ],
+    "output_bytes": 978944,
+    "output_sha256": "f6330598b444659fd4ca9489d351fcb4c48573ebcc4dc113032834a39fae1f63",
+    "sources": {
+      "delivery/controller_gui.cpp": "5c8b54afac6fce4532167918b29a7f546acaa8c3a885cd2a04135484bde21e4f",
+      "delivery/controller_gui.manifest": "5e1724adbe22642744ce26760deb3c686ad820897dc6feb942183e98ba9a802c",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+      "delivery/service_processes.h": "4fb6449af2990276f13611619670844704ae703f3da8749bce2b6d29c8030d1a",
+      "delivery/instance_setup.h": "0eff15b516de44b03657f2a207c066aeab1eaff1d39195bfe3b84d7696e2df62",
+      "delivery/resource_cabinet.h": "71291b1c42222e6c3209fb0ca044c4edf6d28d492a2329b15f13d18b56ae6692",
+      "tools/build_gui.py": "6999c12ad2697a37a4b814d4d6d30aacf833ba319e5ec568c4384c1682458509"
+    },
+    "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+    "mysql_build_receipt_sha256": "f5e3ed94dbd177631da62eacc53f5124eb666ac54c9480120a2bdc62e4e2729d",
+    "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."
+  },
+  "pe_metadata": {
+    "machine": "x86_64",
+    "import_dlls": [
+      "USER32.dll",
+      "GDI32.dll",
+      "SHELL32.dll",
+      "ole32.dll",
+      "ADVAPI32.dll",
+      "WS2_32.dll",
+      "bcrypt.dll",
+      "Cabinet.dll",
+      "msvcrt.dll",
+      "KERNEL32.dll"
+    ],
+    "note": "Normal imports only; not delay-load/runtime closure"
+  },
+  "plugin_test": {
+    "receipt_path": "build/probes/20261114T115108554522Z/gui-plugins/receipt.json",
+    "receipt_sha256": "404a20e1434763e7ce20103ba00b16f902fee8e05370400c91919f96d08622c4",
+    "result": {
+      "recorded_utc": "20261114T115108554522Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "gui_sha256": "f6330598b444659fd4ca9489d351fcb4c48573ebcc4dc113032834a39fae1f63",
+      "host_sha256": {
+        "i686": "5bf3b2f327e4da1f1383a3acc71b3c1201b107bc731ca95f148216136705b54d",
+        "x86_64": "caf1eaf250cc2b331caf8fd5c437ca911c871e11ac2e0fc382e398358f84bec3"
+      },
+      "nosegneg": true,
+      "script_sha256": "04691913e7eca3b3c981251305e4bbe3d9050ff865628ddfde5210b70e6e22f3",
+      "checks": {
+        "original_module_backup_matches_before_save": true,
+        "repeated_save_preserves_module_bytes": true,
+        "saved_lua_only_mode_survives_gui_restart": true,
+        "lua_running_without_frida_mapped": {
+          "dp2": true,
+          "frida": false
+        },
+        "frida_reenabled_real_hook_and_bidirectional_rpc": {
+          "dp2": true,
+          "frida": true
+        },
+        "frida_disabled_again_without_stopping_peers": {
+          "dp2": true,
+          "frida": false
+        },
+        "dp2_off_also_disables_frida": true,
+        "dp2_off_live_modules": {
+          "dp2": false,
+          "frida": false
+        },
+        "dp2_off_natural_game_startup_seconds": 36.067,
+        "protocols_with_dp2_disabled": {
+          "channel": {
+            "challenge": true,
+            "positive_responses": 3,
+            "fragmented": true,
+            "coalesced": true
+          },
+          "relay": {
+            "registered_peers": 2,
+            "bidirectional_messages": 8,
+            "unlogged_accounts_disconnected": [
+              701,
+              702
+            ],
+            "own_auth_response_sent": false
+          },
+          "stun": {
+            "responses": 5,
+            "address_and_source_ports": true
+          }
+        },
+        "dp2_off_game_stop_code_zero": true,
+        "plugins_editable_again_after_natural_game_stop": true,
+        "close_normally_stops_remaining_peers_and_database": true,
+        "source_cold_database_unchanged": true
+      },
+      "forced_cleanup": false,
+      "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled. No client gameplay or clean multi-OS acceptance.",
+      "exit_code": 0,
+      "instance": "build/probes/20261114T115108554522Z/gui-plugins/\u63d2\u4ef6 \u5b9e\u4f8b(1)",
+      "logs": {
+        "auction-232388156.stderr.private.log": "1da2a834c683153ed8135ad2a8cac1dd4a3fb5653a57299a1da58389c963175d",
+        "auction-232388156.stdout.private.log": "3f9c6a12b0fa1c7c11a4ca8114b056548ecf3d839ff66582420e73728edfe107",
+        "bridge-232387296.stderr.private.log": "46b7a5cc0efb1b4459231afee460197da8c7541e09a7c5e6cd829c2c6f92447d",
+        "bridge-232387296.stdout.private.log": "85231e405971659f43a2ea7cd60dcaf194577229e4e5840278fcce85580b7e62",
+        "channel-232388406.stderr.private.log": "27289373588d1c63d425af3948a564360216f3ed844e889637eb8d5a5f6244c7",
+        "channel-232388406.stdout.private.log": "30d07e4bef5b27a574f4a30c4d45d79d343247d633e3d7641754526febf9b4cc",
+        "community-232388109.stderr.private.log": "12d189a4a770ca9e45946e9982d08f095ca1140c5c09b46c37578f368c7b4bbd",
+        "community-232388109.stdout.private.log": "e9eceb29811210efb87f56d0d991a489a873f49d9c956f3f609ece97d8809755",
+        "coserver-232388062.stderr.private.log": "50e0bed4aba0c43614c5ec6ad81bd1be3a2f9febd5721cc24b58c957f5439cb5",
+        "coserver-232388062.stdout.private.log": "5a116030ecf1a3755ff2fd54d71ae3695c91db46442a7e25d2392afb8de41a2e",
+        "dbmw_guild-232387500.stderr.private.log": "1a383a42fca0bf5bfdf48bea919e5358a980b5ab1de02ffafa6517368c98335f",
+        "dbmw_guild-232387500.stdout.private.log": "3c1b52a1d5c6adec76aed72c306a23d67d9f7e7bc3f470460dc9124c910fd9d9",
+        "dbmw_mnt-232387593.stderr.private.log": "bdc4f3f2a712fabb3f25463a38e5670fe4fad8af65060bf7c4c25d78759e0260",
+        "dbmw_mnt-232387593.stdout.private.log": "3aa15d6c13e99d07dcba69cbc1a0f3aed6e6cf0cae314979352629d4c818d0bd",
+        "dbmw_stat-232387703.stderr.private.log": "bc27022d1e65cfd4890dc7e089269984a972c26b85e6f1f7bd6faf5b093fdf08",
+        "dbmw_stat-232387703.stdout.private.log": "719bbafa042b840bc8d40e2baf1aa7c5a4a0c7834356bdc029bd7f2d8f482e75",
+        "game-232413593.stderr.private.log": "245675b4ff56f992b460c74ecd341fe2d58949ec5f484614020b5c89236bb35a",
+        "game-232413593.stdout.private.log": "f8747fe16f899e951e1deb4235ed70e06e37aa0e613713057776714b96b3b6e4",
+        "game-232420109.stderr.private.log": "3397632bcbd30df67004aae24b8e80b9d3ebadae1dfc1bbd95398d030c279697",
+        "game-232420109.stdout.private.log": "e42e53fd417bf85374b9e0a09d156f01b7ff7e15d97a8b574f9d565aea13eb14",
+        "game-232426687.stderr.private.log": "ac9a9ed7308a73e0b6d3abdac5aa175511ed274ca47547c789fdc33c37645411",
+        "game-232426687.stdout.private.log": "6fabb35381cbfea3ee6629e2f3e9c2ce5ce1f6c09af10e9696e3b56af1ed369c",
+        "game-232433359.stderr.private.log": "0bb523869e8b583d91eaecc8944020d2b1634c574baf8c7cde744b1b1b9cd05e",
+        "game-232433359.stdout.private.log": "20c2777b5b2f4e0b4e549946d59b90d141f18b3b3291f41c5efc3b9f75022ba2",
+        "guild-232387906.stderr.private.log": "cb09e9c92599e2f87e2f3e844d0567811f483ec1f09af0adb60b1a56c5a9d5ef",
+        "guild-232387906.stdout.private.log": "875e06a5159a2382d71b032f11c343b028a107d26fcf081d7b48389ca1ff62c7",
+        "manager-232387406.stderr.private.log": "5b430aac4980d0f09551430ce0f7918081241c485953f69b95eec81cd4bbe92b",
+        "manager-232387406.stdout.private.log": "a1ae8feac06a7d0bac48e652f25b97552e86a81a96e517125b31980f8cbe4c01",
+        "monitor-232387828.stderr.private.log": "589c23c5829cf587b315e0b8ad0d529cbbef4494343c8d04b9bd8135173c65d4",
+        "monitor-232387828.stdout.private.log": "2accbca71b25181f19427fec21991832a064254f2f93ee46cbf82d3dbebd9bda",
+        "point-232388281.stderr.private.log": "48ba451cb782efd344befd226f20d7005fa748170d6feb8273e76ebbcf63cfc5",
+        "point-232388281.stdout.private.log": "fde0209659aeb3c2545efa8e41410780cb03bb1e9655d703d7f02ac8e1209362",
+        "relay-232388468.stderr.private.log": "c3a76c166c09ca43dc4028e689a513bd8da8924aef02ca10e48157be5a382413",
+        "relay-232388468.stdout.private.log": "2c9e60fadf5a634f2abc8420ad95d2ca5333deea2cab5440598ee11ef46f545c",
+        "statics-232387968.stderr.private.log": "85e5b17642cfb676b98856963abd17ec573fd8d1e66b8cd1f3d1d679ad81e0fc",
+        "statics-232387968.stdout.private.log": "4eef08dce20e40339c917103ea66a089e764e75ddb33d5933390b02fd5e5c88e",
+        "stun-232388531.stderr.private.log": "422dcaa5046f9de90413b3a6dd95de7d00b438a7bfaa87e5a0135905c375b962",
+        "stun-232388531.stdout.private.log": "01b09d0f1c1a4d54d44da396051c9cbec144af7ad1cd80ba122063ae8042de80"
+      }
+    },
+    "shutdown_markers": [
+      "RECV SIGUSR2",
+      "ALL USER LOGOUT COMPLETE",
+      "GAME SERVER SHUTDOWN COMPLETE"
+    ],
+    "screenshots": {
+      "plugins-off-running.png": "202f37aaec2e119af7d8f0e12d95dd60a08b0a1b48af1085466d7911ce540b53"
+    }
+  },
+  "limits": [
+    "Development Windows 10 10.0.19044 only.",
+    "Controls the packaged df.frida module; custom scripts directly loading other plugins bypass it.",
+    "Combined GUI build also includes compressed local resource support verified separately.",
+    "No client gameplay, large connection load, security topology or GUI password editing acceptance."
+  ]
+}

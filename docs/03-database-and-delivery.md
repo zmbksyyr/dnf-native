@@ -131,6 +131,21 @@ build/gui-services/DNF-Native.exe --instance build/instances/core
 
 `--peers-only` 仅用于省去 game 长时间加载的诊断，保留全部 19 项；它不代表产品默认配置。原版服务宿主在执行前加入 GUI 的 Windows Job，正常关闭窗口仍逐项正常停服。MySQL 包装器继续使用自己的 Job，GUI 没有给它再套一层；GUI 被强制终止后的数据库重新接管尚未实现，不能把本机正常关闭测试外推为全部崩溃恢复能力。
 
+插件设置已接入同一 Win32 窗口，提供“启用 DP2/Lua”“启用 Frida”和保存按钮。设置保存在现有 `services.ini` 的 `[plugins] mode=off/lua/frida`，不增加运行配置框架。未设置 mode 的已有实例沿用原有环境；保存后只更新 game 的下次启动环境，不丢弃其他服务的进程句柄。game 运行时禁止修改，停止或退出后恢复编辑；关闭 DP2 会同时关闭 Frida，Lua-only 模式继续加载 DP2 和 Lua。
+
+DP2 关闭通过移除其预加载项实现。Frida 关闭在实例自己的 `df.frida.load` 入口加入环境开关，先保存 `frida.lua.before-native-switch`，再替换实例文件；源资源与用户入口脚本不修改。关闭时记录明确日志并返回原模块文档定义的加载失败值 -1000，不调用 Gadget，默认 Lua 脚本继续执行；启用后仍执行原有加载、hook 与双向调用路径。自定义代码绕过该模块自行加载其他插件不由此设置管理。
+
+本阶段构建与专项检查：
+
+```powershell
+python tools/build_gui.py --mysql-exe build/mysql-gui/mysql-standalone.exe --build-dir build/gui-plugins
+python tools/test_gui_plugins.py --source-instance PRIVATE_STOPPED_INSTANCE
+```
+
+专项使用私有实例副本，实际检查保存/重开窗口、其他 peer 保留、Linux ELF 内存映射、Lua 执行与原址 Frida hook/双向 RPC。完整启动与停服结果以该次 receipt 和实施记录为准，不将短脚本按约定退出 42 的结果当作自然 game 启动。
+
+本轮审阅构建位于 `build/review/`，已包含优化后的宿主配置与压缩资源。以 `--gui build/review/DNF-Native.exe` 运行上述专项，关闭 DP2 的新实例 game 约 36.067 秒自然启动并正常停服；[最终插件证据](evidence/p6-gui-plugin-switches.json)记录构建哈希与实际范围。
+
 | 界面能力 | 具体行为 |
 |---|---|
 | 服务列表 | 展示 19 个服务及 MySQL；区分 core/full、未安装、停用、加载、监听、业务就绪和失败，不伪造缺失组件状态 |
