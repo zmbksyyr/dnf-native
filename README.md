@@ -4,7 +4,9 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 
 **当前状态：本轮实现已提交，等待审阅。** 原版 core 16 服务通过自研宿主、Win32 GUI 和单文件 MySQL 完成本机联合自然启动与停服。GUI 提供 19 项服务列表、单项/整体启停、日志、DP2/Lua/Frida 开关，以及从本地压缩资源创建实例。新建实例导入原始 18 个应用库、核对导出字节并生成独立账号；15 个 peer、channel/relay/monitor/STUN 对照和原版 Frida 数据库接口通过。数据库备份、还原与失败回滚的范围见[实施记录](docs/06-progress.md)。
 
-本轮解决 TLS 异常处理热点和关闭 DP2 时的映射容量不足。原版 game 的完整初始化本机约 36–41 秒；相同配置的 ELF 文件视图对照减少约 69.4 MiB 私有提交。当前审阅程序为 `build/review/DNF-Native.exe`，本地资源 ZIP 为 `build/review/native-local-resources.zip`，190277074 字节。安全三件套完整拓扑、大连接数、密码编辑、jbz69 客户端登录/进图/存档、最终 core/full 分包及干净 Win7/10/11 验收仍未完成；闲置数据不代表客户端负载表现。
+最新 GUI 已按用户参考图调整为浅色卡片、全局控制、真实服务网格、数据库单行及大面积原生日志；最终构建的数据库、日志和插件专项通过。当前审阅程序为 `build/review/DNF-Native.exe`，本地资源 ZIP 为 `build/review/native-local-resources.zip`，190335359 字节。界面截图、构建身份及验证边界见[GUI 阶段说明](docs/12-gui-reference.md)。
+
+此前已解决 TLS 异常处理热点和关闭 DP2 时的映射容量不足；本次关闭 DP2 后以新日志观察原版 game 自然初始化为 35.021 秒。相同配置的 ELF 文件视图历史对照减少约 69.4 MiB 私有提交。原包 PVF 对照已进入角色列表并打开建角界面；数据库修正后客户端在登录前出现图形初始化失败，建角、进图、结算与存档重读仍未通过。安全三件套完整拓扑、大连接数、密码编辑、定制 jbz69 PVF、最终 core/full 分包及干净 Win7/10/11 验收仍未完成；闲置数据不代表客户端负载表现。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -17,6 +19,8 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 - [实施阶段与验收](docs/04-milestones-and-acceptance.md)：P1 否决关卡、19 项服务矩阵、三系统矩阵及需求追踪。
 - [本地压缩资源样件](docs/07-local-package.md)：原生首次创建、体积与审阅产物。
 - [兼容缺口与运行开销](docs/08-compatibility-and-performance.md)：rednf 对照、优化依据及实际边界。
+- [客户端与原数据库兼容](docs/11-client-auth-and-database.md)：密钥、简繁体、账号夹具及原数据库行为。
+- [GUI 参考图落地](docs/12-gui-reference.md)：最新界面、回归、截图与审阅包。
 
 仓库与上级目录中的输入包、`dnf-winport/`、`opendnf-win-jbz69/`、`x/` 独立。原始资产和构建产物不进入 Git。
 

@@ -79,6 +79,12 @@ def main():
     instance = probe / "插件 实例(1)"
     source_before = tree_identity(source / "data")
     shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
+    # A copied init log may already contain the ready marker. Keep it outside
+    # this run's log directory so startup is observed from fresh output.
+    game_logs = instance / "i686/home/neople/game/log"
+    if game_logs.exists():
+        game_logs.rename(probe / "prior-game-logs")
+    (game_logs / "siroco11").mkdir(parents=True)
     if args.hosts:
         for arch in ["i686", "x86_64"]:
             shutil.copy2(args.hosts.resolve(strict=True) / arch / "dnf-host.exe", instance / "hosts" / arch / "dnf-host.exe")

@@ -24,4 +24,4 @@
 
 数据库修正后重试客户端，连续在登录前显示“图表系统建立失败”，最后一次退出为 `0xc0000005`。此前成功进入建角界面的客户端正常退出 0；修正后建角、进图、结算和存档重读尚未复测通过。临时网络诊断 DLL 已从私有客户端移除；原客户端及原版 ELF 哈希未变。
 
-审阅程序为 `build/review/DNF-Native.exe`，ZIP 为 `build/review/native-local-resources.zip`（190330912 字节）。源码、构建、回归、认证标记和截图哈希见[阶段证据](evidence/p10-client-auth-and-database.json)。验证仅限本机 Windows 10；完整备份回滚和原生日志专项沿用先前版本结果，未重复计为本轮通过。
+本阶段审阅程序位于 `build/review/DNF-Native.exe`，当时 ZIP 为 190330912 字节；该目录现已由[后续 GUI 阶段](12-gui-reference.md)更新。此阶段源码、构建、回归、认证标记和截图哈希见[阶段证据](evidence/p10-client-auth-and-database.json)。验证仅限本机 Windows 10；本阶段完整备份回滚和原生日志专项沿用先前版本结果，未重复计为本轮通过。
