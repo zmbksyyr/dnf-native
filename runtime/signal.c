@@ -80,7 +80,7 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
 int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread = nr_current();
     if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) run->signal_pending |= 1ULL << 14;
-    if (thread->in_signal || thread->tls_resume) return 1;
+    if (thread->in_signal) return 1;
     uint64_t ready = run->signal_pending & ~thread->signal_mask;
     for (unsigned signal = 1; signal <= 64; ++signal) {
         uint64_t bit = 1ULL << (signal - 1);

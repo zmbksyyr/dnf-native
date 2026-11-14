@@ -373,8 +373,6 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
         if (!nr_deliver_signal(active, c)) ExitProcess(124);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
-    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION && nr_tls_finish(active, c))
-        return EXCEPTION_CONTINUE_EXECUTION;
     const NrTrap *record = NULL;
     if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
         record = nr_syscall_site(&active->program, pc);

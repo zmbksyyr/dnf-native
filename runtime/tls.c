@@ -51,7 +51,7 @@ static int code_buffer(NrThread *thread, uintptr_t address) {
         MEMORY_BASIC_INFORMATION info;
         if (!VirtualQuery((void *)cursor, &info, sizeof(info))) break;
         if (info.State == MEM_FREE) {
-            thread->tls_code = VirtualAlloc((void *)cursor, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+            thread->tls_code = VirtualAlloc((void *)cursor, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
             if (thread->tls_code) return 1;
         }
         uintptr_t next = ((uintptr_t)info.BaseAddress + info.RegionSize + 65535) & ~(uintptr_t)65535;
@@ -61,25 +61,16 @@ static int code_buffer(NrThread *thread, uintptr_t address) {
     return 0;
 #else
     (void)address;
-    if (!thread->tls_code) thread->tls_code = VirtualAlloc(NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (!thread->tls_code) thread->tls_code = VirtualAlloc(NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     return thread->tls_code != NULL;
 #endif
-}
-
-int nr_tls_finish(NrRun *run, CONTEXT *c) {
-    (void)run;
-    NrThread *thread = nr_current();
-    if (!thread->tls_resume || PC(c) != thread->tls_end) return 0;
-    PC(c) = thread->tls_resume;
-    thread->tls_resume = 0;
-    return 1;
 }
 
 int nr_tls(NrRun *run, CONTEXT *c, const NrTrap *trap) {
     (void)run;
     NrThread *thread = nr_current();
     uintptr_t pc = PC(c);
-    if (!thread->tls_base || thread->tls_resume || !nr_memory(pc, 15, 0)) return 0;
+    if (!thread->tls_base || !nr_memory(pc, 15, 0)) return 0;
     unsigned char bytes[15];
     memcpy(bytes, (const void *)pc, sizeof(bytes));
     if (trap) memcpy(bytes, trap->original, 2);
@@ -147,29 +138,34 @@ int nr_tls(NrRun *run, CONTEXT *c, const NrTrap *trap) {
     unsigned char code[64];
     ZyanUSize length = 15;
     if (!ZYAN_SUCCESS(ZydisEncoderEncodeInstructionAbsolute(&request, code + prefix, &length, (uintptr_t)thread->tls_code + prefix))) return 0;
+    size_t count = prefix + length;
     if (call) {
 #ifdef _WIN64
         code[0] = 0xff; code[1] = 0x35;
         uint32_t displacement = (uint32_t)length;
         memcpy(code + 2, &displacement, 4);
         memcpy(code + prefix + length, &next, sizeof(next));
-        length += sizeof(next);
+        count += sizeof(next);
 #else
         code[0] = 0x68; memcpy(code + 1, &next, 4);
 #endif
     } else if (!jump) {
-        code[length] = 0x0f; code[length + 1] = 0x0b;
+        /* Return natively without changing registers, flags or guest stack. */
+#ifdef _WIN64
+        memcpy(code + count, "\xff\x25\0\0\0\0", 6);
+        memcpy(code + count + 6, &next, sizeof(next));
+        count += 6 + sizeof(next);
+#else
+        code[count] = 0xe9;
+        uint32_t displacement = (uint32_t)(next - ((uintptr_t)thread->tls_code + count + 5));
+        memcpy(code + count + 1, &displacement, 4);
+        count += 5;
+#endif
     }
-    DWORD old;
-    if (!VirtualProtect(thread->tls_code, 4096, PAGE_READWRITE, &old)) return 0;
-    size_t count = prefix + length + (call || jump ? 0 : 2);
+    /* This buffer belongs to the executing guest thread; it is never shared
+       with another thread or exposed as a guest mapping. */
     memcpy(thread->tls_code, code, count);
-    if (!VirtualProtect(thread->tls_code, 4096, PAGE_EXECUTE_READ, &old) ||
-        !FlushInstructionCache(GetCurrentProcess(), thread->tls_code, count)) return 0;
-    if (!call && !jump) {
-        thread->tls_resume = next;
-        thread->tls_end = (uintptr_t)thread->tls_code + length;
-    }
+    if (!FlushInstructionCache(GetCurrentProcess(), thread->tls_code, count)) return 0;
     PC(c) = (uintptr_t)thread->tls_code;
     return 1;
 }

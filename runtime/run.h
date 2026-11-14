@@ -12,7 +12,7 @@ typedef struct {
 } NrWatch;
 
 typedef struct {
-    uintptr_t tls_base, tls_resume, tls_end;
+    uintptr_t tls_base;
     unsigned char *tls_code;
     uint64_t signal_mask, saved_mask;
     CONTEXT saved_context, initial_context;
@@ -78,7 +78,6 @@ int nr_path(NrRun *run, const char *guest, wchar_t *path);
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
-int nr_tls_finish(NrRun *run, CONTEXT *context);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_deliver_signal(NrRun *run, CONTEXT *context);
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
