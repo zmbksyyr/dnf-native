@@ -18,14 +18,75 @@ int nr_thread_init(NrRun *run) {
     return thread_key != TLS_OUT_OF_INDEXES;
 }
 
-static intptr_t wake(uintptr_t address, uintptr_t count) {
+/* Caller holds wait_lock while changing either a futex word or its queue. */
+static intptr_t wake_locked(uintptr_t address, uintptr_t count) {
     intptr_t woken = 0;
-    EnterCriticalSection(&wait_lock);
     for (Waiter *w = waiters; w && count; w = w->next) {
         if (w->address != address) continue;
         if (WaitForSingleObject(w->event, 0) == WAIT_OBJECT_0) continue;
         SetEvent(w->event); --count; ++woken;
     }
+    return woken;
+}
+
+static intptr_t wake(uintptr_t address, uintptr_t count) {
+    EnterCriticalSection(&wait_lock);
+    intptr_t woken = wake_locked(address, count);
+    LeaveCriticalSection(&wait_lock);
+    return woken;
+}
+
+static intptr_t requeue(const uintptr_t args[6]) {
+    if ((args[4] & 3) || (int32_t)args[2] < 0 || (int32_t)args[3] < 0) return -22;
+    if (!nr_memory(args[4], 4, 0)) return -14;
+    EnterCriticalSection(&wait_lock);
+    if (__atomic_load_n((const uint32_t *)args[0], __ATOMIC_SEQ_CST) != (uint32_t)args[5]) {
+        LeaveCriticalSection(&wait_lock);
+        return -11;
+    }
+    intptr_t affected = wake_locked(args[0], args[2]);
+    uintptr_t count = args[3];
+    for (Waiter *w = waiters; w && count; w = w->next) {
+        if (w->address != args[0] || WaitForSingleObject(w->event, 0) == WAIT_OBJECT_0) continue;
+        w->address = args[4];
+        --count; ++affected;
+    }
+    LeaveCriticalSection(&wait_lock);
+    return affected;
+}
+
+static intptr_t wake_op(const uintptr_t args[6]) {
+    if ((args[4] & 3) || (int32_t)args[2] < 0 || (int32_t)args[3] < 0) return -22;
+    if (!nr_memory(args[4], 4, 1)) return -14;
+    uint32_t encoded = (uint32_t)args[5], operation = encoded >> 28, comparison = (encoded >> 24) & 15;
+    int32_t operand = (int32_t)(encoded << 8) >> 20, compare = (int32_t)(encoded << 20) >> 20;
+    if (operation & 8) {
+        if (operand < 0 || operand > 31) return -38;
+        operand = (int32_t)(1u << operand);
+        operation &= 7;
+    }
+    if (operation > 4 || comparison > 5) return -38;
+    EnterCriticalSection(&wait_lock);
+    volatile LONG *word = (volatile LONG *)args[4];
+    uint32_t old = (uint32_t)InterlockedCompareExchange(word, 0, 0), value;
+    for (;;) {
+        switch (operation) {
+            case 0: value = (uint32_t)operand; break;
+            case 1: value = old + (uint32_t)operand; break;
+            case 2: value = old | (uint32_t)operand; break;
+            case 3: value = old & ~(uint32_t)operand; break;
+            default: value = old ^ (uint32_t)operand; break;
+        }
+        uint32_t actual = (uint32_t)InterlockedCompareExchange(word, (LONG)value, (LONG)old);
+        if (actual == old) break;
+        old = actual;
+    }
+    int32_t previous = (int32_t)old;
+    int matched = comparison == 0 ? previous == compare : comparison == 1 ? previous != compare :
+                  comparison == 2 ? previous < compare : comparison == 3 ? previous <= compare :
+                  comparison == 4 ? previous > compare : previous >= compare;
+    intptr_t woken = wake_locked(args[0], args[2]);
+    if (matched) woken += wake_locked(args[4], args[3]);
     LeaveCriticalSection(&wait_lock);
     return woken;
 }
@@ -66,6 +127,8 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
         if (args[0] & 3) { *result = -22; return 1; }
         if (!nr_memory(args[0], 4, 0)) { *result = -14; return 1; }
         if (operation == 1) { *result = wake(args[0], args[2]); return 1; }
+        if (operation == 4) { *result = requeue(args); return 1; }
+        if (operation == 5) { *result = wake_op(args); return 1; }
         if (operation != 0 || (args[1] & ~129u)) { *result = -38; return 1; }
         DWORD timeout = INFINITE;
         if (args[3]) {

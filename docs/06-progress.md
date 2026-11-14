@@ -259,3 +259,11 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 `tools/test_relay.py` 从原版 TCPHandlerRelay::dispatch、relayToTCP、UDPHandlerS2S::dispatch 独立确定协议：TCP 报头为两个 16 位值和两个 32 位账号字段，登记 ID 0、转发 ID 1，原版将转发 ID 改为 3 并保留后续字节。自编的两个测试连接先通过各自的回送确认登记，再逐字节核对 32 次双向二进制转发，以及拆包和连包；随后向 UDP 8200 发送原版 ID 2500、结果 0 的 S2S 报文，指定连接确实关闭，另一个连接仍能回送。
 
 本次使用原版 PVP 模式，TCP 7200 和 S2S UDP 8200；没有把未暴露的 UDP 数据转发路径算作通过。独立副本仅将 max_client 改为 16，原版 ELF 和 runtime 均未修改。结束时请求 runtime SIGTERM，原版返回 0，无强制回收或 gap。尚未验证原版 monitor 对接、PVP 客户端业务、满额负载、全部 worker 清理或 Win7/Win11。证据见 [relay 转发协议](evidence/p2-relay-protocol.json)。
+
+## 2026-11-14 · futex 比较迁移与条件原子唤醒
+
+Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE 的 CMP_REQUEUE/WAKE_OP 未实现。runtime 现在在原有等待队列锁内比较并迁移等待者，返回实际唤醒与迁移数量；WAKE_OP 对第二个字执行 CAS 原子更新，并根据更新前的有符号值决定第二队列唤醒。实现依据 Linux man-pages 的操作编码、返回值和同步语义独立编写，没有增加依赖。
+
+自编双架构 ELF 使用真实 clone 线程，核对比较失败不改变队列、先唤醒再迁移、条件成立/不成立、五种原子运算、移位、有符号参数及 clear_tid 退出。i386、x64 均正常返回 42；同一正式构建的 TLS、入口/信号、原版 channel 握手和 relay 转发回归通过。仅覆盖本进程地址队列；跨进程 futex、PI 和 robust owner-death 等不在本次实现范围。
+
+这两项补齐没有解决 Frida 退出异常。独立诊断构建显示主线程先 munmap Frida 的 0x17ca570 字节映射，另一个线程随后在模块偏移 0x89e3c 发生执行访问异常；代码页已解除提交，栈仍已提交且可读。补齐 futex 后相同短失败路径仍返回 125。因此只将新操作计作原语通过，模块卸载和线程生命周期仍须定位，没有禁止 munmap 或虚假保留映射。证据见 [futex 队列与退出边界](evidence/p2-futex-queues.json)。
