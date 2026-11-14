@@ -1,5 +1,5 @@
 {
-  "recorded_utc": "2026-11-14T05:00:00Z",
+  "recorded_utc": "2026-11-14T05:02:47.874575+00:00",
   "scope": "Runtime select socket readiness and concurrent close policy; original DBMW regression",
   "finding": {
     "trigger": "A DBMW worker closes a listening socket while another thread is in select. Winsock wakes select with a stale ready count; the original guest then reads its already -1 socket descriptor and crashes at 0x08058634.",
@@ -9,19 +9,31 @@
   "implementation": {
     "source": "runtime/net.c",
     "test_source": "tests/select_close.c",
-    "test": "tools/test_select_close.py --hosts build/staged",
-    "staged_hosts": {
-      "i686_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
-      "x86_64_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d"
-    }
+    "test": "python tools/test_select_close.py"
   },
   "results": {
-    "i686": {"exit_code": 42, "attempts": 5, "passed": true},
-    "x86_64": {"exit_code": 42, "attempts": 5, "passed": true},
+    "i686": {
+      "exit_code": 42,
+      "attempts": 5,
+      "passed": true
+    },
+    "x86_64": {
+      "exit_code": 42,
+      "attempts": 5,
+      "passed": true
+    },
     "original_dbmw": {
       "probe": "build/probes/20261114T050055134280Z/dbmw",
-      "instances": ["dbmw_guild", "dbmw_mnt", "dbmw_stat"],
-      "exit_codes": [1, 1, 1],
+      "instances": [
+        "dbmw_guild",
+        "dbmw_mnt",
+        "dbmw_stat"
+      ],
+      "exit_codes": [
+        1,
+        1,
+        1
+      ],
       "normal_cleanup_markers": true,
       "forced_cleanup": false,
       "mysql_exit_code": 0,
@@ -31,5 +43,419 @@
   "limits": [
     "Cross-thread close/select is unspecified by Linux; EBADF is this runtime's explicit policy for the observed Windows stale-wakeup case.",
     "No complete 16-service or client business acceptance."
-  ]
+  ],
+  "before": {
+    "recorded_utc": "2026-11-14T04:55:25.201382+00:00",
+    "os": "Windows-10-10.0.19044-SP0",
+    "results": [
+      {
+        "arch": "i686",
+        "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+        "fixture_sha256": "8d758411b3011bc52a1603da9293bf700a25c8fc73f0567fd17e312c5d68f1f8",
+        "exit_code": 74,
+        "reports": [
+          {
+            "attempt": 0,
+            "select_result": 1,
+            "errno": 9,
+            "empty_read_set": 1
+          }
+        ],
+        "stderr": "adapt sha256=12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd sections=3 syscall_traps=0 tls_traps=40\r\nadapt sha256=8d758411b3011bc52a1603da9293bf700a25c8fc73f0567fd17e312c5d68f1f8 sections=2 syscall_traps=0 tls_traps=0\r\nenter guest bits=32 entry=0xea1150 stack=0x5f9fbe0 argc=1\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\etc\\ld.so.cache flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\tls\\i686\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\tls\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\i686\\libpthread.so.0 flags=0x80000 errno=-2\r\nadapt sha256=9e376548346a708a4c112779b8bf3ace9a46317cc22e2cc028ab4d0a45be84f2 sections=6 syscall_traps=0 tls_traps=588\r\nELF dependency private snapshot sha256=9e376548346a708a4c112779b8bf3ace9a46317cc22e2cc028ab4d0a45be84f2 base=0x3e0000 bytes=131072\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\i686\\libc.so.6 flags=0x80000 errno=-2\r\nadapt sha256=16d8c89d7a761f5c567955f50e699cdafffa53978cbb0b9d2bcb9b2a002de5ad sections=5 syscall_traps=0 tls_traps=3810\r\nELF dependency private snapshot sha256=16d8c89d7a761f5c567955f50e699cdafffa53978cbb0b9d2bcb9b2a002de5ad base=0x61b0000 bytes=1900544\r\nguest exit status=74\r\n",
+        "passed": false
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "8510b9ea213d14aaeef3480d41f8f15f24705360c16091acd9cf2952ed1ee42d",
+        "fixture_sha256": "84dbc97259247bf0f119ef874ed8d14c9be89769b401f9d90781ac094d066ac3",
+        "exit_code": 74,
+        "reports": [
+          {
+            "attempt": 0,
+            "select_result": 1,
+            "errno": 9,
+            "empty_read_set": 1
+          }
+        ],
+        "stderr": "adapt sha256=09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d sections=2 syscall_traps=37 tls_traps=39\r\nadapt sha256=84dbc97259247bf0f119ef874ed8d14c9be89769b401f9d90781ac094d066ac3 sections=2 syscall_traps=0 tls_traps=0\r\nenter guest bits=64 entry=0x155dae71140 stack=0x929dffa30 argc=1\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\etc\\ld.so.cache flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\tls\\x86_64\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\tls\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\x86_64\\libpthread.so.0 flags=0x80000 errno=-2\r\nadapt sha256=b3bf84a9c150a558b0fe4512ed20e18a346b6485ee0c5e770e55811678505abb sections=5 syscall_traps=166 tls_traps=395\r\nELF dependency private snapshot sha256=b3bf84a9c150a558b0fe4512ed20e18a346b6485ee0c5e770e55811678505abb base=0x155df0a0000 bytes=2228224\r\nadapt sha256=74d15f40fdb93f1d7e014d2da1d32d459e81ad28700d4de9db54bea83c27149a sections=4 syscall_traps=433 tls_traps=2371\r\nELF dependency private snapshot sha256=74d15f40fdb93f1d7e014d2da1d32d459e81ad28700d4de9db54bea83c27149a base=0x155df4e0000 bytes=3997696\r\nguest exit status=74\r\n",
+        "passed": false
+      }
+    ],
+    "note": "errno after a successful select is unspecified. Both old hosts returned 1 with an empty read set; that is the failure criterion."
+  },
+  "after": {
+    "recorded_utc": "2026-11-14T05:00:40.000321+00:00",
+    "os": "Windows-10-10.0.19044-SP0",
+    "scope": "Own ELF using upstream glibc/pthread: ready masks/counts and concurrent socket close. Cross-thread close/select is unspecified on Linux; this runtime returns EBADF. No original-service acceptance.",
+    "results": [
+      {
+        "arch": "i686",
+        "host_sha256": "d7dbe81dd6e335177c10430a4d41d3a8d2c8a786fe31ac8ad0ec7a16c9fa03b1",
+        "fixture_sha256": "431fa777a84214cb846c9a9c8ab11d4f947f649d2fc52e73782b79552d0e19f7",
+        "exit_code": 42,
+        "reports": [
+          {
+            "attempt": 0,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 1,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 2,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 3,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 4,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          }
+        ],
+        "stderr": "adapt sha256=12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd sections=3 syscall_traps=0 tls_traps=40\r\nadapt sha256=431fa777a84214cb846c9a9c8ab11d4f947f649d2fc52e73782b79552d0e19f7 sections=2 syscall_traps=0 tls_traps=0\r\nenter guest bits=32 entry=0xd31150 stack=0x636fb80 argc=1\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\etc\\ld.so.cache flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\tls\\i686\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\tls\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\i686\\libpthread.so.0 flags=0x80000 errno=-2\r\nadapt sha256=9e376548346a708a4c112779b8bf3ace9a46317cc22e2cc028ab4d0a45be84f2 sections=6 syscall_traps=0 tls_traps=588\r\nELF dependency private snapshot sha256=9e376548346a708a4c112779b8bf3ace9a46317cc22e2cc028ab4d0a45be84f2 base=0xd60000 bytes=131072\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\i686\\lib\\i686\\libc.so.6 flags=0x80000 errno=-2\r\nadapt sha256=16d8c89d7a761f5c567955f50e699cdafffa53978cbb0b9d2bcb9b2a002de5ad sections=5 syscall_traps=0 tls_traps=3810\r\nELF dependency private snapshot sha256=16d8c89d7a761f5c567955f50e699cdafffa53978cbb0b9d2bcb9b2a002de5ad base=0x6580000 bytes=1900544\r\nguest exit status=42\r\n",
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "fd93e3baa52779918f9f0103733272ce2f641ad9e28a668f63415f73d9d5b7a9",
+        "fixture_sha256": "4cb34636cd716c687347c5849790d7379cad13eb05128ff2c6b078a5b577615a",
+        "exit_code": 42,
+        "reports": [
+          {
+            "attempt": 0,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 1,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 2,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 3,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          },
+          {
+            "attempt": 4,
+            "select_result": -1,
+            "errno": 9,
+            "empty_read_set": 0
+          }
+        ],
+        "stderr": "adapt sha256=09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d sections=2 syscall_traps=37 tls_traps=39\r\nadapt sha256=4cb34636cd716c687347c5849790d7379cad13eb05128ff2c6b078a5b577615a sections=2 syscall_traps=0 tls_traps=0\r\nenter guest bits=64 entry=0x182c98f1140 stack=0x58684ff7d0 argc=1\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\etc\\ld.so.cache flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\tls\\x86_64\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\tls\\libpthread.so.0 flags=0x80000 errno=-2\r\nopen failed path=D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\select-close\\x86_64\\lib64\\x86_64\\libpthread.so.0 flags=0x80000 errno=-2\r\nadapt sha256=b3bf84a9c150a558b0fe4512ed20e18a346b6485ee0c5e770e55811678505abb sections=5 syscall_traps=166 tls_traps=395\r\nELF dependency private snapshot sha256=b3bf84a9c150a558b0fe4512ed20e18a346b6485ee0c5e770e55811678505abb base=0x182cdb20000 bytes=2228224\r\nadapt sha256=74d15f40fdb93f1d7e014d2da1d32d459e81ad28700d4de9db54bea83c27149a sections=4 syscall_traps=433 tls_traps=2371\r\nELF dependency private snapshot sha256=74d15f40fdb93f1d7e014d2da1d32d459e81ad28700d4de9db54bea83c27149a base=0x182cdf60000 bytes=3997696\r\nguest exit status=42\r\n",
+        "passed": true
+      }
+    ]
+  },
+  "original_before": {
+    "probe": "build\\probes\\20261114T044354495575Z\\dbmw",
+    "recorded_utc": "20261114T044354495575Z",
+    "scope": "Original DBMW initialization observation only, no protocol or database business acceptance. Independent private MySQL 3307.",
+    "source_unchanged": true,
+    "mysql_exit_code": 0,
+    "results": [
+      {
+        "name": "dbmw_guild",
+        "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "3a277232b6b583b9a1d2561c228c832b5283e99abb2ecfdaf4877b856c7f4eee",
+        "exit_code": 125,
+        "gaps": [
+          "unhandled exception code=0xc0000005 pc=0x8058634"
+        ],
+        "markers": [],
+        "logs": {
+          "stderr.log": "d37e76653cd658578c0c1822c3b56e11b91b39fe654dac15739fb624d0aaafc6",
+          "stdout.private.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "dbmw_mnt",
+        "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "9ea5417d4333c6a467d9d98032fc1f28052e5930836db8768f3bd87342be9d9f",
+        "exit_code": 125,
+        "gaps": [
+          "unhandled exception code=0xc0000005 pc=0x8058634"
+        ],
+        "markers": [],
+        "logs": {
+          "stderr.log": "f3dffc07f098c0d2af2307abdb42dfdecf703869ed311642a65258899d2828ef",
+          "stdout.private.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "dbmw_stat",
+        "host_sha256": "f699434b6cdcde2fdcb357db3b50abf3415f06070daa678b1d93a972c296df99",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "941d5fd3c626249eb0b0fcbac9b17af45b2e38584538a2d4a6f4c2ae80a16cd0",
+        "exit_code": 1,
+        "gaps": [],
+        "markers": [
+          "Application Init() Success!",
+          "Application App Config Load_Table() Success!",
+          "Application Server Config Load_Table() Success!",
+          "Application Init Frame Count() Success!",
+          "Application UDP Handler Create() Success!",
+          "Application Server Handler Create() Success!",
+          "Application Packet Translater Attach() Success!",
+          "Application Packet Decoder Attach() Success!",
+          "Application DB Manager Init() Success!",
+          "E_MASTER_DB Open Success!",
+          "E_ACCOUNT_DB Open Success!",
+          "E_GAME_DB Open Success!",
+          "E_GAME_DB_2ND Open Success!",
+          "E_LOG_DB Open Success!",
+          "E_WEB_DB Open Success!",
+          "E_SSO_DB Open Success!",
+          "E_GUILD_DB Open Success!",
+          "E_EVENT_DB Open Success!",
+          "E_SE_EVENT_DB Open Success!",
+          "E_FRAME_LAG_INDEX_DB Open Success!",
+          "DBMW_ALL_DB Open Success",
+          "Application Network Thread Begin() Success!",
+          "Application Load() Success!",
+          "Recv SIGTERM signal",
+          "Thread Free Success!",
+          "Game Server Handler Free Success!",
+          "UDP Handler Free Success!",
+          "Signal Translater Free Success!",
+          "Application Config Free Success!",
+          "Application Server Config Free Success!",
+          "Application Initor Free Success!",
+          "Guild Manager Free Success!",
+          "Application End!"
+        ],
+        "logs": {
+          "stderr.log": "cb9a79db0b6594099f9ef6e0841f839452b0f67d6f1bc428181734561efbb994",
+          "stdout.private.log": "da861b29f727bd0c864d6ecf0aa764184f3496460ece9dbf77aeb62efeca5567"
+        }
+      }
+    ]
+  },
+  "original_after": {
+    "recorded_utc": "20261114T050055134280Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T050055134280Z\\dbmw",
+    "scope": "Three original DBMW instances: database/thread initialization and SIGTERM cleanup only. No protocol or database business acceptance.",
+    "database_source": {
+      "files": 1506,
+      "bytes": 266034085,
+      "tree_sha256": "3a45764cc9799cc6f0060b2060e03fd3d958d5f26d3999ee1e45fd40dd353506"
+    },
+    "results": [
+      {
+        "name": "dbmw_guild",
+        "host_sha256": "d7dbe81dd6e335177c10430a4d41d3a8d2c8a786fe31ac8ad0ec7a16c9fa03b1",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "3a277232b6b583b9a1d2561c228c832b5283e99abb2ecfdaf4877b856c7f4eee",
+        "forced_cleanup": false,
+        "exit_code": 1,
+        "gaps": [],
+        "markers": [
+          "DBMW_ALL_DB Open Success",
+          "Application Network Thread Begin() Success!",
+          "Application Load() Success!",
+          "Recv SIGTERM signal",
+          "Thread Free Success!",
+          "Application End!"
+        ],
+        "logs": {
+          "stderr.log": "510626ff6eda52a727a8fd42e17cd78ebd798d7171353a613f81083862b61613",
+          "stdout.private.log": "d9bb3d48fe7d716b6f2c82afbf59b44461500c965cae9e13c68cd70d28fc4f88"
+        },
+        "passed": true
+      },
+      {
+        "name": "dbmw_mnt",
+        "host_sha256": "d7dbe81dd6e335177c10430a4d41d3a8d2c8a786fe31ac8ad0ec7a16c9fa03b1",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "9ea5417d4333c6a467d9d98032fc1f28052e5930836db8768f3bd87342be9d9f",
+        "forced_cleanup": false,
+        "exit_code": 1,
+        "gaps": [],
+        "markers": [
+          "DBMW_ALL_DB Open Success",
+          "Application Network Thread Begin() Success!",
+          "Application Load() Success!",
+          "Recv SIGTERM signal",
+          "Thread Free Success!",
+          "Application End!"
+        ],
+        "logs": {
+          "stderr.log": "5ad781469654ae2c747a4ef81d9649d45b803dfcab94786890dd5fdebc032237",
+          "stdout.private.log": "5778985a801925f98d6c7f38941ee713a694e14237efdbb9f8011e26d6f9eac0"
+        },
+        "passed": true
+      },
+      {
+        "name": "dbmw_stat",
+        "host_sha256": "d7dbe81dd6e335177c10430a4d41d3a8d2c8a786fe31ac8ad0ec7a16c9fa03b1",
+        "elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+        "config_sha256": "941d5fd3c626249eb0b0fcbac9b17af45b2e38584538a2d4a6f4c2ae80a16cd0",
+        "forced_cleanup": false,
+        "exit_code": 1,
+        "gaps": [],
+        "markers": [
+          "DBMW_ALL_DB Open Success",
+          "Application Network Thread Begin() Success!",
+          "Application Load() Success!",
+          "Recv SIGTERM signal",
+          "Thread Free Success!",
+          "Application End!"
+        ],
+        "logs": {
+          "stderr.log": "58426666bd5b32d976acf974c6f1ae5428e4c2481812dafda3c86e163e56dd6a",
+          "stdout.private.log": "c09f62636a7891f9c77b976ff30771bb6addb5634f660d923ba1d4ee716aa3d7"
+        },
+        "passed": true
+      }
+    ],
+    "mysql_forced_cleanup": false,
+    "mysql_shutdown_exit_code": 0,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "regressions": {
+    "net": [
+      {
+        "arch": "i686",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "linger_on": false,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "linger_on": true,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "linger_on": false,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "linger_on": true,
+        "passed": true
+      }
+    ],
+    "poll": [
+      {
+        "arch": "i686",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "passed": true
+      }
+    ],
+    "epoll": [
+      {
+        "arch": "i686",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "passed": true
+      }
+    ],
+    "shared-entry": [
+      {
+        "arch": "i686",
+        "case": "dlopen-zero",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "case": "dlopen-invalid",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "case": "zero-process-entry",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 1,
+        "passed": true
+      },
+      {
+        "arch": "i686",
+        "case": "zero-interpreter-entry",
+        "host_sha256": "dbcf94c719d19ac44bda29689bd2b3002e6651dbc598c6be3d030a081e586f48",
+        "exit_code": 1,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "dlopen-zero",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "dlopen-invalid",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 42,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "zero-process-entry",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 1,
+        "passed": true
+      },
+      {
+        "arch": "x86_64",
+        "case": "zero-interpreter-entry",
+        "host_sha256": "b1a30d5b82f22b3e487dd345624e19d3811917240040729790cb2d471b6d195e",
+        "exit_code": 1,
+        "passed": true
+      }
+    ]
+  },
+  "regressions_note": "TCP/poll/epoll and DSO regressions preceded the final clearing of unused mask bits beyond nfds. The final select fixture and original three DBMW runs use the final build; hashes identify each."
 }
