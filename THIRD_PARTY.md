@@ -16,3 +16,5 @@ NTFS inode 处理依据 Microsoft 的 [MFT_SEGMENT_REFERENCE 格式](https://lea
 MySQL 单文件首版的本地运行库来自 Microsoft 官方 VC++ 2019 14.29.30157.0 x64 分发包和 Microsoft.Windows.SDK.CPP 10.0.19041.5 NuGet 包。`tools/import_mysql_runtime.py` 固定来源与 SHA-256，只解包，不执行安装器；导入三个 VC++ DLL 与 SDK x64 UCRT 的全部 42 个 DLL，均校验 Microsoft Authenticode。来源、逐文件哈希与签名见 [Microsoft 运行库记录](docs/evidence/p4-mysql-runtime-import.json)。保留 VC runtime 的原始 license.rtf 和 UCRT 来源/许可链接。SDK 的本地部署规则见 [Universal CRT deployment](https://learn.microsoft.com/en-us/cpp/windows/universal-crt-deployment)。
 
 解包工具来自 [7-Zip 官方 26.06 发布](https://github.com/ip7z/7zip/releases/tag/26.06)，只用于开发导入，未嵌入 `mysql-standalone.exe`。自研引导程序使用系统 Cabinet FDI、CNG 和 Win32 进程接口；原始 MySQL、Microsoft 和 7-Zip 二进制及构建产物均留在 Git 忽略目录。当前没有发布最终离线包。
+
+原版数据库配置口令与 relay/monitor 联动曾只读查阅参考工程的接口恢复文件以定位问题；对应格式、函数地址和实际行为由原版 ELF 反汇编及本项目原生实验核实。口令编码和协议诊断在本项目独立编写，未移入参考代码、字节表或生成器。固定口令材料从哈希锁定的原版输入读取，未写入源码或 Git；具体来源、地址和验证范围见 [MySQL 与原版服务链](docs/evidence/p4-mysql-core-integration.json)。

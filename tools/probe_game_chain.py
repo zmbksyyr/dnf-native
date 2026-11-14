@@ -1,8 +1,10 @@
 """Observe original game/DP2 startup with bridge and a copied private MySQL database."""
 
 import argparse
+import ctypes
 import datetime
 import json
+import os
 import platform
 from pathlib import Path
 import re
@@ -11,6 +13,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 
 from probe_mysql import tree_identity
@@ -20,7 +23,21 @@ from test_channel import request_stop
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def start_core(instance, db, services):
+def udp_owner(port):
+    api = ctypes.WinDLL("iphlpapi").GetExtendedUdpTable
+    size = ctypes.c_ulong()
+    api(None, ctypes.byref(size), False, 2, 1, 0)
+    buffer = ctypes.create_string_buffer(size.value)
+    if api(buffer, ctypes.byref(size), False, 2, 1, 0):
+        return None
+    words = memoryview(buffer).cast("B").cast("I")
+    for index in range(words[0]):
+        if socket.ntohs(words[2 + index * 3] & 0xffff) == port:
+            return words[3 + index * 3]
+    return None
+
+
+def start_core(instance, db, services, relay_s2s_port=8200):
     from probe_monitor import private_elf, UDP_STOP_PATCHES, STATISTICS_PATCHES
     monitor_patches = UDP_STOP_PATCHES + STATISTICS_PATCHES
     entries = [("manager", "manager", "nofork"), ("dbmw_guild", "dbmw_gld_siroco", "nofork"),
@@ -46,6 +63,8 @@ def start_core(instance, db, services):
                 text = re.sub(r"(?m)^this_ip\s*=.*$", "this_ip = 127.0.0.1", text)
             if name in ["channel", "relay"]:
                 text = re.sub(r"(?m)^max_client\s*=.*$", "max_client = 16", text)
+            if name == "relay":
+                text = re.sub(r"(?m)^udp_port_to_monitor\s*=.*$", "udp_port_to_monitor = " + str(relay_s2s_port), text)
             fields = []
             if name.startswith("dbmw") and config.stem == config_name:
                 fields = [("master_db_" + key, value) for key, value in
@@ -122,6 +141,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database-source", type=Path, required=True,
                         help="Stopped private restored instance containing data/ and game-db.json")
+    parser.add_argument("--mysql-standalone", type=Path,
+                        default=ROOT / "build/mysql-standalone/mysql-standalone.exe",
+                        help="Independent single EXE used for every official MySQL tool invocation")
     parser.add_argument("--timeout", type=float, default=2100)
     parser.add_argument("--dp2-cleanup", action="store_true",
                         help="Use early luv cleanup and Gadget full teardown in the private game copy")
@@ -133,6 +155,8 @@ def main():
                         help="Observe the other 14 core services alongside bridge/game; requires log review, not business acceptance")
     parser.add_argument("--peers-only-seconds", type=float,
                         help="Observe bridge and the other 14 core services for a short diagnosis, without game")
+    parser.add_argument("--trace-relay-monitor", action="store_true",
+                        help="Diagnostic only: forward actual monitor replies from 8200 to private relay 18200 and record headers")
     args = parser.parse_args()
     if args.peers_only_seconds is not None:
         if args.peers_only_seconds <= 0 or args.script_db or args.stop_after_started is not None:
@@ -142,7 +166,10 @@ def main():
         parser.error("--script-db exits before natural game startup")
     if args.core and args.script_db:
         parser.error("--core requires natural game startup")
+    if args.trace_relay_monitor and not args.core:
+        parser.error("--trace-relay-monitor requires core peers")
     source = args.database_source.resolve()
+    mysql_exe = args.mysql_standalone.resolve(strict=True)
     # Both ports are fixed by the current original bridge/game configuration.
     for port in [3306, 7000]:
         with socket.socket() as check:
@@ -166,13 +193,22 @@ def main():
         "[server]\nmax_client = 6500\nthis_ip = 127.0.0.1\nthis_udp_port = 7000\nthis_tcp_port = 7000\n"
         "[DB]\ndb_ip = 127.0.0.1\ndb_name = d_channel\ndb_id = dnf_bridge\ndb_pwd = " + password + "\n",
         encoding="ascii")
-    mysqlbin = ROOT / ".local/mysql-5.7.44/bin"
+    mysql_env = dict(os.environ)
+    mysql_env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
+    for name in ["MYSQL_HOME", "MYSQL_PWD", "MYSQL_TCP_PORT"]:
+        mysql_env.pop(name, None)
     pipe = "DNFGameChain" + stamp
     options = ["--no-defaults", "--protocol=PIPE", "--socket=" + pipe, "--user=root"]
+    if (source / "client.private.cnf").is_file():
+        shutil.copy2(source / "client.private.cnf", dbroot / "client.private.cnf")
+        options = ["--defaults-file=client.private.cnf", "--protocol=PIPE", "--socket=" + pipe, "--ssl-mode=DISABLED"]
+
+    def mysql_command(tool):
+        return [str(mysql_exe), tool, str(dbroot)]
 
     def sql(query):
-        result = subprocess.run([str(mysqlbin / "mysql.exe"), *options, "--batch", "--skip-column-names"],
-                                input=query.encode("ascii"), capture_output=True, timeout=10)
+        result = subprocess.run(mysql_command("mysql") + options + ["--batch", "--skip-column-names"],
+                                input=query.encode("ascii"), capture_output=True, env=mysql_env, timeout=10)
         if result.returncode:
             (dbroot / "query-error.private.log").write_bytes(result.stderr)
             raise RuntimeError("Private MySQL query failed; see the private log")
@@ -183,28 +219,47 @@ def main():
 
     host, ld, elf = ROOT / "build/i686/dnf-host.exe", guestroot / "lib/ld-2.17.so", guest / "df_bridge_r"
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "database_source": before,
+               "probe_script_sha256": sha(Path(__file__)),
                "host_sha256": sha(host), "bridge_sha256": sha(elf),
+               "mysql_bootstrap_sha256": sha(mysql_exe),
+               "mysql_private_credentials": (source / "client.private.cnf").is_file(),
                "scope": "Original JS database interface only" if args.script_db else "Original game startup observation; no business acceptance"}
     if args.peers_only_seconds is not None:
         receipt["scope"] = "Fifteen original core peers without game; initialization and database diagnosis only"
     database = bridge = None
+    relay_proxy = proxy_thread = None
+    proxy_stop = threading.Event()
     core_services = []
     if args.core:
         receipt["core_services"] = []
+        receipt["protocol_observations"] = {}
         receipt["core_configuration"] = {"addresses": "loopback", "channel_relay_max_client": 16,
                                          "monitor": "private UDP shutdown and initial minute counter patches", "stun": "test mode; default signal exit"}
+    def check_core_protocols(label):
+        path = instance / ("protocols-" + label + ".json")
+        result = subprocess.run([sys.executable, str(ROOT / "tools/probe_core_protocols.py"),
+                                 "--channel-port", "7001", "--relay-monitor-auth", "--output", str(path)],
+                                cwd=ROOT, capture_output=True, timeout=45)
+        receipt["protocol_observations"][label] = json.loads(path.read_text(encoding="utf-8"))
+        if result.returncode:
+            raise RuntimeError("Core protocol observation failed: " + label)
+
     try:
-        command = [str(mysqlbin / "mysqld.exe"), "--no-defaults", "--basedir=" + str(mysqlbin.parent),
-                   "--datadir=" + str(dbroot / "data"), "--lower-case-table-names=1", "--character-set-server=latin1",
+        prepared = subprocess.run(mysql_command("prepare"), capture_output=True, env=mysql_env,
+                                  timeout=60, check=True)
+        payload = Path(prepared.stdout.decode("utf-8").strip())
+        receipt["mysql_official_tool_sha256"] = {name: sha(payload / "bin" / (name + ".exe"))
+                                                 for name in ["mysqld", "mysql", "mysqladmin", "mysqldump"]}
+        command = mysql_command("mysqld") + ["--no-defaults", "--lower-case-table-names=1", "--character-set-server=latin1",
                    "--bind-address=127.0.0.1", "--port=3306", "--enable-named-pipe", "--socket=" + pipe, "--console"]
         with (dbroot / "server.private.log").open("wb") as log:
-            database = subprocess.Popen(command, stdout=log, stderr=log)
+            database = subprocess.Popen(command, stdout=log, stderr=log, env=mysql_env)
         deadline = time.monotonic() + 15
         while True:
             if database.poll() is not None:
                 raise RuntimeError("Private MySQL exited during startup")
-            check = subprocess.run([str(mysqlbin / "mysql.exe"), *options, "--execute=SELECT 1"],
-                                   capture_output=True, timeout=5)
+            check = subprocess.run(mysql_command("mysql") + options + ["--execute=SELECT 1"],
+                                   capture_output=True, env=mysql_env, timeout=5)
             if check.returncode == 0:
                 break
             if time.monotonic() >= deadline:
@@ -272,7 +327,32 @@ def main():
                     receipt["monthly_history_tables"].append(name)
             if args.peers_only_seconds is not None:
                 receipt["statistics_since"] = sql("SELECT NOW();").decode("ascii").strip()
-            start_core(instance, db, core_services)
+            if args.trace_relay_monitor:
+                relay_proxy = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                relay_proxy.bind(("127.0.0.1", 8200))
+                relay_proxy.settimeout(0.2)
+                receipt["relay_monitor_trace"] = []
+
+                def forward_monitor():
+                    while not proxy_stop.is_set():
+                        try:
+                            data, address = relay_proxy.recvfrom(4096)
+                        except socket.timeout:
+                            continue
+                        except ConnectionResetError:
+                            # Monitor may send before relay binds 18200. Windows
+                            # reports that earlier ICMP refusal on this UDP recv.
+                            continue
+                        owner = udp_owner(address[1])
+                        service = next((record["name"] for process, private, record in core_services if process.pid == owner), None)
+                        receipt["relay_monitor_trace"].append({"source_port": address[1], "source_service": service,
+                                                                "bytes": len(data), "header_hex": data[:15].hex()})
+                        relay_proxy.sendto(data, ("127.0.0.1", 18200))
+
+                proxy_thread = threading.Thread(target=forward_monitor)
+                proxy_thread.start()
+            start_core(instance, db, core_services, 18200 if args.trace_relay_monitor else 8200)
+            check_core_protocols("before_observation")
         print("Private game chain:", instance, flush=True)
         if args.peers_only_seconds is not None:
             deadline = time.monotonic() + args.peers_only_seconds
@@ -306,10 +386,16 @@ def main():
                 if (probe["exit_code"] != 0 or probe["forced_cleanup"] or probe["stop_signal"] != 12 or
                         probe["shutdown_markers"] != ["RECV SIGUSR2", "ALL USER LOGOUT COMPLETE", "GAME SERVER SHUTDOWN COMPLETE"]):
                     raise RuntimeError("Original game did not complete startup and SIGUSR2 shutdown")
+        if args.core:
+            check_core_protocols("after_observation")
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:
         stop_core(core_services)
+        if proxy_thread:
+            proxy_stop.set()
+            proxy_thread.join(timeout=2)
+            relay_proxy.close()
         if args.core:
             receipt["core_services"] = [record for process, private, record in core_services]
         if bridge:
@@ -324,21 +410,31 @@ def main():
             receipt["bridge_exit_code"] = bridge.returncode
         if database:
             if database.poll() is None:
-                result = subprocess.run([str(mysqlbin / "mysqladmin.exe"), *options, "shutdown"], capture_output=True, timeout=15)
+                result = subprocess.run(mysql_command("mysql") + options, input=b"SHUTDOWN;\n",
+                                        capture_output=True, env=mysql_env, timeout=15)
+                receipt["mysql_shutdown_method"] = "SQL SHUTDOWN"
                 receipt["mysql_shutdown_exit_code"] = result.returncode
+                receipt["mysql_shutdown_client_lost_ack"] = result.returncode == 1 and b"ERROR 2013 (HY000)" in result.stderr
                 (dbroot / "shutdown.private.log").write_bytes(result.stdout + result.stderr)
                 try:
                     database.wait(timeout=20)
                 except subprocess.TimeoutExpired:
                     receipt["mysql_forced_cleanup"] = True
-                    database.terminate()
+                    subprocess.run(["taskkill.exe", "/PID", str(database.pid), "/T", "/F"],
+                                   capture_output=True, timeout=10)
                     database.wait(timeout=5)
             receipt["mysql_exit_code"] = database.returncode
+            receipt["mysql_shutdown_complete"] = database.returncode == 0 and b"Shutdown complete" in (dbroot / "server.private.log").read_bytes()
         receipt["database_source_unchanged"] = before == tree_identity(source / "data")
         (instance / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         print("Chain receipt:", instance / "receipt.json", flush=True)
     if receipt.get("error"):
         raise SystemExit(receipt["error"])
+    if (not receipt.get("mysql_shutdown_complete") or
+            (receipt.get("mysql_shutdown_exit_code") != 0 and not receipt.get("mysql_shutdown_client_lost_ack")) or
+            receipt.get("mysql_forced_cleanup") or receipt.get("bridge_exit_code") != 0 or
+            receipt.get("bridge_forced_cleanup") or not receipt["database_source_unchanged"]):
+        raise SystemExit("Database or bridge lifecycle failed; inspect its receipt and private logs")
     if any(record["exited_before_stop"] or record["forced_cleanup"] or record["gaps"]
            for process, private, record in core_services):
         raise SystemExit("Core peer observation has failures; inspect its receipt and application logs")

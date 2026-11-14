@@ -13,6 +13,7 @@ import time
 
 from bootstrap import sha256
 from probe_mysql import DATABASES, DUMP_OPTIONS
+from legacy_db_password import encode_password
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -107,9 +108,10 @@ def main():
         if len(cipher) != 2 or not cipher[1]:
             raise RuntimeError("Application administration transport is not TLS")
         receipt["tls_cipher"] = cipher[1]
-        db = {"host": "127.0.0.1", "port": port, "user": "dnf_native_game", "password": secrets.token_hex(16),
+        password = secrets.token_hex(8)
+        db = {"host": "127.0.0.1", "port": port, "user": "dnf_native_game", "password": encode_password(password),
               "database": "d_taiwan"}
-        sql("CREATE USER 'dnf_native_game'@'127.0.0.1' IDENTIFIED BY '" + db["password"] +
+        sql("CREATE USER 'dnf_native_game'@'127.0.0.1' IDENTIFIED BY '" + password +
             "'; GRANT ALL ON *.* TO 'dnf_native_game'@'127.0.0.1';")
         sql("UPDATE d_taiwan.db_connect SET db_ip='127.0.0.1',db_port=" + str(port) +
             ",db_userid='dnf_native_game',db_passwd='" + db["password"] + "';")
@@ -122,6 +124,7 @@ def main():
             if server.poll() is None:
                 stopped = invoke("mysqladmin", options + ["shutdown"], check=False)
                 receipt["mysqladmin_shutdown_exit_code"] = stopped.returncode
+                receipt["mysqladmin_shutdown_lost_ack"] = stopped.returncode == 1 and b"Lost connection to MySQL server during query" in stopped.stderr
                 try:
                     server.wait(timeout=30)
                 except subprocess.TimeoutExpired:
@@ -129,14 +132,16 @@ def main():
                     subprocess.run(["taskkill.exe", "/PID", str(server.pid), "/T", "/F"], capture_output=True, timeout=10)
                     server.wait(timeout=10)
             receipt["server_exit_code"] = server.returncode
+            receipt["server_shutdown_complete"] = server.returncode == 0 and b"Shutdown complete" in (instance / "server.private.log").read_bytes()
         receipt["seed_source_unchanged"] = sha256(seed) == args.seed_sha256
         receipt["limits"] = ["Developer Windows 10 only; not a clean Win7/10/11 offline matrix.",
                              "Original application schemas only; source MySQL system accounts are not imported.",
                              "Game account is deliberately broad for private diagnosis; no product privilege policy or GUI rollback acceptance."]
         (instance / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(receipt, ensure_ascii=True))
-    if (receipt.get("error") or receipt["forced_cleanup"] or receipt.get("server_exit_code") != 0 or
-            receipt.get("mysqladmin_shutdown_exit_code") != 0 or not receipt["seed_source_unchanged"]):
+    if (receipt.get("error") or receipt["forced_cleanup"] or not receipt.get("server_shutdown_complete") or
+            (receipt.get("mysqladmin_shutdown_exit_code") != 0 and not receipt.get("mysqladmin_shutdown_lost_ack")) or
+            not receipt["seed_source_unchanged"]):
         raise SystemExit(1)
 
 

@@ -2,6 +2,7 @@
 
 import argparse
 import datetime
+import hashlib
 import json
 from pathlib import Path
 import socket
@@ -33,11 +34,13 @@ def channel(port):
     return {"challenge": True, "positive_responses": 3, "fragmented": True, "coalesced": True}
 
 
-def relay():
+def relay(monitor_auth=False):
     peers = []
     accounts = [701, 702]
+    stage = "connect"
     try:
         for account in accounts:
+            stage = "registration for account " + str(account)
             peer = socket.create_connection(("127.0.0.1", 7200), timeout=5)
             peers.append(peer)
             peer.sendall(packet(0, account, 0) + packet(1, account, account, b"registered"))
@@ -45,20 +48,53 @@ def relay():
             if receive(peer, len(expected)) != expected:
                 raise RuntimeError("Relay registration differs")
         for index in range(8):
+            stage = "forwarded message " + str(index)
             source, target = index % 2, 1 - index % 2
             body = struct.pack("<I", index) + bytes(range(256)) * 7
             peers[source].sendall(packet(1, accounts[source], accounts[target], body))
             expected = packet(3, accounts[source], accounts[target], body)
             if receive(peers[target], len(expected)) != expected:
                 raise RuntimeError("Relay forwarded bytes differ")
+        if monitor_auth:
+            # These own test accounts have no live game login. Wake the relay's
+            # normal auth queue with ignored S2S type 1 packets, then require
+            # the actual monitor to reject both; never forge an auth response.
+            stage = "monitor rejection of unlogged test accounts"
+            closed = set()
+            for peer in peers:
+                peer.settimeout(0.1)
+            deadline = time.monotonic() + 6
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as wake:
+                while len(closed) != len(peers):
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Unlogged relay accounts were not both rejected")
+                    wake.sendto(struct.pack("<HHHIIB", 1, 15, 0, 0, 0, 0), ("127.0.0.1", 8200))
+                    for index, peer in enumerate(peers):
+                        if index in closed:
+                            continue
+                        try:
+                            data = peer.recv(1)
+                        except socket.timeout:
+                            continue
+                        except ConnectionResetError:
+                            data = b""
+                        if data:
+                            raise RuntimeError("Unexpected bytes during monitor rejection")
+                        closed.add(index)
+            return {"registered_peers": 2, "bidirectional_messages": 8,
+                    "unlogged_accounts_disconnected": accounts, "own_auth_response_sent": False}
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+            stage = "targeted disconnect"
             udp.sendto(struct.pack("<HHHIIB", 2500, 15, 0, 0, accounts[0], 0), ("127.0.0.1", 8200))
         if peers[0].recv(1) != b"":
             raise RuntimeError("Relay targeted disconnect differs")
         peers[1].sendall(packet(1, accounts[1], accounts[1], b"still connected"))
+        stage = "unrelated peer after targeted disconnect"
         expected = packet(3, accounts[1], accounts[1], b"still connected")
         if receive(peers[1], len(expected)) != expected:
             raise RuntimeError("Relay disconnected the unrelated peer")
+    except Exception as error:
+        raise RuntimeError("Relay " + stage + ": " + str(error)) from error
     finally:
         for peer in peers:
             peer.close()
@@ -87,11 +123,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--channel-port", type=int, required=True)
+    parser.add_argument("--relay-monitor-auth", action="store_true",
+                        help="Expect the running original monitor to reject the unlogged test accounts")
     args = parser.parse_args()
     receipt = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+               "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "channel_port": args.channel_port, "relay_accounts": [701, 702], "results": {}}
-    for name, check in [("channel", lambda: channel(args.channel_port)), ("relay", relay), ("stun", stun)]:
+    receipt["relay_monitor_auth"] = args.relay_monitor_auth
+    for name, check in [("channel", lambda: channel(args.channel_port)),
+                        ("relay", lambda: relay(args.relay_monitor_auth)), ("stun", stun)]:
         try:
             receipt["results"][name] = {"passed": True, "checks": check()}
         except Exception as error:

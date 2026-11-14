@@ -4,9 +4,9 @@
 
 ## 1. MySQL 单文件发布
 
-`mysql-standalone.exe` 是本项目独立编写的引导程序，内部封装官方 5.7.44 的最小完整 payload。解压后执行真实官方 `mysqld/mysql/mysqladmin/mysqldump`，而不是仿制数据库。源码、四个 PE、DLL、字符集、必要 share/plugin 文件和分发材料分别锁定来源与哈希。
+`mysql-standalone.exe` 是本项目独立编写的引导程序，内部封装官方 5.7.44 payload，最终最小依赖闭包仍待裁剪和验证。解压后执行真实官方 `mysqld/mysql/mysqladmin/mysqldump`。源码、四个 PE、DLL、字符集、必要 share/plugin 文件和分发材料分别锁定来源与哈希。
 
-当前版本为 15,906,304 字节，使用系统 Cabinet FDI 解压内嵌 LZX CAB，CNG 校验文件哈希，以 Win32 CreateProcessW 调用四个官方工具。`prepare INSTANCE` 解压到实例内 `.mysql/payload-<manifest hash>`；`mysqld|mysql|mysqladmin|mysqldump INSTANCE [官方参数]` 执行工具并转交标准输入输出与退出码，mysqld 的 basedir/datadir 固定在该实例内。并发准备使用文件锁，展开后校验再提交目录；已有缓存逐文件校验，失败明确返回错误，不覆盖数据库。
+当前版本为 15,908,352 字节，使用系统 Cabinet FDI 解压内嵌 LZX CAB，CNG 校验文件哈希，以 Win32 CreateProcessW 调用四个官方工具。`prepare INSTANCE` 解压到实例内 `.mysql/payload-<manifest hash>`；`mysqld|mysql|mysqladmin|mysqldump INSTANCE [官方参数]` 执行工具并转交标准输入输出与退出码，mysqld 的 basedir/datadir 固定在该实例内。并发准备使用文件锁，展开后校验再提交目录；已有缓存逐文件校验，失败明确返回错误，不覆盖数据库。
 
 官方 5.7 客户端的 defaults loader 在本机不能读取中文绝对配置路径。子进程工作目录固定为实例目录，控制器使用 `--defaults-file=client.private.cnf` 这类固定相对文件名；该方式已在中文/空格/括号实例目录中完成 TLS 读写和备份还原。8.3 路径仍可能含中文，不能依赖它解决此问题。首版保留整个官方 share 目录，尚未做最终按访问记录裁剪。
 
@@ -16,7 +16,9 @@
 
 安全版本在中文实例中实际完成初始化、重启、TLS、备份还原及正常关闭；预定 TCP 端口被独占时初始化仍成功，空密码 root 被认证拒绝，敏感目录/文件的实际 DACL 通过检查。已有实例重试不改变 data 中任何文件。证据见 [安全初始化](evidence/p4-mysql-secure-initialize.json)。GUI 密码设置、跨 Windows 用户迁移、备份/回滚控制流程仍待实现。
 
-后续复测发现官方 mysqladmin 在命名管道停服时偶发返回连接丢失。初始化内部改用已有 mysql 的 SQL SHUTDOWN，并独立等待、核对客户端及服务器结果，避免客户端先报错时提前结束尚在关闭的服务器。官方 mysqladmin 透传能力仍保留其真实返回码。修正版本再次通过单文件完整测试与原始应用数据往返，见 [原始数据实测](evidence/p4-mysql-original-seed.json)。
+后续复测发现命名管道停服时，mysqladmin 和 SQL SHUTDOWN 都可能丢失关闭确认。引导使用 SQL SHUTDOWN，并独立等待自有服务器；仅在服务器返回 0、日志出现 Shutdown complete、客户端错误明确为 ERROR 2013 时，将其记录为确认丢失并提示。其他客户端错误、服务器错误和超时仍失败。客户端非零结果保持原值，未改写为 0。证据见 [原始数据实测](evidence/p4-mysql-original-seed.json)及[服务链接入](evidence/p4-mysql-core-integration.json)。
+
+原版服务配置及 d_taiwan.db_connect.db_passwd 保存 24 字节 XTEA/ECB 密文的十六进制形式，不能填管理员配置里的明文密码。已根据原版 DBMW 的构造、解码和分组函数核实格式，独立实现 tools/legacy_db_password.py；固定材料只从哈希锁定的原版 ELF 读取，材料和真实口令不进 Git。隔离测试账号采用 16 个 ASCII 字符，经该格式编码后，三路 DBMW 和 auction/point 均完成真实连接；管理员配置继续使用独立的强随机凭据。GUI 密码配置仍待接入这一约束。
 
 不得把“只携带四个 EXE”视为完整闭包。静态普通/延迟导入、运行期 DLL/插件/数据文件访问、中文路径、初始化、查询、备份、还原及 TLS 连接都参与闭包判定。VC++ 2019/UCRT 采用可分发且经 Win7/10/11 验证的本地部署组合，不能要求另装 VC Redist，也不能直接从开发机 System32 抄取 DLL。开发工具使用何种 CRT 不改变这一产品要求。
 

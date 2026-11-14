@@ -86,7 +86,7 @@ def main():
         acl_env["DNF_MYSQL_INSTANCE"] = str(instance)
         acl_script = """$root = $env:DNF_MYSQL_INSTANCE
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$results = foreach ($name in @('data','server.cnf','client.private.cnf','mysql-initialize.private.log','mysql-bootstrap.private.log')) {
+$results = foreach ($name in @('data','server.cnf','client.private.cnf','mysql-initialize.private.log','mysql-bootstrap.private.log','mysql-shutdown.private.log')) {
     $acl = Get-Acl -LiteralPath (Join-Path $root $name)
     $rules = @($acl.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]))
     [pscustomobject]@{name=$name; protected=$acl.AreAccessRulesProtected;
@@ -182,8 +182,9 @@ ConvertTo-Json -InputObject @($result) -Compress
         checks["server_shutdown_complete"] = server.returncode == 0 and b"Shutdown complete" in (probe / "server.private.log").read_bytes()
         if not checks["server_shutdown_complete"]:
             raise RuntimeError("Official MySQL did not shut down normally")
-        if stopped.returncode:
-            raise RuntimeError("mysqladmin shutdown reported an error; server outcome recorded separately")
+        receipt["mysqladmin_shutdown_lost_ack"] = stopped.returncode == 1 and b"Lost connection to MySQL server during query" in stopped.stderr
+        if stopped.returncode and not receipt["mysqladmin_shutdown_lost_ack"]:
+            raise RuntimeError("mysqladmin shutdown reported an unexpected error; server outcome recorded separately")
         identity = {str(p.relative_to(instance / "data")): sha256(p)
                     for p in (instance / "data").rglob("*") if p.is_file()}
         repeat = invoke("initialize", [str(port)], check=False)

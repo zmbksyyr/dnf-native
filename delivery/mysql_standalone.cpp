@@ -367,14 +367,15 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     Child server = launch(root, instance, L"mysqld", {L"--defaults-file=server.cnf", L"--skip-networking",
                           L"--enable-named-pipe", L"--socket=" + wide(pipe.c_str()), L"--console"},
                           input.handle, server_log.handle, server_log.handle);
-    auto sql = [&](const std::string &query) {
+    auto sql = [&](const std::string &query, HANDLE output = INVALID_HANDLE_VALUE) {
+        if (output == INVALID_HANDLE_VALUE) output = server_log.handle;
         SECURITY_ATTRIBUTES pipe_security{sizeof(pipe_security), nullptr, TRUE};
         HANDLE reader, writer;
         require(CreatePipe(&reader, &writer, &pipe_security, 0), "Create private SQL input");
         File read_end(reader), write_end(writer);
         require(SetHandleInformation(writer, HANDLE_FLAG_INHERIT, 0), "Protect SQL input writer");
         Child client = launch(root, instance, L"mysql", {L"--defaults-file=bootstrap.private.cnf", L"--connect-expired-password",
-                              L"--batch", L"--skip-column-names"}, reader, server_log.handle, server_log.handle);
+                              L"--batch", L"--skip-column-names"}, reader, output, output);
         DWORD bytes = 0;
         require(WriteFile(writer, query.data(), static_cast<DWORD>(query.size()), &bytes, nullptr) && bytes == query.size(),
                 "Send private initialization SQL");
@@ -393,10 +394,15 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     write_private(instance + L"\\bootstrap.private.cnf", bootstrap + password + "\"\n", CREATE_ALWAYS);
     if (sql("SELECT VERSION(),@@server_uuid,@@lower_case_table_names;\n"))
         throw std::runtime_error("New credential verification failed; private files retained");
-    int stop_code = sql("SHUTDOWN;\n");
+    File shutdown_log = private_file(instance + L"\\mysql-shutdown.private.log");
+    int stop_code = sql("SHUTDOWN;\n", shutdown_log.handle);
     int server_code = server.wait(30000);
-    if (stop_code || server_code) throw std::runtime_error("Initialized database shutdown failed (client " +
-                                  std::to_string(stop_code) + ", server " + std::to_string(server_code) + ")");
+    bool complete = !server_code && read_file(instance + L"\\mysql-bootstrap.private.log").find("Shutdown complete") != std::string::npos;
+    bool lost_ack = stop_code == 1 && read_file(instance + L"\\mysql-shutdown.private.log").find("ERROR 2013 (HY000)") != std::string::npos;
+    if (!complete || (stop_code && !lost_ack))
+        throw std::runtime_error("Initialized database shutdown failed (client " + std::to_string(stop_code) +
+                                 ", server " + std::to_string(server_code) + ")");
+    if (lost_ack) std::fputs("mysql-standalone: shutdown client reported ERROR 2013; owned server exited 0 with Shutdown complete.\n", stderr);
     require(DeleteFileW((instance + L"\\bootstrap.private.cnf").c_str()), "Remove temporary bootstrap credential");
     std::puts("Initialized official MySQL 5.7.44; generated credential saved in client.private.cnf; server stopped.");
     return 0;

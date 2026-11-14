@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已完成本机联合自然启动与停服；game 的 DP2/Lua/Frida 加载和完整清理通过，channel、relay、STUN 有真实协议往返，monitor 首次统计写库已修复。MySQL 5.7.44 单文件及原生安全初始化、TLS、备份还原已实测。修正配置后的完整联跑仍在验证；原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。安全初始化的数据库已接入 15 个辅助服务和原版 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致。原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -83,8 +83,10 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --core --dp2-cleanup --stop-after-started 120 --timeout 2100` 观察完整 core 16 服务的联合启动/停止。私有地址使用 loopback，channel/relay 测试容量为 16，monitor 应用已记录的私有补丁。SO_ERROR 修复后的自然启动与停服已完成联跑，receipt 与应用日志共同用于审阅；不计完整互通或客户端验收。
 
-联合观察期间可用 `python tools/probe_core_protocols.py --channel-port 7001 --output build/core-protocols.json` 检查现有私有 channel/relay/STUN 实例。该工具使用 relay 测试账号 701/702，核对握手、双向转发、定向断开和 UDP 响应；端口须与实际监听一致。结果仅涵盖自编协议请求。
+联合观察期间可用 `python tools/probe_core_protocols.py --channel-port 7001 --relay-monitor-auth --output build/core-protocols.json` 检查现有私有 channel/relay/STUN 实例。该工具使用 relay 测试账号 701/702，核对握手、双向转发、真实 monitor 拒绝未登录账号和 STUN 响应；端口须与实际监听一致。独立 relay 的定向断开、另一连接保留与连续重连用 `python tools/test_relay.py --reconnect-rounds 5` 验证。结果仅涵盖自编协议请求，未验证游戏客户端的登录认证。
 
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --peers-only-seconds 75` 只观察 15 个 core peer，记录真实 monitor 统计写库并正常停服，用于辅助服务诊断。该模式不运行 game。monitor 私有副本同时包含已记录的 UDP 停服与首次计数初始化修复；独立 monitor 对照可用 `--fix-statistics` 选择后一项。
+
+联合探测的所有 MySQL 操作现通过 `mysql-standalone.exe`，先按下方命令构建，也可用 `--mysql-standalone EXE` 指定已封样产物。安全数据源同时带 `client.private.cnf` 和 `game-db.json`：前者保存管理员真实密码，后者的 password 字段是原版配置要求的 48 位密文。`python tools/probe_mysql_seed.py --seed PRIVATE_APPLICATION.sql --seed-sha256 SHA256` 创建安全初始化并验证原始应用数据往返的私有实例。`--trace-relay-monitor` 仅用于诊断，记录原版 monitor 的真实回复及发送进程；它临时将 relay 的 S2S 接收端移到 18200，由本工具从 8200 转发。
 
 MySQL 单文件：先执行 `python tools/import_mysql_runtime.py` 和 `python tools/build_mysql_standalone.py`，产物为 `build/mysql-standalone/mysql-standalone.exe`。`python tools/test_mysql_standalone.py` 在新的私有中文目录里验证安全初始化、权限、TLS 与备份还原。`mysql-standalone.exe initialize INSTANCE [PORT]` 只接受新实例，用官方临时密码通过仅本机命名管道设置随机密码；成功后数据库已停止，凭据存于当前 Windows 用户独享的 `client.private.cnf`。启动用 `mysql-standalone.exe mysqld INSTANCE --defaults-file=server.cnf --console`，客户端用 `mysql-standalone.exe TOOL INSTANCE --defaults-file=client.private.cnf [官方参数]`，TOOL 为 mysql/mysqladmin/mysqldump。工具工作目录固定为实例目录，配置使用相对文件名。约 15.9 MB，尚非最终离线包或 Win7/11 验收。

@@ -1,5 +1,6 @@
 """Verify original relay TCP forwarding and UDP disconnect control on loopback."""
 
+import argparse
 import datetime
 import hashlib
 import json
@@ -27,6 +28,11 @@ def packet(identifier, sender, recipient, body=b""):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reconnect-rounds", type=int, default=0)
+    args = parser.parse_args()
+    if args.reconnect_rounds < 0:
+        parser.error("--reconnect-rounds must be nonnegative")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = ROOT / "build/probes" / stamp / "relay"
     instance.mkdir(parents=True)
@@ -108,6 +114,16 @@ def main():
             if receive(peers[1], len(expected)) != expected:
                 raise RuntimeError("Relay disconnected the unrelated peer")
             checks["other_peer_preserved"] = True
+            if args.reconnect_rounds:
+                from probe_core_protocols import relay
+                for peer in peers:
+                    peer.close()
+                peers.clear()
+                checks["reconnect_rounds"] = 0
+                for _ in range(args.reconnect_rounds):
+                    time.sleep(0.2)
+                    relay()
+                    checks["reconnect_rounds"] += 1
         except Exception as failure:
             error = str(failure)
         finally:

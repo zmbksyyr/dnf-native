@@ -1,0 +1,1957 @@
+{
+  "recorded_utc": "2026-11-14T08:06:57.732329+00:00",
+  "scope": "Single-EXE MySQL in original native service chains, original credential encoding and real monitor refusal of unlogged test accounts. No client or final release acceptance.",
+  "build": {
+    "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
+    "output_bytes": 15908352,
+    "output_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
+    "source_sha256": "44cb32b6daae507b522e768c773337ec5d8395629d4dff810b418dc38bdd2ec2",
+    "cabinet_sha256": "b81848ab73b9692ca5f06ddd9a0d8eae9d831468c177ad8ad6b19596e1abe3d9"
+  },
+  "build_receipt_sha256": "dd46990df1924549729892401be79dc2bd6984849849b658238011a3cd3896d9",
+  "sources": {
+    "delivery/mysql_standalone.cpp": "44cb32b6daae507b522e768c773337ec5d8395629d4dff810b418dc38bdd2ec2",
+    "tools/build_mysql_standalone.py": "74f0e53193b6ed1b62491eefc5aa537ea107a1d66007458d649f1fe293c84129",
+    "tools/test_mysql_standalone.py": "a096782ef813e368129b579c279c555295319db9a11eb6a730f32518da73e268",
+    "tools/legacy_db_password.py": "39cf4ce2b8dc1c3af554d97e8f3cf66b8aa5e068d2e85341ad83c336a480ebe0",
+    "tools/probe_mysql_seed.py": "1dbf909b8af2da09280f635d0cf6c14913e29393905e217b1494045727412479",
+    "tools/probe_game_chain.py": "f6fc5ba1d9134f8bf96d7b3bba1a9b766199db25b4752b35bd6fba768e231b9d",
+    "tools/probe_core_protocols.py": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
+    "tools/test_relay.py": "d5c1b961728d323a1de0ae58ff50e350dc4b58bdda1ea216de3e01eca1863b79"
+  },
+  "native_single_exe": {
+    "receipt_sha256": "547c74d637beb3d06e606e9bac631fee5d29ae601faf65ef2b544cbc5130cfb4",
+    "result": {
+      "recorded_utc": "20261114T075753291628Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T075753291628Z\\mysql-sfx",
+      "exe_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
+      "exe_bytes": 15908352,
+      "scope": "Secure native initialization, TLS query, backup and restore from only the standalone EXE; developer Windows 10 only.",
+      "checks": {
+        "concurrent_prepare": 4,
+        "secure_initialize_without_tcp": true,
+        "initialize_fresh_private_data": true,
+        "private_windows_permissions": true,
+        "passwordless_root_refused": true,
+        "query_write_read_over_tls": true,
+        "logical_backup_restore_rows": 2,
+        "loaded_vc_runtime_app_local": true,
+        "server_shutdown_complete": true,
+        "existing_data_reinitialization_refused": true,
+        "modified_cache_refused": true
+      },
+      "forced_cleanup": false,
+      "versions": {
+        "mysqld": "5.7.44",
+        "mysql": "5.7.44",
+        "mysqladmin": "5.7.44",
+        "mysqldump": "5.7.44"
+      },
+      "private_permissions": [
+        {
+          "name": "data",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "server.cnf",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "client.private.cnf",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-initialize.private.log",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-bootstrap.private.log",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-shutdown.private.log",
+          "protected": true,
+          "current_user_only": true
+        }
+      ],
+      "database_identity": "5.7.44\t19419154-e001-11f1-b0c8-345a6041c9d0",
+      "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+      "logical_backup_sha256": "e0e08c6fc57c9f023d75adbd3166c7b487c9b6348ffc7187f4b023baaa342be7",
+      "runtime_modules": [
+        {
+          "name": "ucrtbase.dll",
+          "app_local": false,
+          "sha256": "de8d08d01291df93821314176381f3d1ae863e6c5584a7f8ea42f0b94b15ef65"
+        },
+        {
+          "name": "msvcp140.dll",
+          "app_local": true,
+          "sha256": "75872c426555ac8af55b5a7f6d4aea8831af74353b22612850a2bfc40e3b67e1"
+        },
+        {
+          "name": "vcruntime140.dll",
+          "app_local": true,
+          "sha256": "270ba17bf89cc2eb6e6ce536eb78e4614ab5499f653ab7e07fe9e3d33bf3b6e3"
+        },
+        {
+          "name": "vcruntime140_1.dll",
+          "app_local": true,
+          "sha256": "f3754fc6ec87bcf84e05f3287b5de7bd305a30a0e1db7d478cb6353600682784"
+        }
+      ],
+      "mysqladmin_shutdown_exit_code": 0,
+      "server_exit_code": 0,
+      "mysqladmin_shutdown_lost_ack": false,
+      "limits": [
+        "Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
+        "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
+        "Native initialization generates a local credential; GUI password configuration and cross-machine migration remain untested.",
+        "No GUI backup/rollback workflow or final complete offline package acceptance."
+      ]
+    }
+  },
+  "native_seed": {
+    "receipt_sha256": "7a549ac47951c991fa0abfccf20ae66ffc5929f658ce08d5e03bb82d1883b46a",
+    "result": {
+      "recorded_utc": "20261114T075753346100Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T075753346100Z\\mysql-secure-seed",
+      "scope": "Secure single-EXE initialization and real original application-seed backup/restore; no GUI or DNF client acceptance.",
+      "exe_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
+      "script_sha256": "1dbf909b8af2da09280f635d0cf6c14913e29393905e217b1494045727412479",
+      "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+      "databases": [
+        "d_channel",
+        "d_guild",
+        "d_taiwan",
+        "d_taiwan_secu",
+        "d_technical_report",
+        "taiwan_billing",
+        "taiwan_cain",
+        "taiwan_cain_2nd",
+        "taiwan_cain_auction_cera",
+        "taiwan_cain_auction_gold",
+        "taiwan_cain_log",
+        "taiwan_cain_web",
+        "taiwan_game_event",
+        "taiwan_login",
+        "taiwan_login_play",
+        "taiwan_mng_manager",
+        "taiwan_prod",
+        "taiwan_se_event"
+      ],
+      "checks": {
+        "native_secure_initialization": true,
+        "original_application_seed_imported": true,
+        "all_application_databases_backup_restore_identical": true,
+        "private_game_account_prepared": true
+      },
+      "forced_cleanup": false,
+      "table_counts": {
+        "d_channel": 5,
+        "d_guild": 26,
+        "d_taiwan": 109,
+        "d_taiwan_secu": 7,
+        "d_technical_report": 42,
+        "taiwan_billing": 12,
+        "taiwan_cain": 81,
+        "taiwan_cain_2nd": 32,
+        "taiwan_cain_auction_cera": 9,
+        "taiwan_cain_auction_gold": 9,
+        "taiwan_cain_log": 97,
+        "taiwan_cain_web": 17,
+        "taiwan_game_event": 51,
+        "taiwan_login": 44,
+        "taiwan_login_play": 1,
+        "taiwan_mng_manager": 20,
+        "taiwan_prod": 26,
+        "taiwan_se_event": 13
+      },
+      "backup_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+      "backup_bytes": 977716,
+      "reexport_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+      "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+      "mysqladmin_shutdown_exit_code": 0,
+      "mysqladmin_shutdown_lost_ack": false,
+      "server_exit_code": 0,
+      "server_shutdown_complete": true,
+      "seed_source_unchanged": true,
+      "limits": [
+        "Developer Windows 10 only; not a clean Win7/10/11 offline matrix.",
+        "Original application schemas only; source MySQL system accounts are not imported.",
+        "Game account is deliberately broad for private diagnosis; no product privilege policy or GUI rollback acceptance."
+      ]
+    }
+  },
+  "full_core_observation": {
+    "receipt_sha256": "01b521255e5fb15bb89f6b62a860959eff06252aa9ee55afad517bb4933293ed",
+    "probe": "build/probes/20261114T070338812065Z/game-chain",
+    "source_snapshot_sha256": "ae2680bafb8e2834219f06a047b81c64df2976c3d5644d565f016088462a2078",
+    "probe_exit_code": 1,
+    "result": {
+      "recorded_utc": "20261114T070338812065Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Original game startup observation; no business acceptance",
+      "mysql_bootstrap_sha256": "86d9608d6d6ba7f408dc2c025940425c60f55d757328c1a5de1b9966d5fdb4b2",
+      "game": {
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "exit_code": 0,
+        "forced_cleanup": false,
+        "elapsed_seconds": 1480.445,
+        "syscall_gaps": [
+          "syscall gap nr=291",
+          "syscall gap nr=332"
+        ],
+        "runtime_gaps": [],
+        "dp2_cleanup": true,
+        "startup_seen_after_seconds": 1298.894,
+        "stop_signal": 12,
+        "observation_after_start_seconds": 120.039,
+        "shutdown_markers": [
+          "RECV SIGUSR2",
+          "ALL USER LOGOUT COMPLETE",
+          "GAME SERVER SHUTDOWN COMPLETE"
+        ],
+        "probe": "build\\probes\\20261114T070437414469Z\\game"
+      },
+      "core_configuration": {
+        "addresses": "loopback",
+        "channel_relay_max_client": 16,
+        "monitor": "private UDP shutdown and initial minute counter patches",
+        "stun": "test mode; default signal exit"
+      },
+      "protocol_observations": {
+        "before_observation": {
+          "recorded_utc": "2026-11-14T07:04:36.255562+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": true,
+              "checks": {
+                "registered_peers": 2,
+                "bidirectional_messages": 8,
+                "targeted_disconnect": true,
+                "other_peer_preserved": true
+              }
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          }
+        },
+        "after_observation": {
+          "recorded_utc": "2026-11-14T07:29:18.698848+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": false,
+              "error": "[WinError 10054] \u8fdc\u7a0b\u4e3b\u673a\u5f3a\u8feb\u5173\u95ed\u4e86\u4e00\u4e2a\u73b0\u6709\u7684\u8fde\u63a5\u3002"
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          }
+        }
+      },
+      "core_services": [
+        {
+          "name": "manager",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "arguments": [
+            "manager",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\manager.cfg": "9489151ab8a457454d7c5dfca2534a282aa48592fbf155e296d65daa56297771"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "16e74af1f6dbee356233fd0def110c740151eae127c57879e2e47d930264318b",
+            "stdout.private.log": "3487e38258676eed6d32f66fbedd9adfe912d9312c1bc7810e5bcd8029c68700"
+          }
+        },
+        {
+          "name": "dbmw_guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_gld_siroco.cfg": "41e01f72816e114077c2ae16f42aa6bb5d607bb59dff87fdd9942f2823c1ea08"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "e41824ca64109b610b8d236893c9cf169e446d96e879376f5660676a016b7e46",
+            "stdout.private.log": "ff45503edcd2bb8a527d90852b040c48c162d17f9d469aee9b690f76276c4c70"
+          }
+        },
+        {
+          "name": "dbmw_mnt",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_mnt_siroco.cfg": "f7adcb314e910f21026d99c41ae1a49ab56f6d92edfff8a729645acf2a017a11"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "a64fa935f8ae4bcda48d21dd84d900bd6dc47fca6e32e42ce06ce6b7554fba5d",
+            "stdout.private.log": "160a49615c6d7707c8b70eb40966a299aeae906ad33d708b64d5339f4b328d1f"
+          }
+        },
+        {
+          "name": "dbmw_stat",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_stat_siroco.cfg": "c3212f87fdeb7d9b091dbe82c51a927c3562c2306eb2cd71a34ce2b597b68fd2"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "3a0bdc617219915f9643d3b2cb90a95535f10f19f65777b1c409b3413fbbeb4b",
+            "stdout.private.log": "2e6462ec5a271aed196121bb0692fee820fd37dd181b63d9c6434fea4925fc9b"
+          }
+        },
+        {
+          "name": "monitor",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+          "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+          "arguments": [
+            "mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\mnt_siroco.cfg": "9396600bed6edc8376cdc186e55653a70efb50fee340f2e06666828341121b44"
+          },
+          "patches": [
+            {
+              "address": "0x08062877",
+              "offset": 108663,
+              "before": "c6400400",
+              "after": "c6400401",
+              "purpose": "Initialize the application loop flag before stop callbacks can run."
+            },
+            {
+              "address": "0x08063fa4",
+              "offset": 114596,
+              "before": "c6400401",
+              "after": "90909090",
+              "purpose": "Preserve a stop request received during application Load."
+            },
+            {
+              "address": "0x0805aa4c",
+              "offset": 76364,
+              "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+              "after": "c64008018944240cc7442408b8aa050883642404009090",
+              "purpose": "Set running before pthread_create; preserve its original arguments."
+            },
+            {
+              "address": "0x080973ce",
+              "offset": 324558,
+              "before": "c6400801",
+              "after": "90909090",
+              "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+            },
+            {
+              "address": "0x08064042",
+              "offset": 114754,
+              "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+              "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+              "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+            },
+            {
+              "address": "0x080a635a",
+              "offset": 385882,
+              "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+              "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+              "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+            }
+          ],
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "92051556e8bea292ed48e4a8a220010472f95c182845b3c38db0ec206c39549a",
+            "stdout.private.log": "a22349c095c120d6e56fadb92ea32581d836c9cdea4d7bc024e6e2488585f717"
+          }
+        },
+        {
+          "name": "guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "arguments": [
+            "gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\gld_siroco.cfg": "9c7e4be20164895172f22e68074bb500c6b8c449891151f171cde2ff53330f31"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Guild And Guild Member DB Save Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "b9b732e2dd9bd47b7e452e3e753a492bba3c4be3b1fe2e8cb27d229d4ea97de7",
+            "stdout.private.log": "83ae0bbd0ee962824714d461b43f135590bc6362ae4e2dd6fb5e4acd0db6cf67"
+          }
+        },
+        {
+          "name": "statics",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "arguments": [
+            "stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\stat_siroco.cfg": "93ac72ab27a06946fd2530b6b909f39d790d65b54cb75d59874532b689c271df"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "6dab111eae2d0ef9df468ad3915b3dae9b43f0947197fd8f0b1d21a0e4b90798",
+            "stdout.private.log": "2e637e28cc861235acb5da768f7e29b6d09da0793d0ffe6566cb1cab01198d55"
+          }
+        },
+        {
+          "name": "coserver",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "arguments": [
+            "coserver",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\coserver.cfg": "01811a81bf8e950b92facc7be4abcf40431ddda882e2a4dd7675b55b3012e52e"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "d14c406d9b01ba14e786cb088a3b374d1899b4522bb2b5263e5324f8d8ab95a2",
+            "stdout.private.log": "bc68f6f7eeae6fcd06ed890f42acda00c66fc4b377fe4806976b6909e4ae3bc5"
+          }
+        },
+        {
+          "name": "community",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "arguments": [
+            "community",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\community.cfg": "c4528dc998c2ffb8ecd9721e61c3259bde9f48583edf42f532f2d4a2b0b06e77"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Community Server(IP:127.0.0.1, PORT:31100)"
+          ],
+          "logs": {
+            "stderr.log": "5d3466e992de2cd967e37a832cdf14f92c2d041e9807c3319a5bbd29ee99347d",
+            "stdout.private.log": "b748fa6a47bfc6e4e0606904511594b84b5d7bef3ec81a6f5dc19ea08f4d6641"
+          }
+        },
+        {
+          "name": "auction",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "arguments": [
+            "./cfg/auction_siroco.cfg",
+            "run",
+            "./df_auction_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\auction_siroco.cfg": "33c676fbf983d48b9476a29ad98e3552d43529d2bced5b041ff9c64f6c9962fc",
+            "cfg\\bridge.cfg": "96755361e3e7d11210b9dffc9043091e70bb3e931948b2fabb2789f5f7373708"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "f9cf7d7b155f855f3ae00bcc238e4d5044123c9599a4d9b915ed958c39b2816b",
+            "stdout.private.log": "fc66f794ebdc9bd8a8fdd989efe3e011c69573e5fe71c54f59ea3b281a3dc03d"
+          }
+        },
+        {
+          "name": "point",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "arguments": [
+            "./cfg/point_siroco.cfg",
+            "run",
+            "./df_point_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\point_siroco.cfg": "c1e104a90387248803867d6e76d606cef017ae664cacd7d74fc164e56a77800f"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "87b2837693b5c6115070adfbb032b999302dfa529f61ff7c67db06496f815a19",
+            "stdout.private.log": "044a4362e4d7f11dafa0d88e5fdd257578e35cfca1a8d50d42bef94d3a6c1530"
+          }
+        },
+        {
+          "name": "channel",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "arguments": [
+            "channel",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\channel.cfg": "5f73e00a2cf5dc4ec4748543d6392a9ea8c1b5c3601e235165d580ddb88cd7e9"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "e2ccaa05b84e94c714eeef697305d6e40eca3fca0000fdaddfc29094d2210431",
+            "stdout.private.log": "da2130099f2d3a5495160b98fe838a679576930179f39d21661be5fbf4d6265f"
+          }
+        },
+        {
+          "name": "relay",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "arguments": [
+            "relay_200",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\relay_200.cfg": "b103fdbbc81c64c9dd460b3c612819730dc6a3b672d571c76366a2df43f77e60"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "b69b7cc1a3bc5b240687814d5216ddade8eecf13ae7a0cf81b5479c7730e23db",
+            "stdout.private.log": "2c9e60fadf5a634f2abc8420ad95d2ca5333deea2cab5440598ee11ef46f545c"
+          }
+        },
+        {
+          "name": "stun",
+          "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+          "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "arguments": [
+            "test"
+          ],
+          "configuration_sha256": {
+            "cfg\\udp_server.cfg": "7f2e554ebb79fd6145700b3c95a7943c598ca43a243af9a63085f1bbb6ce3016"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "d1cf071f48e4b416b67c1a57f79afb5caebec387f203d03a5f1db5af88be2cfd",
+            "stdout.private.log": "a8ff187cb867d9367e301494a525c2a510a5f7f6300daf5cfc90ae1c0069a660"
+          }
+        }
+      ],
+      "bridge_script_matches": true,
+      "bridge_exit_code": 0,
+      "mysql_shutdown_exit_code": 0,
+      "mysql_exit_code": 0,
+      "database_source_unchanged": true,
+      "error": "Core protocol observation failed: after_observation"
+    },
+    "cleanup_log_markers": {
+      "dispose": true,
+      "unload": true
+    },
+    "limit": "Natural game startup, 120 seconds observation and ordered service shutdown observed; its final synthetic relay assertion failed and is retained. This is not relabeled a full protocol or client acceptance pass."
+  },
+  "credential_format": {
+    "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+    "original_functions": {
+      "config_constructor": "0x0806fef6",
+      "decode_setting": "0x08069f70",
+      "encrypt_block": "0x080535a0"
+    },
+    "format": "24 bytes of XTEA ECB, 32 rounds, big-endian words, zero padding; 48 hexadecimal characters. 1-19 ASCII password bytes.",
+    "private_material": "First 16 bytes at original file-backed virtual address 0x081ab9c0; read only after full original SHA-256 check. No key or real password is included in source/evidence.",
+    "failed_plaintext_fixture_receipt_sha256": "24b35714cf122cf56420d4a0dbdb19e25f88ca5b3b5fa02a8debd27db19631fa",
+    "failed_plaintext_native_outcome": {
+      "dbmw_exit_codes": [
+        134,
+        134,
+        134
+      ],
+      "error": "dbmw_guild exited during peer observation"
+    },
+    "verified_encoded_outcome": "Three original DBMW services and original auction/point opened the private secure server and shut down normally; monitor wrote real statistics."
+  },
+  "mature_peers_monitor_trace": {
+    "receipt_sha256": "ae440d31cf3c9fff17b70c44cae949464e6addcaa2691749fcf73e3f14eb0a4b",
+    "probe": "build/probes/20261114T075142492633Z/game-chain",
+    "probe_exit_code": 1,
+    "result": {
+      "recorded_utc": "20261114T075142492633Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Fifteen original core peers without game; initialization and database diagnosis only",
+      "probe_script_sha256": "2b484a1e6a7630421b082ccb5d28455f495de72cac414022c0725fba84ec7fd5",
+      "mysql_bootstrap_sha256": "af4772daf8220010edd6c5e1c6ab70c46685d4cf48c15227ec6eba9c26dccdba",
+      "mysql_private_credentials": true,
+      "core_configuration": {
+        "addresses": "loopback",
+        "channel_relay_max_client": 16,
+        "monitor": "private UDP shutdown and initial minute counter patches",
+        "stun": "test mode; default signal exit"
+      },
+      "protocol_observations": {
+        "before_observation": {
+          "recorded_utc": "2026-11-14T07:52:40.067360+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": true,
+              "checks": {
+                "registered_peers": 2,
+                "bidirectional_messages": 8,
+                "unlogged_accounts_disconnected": [
+                  701,
+                  702
+                ],
+                "own_auth_response_sent": false
+              }
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          },
+          "relay_monitor_auth": true
+        },
+        "after_observation": {
+          "recorded_utc": "2026-11-14T07:53:57.102945+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": true,
+              "checks": {
+                "registered_peers": 2,
+                "bidirectional_messages": 8,
+                "unlogged_accounts_disconnected": [
+                  701,
+                  702
+                ],
+                "own_auth_response_sent": false
+              }
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          },
+          "relay_monitor_auth": true
+        }
+      },
+      "occupation_statistics": {
+        "taiwan_cain": [
+          "2026-11-14 15:52:52\t0\t0\t0\t0",
+          "2026-11-14 15:53:52\t0\t0\t0\t0"
+        ],
+        "taiwan_cain_log": []
+      },
+      "peer_observation_seconds": 75.0,
+      "core_services": [
+        {
+          "name": "manager",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "arguments": [
+            "manager",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\manager.cfg": "9489151ab8a457454d7c5dfca2534a282aa48592fbf155e296d65daa56297771"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "c5f82f077292533840c5d0df8897b5f725c8bb1632c4e105003bec87bef13474",
+            "stdout.private.log": "76e91b5b165812644bfb2cea66ee9f05832cb9ec49bfb4ce4365ad592d45821d"
+          }
+        },
+        {
+          "name": "dbmw_guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_gld_siroco.cfg": "5b703cb41e6d9e79ec12cef067ab38bce9cfa754943972afb3eda6ed69040697"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "0da39f00e75f0ae0f0f31e183c91d9a935ed1b197b73c912505794a763e77a36",
+            "stdout.private.log": "ce6ca4a88610c9d7d965f4fc0e36ca0b7954dc03107f07eba6fdb976b2afa6e7"
+          }
+        },
+        {
+          "name": "dbmw_mnt",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_mnt_siroco.cfg": "fe0c440d9970befd9e9075977132c7a13eae15d2637063020e7df9a3f0ca0bc7"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "2802e87bf1e61c3e27858954a9c90435e0954cb03e2b2b174352f0c27e99e063",
+            "stdout.private.log": "11c718cf9029929f883279409c2ec36452a0a9b335a67d1470f32db7a7ac28b0"
+          }
+        },
+        {
+          "name": "dbmw_stat",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_stat_siroco.cfg": "39eda98eef03df686c199baea08674af4087055bc83b02705d634876b8799986"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "e0ed9bce1761203190ebfc3283e9f4b73c56140c32a51e27b78d8af69f87ce4c",
+            "stdout.private.log": "d9457f2596b8014b8d0753895c7c92d17da2946c599730af97c786b3d8024ba1"
+          }
+        },
+        {
+          "name": "monitor",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+          "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+          "arguments": [
+            "mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\mnt_siroco.cfg": "9396600bed6edc8376cdc186e55653a70efb50fee340f2e06666828341121b44"
+          },
+          "patches": [
+            {
+              "address": "0x08062877",
+              "offset": 108663,
+              "before": "c6400400",
+              "after": "c6400401",
+              "purpose": "Initialize the application loop flag before stop callbacks can run."
+            },
+            {
+              "address": "0x08063fa4",
+              "offset": 114596,
+              "before": "c6400401",
+              "after": "90909090",
+              "purpose": "Preserve a stop request received during application Load."
+            },
+            {
+              "address": "0x0805aa4c",
+              "offset": 76364,
+              "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+              "after": "c64008018944240cc7442408b8aa050883642404009090",
+              "purpose": "Set running before pthread_create; preserve its original arguments."
+            },
+            {
+              "address": "0x080973ce",
+              "offset": 324558,
+              "before": "c6400801",
+              "after": "90909090",
+              "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+            },
+            {
+              "address": "0x08064042",
+              "offset": 114754,
+              "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+              "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+              "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+            },
+            {
+              "address": "0x080a635a",
+              "offset": 385882,
+              "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+              "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+              "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+            }
+          ],
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "6843c81d3990a982f240134eff6babb09112828497ba34e838b52612557abbcf",
+            "stdout.private.log": "04695a5ac7e0bc2b244862dc0d601529f5291d9562f00b2fcdd9aa6566adc162"
+          }
+        },
+        {
+          "name": "guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "arguments": [
+            "gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\gld_siroco.cfg": "9c7e4be20164895172f22e68074bb500c6b8c449891151f171cde2ff53330f31"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Guild And Guild Member DB Save Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "1fdec5846b98c5f02f38e0bc5edef0764c870d16aa455518ffd441fb8152040c",
+            "stdout.private.log": "8a19d4dbf8196388507c815bf0e802bbe9878f70b07eda407a45795b7289f2e1"
+          }
+        },
+        {
+          "name": "statics",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "arguments": [
+            "stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\stat_siroco.cfg": "93ac72ab27a06946fd2530b6b909f39d790d65b54cb75d59874532b689c271df"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "dbd779d71479ecfa9e4a43d778e6882095024c36715091f0a04cd10344fcdf6a",
+            "stdout.private.log": "5167d4af6fdb2dca2687b887198f671710d6a4258bf969b91e43e6fefc242482"
+          }
+        },
+        {
+          "name": "coserver",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "arguments": [
+            "coserver",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\coserver.cfg": "01811a81bf8e950b92facc7be4abcf40431ddda882e2a4dd7675b55b3012e52e"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "fac15dfdb9c398a3fb68ee93193fe7b0a57f9d8777d1770f4f833e3365eec63c",
+            "stdout.private.log": "8a97566e2bc2a168cc05537f5f5e70a51951b9b8e8eae35e2da12c8a0b83c8af"
+          }
+        },
+        {
+          "name": "community",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "arguments": [
+            "community",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\community.cfg": "c4528dc998c2ffb8ecd9721e61c3259bde9f48583edf42f532f2d4a2b0b06e77"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Community Server(IP:127.0.0.1, PORT:31100)"
+          ],
+          "logs": {
+            "stderr.log": "51afef037debe8a14df846d6a7dda178efbcfadb48c140e6165267989f1c8a08",
+            "stdout.private.log": "8ff3b6e3a571fe54d67f1a58f74b866e37be471be40fd014ef4fac09a898f924"
+          }
+        },
+        {
+          "name": "auction",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "arguments": [
+            "./cfg/auction_siroco.cfg",
+            "run",
+            "./df_auction_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\auction_siroco.cfg": "8158df7a20d59c1b3649afb5780f96a8a6f790cea7fc62bd9e8ffa14bedbd02d",
+            "cfg\\bridge.cfg": "96755361e3e7d11210b9dffc9043091e70bb3e931948b2fabb2789f5f7373708"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "e2b8a429489aa0d06532fee724c8da574fa92f5a8998c0491aa6f4039cead633",
+            "stdout.private.log": "70580e591a414ba5c468f0faf9274c1fface71631b973e5611adc8fde91ae776"
+          }
+        },
+        {
+          "name": "point",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "arguments": [
+            "./cfg/point_siroco.cfg",
+            "run",
+            "./df_point_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\point_siroco.cfg": "19f6b290e6cf7e019fcaaad60e55e4d06406b155a12dc4f1d5f472acb9837352"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "cd351ea3e9fcadf5669759c23e59fc6bd6df9d76ffded5593d7b9d9e3af996fe",
+            "stdout.private.log": "be38275a50475c83085dbc8c5d3f0439f11fd5c308f89199219afba72dde23f2"
+          }
+        },
+        {
+          "name": "channel",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "arguments": [
+            "channel",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\channel.cfg": "5f73e00a2cf5dc4ec4748543d6392a9ea8c1b5c3601e235165d580ddb88cd7e9"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "e73734613e369a9d89dc3f8c4f44807ddbef62503333b31e3cbc6d760b661127",
+            "stdout.private.log": "99ed7c1887e19656c85845e7f34fff188443bbe04e134dc8a1e1279131616c78"
+          }
+        },
+        {
+          "name": "relay",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "arguments": [
+            "relay_200",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\relay_200.cfg": "ec5ae16a114197164f1c3dd745bc87c53cd2cc227ca3be28af2a8e9ee8b2a2fc"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "2336d975fd70de48aa927a0e714bc2d4bd20494c9b72d91fb7ed18d6524529fe",
+            "stdout.private.log": "509aaf2070f266214784196d4229e9f8fa5ad0e2b9a557c14531aa280d6e54b6"
+          }
+        },
+        {
+          "name": "stun",
+          "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+          "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "arguments": [
+            "test"
+          ],
+          "configuration_sha256": {
+            "cfg\\udp_server.cfg": "7f2e554ebb79fd6145700b3c95a7943c598ca43a243af9a63085f1bbb6ce3016"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "9c3623b906a3314eef0052019ec8138e225c3f054b232f036ad75a4098d9f8a1",
+            "stdout.private.log": "01b09d0f1c1a4d54d44da396051c9cbec144af7ad1cd80ba122063ae8042de80"
+          }
+        }
+      ],
+      "bridge_script_matches": true,
+      "bridge_exit_code": 0,
+      "mysql_shutdown_method": "SQL SHUTDOWN",
+      "mysql_shutdown_exit_code": 1,
+      "mysql_exit_code": 0,
+      "database_source_unchanged": true
+    },
+    "actual_monitor_rejections": [
+      {
+        "source_service": "monitor",
+        "source_port": 58473,
+        "account": 701,
+        "result": 0,
+        "header_sha256": "6428b18417696c3b3da9c6736c7de7f0f65f064936e2e9de1fe2718776c13827"
+      },
+      {
+        "source_service": "monitor",
+        "source_port": 58473,
+        "account": 702,
+        "result": 0,
+        "header_sha256": "17bf489a0914859db189253f4cfcc83170c9f58526e7a529b6edbdf95f620b9d"
+      },
+      {
+        "source_service": "monitor",
+        "source_port": 58473,
+        "account": 701,
+        "result": 0,
+        "header_sha256": "6428b18417696c3b3da9c6736c7de7f0f65f064936e2e9de1fe2718776c13827"
+      },
+      {
+        "source_service": "monitor",
+        "source_port": 58473,
+        "account": 702,
+        "result": 0,
+        "header_sha256": "17bf489a0914859db189253f4cfcc83170c9f58526e7a529b6edbdf95f620b9d"
+      }
+    ],
+    "trace_routing": "Diagnostic forwarding only: monitor responses to 8200 are forwarded unchanged to the private relay S2S port 18200. Windows GetExtendedUdpTable owner PID is matched to the actual original monitor host process.",
+    "probe_exit_explanation": "Its earlier checker rejected the SQL shutdown client exit 1 despite server exit 0 and Shutdown complete. The receipt is unchanged; the final direct test records and classifies that observed ERROR 2013 explicitly."
+  },
+  "default_routing_secure_peers": {
+    "receipt_sha256": "9aca6121c1e3e373553c3ed6f5e8cbf2c90b6aa3603d2c1f078b7965ae9014cd",
+    "probe": "build/probes/20261114T075753281406Z/game-chain",
+    "probe_exit_code": 0,
+    "result": {
+      "recorded_utc": "20261114T075753281406Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Fifteen original core peers without game; initialization and database diagnosis only",
+      "probe_script_sha256": "f6fc5ba1d9134f8bf96d7b3bba1a9b766199db25b4752b35bd6fba768e231b9d",
+      "mysql_bootstrap_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
+      "mysql_private_credentials": true,
+      "core_configuration": {
+        "addresses": "loopback",
+        "channel_relay_max_client": 16,
+        "monitor": "private UDP shutdown and initial minute counter patches",
+        "stun": "test mode; default signal exit"
+      },
+      "protocol_observations": {
+        "before_observation": {
+          "recorded_utc": "2026-11-14T07:58:50.977131+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": true,
+              "checks": {
+                "registered_peers": 2,
+                "bidirectional_messages": 8,
+                "unlogged_accounts_disconnected": [
+                  701,
+                  702
+                ],
+                "own_auth_response_sent": false
+              }
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          },
+          "relay_monitor_auth": true
+        },
+        "after_observation": {
+          "recorded_utc": "2026-11-14T07:58:53.997167+00:00",
+          "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+          "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
+          "channel_port": 7001,
+          "relay_accounts": [
+            701,
+            702
+          ],
+          "results": {
+            "channel": {
+              "passed": true,
+              "checks": {
+                "challenge": true,
+                "positive_responses": 3,
+                "fragmented": true,
+                "coalesced": true
+              }
+            },
+            "relay": {
+              "passed": true,
+              "checks": {
+                "registered_peers": 2,
+                "bidirectional_messages": 8,
+                "unlogged_accounts_disconnected": [
+                  701,
+                  702
+                ],
+                "own_auth_response_sent": false
+              }
+            },
+            "stun": {
+              "passed": true,
+              "checks": {
+                "responses": 5,
+                "address_and_source_ports": true
+              }
+            }
+          },
+          "relay_monitor_auth": true
+        }
+      },
+      "occupation_statistics": {
+        "taiwan_cain": [],
+        "taiwan_cain_log": []
+      },
+      "peer_observation_seconds": 1.0,
+      "core_services": [
+        {
+          "name": "manager",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "arguments": [
+            "manager",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\manager.cfg": "9489151ab8a457454d7c5dfca2534a282aa48592fbf155e296d65daa56297771"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "7ed5b0260d2068a371682cd063c4167ba3d73b7c37ec4b7c9571b112934917a1",
+            "stdout.private.log": "98ec7454462b5a15e100402c1eed04accfc5209be5ef465da4529fb81487aba7"
+          }
+        },
+        {
+          "name": "dbmw_guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_gld_siroco.cfg": "5b703cb41e6d9e79ec12cef067ab38bce9cfa754943972afb3eda6ed69040697"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "b6cd61449d4ae0c982d8843b581897ce9f59098dd079bdd7370c3c974cdf66ef",
+            "stdout.private.log": "fc6850d5758fb3ede608b8fddfab4c1c2f3f49f7c67bf9cd08fe3b0ee58b8bf1"
+          }
+        },
+        {
+          "name": "dbmw_mnt",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_mnt_siroco.cfg": "fe0c440d9970befd9e9075977132c7a13eae15d2637063020e7df9a3f0ca0bc7"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "2712f7b4170b68496fdf4fbecde5db1bc54c6a7d0af21294fffc39cbecc9d01d",
+            "stdout.private.log": "35f641133abd6a1164a17bcc0ca78ddbf468d1aa47798e8dd0385637444d3045"
+          }
+        },
+        {
+          "name": "dbmw_stat",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "arguments": [
+            "dbmw_stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\dbmw_stat_siroco.cfg": "39eda98eef03df686c199baea08674af4087055bc83b02705d634876b8799986"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "DBMW_ALL_DB Open Success",
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Application End!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "c3998f0d5f9ed8f69ae459b11fa43473aa8848227c85dd0fc94cf96dc35efaa9",
+            "stdout.private.log": "0ce2d04d78a65c0dc3e814a56b702045502ca2fbfe24d549e2e0a3ab11746250"
+          }
+        },
+        {
+          "name": "monitor",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+          "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+          "arguments": [
+            "mnt_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\mnt_siroco.cfg": "9396600bed6edc8376cdc186e55653a70efb50fee340f2e06666828341121b44"
+          },
+          "patches": [
+            {
+              "address": "0x08062877",
+              "offset": 108663,
+              "before": "c6400400",
+              "after": "c6400401",
+              "purpose": "Initialize the application loop flag before stop callbacks can run."
+            },
+            {
+              "address": "0x08063fa4",
+              "offset": 114596,
+              "before": "c6400401",
+              "after": "90909090",
+              "purpose": "Preserve a stop request received during application Load."
+            },
+            {
+              "address": "0x0805aa4c",
+              "offset": 76364,
+              "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+              "after": "c64008018944240cc7442408b8aa050883642404009090",
+              "purpose": "Set running before pthread_create; preserve its original arguments."
+            },
+            {
+              "address": "0x080973ce",
+              "offset": 324558,
+              "before": "c6400801",
+              "after": "90909090",
+              "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+            },
+            {
+              "address": "0x08064042",
+              "offset": 114754,
+              "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+              "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+              "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+            },
+            {
+              "address": "0x080a635a",
+              "offset": 385882,
+              "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+              "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+              "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+            }
+          ],
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "db1dc290ac1c49d8d97313d1a9596c928c93cb5f232bc3d81aa04190a7c1d131",
+            "stdout.private.log": "8304c93c993cba9c2e758eab779fe7c29912eab42bb7d368e5ac15a19577861f"
+          }
+        },
+        {
+          "name": "guild",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "arguments": [
+            "gld_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\gld_siroco.cfg": "9c7e4be20164895172f22e68074bb500c6b8c449891151f171cde2ff53330f31"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Guild And Guild Member DB Save Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "cc32cbe871bd89fca386131a9d7393ef396d334d28f5f775a0f0f0aa95e9e96d",
+            "stdout.private.log": "37b0dcc6703fdb8fa8c3079650dd7c431b86dabb7de4345356f01eed416df384"
+          }
+        },
+        {
+          "name": "statics",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "arguments": [
+            "stat_siroco",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\stat_siroco.cfg": "93ac72ab27a06946fd2530b6b909f39d790d65b54cb75d59874532b689c271df"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "20c85467a92a495dba7637826da14178c08df76e3b550a8901bbf4f0b0e7ac47",
+            "stdout.private.log": "68392c8836cacab1f381e945b998fa791f25ba5dc5802e7dce34cdbcb8b40ffc"
+          }
+        },
+        {
+          "name": "coserver",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "arguments": [
+            "coserver",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\coserver.cfg": "01811a81bf8e950b92facc7be4abcf40431ddda882e2a4dd7675b55b3012e52e"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 1,
+          "gaps": [],
+          "markers": [
+            "Application Init() Success!",
+            "Application Load() Success!",
+            "Recv SIGTERM signal",
+            "Application Stop!"
+          ],
+          "logs": {
+            "stderr.log": "d6e184a5bb274bcc2c647e3009781c72758581737ae905a05f01b4701547f967",
+            "stdout.private.log": "83727f827368494ff4d763e9b9f8a12451f861616ee49f55acf56828a0fc8d2f"
+          }
+        },
+        {
+          "name": "community",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "arguments": [
+            "community",
+            "nofork"
+          ],
+          "configuration_sha256": {
+            "cfg\\community.cfg": "c4528dc998c2ffb8ecd9721e61c3259bde9f48583edf42f532f2d4a2b0b06e77"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Community Server(IP:127.0.0.1, PORT:31100)"
+          ],
+          "logs": {
+            "stderr.log": "9a17e9b7451198b7dec4d41f9d57e315c3833c8f9dbe33d1e205c31376be2f2f",
+            "stdout.private.log": "063c721f9d10bf175f7e3eb85812734140bb7adb99c86aec41be077b8fc53aaf"
+          }
+        },
+        {
+          "name": "auction",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "arguments": [
+            "./cfg/auction_siroco.cfg",
+            "run",
+            "./df_auction_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\auction_siroco.cfg": "8158df7a20d59c1b3649afb5780f96a8a6f790cea7fc62bd9e8ffa14bedbd02d",
+            "cfg\\bridge.cfg": "96755361e3e7d11210b9dffc9043091e70bb3e931948b2fabb2789f5f7373708"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "1a9fec3ccc901615b36e80d0defda70befb4926ed88d1c2288c4efbb0bd210e1",
+            "stdout.private.log": "c16ba1e8da7cc74b1c50c7e6f2767b966a731d1169a6ab056580520820e534ee"
+          }
+        },
+        {
+          "name": "point",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "arguments": [
+            "./cfg/point_siroco.cfg",
+            "run",
+            "./df_point_r"
+          ],
+          "configuration_sha256": {
+            "cfg\\point_siroco.cfg": "19f6b290e6cf7e019fcaaad60e55e4d06406b155a12dc4f1d5f472acb9837352"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 12,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [
+            "Server Terminated"
+          ],
+          "logs": {
+            "stderr.log": "f6af631fc1a6df27bf9a7cfdde00367c89fa5d0ca7d4e47592c122511c045783",
+            "stdout.private.log": "863dcc55b561bdbe3da4f93d60df8b65e76ffbea55d7ab4ccf237c8be23e7aa8"
+          }
+        },
+        {
+          "name": "channel",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "arguments": [
+            "channel",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\channel.cfg": "5f73e00a2cf5dc4ec4748543d6392a9ea8c1b5c3601e235165d580ddb88cd7e9"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "f0fddd530e4ce2b264b1db3431c5b33132922e81959d48b9b4b33eed2dd01d08",
+            "stdout.private.log": "f663b36e60cccaa63fbefa610d933618b230a557e1a6b9c44f53eb788ea28a99"
+          }
+        },
+        {
+          "name": "relay",
+          "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+          "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "arguments": [
+            "relay_200",
+            "run"
+          ],
+          "configuration_sha256": {
+            "cfg\\relay_200.cfg": "b103fdbbc81c64c9dd460b3c612819730dc6a3b672d571c76366a2df43f77e60"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "bb0ea29e63974e29a99ffb31a61ff8347c7aefef41918325b3cbb843c4075bab",
+            "stdout.private.log": "2c9e60fadf5a634f2abc8420ad95d2ca5333deea2cab5440598ee11ef46f545c"
+          }
+        },
+        {
+          "name": "stun",
+          "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+          "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "arguments": [
+            "test"
+          ],
+          "configuration_sha256": {
+            "cfg\\udp_server.cfg": "7f2e554ebb79fd6145700b3c95a7943c598ca43a243af9a63085f1bbb6ce3016"
+          },
+          "forced_cleanup": false,
+          "exited_before_stop": false,
+          "stop_signal": 15,
+          "exit_code": 0,
+          "gaps": [],
+          "markers": [],
+          "logs": {
+            "stderr.log": "25577a74fc888d9e8a0f52cbb9a25b6792b2dd2e8d70a7f72323eb4ddd2d3ff0",
+            "stdout.private.log": "01b09d0f1c1a4d54d44da396051c9cbec144af7ad1cd80ba122063ae8042de80"
+          }
+        }
+      ],
+      "bridge_script_matches": true,
+      "bridge_exit_code": 0,
+      "mysql_shutdown_method": "SQL SHUTDOWN",
+      "mysql_shutdown_exit_code": 1,
+      "mysql_shutdown_client_lost_ack": true,
+      "mysql_exit_code": 0,
+      "mysql_shutdown_complete": true,
+      "database_source_unchanged": true
+    }
+  },
+  "original_frida_database_interface": {
+    "receipt_sha256": "8fc588b8ca0415db1abb62e8c49c7e6a5f6dd422a01eb1c0296c93ae74c0054a",
+    "probe": "build/probes/20261114T080032161896Z/game-chain",
+    "probe_exit_code": 0,
+    "result": {
+      "recorded_utc": "20261114T080032161896Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Original JS database interface only",
+      "probe_script_sha256": "f6fc5ba1d9134f8bf96d7b3bba1a9b766199db25b4752b35bd6fba768e231b9d",
+      "mysql_bootstrap_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
+      "mysql_private_credentials": true,
+      "game": {
+        "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+        "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "exit_code": 42,
+        "forced_cleanup": false,
+        "elapsed_seconds": 26.335,
+        "syscall_gaps": [
+          "syscall gap nr=291",
+          "syscall gap nr=332"
+        ],
+        "runtime_gaps": [],
+        "dp2_cleanup": true,
+        "startup_seen_after_seconds": null,
+        "stop_signal": null,
+        "observation_after_start_seconds": null,
+        "shutdown_markers": [],
+        "probe": "build\\probes\\20261114T080036322261Z\\game"
+      },
+      "script_db_tables": [
+        "data",
+        "dgnfinishtime",
+        "init_sp_tp"
+      ],
+      "bridge_script_matches": true,
+      "bridge_exit_code": 0,
+      "mysql_shutdown_method": "SQL SHUTDOWN",
+      "mysql_shutdown_exit_code": 1,
+      "mysql_shutdown_client_lost_ack": true,
+      "mysql_exit_code": 0,
+      "mysql_shutdown_complete": true,
+      "database_source_unchanged": true
+    }
+  },
+  "isolated_relay_control": {
+    "receipt_sha256": "9bb172319a9e9dfbb5553003bd1e56363a9dcb43ee75845ae206e82a3f3c9fdb",
+    "probe": "build\\probes\\20261114T073223558747Z\\relay",
+    "recorded_utc": "20261114T073223558747Z",
+    "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+    "elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+    "checks": {
+      "registered_peers": 2,
+      "tcp_messages": 32,
+      "udp_disconnect": true,
+      "other_peer_preserved": true,
+      "fragmented_request": true,
+      "coalesced_requests": true,
+      "reconnect_rounds": 5
+    },
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "protocol_implementation_revision": "2cf98d9:tools/probe_core_protocols.py; subsequent edits annotate the failed phase and add the separate monitor-auth mode, without changing isolated protocol bytes."
+  },
+  "shutdown_policy": {
+    "operation_success": "Owned server exits 0 and records Shutdown complete; a client exit 1 is accepted only for the specifically observed lost shutdown acknowledgment, with the nonzero result retained.",
+    "sql_lost_ack": "ERROR 2013 (HY000) at line 1: Lost connection to MySQL server during query",
+    "other_client_error": "Fail, even if a shutdown marker exists.",
+    "native_initialize_uses_a_separate_private_shutdown_log": true,
+    "native_initialize_lost_ack_branch_observed_in_latest_two_runs": false,
+    "direct_chain_lost_ack_branch_observed": true
+  },
+  "read_only_reference_research": {
+    "files": {
+      "DBMW/DNFAppConfig.cpp": "55109ff203940db51853bb7d2b11b99b8800772d3d748c52f89592d04cfb6c61",
+      "Relay/TCPHandler.cpp": "d594cc90416ca62034197bbb729f680930c3c6d317d6ee725d4ae165dd86d005",
+      "Relay/UDPHandler.cpp": "163a338b41e4ba4f518454989c53386c2d57b6e72a9f8f3784ff275b370b1bf6",
+      "Relay/UDPThread.cpp": "437dfe71b1140b3f4fbe20ed5a16d6eb8e49c93ef6ee0a8ba0694ab355d02a7b",
+      "Relay/RelayService.cpp": "648cf32c5ce5916641d1dc5fb6ebae5700fc83191ce61c98961aef58759a0de2"
+    },
+    "use": "Locate original configuration and monitor/relay interfaces only; verify layout and behavior against original ELF and native runs. Independently written encoder/probes; no reference code, data table, generator or compiled artifact enters execution or delivery."
+  },
+  "limits": [
+    "Developer Windows 10 10.0.19044 only; no clean ordinary-user Win7/10/11 matrix.",
+    "The initial full 16-service run used the earlier copied private database. Secure initialization was independently tested with 15 peers and the original Frida database interface, not another complete game startup.",
+    "Monitor negative authentication of own unlogged accounts is verified; positive game login, original client and playable business are not.",
+    "Known inotify 291/332 fallback remains in game; no new syscall support claimed.",
+    "No Win32 GUI, cold presnapshot/automatic restore rollback, final minimal payload or complete <=210 MB offline ZIP acceptance."
+  ]
+}
