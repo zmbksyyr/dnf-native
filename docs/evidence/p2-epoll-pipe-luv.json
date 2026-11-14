@@ -2,7 +2,7 @@
   "recorded_utc": "2026-11-14T03:17:56.438885+00:00",
   "os": "Windows-10-10.0.19044-SP0",
   "source_base_commit": "8f94f25",
-  "scope": "Pipe/socket epoll primitives and original DP2/luv timer interface; full game abort correlation and post-fix startup pending.",
+  "scope": "Pipe/socket epoll and original DP2/luv timer interfaces; natural old-host abort matches libuv+0x19661. Post-fix natural startup is under observation.",
   "sources": {
     "runtime/net.c": "a704bfb08a995afac9fc603fda18f00b118fe128cd43ace0be4d9236e6d62c2f",
     "tests/epoll.c": "c699b0de732e2130215374e100e2c577be9f7e5d1223e945d27f0dbd6dc9321c",
@@ -313,5 +313,175 @@
     "Full natural game startup and shutdown are not accepted by these fixtures.",
     "No EPOLLET, ONESHOT, nested epoll or complete Linux epoll semantics acceptance.",
     "Windows 10 x64 10.0.19044 only."
-  ]
+  ],
+  "short_abort_stack_diagnostic": {
+    "probe": "build/probes/20261114T031855045599Z/game",
+    "host_sha256": "be8ec8893e1950a11ce8fddbddd69ce1c9d27ebdbc54e18df2bef7f487c37e46",
+    "exit_code": 134,
+    "log_sha256": "a820fcfca86a7a8a2ed65cf7e53733adc26df25d2f3784d4df6be57c7fcd31d9",
+    "trace": [
+      "native-abort tid=9864 pc=0x9850950 sp=0x7f2bf0c",
+      "native-abort-backtrace 0xa339661 0xa339661",
+      "native-abort-stack[0] libuv.so+0x19661"
+    ],
+    "diagnostic_only_syscall_gap": "i386 mincore nr=218, triggered by Thread.backtrace in the added diagnostic, not the original timer fixture"
+  },
+  "static_abort_basis": {
+    "libuv_sha256": "b50ddbae1ca904569adb6790b4b5972c443872c70bb477328d2b4feafb76e840",
+    "uv__io_poll": "0x19210",
+    "epoll_ctl_call": "0x1929c",
+    "unexpected_errno_abort_branch": "0x192b0 to 0x1965c unless errno is EEXIST",
+    "abort_call": "0x1965c",
+    "abort_return": "0x19661"
+  },
+  "fixed_frida_luv": {
+    "recorded_utc": "20261114T032132676476Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "483ccab44ce3e1cc97fb005b8dbc24942a43c5bf14479ab114c9ae86d00303f3",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 42,
+    "forced_cleanup": false,
+    "elapsed_seconds": 29.392,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "e348d03419d27791ebad07109c7b50928e3a577665db42b4e7cbaf2a9b3d1e7d",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "4c3d23843b7c3374068f95174c36012f61f37185a26eb36404e6bf63e56747c2",
+      "dp2\\df_game_r.js": "e6c7df419e63d5b93cbdbbf161ae893a260e7499052e852470597713c11b6cad"
+    },
+    "syscall_gaps": [
+      "syscall gap nr=291",
+      "syscall gap nr=332"
+    ],
+    "runtime_gaps": [],
+    "probe": "build/probes/20261114T032132676476Z/game",
+    "log_sha256": {
+      "stdout.log": "ce40ed27d52141e1536861d33b37cd326ab20d69119eb15f2f8b8b4096c17e2d",
+      "stderr.log": "722569f965c00e6bbfd0603aa6a4b545bacc17a2ed166b3435a925ae5e272e9b"
+    },
+    "timer_fired_and_loop_returned": true
+  },
+  "natural_game_abort_stack": {
+    "recorded_utc": "20261114T030321422901Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "be8ec8893e1950a11ce8fddbddd69ce1c9d27ebdbc54e18df2bef7f487c37e46",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 134,
+    "forced_cleanup": false,
+    "elapsed_seconds": 1286.188,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "1d961f95092ebde1652b163217cc4dae6786147845846cf7f5fc931191dc19ab",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "951168b0262494c03743f618b8e9f704db043c4a0c3e5e41ab8e51ccdb64d0aa",
+      "dp2\\df_game_r.js": "e6c7df419e63d5b93cbdbbf161ae893a260e7499052e852470597713c11b6cad"
+    },
+    "syscall_gaps": [
+      "syscall gap nr=218",
+      "syscall gap nr=291",
+      "syscall gap nr=332"
+    ],
+    "runtime_gaps": [
+      "ELF dependency snapshot failed: unsupported extent"
+    ],
+    "initialization_markers": [
+      "All DB Open Success",
+      "Init Query Table Success",
+      "Init GlobalData Success",
+      "Init HistoryLog Success",
+      "InitRDARScriptStringManager Success",
+      "Init DataManager Success"
+    ],
+    "probe": "build/probes/20261114T030321422901Z/game",
+    "trace": [
+      "native-abort tid=11872 pc=0x76a0950 sp=0x59ee0c6c",
+      "native-abort-backtrace 0x7df9661 0x7df9661",
+      "native-abort-stack[0] libuv.so+0x19661",
+      "native-abort-stack[28] libdp2game.so+0x2d050e",
+      "native-abort-stack[36] libdp2game.so+0x2d050e",
+      "native-abort-stack[40] libc.so.6+0x1c7000",
+      "native-abort-stack[63] libdp2game.so+0x2d050e"
+    ],
+    "log_sha256": {
+      "stdout.log": "fa3e9d0d9ddf4be8061c8b58e2f8f22f73dee1dd95f03fd391ab5665c8ebdf77",
+      "stderr.log": "eceac2952343fc5d5e65ade397c46c25693b0805e6b50bd66cffa0868474d2f9"
+    },
+    "diagnostic_only_syscall_gap": "i386 mincore 218 from the added Thread.backtrace",
+    "result": "The full natural startup on the old host aborts at the same libuv+0x19661 return site as the short Lua timer reproduction."
+  },
+  "natural_diagnostic_chain": {
+    "database_source": {
+      "files": 1506,
+      "bytes": 266034085,
+      "tree_sha256": "3a45764cc9799cc6f0060b2060e03fd3d958d5f26d3999ee1e45fd40dd353506"
+    },
+    "bridge_exit_code": 0,
+    "mysql_shutdown_exit_code": 0,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "formal_luv": {
+    "os": "Windows-10-10.0.19044-SP0",
+    "host_sha256": "c830c112551f23d50d56d7ef8c3760a5e9889c986277184431aebd7137c0b78c",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 42,
+    "forced_cleanup": false,
+    "elapsed_seconds": 25.372,
+    "inputs": {
+      "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+      "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+      "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+      "home\\neople\\game\\cfg\\siroco11.cfg": "e348d03419d27791ebad07109c7b50928e3a577665db42b4e7cbaf2a9b3d1e7d",
+      "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+      "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+      "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+      "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+      "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+      "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+      "dp2\\df_game_r.lua": "a0a119a1333aca8e98a344c32b4fefcabcd66f97fcdc70ebc05040b1a340a7b6",
+      "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+    },
+    "syscall_gaps": [],
+    "runtime_gaps": [],
+    "recorded_utc": "2026-11-14T03:25:59.200524+00:00",
+    "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+    "probe": "build\\probes\\20261114T032533067988Z\\game",
+    "command": [
+      "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tools\\probe_game.py",
+      "--preload",
+      "--timeout",
+      "60",
+      "--host",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+      "--lua-script",
+      "D:\\cache\\dnf-runtime\\dnf-native\\tests\\luv_timer.lua"
+    ],
+    "markers": [
+      "dnf-native-luv-timer-fired",
+      "dnf-native-luv-loop-returned"
+    ],
+    "passed": true,
+    "log_sha256": {
+      "stdout.log": "58dfc906dd91a2552986f7e957458c6d66c555e17bd5083460eb6967872bd0c4",
+      "stderr.log": "7ef67338c8dc41467d283da79acda7c50ac74fedc9d7e7cf25869230860d38e9"
+    }
+  }
 }

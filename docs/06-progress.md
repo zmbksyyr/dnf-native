@@ -292,4 +292,6 @@ Frida 失败退出路径的诊断实际发现 futex 操作 132/133，即 PRIVATE
 
 新增双架构 ELF 核对空管道超时、64 位事件数据、MOD/DEL、UDP socket 与管道混合等待、HUP、关闭 fd 后注销，以及外部 Windows 管道延迟写入唤醒。双架构全部通过，同一独立构建的 poll、TCP、入口/信号、加载器及原版 channel、relay 协议回归也通过。正式宿主仍由此前完整诊断运行使用，未覆盖正在运行的映像；完整 game 的 abort 调用栈及新构建的自然启动结果另行记录，不能以短样件通过宣称整体问题已解决。
 
+后续完整诊断运行在 1286.188 秒返回 134，实际 abort 返回地址同样是原版 `libuv.so+0x19661`。原版反汇编确认该地址紧随 `uv__io_poll` 的 epoll_ctl 非 EEXIST 错误分支，和短样件一致。修复构建中附加 Frida 的短定时器也自行返回 42，耗时 29.392 秒；正式宿主重建后的无 Frida 定时器检查返回 42，耗时 25.372 秒，无强制回收或 gap。完整修复构建已启动新的 game、bridge、私有 MySQL 联合观察，其自然启动结果仍待本轮结束后记录。
+
 证据见 [epoll 管道与原版 luv 定时器](evidence/p2-epoll-pipe-luv.json)。仅实测 Windows 10 x64 10.0.19044，EPOLLET/ONESHOT 等仍未支持。
