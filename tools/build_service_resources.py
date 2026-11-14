@@ -43,6 +43,7 @@ def main():
         if count != 1:
             raise RuntimeError("Original Frida database setting differs: " + key)
     script.write_text(text, encoding="utf-8")
+    next(entry for entry in records if entry["name"] == "game")["frida_item_reset"]["prepared_script_sha256"] = sha256(script)
     shutil.copy2(seed, output / "seed.sql")
     ini = configparser.ConfigParser(interpolation=None)
     files = sorted(path for path in output.rglob("*") if path.is_file())
@@ -56,7 +57,7 @@ def main():
                "resource_count": len(files), "raw_bytes": sum(path.stat().st_size for path in files),
                "seed_sha256": args.seed_sha256, "manifest_sha256": sha256(output / "resources.ini"),
                "services": records,
-               "sources": {name: sha256(ROOT / name) for name in ["tools/build_service_resources.py", "tools/prepare_service_instance.py", "runtime/dp2_cleanup.lua"]}}
+               "sources": {name: sha256(ROOT / name) for name in ["tools/build_service_resources.py", "tools/prepare_service_instance.py", "runtime/dp2_cleanup.lua", "runtime/frida_item_reset.js"]}}
     (output.parent / "resources-build-receipt.json").write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
     print("Built native first-run resources:", len(files), "files; seed", args.seed_sha256, flush=True)
 

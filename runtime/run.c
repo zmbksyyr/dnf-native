@@ -51,7 +51,9 @@ int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
                     covered = last;
             }
         }
-        for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
+        /* Once this request is covered, later mappings cannot improve its
+           validity. Frida's small memory operations hit this path repeatedly. */
+        for (unsigned i = 0; i < NR_VM_SLOTS && covered < end; ++i) {
             NrVm *v = &active->vm[i];
             uintptr_t first = (uintptr_t)v->base;
             if (first && address >= first && address - first < v->size && first + v->size > covered)

@@ -131,7 +131,7 @@ def main():
             select(window, index); click(window, 221)
             ready(window, rows(window)[index].split()[0] + "：进程运行中", 30)
         time.sleep(25)
-        assert sum("进程运行中" in row for row in rows(window)) == 15
+        assert sum("进程运行中" in row for row in rows(window)) == 15, rows(window)
         checks["native_initialized_fifteen_original_peers"] = True
         checks["channel_protocol"] = channel(7001)
         checks["relay_and_actual_monitor_protocol"] = relay(True)

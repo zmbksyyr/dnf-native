@@ -34,6 +34,33 @@ ENTRIES = [
 ]
 
 
+def prepare_item_reset(script, game):
+    """Replace only the pinned package's hot JS reset; preserve its semantics."""
+    source_sha = sha256(script)
+    game_sha = sha256(game)
+    if (source_sha != "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b" or
+            game_sha != "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979"):
+        raise RuntimeError("Native item reset requires the pinned original game and script")
+    old = ("Interceptor.replace(ptr(0x080CB7D8), new NativeCallback(function (Inven_Item) {//装备全字节删除\n"
+           "        var MReset = Memory.alloc(61)\n"
+           "        Memory.copy(Inven_Item, MReset, 61)\n"
+           "        return Inven_Item;\n"
+           "    }, 'pointer', ['pointer']));")
+    dispose = "dispose: function () {\n"
+    text = script.read_text(encoding="utf-8")
+    if text.count(old) != 1 or text.count(dispose) != 1:
+        raise RuntimeError("Packaged item reset or dispose block differs")
+    helper = ROOT / "runtime/frida_item_reset.js"
+    text = text.replace(old, "dnf_native_install_item_reset();")
+    text = text.replace(dispose, dispose + "        dnf_native_restore_item_reset();\n")
+    script.write_text(helper.read_text(encoding="utf-8") + "\n" + text, encoding="utf-8", newline="\n")
+    return {"source_script_sha256": source_sha, "game_sha256": game_sha,
+            "helper_sha256": sha256(helper), "prepared_script_sha256": sha256(script),
+            "address": "0x080cb7d8", "original_bytes": "5589e583ec188b4508c600008b4508c64001008b4508",
+            "replacement_bytes": "578b7c240889fa31c0b93d000000fcf3aa89d05fc390",
+            "scope": "Same 61-byte reset as packaged JS, restored during dispose; disk ELF unchanged"}
+
+
 def copy_service_resources(output, db, bridge_password, peers_only=False):
     records = []
     for arch in ["i686", "x86_64"]:
@@ -123,6 +150,8 @@ def copy_service_resources(output, db, bridge_password, peers_only=False):
         ini[name] = section
         records.append({"name": name, "original_elf_sha256": original_sha, "executed_elf_sha256": sha256(elf),
                                    "host_sha256": sha256(output / section["host"]), "loader_sha256": sha256(loader), "patches": patches})
+        if name == "game":
+            records[-1]["frida_item_reset"] = prepare_item_reset(root / "dp2/df_game_r.js", elf)
     with (output / "services.ini").open("w", encoding="utf-16") as file:
         ini.write(file)
     return records
@@ -212,7 +241,7 @@ def prepare(output, database_source, mysql, peers_only=False):
                 server.terminate(); server.wait(timeout=10)
         record["source_database_unchanged"] = before == tree_identity(source / "data")
         record["database_shutdown_complete"] = server is not None and server.returncode == 0 and b"Shutdown complete" in (output / "prepare-server.private.log").read_bytes()
-        record["sources"] = {name: sha256(ROOT / name) for name in ["tools/prepare_service_instance.py", "runtime/dp2_cleanup.lua"]}
+        record["sources"] = {name: sha256(ROOT / name) for name in ["tools/prepare_service_instance.py", "runtime/dp2_cleanup.lua", "runtime/frida_item_reset.js"]}
         (output / "prepare-receipt.json").write_text(json.dumps(record, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
     if record["forced_cleanup"] or not record["source_database_unchanged"] or not record["database_shutdown_complete"]:
         raise RuntimeError("Private instance preparation did not complete cleanly")

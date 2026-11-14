@@ -1,0 +1,967 @@
+{
+  "recorded_utc": "2026-11-14T18:35:27.242072+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Original-package PVF client gameplay and cold persistence; reference GUI; equivalent native packaged item reset, actual original cache construction and full-stack shutdown. Known failures retained; no pure-client, multi-OS or production-load acceptance.",
+  "sources": {
+    "runtime/run.c": "1c28030856814d7c59eccb6d10ded1d30c86a574bf6a7bc48c5be8b9960ff60f",
+    "runtime/frida_item_reset.js": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
+    "tools/prepare_service_instance.py": "886d20d597e83acf9868eb4472379a94105d4a919ca119972b54281e6cad8a37",
+    "tools/build_service_resources.py": "a12ac7dc2e02eb2d54584951bec99fec0f95b0bfc43fb5a81d3624815d969a5f",
+    "tools/test_frida.py": "1738a388d7c385fd60a55639f4a0e1136f3c57b8406d60ba7e5bc7da05631708",
+    "tests/frida_item_reset.js": "325bcb08bd2d1f83ef54c1cd243a64f6c979fca13a376eb5e9a0d63a90ef3cd2",
+    "tools/test_gui_setup.py": "2b1807a51b3d61c9eef50ea165f184e67b519493a983b28565cdf6e931ed12df"
+  },
+  "original_game": {
+    "path": "originals/dp123/home/neople/game/df_game_r",
+    "bytes": 36360954,
+    "sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979"
+  },
+  "original_script": {
+    "path": "originals/dp123/dp2/df_game_r.js",
+    "bytes": 106182,
+    "sha256": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+  },
+  "gameplay": {
+    "probe": "build/probes/20261114T163448584755Z/client-graphics",
+    "pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+    "actions_observed": [
+      "original authentication",
+      "male slayer creation",
+      "Lorien movement, attack and potion",
+      "multiple rooms",
+      "boss defeat",
+      "clear reward",
+      "return to town",
+      "cold restart login and town"
+    ],
+    "tutorial_client_mode": "full (client GM and auto-pickup features enabled; not clean score acceptance)",
+    "cold_reload_client_mode": "fixonly",
+    "client_receipts": {
+      "tutorial-client-receipt.private.json": {
+        "executable_sha256": "246b838163fa7c71aa0445fa4aafde04e7ac72aa72855a4b2a7eaeed5eeae264",
+        "pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "exit_code": 0,
+        "forced_cleanup": false
+      },
+      "client-receipt.private.json": {
+        "executable_sha256": "246b838163fa7c71aa0445fa4aafde04e7ac72aa72855a4b2a7eaeed5eeae264",
+        "pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "exit_code": 0,
+        "forced_cleanup": false
+      }
+    },
+    "snapshots_equal": true,
+    "snapshot_files": [
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/cold-reload-before.private.log",
+        "bytes": 149,
+        "sha256": "541d3725c2987cb657fae82d41741f1b877ea9c6b11377d371cf28437c14a4ea"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/cold-reload-after.private.log",
+        "bytes": 149,
+        "sha256": "541d3725c2987cb657fae82d41741f1b877ea9c6b11377d371cf28437c14a4ea"
+      }
+    ],
+    "snapshot_columns": [
+      "charac_no",
+      "lev",
+      "exp",
+      "money",
+      "coin",
+      "pay_coin",
+      "event_coin",
+      "OCTET_LENGTH(inventory)",
+      "SHA2(inventory,256)",
+      "SHA2(equipslot,256)"
+    ],
+    "cold_values": {
+      "lev": 2,
+      "exp": 0,
+      "money": 1060,
+      "coin": 5,
+      "pay_coin": 0,
+      "event_coin": 0,
+      "inventory_bytes": 88,
+      "inventory_sha256": "1bc16a87807fccf35866c7ab76cc8961e1d45df31209bb5f0c0f3f5bf43a677a",
+      "equipslot_sha256": "8431332bdc51e95a2e827a0504fb7377969aec90d9e7d978e5a6a09f436e3ae9"
+    },
+    "screenshots": [
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-create-submitted.private.png",
+        "bytes": 603174,
+        "sha256": "a0575976397db860c5d57d13603baba8a333783ea1a2e3904ab5534ae8d79848"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-tutorial-clear.private.png",
+        "bytes": 422641,
+        "sha256": "dec3bc488b5b4cea6f403483e7dd22da8029dafd8e53eb60d415e87f4c4bdf62"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-tutorial-settlement.private.png",
+        "bytes": 456656,
+        "sha256": "1c2308470a476c7b9a1587d20081cd48b5917dccf3388072231deffd0230f90d"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-choose-channel-reload.private.png",
+        "bytes": 612365,
+        "sha256": "f3dd3ddf716c0b293899a88f5e910b0ffa3a261e4381770e543beb9aae8931d9"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-cold-reload-town.private.png",
+        "bytes": 477794,
+        "sha256": "29d4ea47299b03adf3e10ec605629dff5a10a5a3b5b95c747964d3e793fbae0c"
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/client-cold-reload-confirmed.private.png",
+        "bytes": 461590,
+        "sha256": "7ba701928a978c43c040948570026d476d8163cca4fac71d48360615337790dd"
+      }
+    ],
+    "earlier_shutdowns": [
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/tutorial-server-receipt.json",
+        "forced_cleanup": true,
+        "not_normal_shutdown_acceptance": true
+      },
+      {
+        "path": "build/probes/20261114T163448584755Z/client-graphics/server-receipt.json",
+        "forced_cleanup": true,
+        "not_normal_shutdown_acceptance": true
+      }
+    ]
+  },
+  "native_reset": {
+    "fixture": {
+      "recorded_utc": "2026-11-14T18:20:29.778211+00:00",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Own bridge scripts in original game/DP2/Lua/Frida; no database, gameplay or full plugin acceptance",
+      "probe": "build\\probes\\20261114T182025990736Z\\game",
+      "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 42,
+      "forced_cleanup": false,
+      "elapsed_seconds": 3.187,
+      "markers": [
+        "dnf-native-original-game-hook-ok",
+        "dnf-native-js-lua-roundtrip-ok calls=32",
+        "dnf-native-lua-js-roundtrip-ok calls=32",
+        "dnf-native-cache1000-constructed milliseconds=",
+        "dnf-native-reset61-boundaries-and-restore-ok"
+      ],
+      "sources": {
+        "tools/test_frida.py": "1738a388d7c385fd60a55639f4a0e1136f3c57b8406d60ba7e5bc7da05631708",
+        "tests/frida_bridge.js": "429980d35b9ed58864cfaaf9414c071607d9062b476e133a5fa37f4bd761f183",
+        "tests/frida_bridge.lua": "000e6bad3118d44aa85c330bae99e56f8b2221978c78979c42591d99971f7c65",
+        "runtime/frida_item_reset.js": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
+        "tests/frida_item_reset.js": "325bcb08bd2d1f83ef54c1cd243a64f6c979fca13a376eb5e9a0d63a90ef3cd2"
+      },
+      "item_reset": true,
+      "cache1000_milliseconds": 94,
+      "game_hook": {
+        "original": 0,
+        "hooked": 64,
+        "restored": 0
+      },
+      "inputs": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "000e6bad3118d44aa85c330bae99e56f8b2221978c78979c42591d99971f7c65",
+        "dp2\\df_game_r.js": "6106c6f95de1e29a5e016183e1a548f5bff923e9a1f3663554653898ddc9321e"
+      },
+      "logs": {
+        "stdout.log": "e50b498ff3f87b5e6185d5f604bfb33b6066938b81a2ebfe31d00def5cb4feb9",
+        "stderr.log": "3819473d5b05aa6bd5d06ebb03960e93e30faab7733e19b4a47245d7a356e814"
+      },
+      "syscall_gaps": [
+        "syscall gap nr=291",
+        "syscall gap nr=332"
+      ],
+      "runtime_gaps": [],
+      "passed": true
+    },
+    "ordinary_production_script_full_stack": {
+      "probe": "build/probes/20261114T182115628329Z/client-shutdown-inline",
+      "receipt": {
+        "gui_pid": 14504,
+        "ready": true,
+        "forced_cleanup": false,
+        "startup_seconds": 35.517,
+        "exit_code": 0
+      },
+      "protocols": {
+        "channel": {
+          "challenge": true,
+          "positive_responses": 3,
+          "fragmented": true,
+          "coalesced": true
+        },
+        "relay": {
+          "registered_peers": 2,
+          "bidirectional_messages": 8,
+          "unlogged_accounts_disconnected": [
+            701,
+            702
+          ],
+          "own_auth_response_sent": false
+        },
+        "stun": {
+          "responses": 5,
+          "address_and_source_ports": true
+        }
+      }
+    },
+    "live_original_cache": {
+      "probe": "build/probes/20261114T182539856174Z/cache-shutdown",
+      "receipt": {
+        "gui_pid": 14564,
+        "ready": true,
+        "forced_cleanup": false,
+        "startup_seconds": 36.028,
+        "exit_code": 0
+      },
+      "cache": {
+        "cache1000_milliseconds": 94,
+        "stdout_sha256": "ae96ba38b17c1e61f822545e26a7e0d2c503e0c874aedc7bbcaeb6ee38c956f1",
+        "scope": "Original cache constructed under final package script in running 16-service stack; not client logout"
+      },
+      "test_only_script_workload": {
+        "production_script_sha256": "9143323f89aaddae5e70a5842dd176ae0c40662f7f3fded9fea0f4e1d118ff7f",
+        "test_script_sha256": "5e3a77e3f3f7f29b25b8b3a1ba467d5794b5be3031f502b9a759e21a5ae95249",
+        "scope": "Final packaged script plus a test-only call to the original cache singleton after startup; no client login assertion"
+      },
+      "shutdown": {
+        "requested_epoch": 1794680827.2112823,
+        "receipt_written_after_seconds": 26.87
+      },
+      "production_script_restored": true
+    },
+    "pinned_patch": {
+      "source_script_sha256": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b",
+      "game_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "helper_sha256": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
+      "prepared_script_sha256": "9143323f89aaddae5e70a5842dd176ae0c40662f7f3fded9fea0f4e1d118ff7f",
+      "address": "0x080cb7d8",
+      "original_bytes": "5589e583ec188b4508c600008b4508c64001008b4508",
+      "replacement_bytes": "578b7c240889fa31c0b93d000000fcf3aa89d05fc390",
+      "scope": "Same 61-byte reset as packaged JS, restored during dispose; disk ELF unchanged"
+    },
+    "scope_limit": "Original 1000-entry allocation is retained; no claim of load CPU/memory reduction percentage or post-fix real-client logout acceptance."
+  },
+  "runtime_builds": [
+    {
+      "arch": "i686",
+      "output_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+      "sources": {
+        "runtime\\adapt.c": "e45d1dfba615fa080e19d9401519782b44579aad569389c770ca6ea553eaa374",
+        "runtime\\dp2_cleanup.lua": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42",
+        "runtime\\elf.c": "77bf37803209ee1a530cdbc2995f560e58073526983fa82757a8d3a51384576d",
+        "runtime\\elf.h": "3a88313cf5ee1a395a5170d870b662caf1250ce9efdd524d7d3c75f5f6e01c69",
+        "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+        "runtime\\files.c": "a4e3491167b4d952635e6880a21db29731819014bf0c499e6257f7704568cf4d",
+        "runtime\\main.c": "d24340c71cf4df1281bbe4432dd9f08f0f5306ddf2dcd862fe90fb83b801d3e9",
+        "runtime\\net.c": "892bc6b8143068c79d113b2dde84cc0e6f2bf2623006c9b9196bc622f38779b9",
+        "runtime\\run.c": "1c28030856814d7c59eccb6d10ded1d30c86a574bf6a7bc48c5be8b9960ff60f",
+        "runtime\\run.h": "87878fce6cb18ed07ae6a86480b8878a86a8e8f070060749705c1cf2198bb65e",
+        "runtime\\signal.c": "f92bddf3617fd79d6c1e54413e7fb98276d362e60404e5765f9873f3417487be",
+        "runtime\\thread.c": "bf32dbd1e71fa3671e342463b3f8df8cd513469c2ab441fb2f5217ca9f06ce18",
+        "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+        "runtime\\vm.c": "bf595f87f9f4371d58133f55d8a0d0bd8b9e92dbbc99f3a3b474030f111463c9"
+      }
+    },
+    {
+      "arch": "x86_64",
+      "output_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+      "sources": {
+        "runtime\\adapt.c": "e45d1dfba615fa080e19d9401519782b44579aad569389c770ca6ea553eaa374",
+        "runtime\\dp2_cleanup.lua": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42",
+        "runtime\\elf.c": "77bf37803209ee1a530cdbc2995f560e58073526983fa82757a8d3a51384576d",
+        "runtime\\elf.h": "3a88313cf5ee1a395a5170d870b662caf1250ce9efdd524d7d3c75f5f6e01c69",
+        "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+        "runtime\\files.c": "a4e3491167b4d952635e6880a21db29731819014bf0c499e6257f7704568cf4d",
+        "runtime\\main.c": "d24340c71cf4df1281bbe4432dd9f08f0f5306ddf2dcd862fe90fb83b801d3e9",
+        "runtime\\net.c": "892bc6b8143068c79d113b2dde84cc0e6f2bf2623006c9b9196bc622f38779b9",
+        "runtime\\run.c": "1c28030856814d7c59eccb6d10ded1d30c86a574bf6a7bc48c5be8b9960ff60f",
+        "runtime\\run.h": "87878fce6cb18ed07ae6a86480b8878a86a8e8f070060749705c1cf2198bb65e",
+        "runtime\\signal.c": "f92bddf3617fd79d6c1e54413e7fb98276d362e60404e5765f9873f3417487be",
+        "runtime\\thread.c": "bf32dbd1e71fa3671e342463b3f8df8cd513469c2ab441fb2f5217ca9f06ce18",
+        "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+        "runtime\\vm.c": "bf595f87f9f4371d58133f55d8a0d0bd8b9e92dbbc99f3a3b474030f111463c9"
+      }
+    }
+  ],
+  "runtime_checks": {
+    "vm-checks.json": {
+      "recorded_utc": "2026-11-14T18:33:03.987682+00:00",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Own anonymous VM fixtures; not full mmap or service acceptance",
+      "results": [
+        {
+          "arch": "i686",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=i386-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-fomit-frame-pointer",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wl,--image-base=0x8048000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\vm.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\vm"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\vm",
+            "c5f5107f2ff94c1172b09c9fbb8455c2bbab711db51fe3b5c2f9383cee488cc5",
+            "vm-fixture"
+          ],
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "fixture_sha256": "c5f5107f2ff94c1172b09c9fbb8455c2bbab711db51fe3b5c2f9383cee488cc5",
+          "exit_code": 42,
+          "stdout": "anon-vm-ok\n",
+          "stderr": "adapt sha256=c5f5107f2ff94c1172b09c9fbb8455c2bbab711db51fe3b5c2f9383cee488cc5 sections=1 syscall_traps=0 tls_traps=0 tls_direct=0\r\nenter guest bits=32 entry=0x80491b0 stack=0x62cf9c0 argc=1\r\n",
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=x86_64-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-fomit-frame-pointer",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wl,--image-base=0x400000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\vm.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\vm"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\vm",
+            "9f9bb663336111a6feb7d3675c36e2a37ea180c82f813c8e9c9bc12b14294281",
+            "vm-fixture"
+          ],
+          "host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "fixture_sha256": "9f9bb663336111a6feb7d3675c36e2a37ea180c82f813c8e9c9bc12b14294281",
+          "exit_code": 42,
+          "stdout": "anon-vm-ok\n",
+          "stderr": "adapt sha256=9f9bb663336111a6feb7d3675c36e2a37ea180c82f813c8e9c9bc12b14294281 sections=1 syscall_traps=1 tls_traps=0 tls_direct=0\r\nenter guest bits=64 entry=0x401130 stack=0xd46d7ff7d0 argc=1\r\n",
+          "passed": true
+        }
+      ]
+    },
+    "tls-checks.json": {
+      "recorded_utc": "2026-11-14T18:33:04.159177+00:00",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Own TLS fixtures; timing is local observation only, not service acceptance",
+      "results": [
+        {
+          "arch": "i686",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=i386-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-mno-red-zone",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wl,--image-base=0x8048000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\tls.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\tls"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\tls",
+            "3968386c51a8aa0a99676e927081ca1ce91bac5c5088be2f6b1aa755b28a6462",
+            "tls-fixture"
+          ],
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "fixture_sha256": "3968386c51a8aa0a99676e927081ca1ce91bac5c5088be2f6b1aa755b28a6462",
+          "exit_code": 42,
+          "elapsed_seconds": 0.190538,
+          "rounds": 10000,
+          "stdout": "native-tls-ok\n",
+          "stderr": "adapt sha256=3968386c51a8aa0a99676e927081ca1ce91bac5c5088be2f6b1aa755b28a6462 sections=1 syscall_traps=0 tls_traps=8 tls_direct=11\r\nenter guest bits=32 entry=0x80490d0 stack=0x665fb20 argc=1\r\n",
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=x86_64-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-mno-red-zone",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wl,--image-base=0x400000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\tls.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\tls"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\tls",
+            "3302d20e232c75dbb26549e9cca7ad3e1bce93a5786a6512e028857807b1350d",
+            "tls-fixture"
+          ],
+          "host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "fixture_sha256": "3302d20e232c75dbb26549e9cca7ad3e1bce93a5786a6512e028857807b1350d",
+          "exit_code": 42,
+          "elapsed_seconds": 0.095964,
+          "rounds": 10000,
+          "stdout": "native-tls-ok\n",
+          "stderr": "adapt sha256=3302d20e232c75dbb26549e9cca7ad3e1bce93a5786a6512e028857807b1350d sections=1 syscall_traps=9 tls_traps=7 tls_direct=0\r\nenter guest bits=64 entry=0x401130 stack=0xdf492ffba0 argc=1\r\n",
+          "passed": true
+        }
+      ]
+    },
+    "process-signal-checks.json": {
+      "recorded_utc": "2026-11-14T18:33:04.147376+00:00",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Own native ELF processes: kill(0), SIGUSR2 while blocked, SIGTERM and delivery after unblocking. No game shutdown acceptance.",
+      "results": [
+        {
+          "receiver_arch": "i686",
+          "sender_arch": "i686",
+          "receiver_host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "sender_host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "receiver_fixture_sha256": "109668c4fac039b00401340f85490034ad0c8baa94ed19326f03c93dd9fba1f2",
+          "sender_fixture_sha256": "03844860795b24c7a960b2be8fdb2c9e011d6efe7402ba5ae64c8e3368feb7fa",
+          "receiver_exit_code": 42,
+          "sender_exit_code": 42,
+          "receiver_stderr": "adapt sha256=109668c4fac039b00401340f85490034ad0c8baa94ed19326f03c93dd9fba1f2 sections=1 syscall_traps=0 tls_traps=0 tls_direct=0\r\nenter guest bits=32 entry=0x8049100 stack=0x5e0f8e0 argc=1\r\n",
+          "sender_stderr": "adapt sha256=03844860795b24c7a960b2be8fdb2c9e011d6efe7402ba5ae64c8e3368feb7fa sections=1 syscall_traps=0 tls_traps=0 tls_direct=0\r\nenter guest bits=32 entry=0x80490c0 stack=0x649f970 argc=1\r\n",
+          "forced_cleanup": false,
+          "error": null,
+          "passed": true
+        },
+        {
+          "receiver_arch": "i686",
+          "sender_arch": "x86_64",
+          "receiver_host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "sender_host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "receiver_fixture_sha256": "109668c4fac039b00401340f85490034ad0c8baa94ed19326f03c93dd9fba1f2",
+          "sender_fixture_sha256": "55fcfd55d244a63db28631ddfa1ba6145e46df84ff2c545011f1dd033edffcfd",
+          "receiver_exit_code": 42,
+          "sender_exit_code": 42,
+          "receiver_stderr": "adapt sha256=109668c4fac039b00401340f85490034ad0c8baa94ed19326f03c93dd9fba1f2 sections=1 syscall_traps=0 tls_traps=0 tls_direct=0\r\nenter guest bits=32 entry=0x8049100 stack=0x68cf950 argc=1\r\n",
+          "sender_stderr": "adapt sha256=55fcfd55d244a63db28631ddfa1ba6145e46df84ff2c545011f1dd033edffcfd sections=1 syscall_traps=7 tls_traps=0 tls_direct=0\r\nenter guest bits=64 entry=0x401120 stack=0x689b8ff760 argc=1\r\n",
+          "forced_cleanup": false,
+          "error": null,
+          "passed": true
+        },
+        {
+          "receiver_arch": "x86_64",
+          "sender_arch": "i686",
+          "receiver_host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "sender_host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "receiver_fixture_sha256": "26ae995127fdc7df6aeb95a821fc72b549cacb9aa681850be00ff21cf58946b2",
+          "sender_fixture_sha256": "16db92268d202499d9a77ab3bfa1577e0c59ba18b9baf023c556cc5e4151cc43",
+          "receiver_exit_code": 42,
+          "sender_exit_code": 42,
+          "receiver_stderr": "adapt sha256=26ae995127fdc7df6aeb95a821fc72b549cacb9aa681850be00ff21cf58946b2 sections=1 syscall_traps=15 tls_traps=0 tls_direct=0\r\nenter guest bits=64 entry=0x401190 stack=0xa0c6fff960 argc=1\r\n",
+          "sender_stderr": "adapt sha256=16db92268d202499d9a77ab3bfa1577e0c59ba18b9baf023c556cc5e4151cc43 sections=1 syscall_traps=0 tls_traps=0 tls_direct=0\r\nenter guest bits=32 entry=0x80490c0 stack=0x5d7f6a0 argc=1\r\n",
+          "forced_cleanup": false,
+          "error": null,
+          "passed": true
+        },
+        {
+          "receiver_arch": "x86_64",
+          "sender_arch": "x86_64",
+          "receiver_host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "sender_host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "receiver_fixture_sha256": "26ae995127fdc7df6aeb95a821fc72b549cacb9aa681850be00ff21cf58946b2",
+          "sender_fixture_sha256": "342ac99f870b1617bca9ef1e702b8120d838dcbdfa63f4aef7f8e8284cb913ef",
+          "receiver_exit_code": 42,
+          "sender_exit_code": 42,
+          "receiver_stderr": "adapt sha256=26ae995127fdc7df6aeb95a821fc72b549cacb9aa681850be00ff21cf58946b2 sections=1 syscall_traps=15 tls_traps=0 tls_direct=0\r\nenter guest bits=64 entry=0x401190 stack=0x3b75fff990 argc=1\r\n",
+          "sender_stderr": "adapt sha256=342ac99f870b1617bca9ef1e702b8120d838dcbdfa63f4aef7f8e8284cb913ef sections=1 syscall_traps=7 tls_traps=0 tls_direct=0\r\nenter guest bits=64 entry=0x401120 stack=0xd59b1ff6a0 argc=1\r\n",
+          "forced_cleanup": false,
+          "error": null,
+          "passed": true
+        }
+      ]
+    }
+  },
+  "new_resources": {
+    "build_receipt": {
+      "recorded_utc": "2026-11-14T18:22:43.819716+00:00",
+      "scope": "Untrimmed local first-run templates; not a minimized offline release or license/source closure.",
+      "resource_count": 1308,
+      "raw_bytes": 667553463,
+      "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+      "manifest_sha256": "625f3dfbce4bd4523eb87ae628902d9802b406b765c9ead58c536d2d3dbe5af1",
+      "services": [
+        {
+          "name": "bridge",
+          "original_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+          "executed_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "manager",
+          "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "dbmw_guild",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "dbmw_mnt",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "dbmw_stat",
+          "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "monitor",
+          "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+          "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": [
+            {
+              "address": "0x08062877",
+              "offset": 108663,
+              "before": "c6400400",
+              "after": "c6400401",
+              "purpose": "Initialize the application loop flag before stop callbacks can run."
+            },
+            {
+              "address": "0x08063fa4",
+              "offset": 114596,
+              "before": "c6400401",
+              "after": "90909090",
+              "purpose": "Preserve a stop request received during application Load."
+            },
+            {
+              "address": "0x0805aa4c",
+              "offset": 76364,
+              "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+              "after": "c64008018944240cc7442408b8aa050883642404009090",
+              "purpose": "Set running before pthread_create; preserve its original arguments."
+            },
+            {
+              "address": "0x080973ce",
+              "offset": 324558,
+              "before": "c6400801",
+              "after": "90909090",
+              "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+            },
+            {
+              "address": "0x08064042",
+              "offset": 114754,
+              "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+              "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+              "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+            },
+            {
+              "address": "0x080a635a",
+              "offset": 385882,
+              "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+              "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+              "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+            }
+          ]
+        },
+        {
+          "name": "guild",
+          "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "statics",
+          "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "coserver",
+          "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "community",
+          "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "auction",
+          "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "point",
+          "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "channel",
+          "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "relay",
+          "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "stun",
+          "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+          "host_sha256": "1e3c5c142968cd45879236721c5a9f649cb5d152ad264c87356633acc34a2989",
+          "loader_sha256": "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+          "patches": []
+        },
+        {
+          "name": "game",
+          "original_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+          "executed_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": [],
+          "frida_item_reset": {
+            "source_script_sha256": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b",
+            "game_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+            "helper_sha256": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
+            "prepared_script_sha256": "0fa1863cf5101bab10df293110bc1b2b8060fa0ba0301c3fc34cb23e0314d26b",
+            "address": "0x080cb7d8",
+            "original_bytes": "5589e583ec188b4508c600008b4508c64001008b4508",
+            "replacement_bytes": "578b7c240889fa31c0b93d000000fcf3aa89d05fc390",
+            "scope": "Same 61-byte reset as packaged JS, restored during dispose; disk ELF unchanged"
+          }
+        },
+        {
+          "name": "zergsvr",
+          "original_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+          "executed_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "secagent",
+          "original_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+          "executed_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        },
+        {
+          "name": "gunnersvr",
+          "original_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+          "executed_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+          "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
+          "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+          "patches": []
+        }
+      ],
+      "sources": {
+        "tools/build_service_resources.py": "a12ac7dc2e02eb2d54584951bec99fec0f95b0bfc43fb5a81d3624815d969a5f",
+        "tools/prepare_service_instance.py": "886d20d597e83acf9868eb4472379a94105d4a919ca119972b54281e6cad8a37",
+        "runtime/dp2_cleanup.lua": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42",
+        "runtime/frida_item_reset.js": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0"
+      }
+    },
+    "cabinet_receipt": {
+      "recorded_utc": "2026-11-14T18:25:15.475977+00:00",
+      "scope": "All local resource bytes retained, exact duplicate objects stored once; native extraction and release acceptance recorded separately.",
+      "file_count": 1308,
+      "unique_objects": 963,
+      "cabinet_bytes": 175446663,
+      "cabinet_sha256": "30f7307e45ffc187af02c2a10dc00ec068579e23be9516ff3186b9da9a7cf8e5",
+      "manifest_sha256": "05110fdf2e62e0aa4569e45927da43382e699d2b0a65b199b233741f24ad5074",
+      "source_manifest_sha256": "625f3dfbce4bd4523eb87ae628902d9802b406b765c9ead58c536d2d3dbe5af1",
+      "builder_sha256": "68181f8105bd4e6bacb7010eeb5dcef3f15f1b427ee25d7ab34d6a39ddcdf9b8"
+    },
+    "first_run_receipt": {
+      "recorded_utc": "20261114T183044510837Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+      "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
+      "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
+      "script_sha256": "2b1807a51b3d61c9eef50ea165f184e67b519493a983b28565cdf6e931ed12df",
+      "checks": {
+        "changed_resource_rejected_before_instance_writes": true,
+        "existing_nonempty_directory_unchanged": true,
+        "copy_and_initialize_window_response_ms": 0.042,
+        "native_first_run_creates_nineteen_service_instance": true,
+        "import_reexport_matches_complete_original_seed_bytes": true,
+        "resource_format": "cabinet",
+        "original_advertised_address_placeholders_are_local": true,
+        "original_eighteen_schemas_and_current_month_tables": true,
+        "original_stored_routine_runs_with_locked_schema_definer": true,
+        "original_credential_encoding_matches_connection_table": true,
+        "game_account_has_no_global_grants": true,
+        "native_initialized_fifteen_original_peers": true,
+        "channel_protocol": {
+          "challenge": true,
+          "positive_responses": 3,
+          "fragmented": true,
+          "coalesced": true
+        },
+        "relay_and_actual_monitor_protocol": {
+          "registered_peers": 2,
+          "bidirectional_messages": 8,
+          "unlogged_accounts_disconnected": [
+            701,
+            702
+          ],
+          "own_auth_response_sent": false
+        },
+        "stun_protocol": {
+          "responses": 5,
+          "address_and_source_ports": true
+        },
+        "original_frida_database_interface_with_generated_account": true,
+        "all_owned_peers_and_database_stopped_normally": true,
+        "all_four_account_secrets_differ_between_instances": true,
+        "second_instance_normal_close": true,
+        "delivery_resources_unchanged": true,
+        "source_resources_unchanged": true
+      },
+      "forced_cleanup": false,
+      "application_table_counts": {
+        "d_channel": 5,
+        "d_guild": 26,
+        "d_taiwan": 109,
+        "d_taiwan_secu": 7,
+        "d_technical_report": 42,
+        "taiwan_billing": 12,
+        "taiwan_cain": 81,
+        "taiwan_cain_2nd": 32,
+        "taiwan_cain_auction_cera": 11,
+        "taiwan_cain_auction_gold": 11,
+        "taiwan_cain_log": 98,
+        "taiwan_cain_web": 17,
+        "taiwan_game_event": 51,
+        "taiwan_login": 44,
+        "taiwan_login_play": 1,
+        "taiwan_mng_manager": 20,
+        "taiwan_prod": 26,
+        "taiwan_se_event": 13
+      },
+      "first_instance": "build\\probes\\20261114T183044510837Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(1)",
+      "second_instance": "build\\probes\\20261114T183044510837Z\\gui-setup\\\u6e38\u620f \u5b9e\u4f8b(2)",
+      "exit_code": 0
+    },
+    "first_run_path": "build/probes/20261114T183044510837Z/gui-setup/receipt.json"
+  },
+  "review_package": {
+    "recorded_utc": "2026-11-14T18:33:44.900736+00:00",
+    "scope": "Reference GUI with original logs; updated ordinary hosts and equivalent native item reset resources. Gameplay and unresolved startup boundaries documented separately.",
+    "zip_path": "build/review/native-local-resources.zip",
+    "zip_bytes": 190315866,
+    "zip_sha256": "e7a2967cfd98816e291a85169707a1734cdc02f47b8f0d646d97a237656486f0",
+    "zip_crc_passed": true,
+    "member_hashes_passed": true,
+    "files": {
+      "DNF-Native.exe": {
+        "bytes": 1037824,
+        "sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9"
+      },
+      "mysql-standalone.exe": {
+        "bytes": 15958528,
+        "sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649"
+      },
+      "resources/resources.ini": {
+        "bytes": 368512,
+        "sha256": "05110fdf2e62e0aa4569e45927da43382e699d2b0a65b199b233741f24ad5074"
+      },
+      "resources/resources.cab": {
+        "bytes": 175446663,
+        "sha256": "30f7307e45ffc187af02c2a10dc00ec068579e23be9516ff3186b9da9a7cf8e5"
+      }
+    }
+  },
+  "known_failures": [
+    {
+      "type": "post-fix client graphics initialization failure",
+      "probe": "build/probes/20261114T182115628329Z/client-shutdown-inline",
+      "client_exit": 3221225477,
+      "server_authentication_seen": false
+    },
+    {
+      "type": "first-run relay startup access violation",
+      "probe": "build/probes/20261114T182754384085Z/gui-setup",
+      "pc": "0x0805b91a",
+      "function": "TManager<RelayService>::getManager",
+      "root_cause_fixed": false,
+      "receipt": {
+        "recorded_utc": "20261114T182754384085Z",
+        "os": "Windows-10-10.0.19044-SP0",
+        "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+        "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
+        "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
+        "script_sha256": "641a4b450ffb4668203919128cf6ce27954ca5ca852a5a726289deba4a79a86d",
+        "checks": {
+          "changed_resource_rejected_before_instance_writes": true,
+          "existing_nonempty_directory_unchanged": true,
+          "copy_and_initialize_window_response_ms": 0.119,
+          "native_first_run_creates_nineteen_service_instance": true,
+          "import_reexport_matches_complete_original_seed_bytes": true,
+          "resource_format": "cabinet",
+          "original_advertised_address_placeholders_are_local": true,
+          "original_eighteen_schemas_and_current_month_tables": true,
+          "original_stored_routine_runs_with_locked_schema_definer": true,
+          "original_credential_encoding_matches_connection_table": true,
+          "game_account_has_no_global_grants": true
+        },
+        "forced_cleanup": false,
+        "application_table_counts": {
+          "d_channel": 5,
+          "d_guild": 26,
+          "d_taiwan": 109,
+          "d_taiwan_secu": 7,
+          "d_technical_report": 42,
+          "taiwan_billing": 12,
+          "taiwan_cain": 81,
+          "taiwan_cain_2nd": 32,
+          "taiwan_cain_auction_cera": 11,
+          "taiwan_cain_auction_gold": 11,
+          "taiwan_cain_log": 98,
+          "taiwan_cain_web": 17,
+          "taiwan_game_event": 51,
+          "taiwan_login": 44,
+          "taiwan_login_play": 1,
+          "taiwan_mng_manager": 20,
+          "taiwan_prod": 26,
+          "taiwan_se_event": 13
+        },
+        "error": "AssertionError: ",
+        "exit_code": 0
+      }
+    },
+    {
+      "type": "earlier single STUN guest FS TLS failure",
+      "pc": "0x1a92c627dfb",
+      "root_cause_fixed": false
+    },
+    {
+      "type": "custom jbz69 PVF lacks equipment/character/atswordman.lay",
+      "fixed": false
+    }
+  ],
+  "cleanup": {
+    "recorded_utc": "2026-11-14T18:36:21.698149+00:00",
+    "scope": "Completed reconstructible runtime, database and template copies only; private diagnostics archived and verified before removal; JSON and screenshots restored.",
+    "before_bytes": 25383715151,
+    "after_bytes": 18043240722,
+    "released_bytes": 7340474429,
+    "removed_copy_paths": [
+      "probes/20261114T175210674748Z",
+      "probes/20261114T181158428280Z",
+      "probes/20261114T181505758373Z",
+      "probes/20261114T182025990736Z",
+      "probes/20261114T182754384085Z",
+      "probes/20261114T183044510837Z/gui-setup/\u6e38\u620f \u5b9e\u4f8b(2)",
+      "probes/20261114T183044510837Z/gui-setup/\u672c\u5730 \u7a0b\u5e8f(1)",
+      "probes/20261114T151518648147Z/gui-setup/\u6e38\u620f \u5b9e\u4f8b(1)",
+      "probes/20261114T162302232447Z",
+      "item-reset-resources/raw",
+      "item-reset-resources/resources"
+    ],
+    "archive_path": "cleanup-cache-stage-diagnostics.zip",
+    "archive_bytes": 37955065,
+    "archive_sha256": "0e0581a1b0e407874c9c60a0b7bbace53828cdfc8417b3cbc0483e353581b84d",
+    "archive_crc_passed": true,
+    "member_hashes_passed": true,
+    "archived_diagnostic_members": 1483,
+    "restored_json_and_screenshots": 8,
+    "retained": [
+      "client-jbz69",
+      "probes/20261114T120516758431Z/client-game/instance",
+      "probes/20261114T183044510837Z/gui-setup/\u6e38\u620f \u5b9e\u4f8b(1)",
+      "review",
+      "original failure stacks and dumps outside removed targets"
+    ]
+  }
+}
