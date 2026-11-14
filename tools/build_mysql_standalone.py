@@ -78,7 +78,9 @@ def main():
     subprocess.run(command, check=True, cwd=ROOT)
     receipt = {"payload_id": payload_id, "files": files, "cabinet_bytes": cabinet.stat().st_size,
                "cabinet_sha256": sha256(cabinet), "output_bytes": output.stat().st_size,
-               "output_sha256": sha256(output), "source_sha256": sha256(source), "command": command,
+               "output_sha256": sha256(output), "source_sha256": sha256(source),
+               "source_files": {str(path.relative_to(ROOT)).replace("\\", "/"): sha256(path)
+                                for path in [source, ROOT / "delivery/mysql_operations.h"]}, "command": command,
                "official_mysql_source": {key: official[key] for key in ["url", "archive_sha256"]},
                "microsoft_runtime_sources": runtime["sources"],
                "scope": "Build of independent SFX and official tool delegation; not final minimized payload or three-OS acceptance."}

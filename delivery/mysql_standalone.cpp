@@ -213,10 +213,28 @@ static std::wstring quote(const std::wstring &argument) {
 
 class Child {
     HANDLE process;
+    HANDLE job = nullptr;
 public:
-    explicit Child(HANDLE value) : process(value) {}
+    explicit Child(HANDLE value) : process(value) {
+        job = CreateJobObjectW(nullptr, nullptr);
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)) ||
+            !AssignProcessToJobObject(job, process)) {
+            DWORD error = GetLastError();
+            TerminateProcess(process, 1);
+            CloseHandle(process);
+            if (job) CloseHandle(job);
+            SetLastError(error);
+            require(false, "Own MySQL child job");
+        }
+    }
     Child(const Child &) = delete;
     Child &operator=(const Child &) = delete;
+    Child(Child &&other) noexcept : process(other.process), job(other.job) {
+        other.process = nullptr;
+        other.job = nullptr;
+    }
     bool running() const { return WaitForSingleObject(process, 0) == WAIT_TIMEOUT; }
     int wait(DWORD timeout) {
         DWORD result = WaitForSingleObject(process, timeout);
@@ -227,12 +245,14 @@ public:
         return static_cast<int>(code);
     }
     ~Child() {
+        if (!process) return;
         if (running()) {
             std::fputs("mysql-standalone: terminating unfinished owned child after failure\n", stderr);
             TerminateProcess(process, 1);
             WaitForSingleObject(process, 5000);
         }
         CloseHandle(process);
+        CloseHandle(job);
     }
 };
 
@@ -249,10 +269,16 @@ static Child launch(const std::wstring &root, const std::wstring &instance, cons
     startup.hStdOutput = output;
     startup.hStdError = error;
     PROCESS_INFORMATION process = {};
-    require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+    require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED,
                            nullptr, instance.c_str(), &startup, &process), "Start official MySQL tool");
-    CloseHandle(process.hThread);
-    return Child(process.hProcess);
+    // Assign the suspended process before it can write data. Closing this
+    // wrapper, including an interrupted restore, then also stops its child.
+    try {
+        Child child(process.hProcess);
+        require(ResumeThread(process.hThread) != DWORD(-1), "Resume owned MySQL tool");
+        CloseHandle(process.hThread);
+        return child;
+    } catch (...) { CloseHandle(process.hThread); throw; }
 }
 
 static int run(const std::wstring &root, const std::wstring &instance, const std::wstring &tool, int count, wchar_t **arguments) {
@@ -419,16 +445,21 @@ static void print_path(const std::wstring &path) {
     WriteFile(output, encoded.data(), bytes, &written, nullptr);
 }
 
+#include "mysql_operations.h"
+
 int wmain(int argc, wchar_t **argv) {
     try {
         if (argc == 2 && std::wstring(argv[1]) == L"--version") {
             std::printf("dnf-native MySQL bootstrap: official MySQL 5.7.44, payload %s\n", payload_id);
             return 0;
         }
-        if (argc < 3) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT] | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
+        if (argc < 3) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT] | backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
         std::wstring tool = argv[1];
-        if (tool != L"initialize" && tool != L"prepare" && tool != L"mysqld" && tool != L"mysql" && tool != L"mysqladmin" && tool != L"mysqldump")
+        bool maintenance = tool == L"backup" || tool == L"restore" || tool == L"recover";
+        if (!maintenance && tool != L"initialize" && tool != L"prepare" && tool != L"mysqld" && tool != L"mysql" && tool != L"mysqladmin" && tool != L"mysqldump")
             throw std::runtime_error("Unknown MySQL operation");
+        if (maintenance && argc != (tool == L"recover" ? 3 : 4))
+            throw std::runtime_error("Usage: backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE");
         unsigned port = 3306;
         if (tool == L"initialize") {
             if (argc > 4) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT]");
@@ -443,10 +474,23 @@ int wmain(int argc, wchar_t **argv) {
         DWORD length = GetFullPathNameW(argv[2], static_cast<DWORD>(path.size()), path.data(), nullptr);
         require(length && length < path.size(), "Resolve instance directory");
         std::wstring instance(path.data(), length);
-        std::wstring root = prepare(instance);
-        if (tool == L"prepare") { print_path(root); return 0; }
-        if (tool == L"initialize") return initialize(root, instance, port);
-        return run(root, instance, tool, argc - 3, argv + 3);
+        if (tool == L"prepare") { print_path(prepare(instance)); return 0; }
+        if (tool == L"mysqld" || tool == L"initialize" || maintenance) {
+            directory(instance + L"\\.mysql");
+            File lock(CreateFileW((instance + L"\\.mysql\\operation.lock").c_str(), GENERIC_READ | GENERIC_WRITE,
+                                 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            // Recover the cold directory layout even when payload extraction or
+            // verification is unavailable. No official process is needed here.
+            if (tool == L"recover") return recover_restore(instance);
+            if (exists(instance + L"\\restore.pending"))
+                throw std::runtime_error("Interrupted restore requires recover INSTANCE before starting or maintaining this database");
+            std::wstring root = prepare(instance);
+            if (tool == L"backup") return backup_database(root, instance, absolute_path(argv[3]));
+            if (tool == L"restore") return restore_database(root, instance, absolute_path(argv[3]));
+            if (tool == L"initialize") return initialize(root, instance, port);
+            return run(root, instance, tool, argc - 3, argv + 3);
+        }
+        return run(prepare(instance), instance, tool, argc - 3, argv + 3);
     } catch (const std::exception &error) {
         std::fprintf(stderr, "mysql-standalone: %s\n", error.what());
         return 1;

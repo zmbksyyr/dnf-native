@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。安全初始化的数据库已接入 15 个辅助服务和原版 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致。原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已通过单文件 MySQL 完成本机联合自然启动与停服，game 的 DP2/Lua/Frida 加载和完整清理通过。安全初始化的数据库已接入 15 个辅助服务和原版 Frida 数据库接口，channel、relay、STUN 有真实协议往返，原版 monitor 的未登录账号拒绝响应已按发送进程核对。原始 18 库、601 张表的备份还原逐字节一致；单文件已增加原生逻辑备份、冷副本还原、切换失败自动回滚和未完成切换恢复，并完成独立实测。原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -90,3 +90,13 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 联合探测的所有 MySQL 操作现通过 `mysql-standalone.exe`，先按下方命令构建，也可用 `--mysql-standalone EXE` 指定已封样产物。安全数据源同时带 `client.private.cnf` 和 `game-db.json`：前者保存管理员真实密码，后者的 password 字段是原版配置要求的 48 位密文。`python tools/probe_mysql_seed.py --seed PRIVATE_APPLICATION.sql --seed-sha256 SHA256` 创建安全初始化并验证原始应用数据往返的私有实例。`--trace-relay-monitor` 仅用于诊断，记录原版 monitor 的真实回复及发送进程；它临时将 relay 的 S2S 接收端移到 18200，由本工具从 8200 转发。
 
 MySQL 单文件：先执行 `python tools/import_mysql_runtime.py` 和 `python tools/build_mysql_standalone.py`，产物为 `build/mysql-standalone/mysql-standalone.exe`。`python tools/test_mysql_standalone.py` 在新的私有中文目录里验证安全初始化、权限、TLS 与备份还原。`mysql-standalone.exe initialize INSTANCE [PORT]` 只接受新实例，用官方临时密码通过仅本机命名管道设置随机密码；成功后数据库已停止，凭据存于当前 Windows 用户独享的 `client.private.cnf`。启动用 `mysql-standalone.exe mysqld INSTANCE --defaults-file=server.cnf --console`，客户端用 `mysql-standalone.exe TOOL INSTANCE --defaults-file=client.private.cnf [官方参数]`，TOOL 为 mysql/mysqladmin/mysqldump。工具工作目录固定为实例目录，配置使用相对文件名。约 15.9 MB，尚非最终离线包或 Win7/11 验收。
+
+单文件现在也提供原生离线维护命令，输入为已停止的私有实例，备份目录必须是实例外尚不存在的新目录。备份包含应用数据、账号、存储过程、事件与触发器；优化器统计由 MySQL 重建，过程/事件按定义导出，不重复备份其系统表内部时间戳。还原限定同一 UUID 且连接配置未改变的实例：先保存逻辑预备份，在冷数据副本中导入、重启并重新导出逐字节核对，验证后才切换。旧数据保留为冷快照；切换失败自动回退，检测到未完成的切换时必须先执行 recover。
+
+```powershell
+mysql-standalone.exe backup INSTANCE NEW_BACKUP_DIRECTORY
+mysql-standalone.exe restore INSTANCE BACKUP_DIRECTORY
+mysql-standalone.exe recover INSTANCE
+```
+
+维护过程使用官方本机共享内存协议并禁用 TCP。诊断已复现官方命名管道发送大 SQL 时断连，共享内存通过对应请求；没有修改官方 PE。复核用 `python tools/test_mysql_maintenance.py --exe build/mysql-standalone/mysql-standalone.exe --database-source PRIVATE_SECURE_INSTANCE`。DNF 停服协调、GUI 接入、密码迁移、跨实例还原和断电验收仍待完成。

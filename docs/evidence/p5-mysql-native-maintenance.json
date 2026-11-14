@@ -1,0 +1,382 @@
+{
+  "recorded_utc": "2026-11-14T08:37:58.140175+00:00",
+  "scope": "Native single-EXE maintenance for stopped same-instance MySQL: full logical application/account/object backup, cold shadow restore, exact reexport, actual activation rollback, journal recovery and owned-child termination. No GUI or DNF business acceptance.",
+  "build": {
+    "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
+    "output_bytes": 15958016,
+    "output_sha256": "6bde49e586430520e0c75e81965f08a098b9de10b17393f5e297e9edfc1bbc13",
+    "source_files": {
+      "delivery/mysql_standalone.cpp": "5182eafb3b1f3d29027dd9a0428633b6a77875b9b82362756f4f19d94b10b860",
+      "delivery/mysql_operations.h": "96cee73fe98219f07d13d683fb71f88e75b3fee55f7927a4f4e404dc954d36f0"
+    },
+    "cabinet_sha256": "b81848ab73b9692ca5f06ddd9a0d8eae9d831468c177ad8ad6b19596e1abe3d9"
+  },
+  "build_receipt_sha256": "7eeab3b8f7d7a371b6b9bdb6484f47241901095b570e6be8cf829f4d7fd7e5db",
+  "sources": {
+    "delivery/mysql_standalone.cpp": "5182eafb3b1f3d29027dd9a0428633b6a77875b9b82362756f4f19d94b10b860",
+    "delivery/mysql_operations.h": "96cee73fe98219f07d13d683fb71f88e75b3fee55f7927a4f4e404dc954d36f0",
+    "tools/build_mysql_standalone.py": "a80ae70ebe2ffd44587b436664cd5bb180e3d29229bf4f381072dc759cb1742c",
+    "tools/test_mysql_maintenance.py": "e6d03a16f6df48f122e10eee914c8dcd46606492248fab80c18d7df9b2b9b382",
+    "tools/test_mysql_standalone.py": "a096782ef813e368129b579c279c555295319db9a11eb6a730f32518da73e268"
+  },
+  "original_application_fixture": {
+    "probe": "build/probes/20261114T075753346100Z/mysql-secure-seed",
+    "receipt_sha256": "7a549ac47951c991fa0abfccf20ae66ffc5929f658ce08d5e03bb82d1883b46a",
+    "application_databases": 18,
+    "application_tables": 601,
+    "source_modified": false
+  },
+  "maintenance": {
+    "receipt_sha256": "d61097d340add5ebdc84fad0874bbc02e0640fd9bde97729cd37231d4cbe64b6",
+    "probe_exit_code": 0,
+    "result": {
+      "recorded_utc": "20261114T083455103419Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T083455103419Z\\mysql-maintenance",
+      "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery. No GUI or DNF client acceptance.",
+      "exe_sha256": "6bde49e586430520e0c75e81965f08a098b9de10b17393f5e297e9edfc1bbc13",
+      "script_sha256": "e6d03a16f6df48f122e10eee914c8dcd46606492248fab80c18d7df9b2b9b382",
+      "sources": {
+        "delivery/mysql_standalone.cpp": "5182eafb3b1f3d29027dd9a0428633b6a77875b9b82362756f4f19d94b10b860",
+        "delivery/mysql_operations.h": "96cee73fe98219f07d13d683fb71f88e75b3fee55f7927a4f4e404dc954d36f0",
+        "tools/build_mysql_standalone.py": "a80ae70ebe2ffd44587b436664cd5bb180e3d29229bf4f381072dc759cb1742c"
+      },
+      "checks": {
+        "running_instance_refused": true,
+        "native_full_logical_backup": true,
+        "corrupt_backup_refused_without_data_writes": true,
+        "failed_sql_import_preserved_active_database": true,
+        "native_shadow_restore_byte_exact": true,
+        "innodb_myisam_binary_rows_and_extra_schema_removal": true,
+        "accounts_routines_events_and_triggers_restored": true,
+        "cold_snapshot_and_logical_prebackup_retained": true,
+        "automatic_rollback_after_original_datadir_rename": true,
+        "rename_window_recovery": [
+          "before_rename",
+          "between_renames",
+          "after_activation"
+        ],
+        "owned_server_exits_when_wrapper_is_terminated": true
+      },
+      "commands": [
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-1.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-2.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-3.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-4.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 0,
+          "log": "command-5.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 1,
+          "log": "command-6.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 0,
+          "log": "command-7.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-8.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 0,
+          "log": "command-9.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-10.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-11.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 0,
+          "log": "command-12.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 1,
+          "log": "command-13.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 0,
+          "log": "command-14.private.log"
+        },
+        {
+          "operation": "mysql",
+          "exit_code": 1,
+          "log": "command-15.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 0,
+          "log": "command-16.private.log"
+        },
+        {
+          "operation": "restore",
+          "exit_code": 1,
+          "log": "command-17.private.log"
+        },
+        {
+          "operation": "restore",
+          "exit_code": 1,
+          "log": "command-18.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 0,
+          "log": "command-19.private.log"
+        },
+        {
+          "operation": "restore",
+          "exit_code": 0,
+          "log": "command-20.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 0,
+          "log": "command-21.private.log"
+        },
+        {
+          "operation": "backup",
+          "exit_code": 0,
+          "log": "command-22.private.log"
+        },
+        {
+          "operation": "mysqld",
+          "exit_code": 1,
+          "log": "command-23.private.log"
+        },
+        {
+          "operation": "recover",
+          "exit_code": 0,
+          "log": "command-24.private.log"
+        },
+        {
+          "operation": "mysqld",
+          "exit_code": 1,
+          "log": "command-25.private.log"
+        },
+        {
+          "operation": "recover",
+          "exit_code": 0,
+          "log": "command-26.private.log"
+        },
+        {
+          "operation": "mysqld",
+          "exit_code": 1,
+          "log": "command-27.private.log"
+        },
+        {
+          "operation": "recover",
+          "exit_code": 0,
+          "log": "command-28.private.log"
+        }
+      ],
+      "forced_cleanup": false,
+      "backup_bytes": 1861103,
+      "backup_sha256": "a77c78570b9403caea5efb6a62d32b00183afeef38efb8fdea1c0a42ab3f1aee",
+      "cold_snapshot": "\u4e2d\u6587\u5b9e\u4f8b (native)\\.mysql\\restore-4d780c8a7558f81b6bbbdbfbbe5b9ea6fa5a94a16e820568\\previous-data",
+      "source_data_unchanged": true,
+      "limits": [
+        "Developer Windows 10 only; no clean ordinary-user Win7/10/11 acceptance.",
+        "Native maintenance requires a stopped instance and unchanged backup-time client/server configuration.",
+        "Rename-window recovery uses constructed on-disk states; no power-loss or disk-full injection.",
+        "Abrupt wrapper termination is real and deliberately kills its owned MySQL child; subsequent crash recovery is not a normal shutdown claim.",
+        "DNF shutdown coordination, GUI wiring, credential migration and cross-instance restore remain pending."
+      ]
+    },
+    "maximum_backup_line_bytes": 811848
+  },
+  "secure_initialization_regression": {
+    "receipt_sha256": "1ba6f925df98a52f2a1cdb9e49f6d8a798405f8563b947be523b018cd6d3bf67",
+    "probe_exit_code": 0,
+    "result": {
+      "recorded_utc": "20261114T083455100016Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T083455100016Z\\mysql-sfx",
+      "exe_sha256": "6bde49e586430520e0c75e81965f08a098b9de10b17393f5e297e9edfc1bbc13",
+      "exe_bytes": 15958016,
+      "scope": "Secure native initialization, TLS query, backup and restore from only the standalone EXE; developer Windows 10 only.",
+      "checks": {
+        "concurrent_prepare": 4,
+        "secure_initialize_without_tcp": true,
+        "initialize_fresh_private_data": true,
+        "private_windows_permissions": true,
+        "passwordless_root_refused": true,
+        "query_write_read_over_tls": true,
+        "logical_backup_restore_rows": 2,
+        "loaded_vc_runtime_app_local": true,
+        "server_shutdown_complete": true,
+        "existing_data_reinitialization_refused": true,
+        "modified_cache_refused": true
+      },
+      "forced_cleanup": false,
+      "versions": {
+        "mysqld": "5.7.44",
+        "mysql": "5.7.44",
+        "mysqladmin": "5.7.44",
+        "mysqldump": "5.7.44"
+      },
+      "private_permissions": [
+        {
+          "name": "data",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "server.cnf",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "client.private.cnf",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-initialize.private.log",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-bootstrap.private.log",
+          "protected": true,
+          "current_user_only": true
+        },
+        {
+          "name": "mysql-shutdown.private.log",
+          "protected": true,
+          "current_user_only": true
+        }
+      ],
+      "database_identity": "5.7.44\t457ea671-e006-11f1-b663-345a6041c9d0",
+      "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+      "logical_backup_sha256": "61be1e6c47d4156547ac0faba176d8464519f7b092f940d9a9a39b1c88c927e6",
+      "runtime_modules": [
+        {
+          "name": "ucrtbase.dll",
+          "app_local": false,
+          "sha256": "de8d08d01291df93821314176381f3d1ae863e6c5584a7f8ea42f0b94b15ef65"
+        },
+        {
+          "name": "msvcp140.dll",
+          "app_local": true,
+          "sha256": "75872c426555ac8af55b5a7f6d4aea8831af74353b22612850a2bfc40e3b67e1"
+        },
+        {
+          "name": "vcruntime140.dll",
+          "app_local": true,
+          "sha256": "270ba17bf89cc2eb6e6ce536eb78e4614ab5499f653ab7e07fe9e3d33bf3b6e3"
+        },
+        {
+          "name": "vcruntime140_1.dll",
+          "app_local": true,
+          "sha256": "f3754fc6ec87bcf84e05f3287b5de7bd305a30a0e1db7d478cb6353600682784"
+        }
+      ],
+      "mysqladmin_shutdown_exit_code": 0,
+      "server_exit_code": 0,
+      "mysqladmin_shutdown_lost_ack": false,
+      "limits": [
+        "Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
+        "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
+        "Native initialization generates a local credential; GUI password configuration and cross-machine migration remain untested.",
+        "No GUI backup/rollback workflow or final complete offline package acceptance."
+      ]
+    }
+  },
+  "maintenance_transport": {
+    "server_networking": "disabled",
+    "official_client_protocol": "MEMORY; host=localhost; random base name",
+    "named_pipe_diagnosis": {
+      "16384_byte_sql_exit_code": 0,
+      "65536_byte_sql_exit_code": 0,
+      "262144_byte_sql_exit_code": 1,
+      "811848_byte_sql_exit_code": 1,
+      "failure": "ERROR 2006 (HY000): MySQL server has gone away",
+      "server_max_allowed_packet": 4194304
+    },
+    "shared_memory_diagnosis": {
+      "262144_byte_sql_exit_code": 0,
+      "811848_byte_sql_exit_code": 0,
+      "server_shutdown_exit_code": 0
+    },
+    "official_PE_modified": false
+  },
+  "backup_format": {
+    "version": 1,
+    "logical_content": "All databases, account tables and routine/event/trigger definitions; exact SQL reexport comparison, no output normalization.",
+    "excluded_system_tables": {
+      "mysql.innodb_index_stats": "Regenerated optimizer statistics.",
+      "mysql.innodb_table_stats": "Regenerated optimizer statistics.",
+      "mysql.proc": "Routines exported via --routines; avoid duplicate rows with recreated internal timestamps.",
+      "mysql.event": "Events exported via --events; avoid duplicate rows with recreated internal timestamps."
+    },
+    "identity": "Same server UUID and unchanged client/server config SHA-256 required.",
+    "committed_marker": "manifest.txt written after a successful dump and normal owned-server shutdown.",
+    "sensitive_output": "Backup/operation directories and newly created private files restricted to current Windows user."
+  },
+  "failure_history": [
+    {
+      "probe": "build/probes/20261114T081914990884Z/mysql-maintenance",
+      "receipt_sha256": "059b868c8add5aae13bea8dac7cf854d856d61b810cf1cddcc5faaa1bd81901f",
+      "recorded_probe_error": "Native backup failed; see private command 8",
+      "resolution": "Absolute Chinese defaults path was rejected by the official client; fixed by the established relative config convention."
+    },
+    {
+      "probe": "build/probes/20261114T082047118267Z/mysql-maintenance",
+      "receipt_sha256": "1768f7289e41f8dca85cf2d999ab2b2f1b048980fe8dfa5ee1c90cb8442620f2",
+      "recorded_probe_error": "Native restore failed; see private command 20",
+      "resolution": "Named-pipe import failed at the 811848-byte help_topic INSERT; SQL failure logging was also separated from shutdown logs."
+    },
+    {
+      "probe": "build/probes/20261114T082737197315Z/mysql-maintenance",
+      "receipt_sha256": "41bb69b36f61ff5d5658d0dd8cc671310ca16aef8225efec1b9857aafa09ac84",
+      "recorded_probe_error": "Native restore failed; see private command 20",
+      "resolution": "Shared-memory import succeeded; reexport differed in regenerated optimizer statistics and duplicate mysql.proc internal timestamps. Native format now exports optimizer-independent data and canonical routine/event definitions."
+    },
+    {
+      "probe": "build/probes/20261114T083107524982Z/mysql-maintenance",
+      "receipt_sha256": "02e1ec31a2fb80dfce18d3018fe01128c22e06eb37efedb21737d48bb2b98c64",
+      "recorded_probe_error": "Pending restore did not block server start",
+      "resolution": "Restore and automatic rollback passed; recovery/start rejection was preceded by unnecessary payload extraction, which failed on the longer constructed fixture path. Recovery and the pending guard now precede preparation."
+    }
+  ],
+  "limits": [
+    "Developer Windows 10 only; no clean ordinary-user Win7/10/11 acceptance.",
+    "Native maintenance requires a stopped instance and unchanged backup-time client/server configuration.",
+    "Rename-window recovery uses constructed on-disk states; no power-loss or disk-full injection.",
+    "Abrupt wrapper termination is real and deliberately kills its owned MySQL child; subsequent crash recovery is not a normal shutdown claim.",
+    "DNF shutdown coordination, GUI wiring, credential migration and cross-instance restore remain pending.",
+    "Native maintenance is validated separately from the earlier 16-service full startup; no new full-game startup claim.",
+    "Win7 Job behavior and app-local UCRT, final minimal dependency closure and <=210 MB release remain unverified."
+  ]
+}
