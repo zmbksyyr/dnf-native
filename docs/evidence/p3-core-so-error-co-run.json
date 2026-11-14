@@ -1,0 +1,449 @@
+{
+  "recorded_utc": "2026-11-14T06:29:42.201987+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Sixteen original core services: natural game startup, observation and graceful shutdown on the SO_ERROR host. Not complete connectivity or game-client acceptance.",
+  "probe": "build/probes/20261114T060223011061Z/game-chain",
+  "receipt_sha256": "f8477f8e3bbb56a15d7bb25007eafb31ee843187668ae8ef5ccdbc50a6654055",
+  "executed_script_commit": "15fee3b",
+  "executed_probe_script_sha256": "80906de39edbabd81c19dc01374ab7ca14e4baeb431b8e78029ec0c4d060bbf4",
+  "game": {
+    "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+    "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "elapsed_seconds": 1475.737,
+    "syscall_gaps": [
+      "syscall gap nr=291",
+      "syscall gap nr=332"
+    ],
+    "runtime_gaps": [],
+    "dp2_cleanup": true,
+    "startup_seen_after_seconds": 1294.301,
+    "stop_signal": 12,
+    "observation_after_start_seconds": 120.937,
+    "shutdown_markers": [
+      "RECV SIGUSR2",
+      "ALL USER LOGOUT COMPLETE",
+      "GAME SERVER SHUTDOWN COMPLETE"
+    ],
+    "probe": "build\\probes\\20261114T060319173430Z\\game"
+  },
+  "game_log_sha256": {
+    "stderr.log": "3fb5e487da869cffc05bf0cbf99ac075ebb0d3a9e6d3cf5b6710066bcf3b59fe",
+    "stdout.log": "1a5ca3fdc695cde1bc9f158b057b62b9af00b5d9fc4385e8684ef0254c0ba2b7"
+  },
+  "game_getsockopt_gap_occurrences": 0,
+  "game_msync_gap_occurrences": 0,
+  "game_cleanup_markers": {
+    "frida_dispose": true,
+    "dp2_unload": true
+  },
+  "peers": [
+    {
+      "name": "manager",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+      "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+      "arguments": [
+        "manager",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Application End!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "7f49b1503c33f4efc689e898869ffd4a2b7da609c6f9a8051e5755054d0feed4",
+        "stdout.private.log": "3ebc74ebe562fce58715a6ebcc095c707837fb98564fdfd181dda0ba4d9aff4f"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "cb1f9abc16afc0a6808e8ed568ec4744f251b9bacae434354a93211ed68b8777"
+    },
+    {
+      "name": "dbmw_guild",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "arguments": [
+        "dbmw_gld_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "DBMW_ALL_DB Open Success",
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Application End!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "6de81077eaea63732a3f646961263a837536e44d2079f90ce5bd2a308e35b51f",
+        "stdout.private.log": "207a88479b5db32d1674d2146e366ca250e4c414c972d12dba3b2aea13121411"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "0b87cc686c9db9b24ead345787b18b358e088edf463ada63788f09beb9b36467"
+    },
+    {
+      "name": "dbmw_mnt",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "arguments": [
+        "dbmw_mnt_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "DBMW_ALL_DB Open Success",
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Application End!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "4213c87cae3d2dfcae670f9f8b265f4963629e4d2ed8354506b3c37ef4ff432a",
+        "stdout.private.log": "d9e1bb54148d55e4db17303ec49de66168ec6253a1a2721142a57d3160ad7298"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "d3bf0061e147990d7db0d541fcb89ce6c00caabf2bb11c9f25850cb066f2fd42"
+    },
+    {
+      "name": "dbmw_stat",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "arguments": [
+        "dbmw_stat_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "DBMW_ALL_DB Open Success",
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Application End!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "bf7ebaeb22b2b9b3207ac389a6a6b1e4509abe7814874658a22be9164b538fd6",
+        "stdout.private.log": "725e96a92fd89506d7bc4773ad2da70ca2d06669f6314e61c4efccaff67f52b5"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "2c9698a906cf59c3fdc4222f8449cf63b600d44b76da4eb14f0a7cc3893aa880"
+    },
+    {
+      "name": "monitor",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+      "executed_elf_sha256": "8e9241a21a4ea29bd4e3e6e5222795357eae5b983bc2f19800d045fff98efdd9",
+      "arguments": [
+        "mnt_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "a194b8d3b03e4ee90360ee054a54d82bb84145ad1de325ee9021beb6a7e3352e",
+        "stdout.private.log": "6ffd42e760be8a2a770dd8318085273d82a6bc8d13d26fa565a5ebb101c0b5f7"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "15936b32938302e206cb1d3fa7eea32ae159298af52d881d4166f172052845c2",
+      "patches": [
+        {
+          "address": "0x08062877",
+          "offset": 108663,
+          "before": "c6400400",
+          "after": "c6400401",
+          "purpose": "Initialize the application loop flag before stop callbacks can run."
+        },
+        {
+          "address": "0x08063fa4",
+          "offset": 114596,
+          "before": "c6400401",
+          "after": "90909090",
+          "purpose": "Preserve a stop request received during application Load."
+        },
+        {
+          "address": "0x0805aa4c",
+          "offset": 76364,
+          "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+          "after": "c64008018944240cc7442408b8aa050883642404009090",
+          "purpose": "Set running before pthread_create; preserve its original arguments."
+        },
+        {
+          "address": "0x080973ce",
+          "offset": 324558,
+          "before": "c6400801",
+          "after": "90909090",
+          "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+        },
+        {
+          "address": "0x08064042",
+          "offset": 114754,
+          "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+          "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+          "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+        }
+      ]
+    },
+    {
+      "name": "guild",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+      "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+      "arguments": [
+        "gld_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Guild And Guild Member DB Save Success!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "b33c9ec188b13a0e6e881c83fc580ae1e6cbf209cc7abc8676a6b9bbcf8d4a63",
+        "stdout.private.log": "25488457524113a3a86aedcc0531b49909ea70af1dd5cdca735d402ad55b3bad"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "9cba93332a37bc446b4d545727b2092394ef62947ce151997e66fbb5165b2633"
+    },
+    {
+      "name": "statics",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+      "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+      "arguments": [
+        "stat_siroco",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "a1d128b82f929874152556092a29360a78df193a13d60ad1574915dca13ccf79",
+        "stdout.private.log": "93d71c6d9cfe66b493a27baf82e028ddc5e7b6e40daa167b75cb8f8fdbc4aed4"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "2ba3939b25883bdab6ebe220905aa113db80c2e6ff64386b4c9a4a4e0538683a"
+    },
+    {
+      "name": "coserver",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+      "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+      "arguments": [
+        "coserver",
+        "nofork"
+      ],
+      "stop_signal": 15,
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Application Init() Success!",
+        "Application Load() Success!",
+        "Recv SIGTERM signal",
+        "Application Stop!"
+      ],
+      "logs": {
+        "stderr.log": "58302a0904ca25c149351a7d2d54928b858fc47a241f6313b9c474d9492483bc",
+        "stdout.private.log": "b2f34d3ef40601c5c695930ec735abb67419f1dd388be9164728598917e8b642"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "88446f8b2c0d708b1b50c3f19a0b6bc7ffb080e37301188e6d341338f39eeb9d"
+    },
+    {
+      "name": "community",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+      "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+      "arguments": [
+        "community",
+        "nofork"
+      ],
+      "stop_signal": 12,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Community Server(IP:127.0.0.1, PORT:31100)"
+      ],
+      "logs": {
+        "stderr.log": "fc3e38aef42552196ab3192b9609f6c87692f3a3f4ec4e97e22ba6051f53de3f",
+        "stdout.private.log": "82712bf5898a86e038264ab6d80929cbb183b9f6f3f4b91a9cf50a0455728b84"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "c115e7466a83fde5f05c3ba831e77210f6964515e0610cb097ffaefcb51ab516"
+    },
+    {
+      "name": "auction",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+      "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+      "arguments": [
+        "./cfg/auction_siroco.cfg",
+        "run",
+        "./df_auction_r"
+      ],
+      "stop_signal": 12,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Server Terminated"
+      ],
+      "logs": {
+        "stderr.log": "ffde5261a04a33e50026ab34bc6a43da2c3360aa61da83a41cf6ba8f4d6027dc",
+        "stdout.private.log": "ffc44a2e1d911f68c967685b55080ac6f79dc3338d8a936927fae0b4369fd1b4"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "e92a0bd1ffca2669d452f336fcf25af400d7a2a7e00e03f5d1692238f58c0518"
+    },
+    {
+      "name": "point",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+      "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+      "arguments": [
+        "./cfg/point_siroco.cfg",
+        "run",
+        "./df_point_r"
+      ],
+      "stop_signal": 12,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [
+        "Server Terminated"
+      ],
+      "logs": {
+        "stderr.log": "c87488d6825e09faf6a7e98e2bac4e4faa475a647ae2d277c09fb112e0387f40",
+        "stdout.private.log": "445dec7149d61761630c38c6608d181e6b9d4cc6951f74b3f5a3f4a73925894f"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "7ec654ae46ddc9c889a8be145b54fcf5ea3c6c556956b8ad001e495110a5e20e"
+    },
+    {
+      "name": "channel",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "arguments": [
+        "channel",
+        "run"
+      ],
+      "stop_signal": 15,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [],
+      "logs": {
+        "stderr.log": "4b336f9516df3c78d2110df329999c896470d5dc429cb93aa1559364eb56ac66",
+        "stdout.private.log": "6ac6f004c5186ea08ca4653b5fcb9194e56830255a30a9e3690abd3076affcf8"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "bc758474bba0bbfbf18aeb496cc9c06673754e8cde87771c519d739357b7209e"
+    },
+    {
+      "name": "relay",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "arguments": [
+        "relay_200",
+        "run"
+      ],
+      "stop_signal": 15,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [],
+      "logs": {
+        "stderr.log": "8d026bc3839d67050ab63285daa5a4751168b660b74ff7030fdb6cc805319f77",
+        "stdout.private.log": "2c9e60fadf5a634f2abc8420ad95d2ca5333deea2cab5440598ee11ef46f545c"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "046884294d132bc823c5c8ba86527f295d23e42c5e27a9e09c4f140e7f440377"
+    },
+    {
+      "name": "stun",
+      "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+      "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+      "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+      "arguments": [
+        "test"
+      ],
+      "stop_signal": 15,
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "gaps": [],
+      "markers": [],
+      "logs": {
+        "stderr.log": "8fb87e5b2bf6d552e44c548c709eeddf15e4e5ed469bf88c87fa618c541e01e5",
+        "stdout.private.log": "a8ff187cb867d9367e301494a525c2a510a5f7f6300daf5cfc90ae1c0069a660"
+      },
+      "exited_before_stop": false,
+      "configuration_identity": "cc1905794a58eec2690d5a3b93a980b30f3c57ba3bc44536f7230f920dbdc2e9"
+    }
+  ],
+  "bridge": {
+    "bridge_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+    "bridge_exit_code": 0,
+    "bridge_script_matches": true
+  },
+  "mysql": {
+    "mysql_shutdown_exit_code": 0,
+    "mysql_exit_code": 0,
+    "database_source_unchanged": true
+  },
+  "mysql_shutdown_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "application_failures": {
+    "channel": "Private this_ip placeholder rejected; defaults 5555 and bridge ipport=0. Corrected separately in p3-core-protocols.json.",
+    "monitor_first_statistics": "DBMW logs MySQL 1264 for first login/logout counters 110056896 and 574452856. Original constructor omits their initialization; correction under separate verification."
+  },
+  "limits": [
+    "Game retains inotify init1/init syscall ENOSYS fallback (332/291); no network runtime gap remains in this observation.",
+    "The channel placeholder and monitor counter fixes are not part of this completed round.",
+    "No DNF game client, Windows 7/11, GUI, final MySQL single-file or offline ZIP acceptance."
+  ]
+}

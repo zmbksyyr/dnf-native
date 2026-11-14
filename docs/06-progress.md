@@ -425,3 +425,9 @@ game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）
 实际 channel 监听 5555，且日志记录 bridge ipport=0。原因是联跑脚本只替换数字 IP，遗漏了原配置的 this_ip = Public IP。原版 Script::get_key_val 只接受一个节名或两个键值 token；该占位行无法形成有效 this_ip，get_server_section 提前返回，后续端口和 bridge 字段没有载入。这不是 bridge 下发端口。现已在私有配置准备步骤中明确设置 this_ip = 127.0.0.1。
 
 对联跑 channel 的另一个私有副本仅修改这一行，保留 max_client=16：实际监听 7001，建立到现有原版 bridge:7000 的连接，拆包/连包握手通过，SIGTERM 后自行返回 0，无 runtime gap 或强制回收。独立 channel 原有 32 次成功响应回归也通过。证据见 [联跑协议与配置](evidence/p3-core-protocols.json)。正在运行的整轮仍保留旧私有配置，修正后的单服务对照不能计作整轮修正通过；完整互通、客户端及最终交付仍未验收。
+
+## 2026-11-14 · SO_ERROR 修复后的完整 core 联合复测结束
+
+本轮原版 game 自然启动耗时 1294.301 秒，启动后观察 120.937 秒，随后 SIGUSR2 正常停服，三个关服标记、Frida dispose、DP2 unload 齐全；总计 1475.737 秒，返回 0，无强制回收。此前的 7664 次 socketcall 15 不支持记录降为零，msync 缺口也未再出现。game 仅保留 inotify 332/291 的 ENOSYS fallback，无其他 runtime gap。其余 14 个 peer 均未提前退出，正常完成停止，无 runtime gap 或强制回收；bridge 响应匹配并返回 0，MySQL 及 mysqladmin 均返回 0，源私有库身份不变。
+
+该轮使用 15fee3b 的联跑脚本和包含 SO_ERROR 修复的正式宿主；执行期间后续编辑的脚本不计入本轮。channel 仍是已发现的占位配置，monitor 首次统计写库出现 MySQL 1264；因此本轮仍不计完整互通或业务验收。两项问题分别修正和验证，不能把本轮启动/停服通过写成所有配置已正确。证据见 [SO_ERROR 后的 core 联跑](evidence/p3-core-so-error-co-run.json)。
