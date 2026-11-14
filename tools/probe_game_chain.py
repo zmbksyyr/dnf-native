@@ -25,9 +25,15 @@ def main():
     parser.add_argument("--database-source", type=Path, required=True,
                         help="Stopped private restored instance containing data/ and game-db.json")
     parser.add_argument("--timeout", type=float, default=2100)
+    parser.add_argument("--dp2-cleanup", action="store_true",
+                        help="Use early luv cleanup and Gadget full teardown in the private game copy")
+    parser.add_argument("--stop-after-started", type=float, metavar="SECONDS",
+                        help="Request SIGUSR2 after observing the original startup marker for this long")
     parser.add_argument("--script-db", action="store_true",
                         help="Run only the original JS init_db interface check, then exit 42")
     args = parser.parse_args()
+    if args.script_db and args.stop_after_started is not None:
+        parser.error("--script-db exits before natural game startup")
     source = args.database_source.resolve()
     # Both ports are fixed by the current original bridge/game configuration.
     for port in [3306, 7000]:
@@ -121,6 +127,10 @@ def main():
             if not receipt["bridge_script_matches"]:
                 raise RuntimeError("Bridge script differs from its original file")
         command = [sys.executable, str(ROOT / "tools/probe_game.py"), "--preload", "--timeout", str(args.timeout)]
+        if args.dp2_cleanup:
+            command.append("--dp2-cleanup")
+        if args.stop_after_started is not None:
+            command += ["--stop-after-started", str(args.stop_after_started)]
         if args.script_db:
             js, lua = instance / "script-db.js", instance / "script-db.lua"
             js.write_text(script + "\nvar savedInit=rpc.exports.init; rpc.exports.init=function(){ "
@@ -142,12 +152,18 @@ def main():
         probe = json.loads((ROOT / "build/game-probe.json").read_text(encoding="utf-8"))
         (instance / "game-receipt.json").write_text(json.dumps(probe, indent=2) + "\n", encoding="utf-8")
         receipt["game"] = {key: probe[key] for key in ["host_sha256", "elf_sha256", "exit_code", "forced_cleanup",
-                                                      "elapsed_seconds", "syscall_gaps", "runtime_gaps"]}
+                                                      "elapsed_seconds", "syscall_gaps", "runtime_gaps", "dp2_cleanup",
+                                                      "startup_seen_after_seconds", "stop_signal",
+                                                      "observation_after_start_seconds", "shutdown_markers"]}
         receipt["game"]["probe"] = str(Path(probe["command"][2]).relative_to(ROOT))
         if args.script_db:
             receipt["script_db_tables"] = sql("SHOW TABLES FROM frida;").decode("ascii").splitlines()
             if probe["exit_code"] != 42 or probe["forced_cleanup"] or receipt["script_db_tables"] != ["data", "dgnfinishtime", "init_sp_tp"]:
                 raise RuntimeError("Original JS database interface check failed")
+        elif args.stop_after_started is not None:
+            if (probe["exit_code"] != 0 or probe["forced_cleanup"] or probe["stop_signal"] != 12 or
+                    probe["shutdown_markers"] != ["RECV SIGUSR2", "ALL USER LOGOUT COMPLETE", "GAME SERVER SHUTDOWN COMPLETE"]):
+                raise RuntimeError("Original game did not complete startup and SIGUSR2 shutdown")
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:

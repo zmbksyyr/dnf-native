@@ -325,3 +325,13 @@ bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。�
 自编独立 ELF 进程分别发送 kill(pid, 0)、12 和 15。接收方先屏蔽 12，核对 15 已处理而 12 未处理，再解除屏蔽确认 12 到达。修复前四种发送/接收架构组合全部失败；修复后 32→32、64→32、32→64、64→64 的双方均自行返回 42，无强制回收。同一正式构建的双架构入口/信号检查通过。
 
 证据见 [跨进程信号](evidence/p2-process-signals.json)，复现命令为 `python tools/build.py`、`python tools/test_process_signal.py` 和 `python tools/test_entry.py`。本次通过范围是信号原语；原版 game 的完整正常关服仍受 Frida/DP2 卸载异常阻塞。实测系统为 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · DP2 析构期间的 Lua 定时器回调
+
+单步追踪将零返回地址定位到原版 DP2 的 CPluginBase 虚函数表：保护代码读取对象的 vptr，再取偏移 0x18 的表项；该地址为 libdp2game.so+0xc76e0，值为零，随后经栈上的 ret 进入地址零。私有内存快照中的 RTTI 确认类型为 CPluginBase。原版解包后的析构函数在 0x311bf 改写为基类 vptr，之后在 0x3121a 调用 uv_run(loop, UV_RUN_NOWAIT)，再执行关闭 luv 句柄的 Lua 代码。因此到期的脚本仍可能在 game 派生对象析构后执行。
+
+对照没有把故障归给 Frida 本身：加载普通 libm、单独注册 Lua handler、只创建空回调定时器、只 require df.game 均返回原版数据库配置失败码 1；保留原始 Lua 内容、仅注释 frida.load 后仍复现返回 125、PC=0。对该私有脚本追加已有 add_unload_handler 回调，提前关闭并处理 luv 句柄后返回 1。原版 Lua/JS/Frida 全部加载、私有配置 teardown=full 并应用同样清理时也返回 1，记录实际 Frida init、dispose 和 DP2 unload，无访问异常或强制回收。
+
+新增独立编写的 runtime/dp2_cleanup.lua，通过既有停服回调提前关闭 luv 句柄并处理 close 回调；probe_game.py 的显式 --dp2-cleanup 仅在私有副本追加该脚本，并将 Gadget teardown 设为 full。正式文件复测返回 1，耗时 48.102 秒。没有跳过原版数据库错误、修改原版机器码、禁止 munmap 或强制成功退出。仍存在已知的 inotify 探测 fallback（i386 291/332），本次未将其扩成新的实现。
+
+证据见 [DP2 清理对照](evidence/p2-dp2-cleanup.json)。这解除的是短失败退出路径，尚不等于完整服务正常停服。联合探测器现可在原版启动标记后观察指定秒数，再发送跨进程 SIGUSR2，并要求原版关服标记和退出码 0。完整 game、bridge、私有 MySQL 的 --dp2-cleanup --stop-after-started 120 复测已启动，结果另行记录。

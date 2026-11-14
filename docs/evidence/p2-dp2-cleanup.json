@@ -1,0 +1,280 @@
+{
+  "recorded_utc": "2026-11-14T04:35:08.915273+00:00",
+  "scope": "Original initialization-failure exit cleanup only; no full startup, shutdown or gameplay acceptance. Expected original exit status is 1 due to the unconfigured game database.",
+  "finding": {
+    "module_sha256": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+    "type": "CPluginBase, confirmed by RTTI in the privately unpacked original image",
+    "base_vptr_write": "libdp2game.so+0x311bf",
+    "uv_run_nowait_call": "libdp2game.so+0x3121a",
+    "null_slot": "libdp2game.so+0xc76e0 (vptr+0x18)",
+    "control_flow": "The protected code loads this zero slot into its virtual stack, then RET consumes it. The base destructor runs luv before closing the handles, allowing overdue application scripts after the derived object lifetime."
+  },
+  "implementation": {
+    "lua_file": "runtime/dp2_cleanup.lua",
+    "lua_sha256": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42",
+    "gadget_teardown": "full, as required by the official Gadget unloading documentation",
+    "documentation": "https://frida.re/docs/gadget/",
+    "original_inputs": "Read-only; edits made in each private probe copy only."
+  },
+  "results": [
+    {
+      "recorded_utc": "20261114T041950609159Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 25.859,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Load libm through dp.frida without original application Lua",
+      "probe": "build\\probes\\20261114T041950609159Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "e7661b6d5409823957a16a14baf5a49b24d62a2f58a012bc474080f38f7859a8",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "5c490ee56fb706461e248eddf993ca522526e45d4f48d91ae2044b2ae67d7172",
+        "stderr.log": "6ea5a400c9fa7b73db336e9199a439d713a282390fa600c551a80d154f73a878"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042107655917Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 25.647,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Register a Lua handler only",
+      "probe": "build\\probes\\20261114T042107655917Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "bbad777f5d66d85d12f44001176f0723226dcb04f36831bf5c08f6ec5727ac34",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "0cc482a8ce6caf6a1dc4f32bf3b15f6adca261af4b974a3fd8d92e8c7414dbc6",
+        "stderr.log": "92fb9c7fb33bc2781e2a5479b3d4908db40176ce1c9fbd4a98e6ee087c7be05f"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042334271000Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 26.188,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Create a timer with an empty callback",
+      "probe": "build\\probes\\20261114T042334271000Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "4f25f88af92539f55ddf6612482a7a5aa2884c544add26d69dfbccf781bded75",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "8c1da8c909d4555bcaa95dae57804586e55408194dcef00a8c7dc61106c6d197",
+        "stderr.log": "44b11bf08de933e02f5426ddff8f76d277706f09b93274743c04748578025e61"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042549876612Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 50.133,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Require df.game only",
+      "probe": "build\\probes\\20261114T042549876612Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "c86292af823f9b36057cdd9c2b364a636463cd22e5ebf4515e886df32092b963",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "0ea62e005a3e6d7feb4afcd909d9327551ecf75e1ac429656fe4f655e000f4a6",
+        "stderr.log": "bf144379d4c446914347c1572b555d453955960b1714732cc25d74068feaf468"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042230937405Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 125,
+      "elapsed_seconds": 40.43,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Original Lua with frida.load commented out",
+      "probe": "build\\probes\\20261114T042230937405Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "3bee61c412860529be4b9617a8c052a7c7160dd728d4da9e252fe640a04c77cb",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "6f07ff4536621abfe574c8f3969c88af03d85e6822ff58750c4f8e65969bd584",
+        "stderr.log": "71b7355220b53acdd70db28623aeef092ae9918cce88115ad457a56f182b0edd"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042610089479Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 50.45,
+      "forced_cleanup": false,
+      "syscall_gaps": [],
+      "runtime_gaps": [],
+      "case": "Same no-Frida Lua plus early luv close/drain",
+      "probe": "build\\probes\\20261114T042610089479Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "feb3eef1184469bb00e0560ff6d7d893ad05be72d6dcadc8bf404581d09e0bb5",
+        "dp2\\df_game_r.lua": "915c839f1c2190e415fbd3f9ebd9c65177a59128e1590629554a607d6e3bd433",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "b6e6ca454319051acea00eedb6cd44205be935bdc837d6e37f71168a7c452177",
+        "stderr.log": "97d0aa2c55035f4789f23b0ac70442d6d989983594db76b4761a4b3efead00f0"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042727624015Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 48.358,
+      "forced_cleanup": false,
+      "syscall_gaps": [
+        "syscall gap nr=291",
+        "syscall gap nr=332"
+      ],
+      "runtime_gaps": [],
+      "case": "Original Lua/JS/Frida plus full and early luv close/drain",
+      "probe": "build\\probes\\20261114T042727624015Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "c224cbb52eaf910498ada15bdc8b603a7474aa045b12c0b46495aa60b341c950",
+        "dp2\\df_game_r.lua": "79935ab5b63e57c2f5ca15dc88ba7a9412a5f29d4059b9a7079fbee9ddfced89",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "c25651d61672b2261a928d7e739ec2417adffae2373f4645b0e3eecc313a2a2d",
+        "stderr.log": "76de80a250d6abe0f7e8eef6990b567d9045eab59492f4501f3742da1641c4f7"
+      }
+    },
+    {
+      "recorded_utc": "20261114T042941961645Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "host_sha256": "b9b12e697466eea17912b14e8d2e35e0d7c7e662e6b31901485c5652446ddcb0",
+      "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "exit_code": 1,
+      "elapsed_seconds": 48.102,
+      "forced_cleanup": false,
+      "syscall_gaps": [
+        "syscall gap nr=291",
+        "syscall gap nr=332"
+      ],
+      "runtime_gaps": [],
+      "case": "Checked-in cleanup script, original Lua/JS/Frida plus full",
+      "probe": "build\\probes\\20261114T042941961645Z\\game",
+      "input_hashes": {
+        "home\\neople\\game\\df_game_r": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+        "home\\neople\\game\\Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+        "home\\neople\\game\\captcha_font\\SeoulHangangL.ttf": "70230c86a217980f0f23621a7d60b6840a6d813004fdaa9dcbc5d5640fb8b170",
+        "usr\\local\\share\\GeoIP\\GeoIP.dat": "58fcdeaac15e222a744b27333a776a2b91dc493d212acbe971ba6b987265a73c",
+        "dp2\\libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+        "dp2\\libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+        "dp2\\lib\\liblua53.so": "607613c0fd48ffe286e35c93b3351148153d50b3d8c0d8ba961f2aea5de8a470",
+        "dp2\\lib\\libdp2game.so": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
+        "dp2\\frida\\frida.so": "8ca458e422dead8081c6e25831050dcbb006794c811bc2fe471f0cb59fdcc239",
+        "dp2\\frida\\frida.config": "c224cbb52eaf910498ada15bdc8b603a7474aa045b12c0b46495aa60b341c950",
+        "dp2\\df_game_r.lua": "86220165123f13203c7005fdb85b3d74efc0e1810326c4f1161d5443d8f3d702",
+        "dp2\\df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b"
+      },
+      "logs": {
+        "stdout.log": "fb69cf2c7d2636523dd1d54d556860e6f7bdcb3a48ad95b3b18a37fadc762abb",
+        "stderr.log": "ad0ae5343dd844cee0037ebed4706a7283e69c4afdd1c4f8a786a16c263439cb"
+      }
+    }
+  ],
+  "reproduction": [
+    "python tools/probe_game.py --preload --dp2-cleanup --timeout 120",
+    "python tools/probe_game_chain.py --database-source <stopped-private-restored-instance> --dp2-cleanup --stop-after-started 120 --timeout 2100"
+  ],
+  "pending": "Full startup plus two-minute observation and requested SIGUSR2 shutdown is running separately; not counted as passing here."
+}

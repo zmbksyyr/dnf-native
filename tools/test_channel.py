@@ -66,15 +66,18 @@ def receive(peer, size):
     return data
 
 
-def request_stop(pid):
-    # Same runtime event used by cross-process guest SIGTERM. This run mode
+def request_stop(pid, signal=15):
+    # Same runtime events used by cross-process guest kill(). This run mode
     # does not write a PID file, so its original stop helper cannot target it.
+    if signal not in [12, 15]:
+        raise ValueError("Only SIGUSR2 and SIGTERM have runtime events")
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.OpenEventW.argtypes = [w.DWORD, w.BOOL, w.LPCWSTR]
     kernel.OpenEventW.restype = w.HANDLE
     kernel.SetEvent.argtypes = [w.HANDLE]
     kernel.CloseHandle.argtypes = [w.HANDLE]
-    event = kernel.OpenEventW(2, False, "Local\\dnf-native-terminate-" + str(pid))
+    prefix = "Local\\dnf-native-sigusr2-" if signal == 12 else "Local\\dnf-native-terminate-"
+    event = kernel.OpenEventW(2, False, prefix + str(pid))
     if not event:
         raise ctypes.WinError(ctypes.get_last_error())
     try:
