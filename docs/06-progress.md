@@ -407,3 +407,13 @@ bridge 脚本响应逐字节匹配原件，返回 0。MySQL 服务器和 mysqlad
 game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）fallback；另反复出现 network unsupported nr=102 op=15，具体 socket option 未被旧日志记录。因此本轮只计联合自然启动和停止观察，完整互通仍未通过。后续静态定位发现 game 的 getsockopt 调用除频道代理的 SO_RCVBUF 外，其余位于非阻塞连接/MonitorTcpThread，使用 SOL_SOCKET/SO_ERROR；实际动态调用细节和修复另行验证，不能将推断记为已修复。
 
 证据见 [16 服务联合观察](evidence/p3-core-co-run.json)。tools/probe_game_chain.py 新增 --core 复用本轮准备和停止步骤，并记录 peer 退出、配置和 monitor 补丁；核心标记仍须结合应用日志审阅。复现 `python tools/probe_game_chain.py --database-source <停止的私有恢复库> --core --dp2-cleanup --stop-after-started 120 --timeout 2100`。仅验证 Windows 10 x64 10.0.19044，客户端、GUI、MySQL 单文件和交付包仍未验收。
+
+## 2026-11-14 · 非阻塞连接与 SO_ERROR
+
+首次 core 观察的 game 实际记录 7664 次 socketcall 15 不支持。独立扫描并逐处反汇编 game 对 getsockopt PLT 的六个直接调用：频道代理使用已支持的 SO_RCVBUF，其余现金连接及四处 MonitorTcpThread 使用 SOL_SOCKET/SO_ERROR。runtime 原先仅支持缓冲区查询，因此存在明确的连接错误查询缺口。旧日志没有 level/option，未将所有 7664 次调用的具体归属写成已动态确认；新日志会记录不支持的 level/option。
+
+实现调用真实 Winsock SO_ERROR，并将其中的 WSA 错误码转成正的 Linux errno。实际失败样件同时确认非阻塞 connect 的 WSAEWOULDBLOCK 应返回 EINPROGRESS，不能沿用普通读写的 EAGAIN。独立 Windows 对照证明拒绝连接后的 SO_ERROR 连续两次均为 10061，因此仅对 pending connect 记录消费状态，首次查询返回 ECONNREFUSED（111），再次返回 0，新连接尝试和 fd 关闭/重用时重置。没有对实际失败连接返回虚假成功。
+
+双架构真实 TCP 样件使用另一个已绑定但未监听的端口制造拒绝连接，旧构建在 SO_ERROR 查询失败；修复后连接成功、EINPROGRESS、poll 的失败事件、111、读取后清除，以及原有传输、getpeername、超时和普通/abortive 关闭全部通过。最终正式双架构构建的 epoll、并发 close/select 和 rename/msync 回归通过，构建身份见 [SO_ERROR 证据](evidence/p3-so-error.json)。该清除处理限定于非阻塞连接错误，不宣称完整 Linux socket error queue。
+
+已用包含上述修复的正式宿主启动新的 16 服务联合复测，继续要求原版自然启动、120 秒观察和正常关服。该轮尚未结束，不能把原语通过替代 game 网络缺口消失或完整互通结论。仅实测 Windows 10 x64 10.0.19044。

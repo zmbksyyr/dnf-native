@@ -8,8 +8,9 @@
 #include <string.h>
 #include <stdio.h>
 
-static intptr_t socket_error(void) {
-    switch (WSAGetLastError()) {
+static intptr_t socket_errno(int error) {
+    switch (error) {
+        case 0: return 0;
         case WSAEBADF: case WSAENOTSOCK: return -9;
         case WSAEACCES: return -13;
         case WSAEFAULT: return -14;
@@ -32,6 +33,8 @@ static intptr_t socket_error(void) {
         default: return -5;
     }
 }
+
+static intptr_t socket_error(void) { return socket_errno(WSAGetLastError()); }
 
 static intptr_t socket_io_error(void) {
     return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
@@ -78,6 +81,7 @@ static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
     run->sockets[fd] = (uintptr_t)s;
     run->file_access[fd] = 4;
     run->nonblock[fd] = nonblock != 0;
+    run->connect_state[fd] = 0;
     return fd;
 }
 
@@ -380,6 +384,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         *result = closesocket(s) == 0 ? 0 : socket_error();
         if (!*result) {
             run->nonblock[fd] = 0;
+            run->connect_state[fd] = 0;
             run->receive_timeout[fd] = run->send_timeout[fd] = 0;
             run->file_access[fd] = 0;
         } else run->sockets[fd] = (uintptr_t)s;
@@ -417,21 +422,39 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         if (args[2] != 16 || !nr_memory(args[1], 16, 0)) { *result = args[2] != 16 ? -22 : -14; return 1; }
         struct sockaddr_in address; memcpy(&address, (const void *)args[1], 16);
         if (address.sin_family != AF_INET) { *result = -97; return 1; }
+        if (operation == 3) run->connect_state[fd] = 0;
         int r = operation == 2 ? bind(s, (const struct sockaddr *)&address, 16) : connect(s, (const struct sockaddr *)&address, 16);
-        *result = r == 0 ? 0 : socket_error(); return 1;
+        if (r == SOCKET_ERROR && operation == 3 && WSAGetLastError() == WSAEWOULDBLOCK) {
+            run->connect_state[fd] = 1;
+            *result = -115;
+        } else *result = r == 0 ? 0 : socket_error();
+        return 1;
     }
     if (operation == 4) { *result = listen(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 13) { *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 15) {
-        if (args[1] != 1 || (args[2] != 7 && args[2] != 8)) { *result = -38; return 1; }
+        if (args[1] != 1 || (args[2] != 4 && args[2] != 7 && args[2] != 8)) {
+            fprintf(stderr, "getsockopt unsupported level=%llu option=%llu\n",
+                    (unsigned long long)args[1], (unsigned long long)args[2]);
+            *result = -38; return 1;
+        }
         if (!nr_memory(args[4], 4, 1)) { *result = -14; return 1; }
         int capacity; memcpy(&capacity, (const void *)args[4], 4);
         if (capacity < 0) { *result = -22; return 1; }
         int bytes = capacity < 4 ? capacity : 4;
         if (bytes && !nr_memory(args[3], (size_t)bytes, 1)) { *result = -14; return 1; }
         int value, length = sizeof(value);
-        int option = args[2] == 7 ? SO_SNDBUF : SO_RCVBUF;
-        if (getsockopt(s, SOL_SOCKET, option, (char *)&value, &length)) { *result = socket_error(); return 1; }
+        int option = args[2] == 4 ? SO_ERROR : args[2] == 7 ? SO_SNDBUF : SO_RCVBUF;
+        if (args[2] == 4 && run->connect_state[fd] == 2) value = 0;
+        else {
+            if (getsockopt(s, SOL_SOCKET, option, (char *)&value, &length)) { *result = socket_error(); return 1; }
+            if (args[2] == 4) {
+                value = (int)-socket_errno(value);
+                /* Winsock retains a failed asynchronous connect's SO_ERROR.
+                   Linux consumes it on the first query. A new connect resets it. */
+                if (value && run->connect_state[fd] == 1) run->connect_state[fd] = 2;
+            }
+        }
         if (bytes) memcpy((void *)args[3], &value, (size_t)bytes);
         memcpy((void *)args[4], &bytes, 4);
         *result = 0; return 1;

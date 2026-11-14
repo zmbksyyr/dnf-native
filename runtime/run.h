@@ -56,6 +56,7 @@ typedef struct {
     unsigned char flock_mode[256];
     uintptr_t sockets[256];
     unsigned char nonblock[256];
+    unsigned char connect_state[256]; /* 1: pending, 2: failed SO_ERROR consumed */
     uint64_t receive_timeout[256];
     uint64_t send_timeout[256];
     NrWatch *epolls[256];

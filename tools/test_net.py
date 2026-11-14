@@ -31,8 +31,10 @@ def main():
     for arch, target, base, abortive in [(arch, target, base, abortive)
             for arch, target, base in [("i686", "i386-linux-gnu", "0x8048000"), ("x86_64", "x86_64-linux-gnu", "0x400000")]
             for abortive in [False, True]]:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener, socket.socket(socket.AF_INET, socket.SOCK_STREAM) as refused:
             listener.bind(("127.0.0.1", 0))
+            # Reserve a real local port without listening: connect must fail.
+            refused.bind(("127.0.0.1", 0))
             listener.listen(1)
             listener.settimeout(8)
             port = listener.getsockname()[1]
@@ -40,7 +42,8 @@ def main():
             fixture.parent.mkdir(parents=True, exist_ok=True)
             build = [str(BIN / "clang.exe"), "--target=" + target, "-fuse-ld=lld", "-nostdlib", "-static",
                      "-ffreestanding", "-fno-stack-protector", "-fno-pic", "-O2", "-Wall", "-Wextra", "-Werror",
-                     "-DNR_PORT=" + str(port), "-DNR_LINGER_ON=" + str(int(abortive)), "-Wl,--image-base=" + base, "-Wl,-e,_start",
+                     "-DNR_PORT=" + str(port), "-DNR_REFUSED_PORT=" + str(refused.getsockname()[1]),
+                     "-DNR_LINGER_ON=" + str(int(abortive)), "-Wl,--image-base=" + base, "-Wl,-e,_start",
                      str(ROOT / "tests/net.c"), "-o", str(fixture)]
             subprocess.run(build, env=env, check=True)
             host = args.hosts.resolve() / arch / "dnf-host.exe"
