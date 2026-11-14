@@ -355,7 +355,7 @@ def main():
                     subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=10)
                     process.wait(timeout=10)
         receipt["limits"] = ["Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
-                             "GUI currently manages MySQL only; original service orchestration, plugins, password editing and level selection remain pending.",
+                  "This probe exercises MySQL controls; original service orchestration is verified separately. Plugin, password and level controls remain pending.",
                              "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
                              "No final complete offline ZIP or gameplay acceptance."]
         (probe / "receipt.json").write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")

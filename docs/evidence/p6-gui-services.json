@@ -1,0 +1,458 @@
+{
+  "recorded_utc": "2026-11-14T09:53:02.439570+00:00",
+  "scope": "Self-developed native GUI orchestration of original core ELF processes, normal shutdown and database controls. No original client gameplay, full security topology or release acceptance.",
+  "build": {
+    "gui_bytes": 886784,
+    "gui_sha256": "653ab7cdfcfaaeeb214af5de6534d3186dcedf57e27cd37efddbee22db00592f",
+    "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
+    "build_receipt_sha256": "39285a4ad9cf054d4906d657f5ec0eae4421e471ac0eefe029b0a86a6783d86f",
+    "sources": {
+      "delivery/controller_gui.cpp": "bd2b48a117e3fc8d982a97c83cde92f627b87927251df0b468b4cfd53aa8addf",
+      "delivery/controller_gui.manifest": "5e1724adbe22642744ce26760deb3c686ad820897dc6feb942183e98ba9a802c",
+      "delivery/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+      "delivery/service_processes.h": "afccea2f1edf34e06d34877ae1768d53079437fa012494cb21ec714b1deb23e8",
+      "tools/build_gui.py": "dbee51649d278dd99769d5e8c0340822170d183e26b2f8bc3bc9bead1c992d58"
+    },
+    "normal_imports": {
+      "machine": "x86_64",
+      "import_dlls": [
+        "USER32.dll",
+        "GDI32.dll",
+        "SHELL32.dll",
+        "ole32.dll",
+        "ADVAPI32.dll",
+        "WS2_32.dll",
+        "msvcrt.dll",
+        "KERNEL32.dll"
+      ],
+      "note": "Normal imports only; not delay-load/runtime closure"
+    }
+  },
+  "core": {
+    "path": "build/probes/20261114T092438049578Z/gui-core/receipt.json",
+    "receipt_sha256": "3d378147f93967c237ec8521df5e1dad3dd2403215c805bbd2eca05ceabe11a6",
+    "checks": {
+      "sixteen_core_processes_started_by_gui": true,
+      "game_natural_startup_seconds": 1301.047,
+      "peer_protocols_after_game_startup": {
+        "channel": {
+          "challenge": true,
+          "positive_responses": 3,
+          "fragmented": true,
+          "coalesced": true
+        },
+        "relay": {
+          "registered_peers": 2,
+          "bidirectional_messages": 8,
+          "unlogged_accounts_disconnected": [
+            701,
+            702
+          ],
+          "own_auth_response_sent": false
+        },
+        "stun": {
+          "responses": 5,
+          "address_and_source_ports": true
+        }
+      },
+      "window_response_after_startup_ms": 0.267,
+      "game_shutdown_markers": [
+        "RECV SIGUSR2",
+        "ALL USER LOGOUT COMPLETE",
+        "GAME SERVER SHUTDOWN COMPLETE"
+      ],
+      "frida_dispose_and_dp2_unload": true,
+      "database_normal_shutdown": true
+    },
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "executed_script_sha256": "3b861c61d15942d7a8045777aed7eb6194b3f7c0f9eb774ccd9b41023e3c89f0"
+  },
+  "unicode_peers_twice": {
+    "path": "build/probes/20261114T094912641323Z/gui-services/receipt.json",
+    "receipt_sha256": "930b025f03f3b75600eb2a9e1d51fd269758c1d0d8f00401ee6aae87c9c2fb82",
+    "checks": {
+      "nineteen_service_entries": true,
+      "start_window_response_ms": 0.026,
+      "fifteen_original_peer_processes": true,
+      "database_stop_and_backup_disabled_while_services_run": true,
+      "channel_protocol": {
+        "challenge": true,
+        "positive_responses": 3,
+        "fragmented": true,
+        "coalesced": true
+      },
+      "relay_and_real_monitor_rejection": {
+        "registered_peers": 2,
+        "bidirectional_messages": 8,
+        "unlogged_accounts_disconnected": [
+          701,
+          702
+        ],
+        "own_auth_response_sent": false
+      },
+      "stun_protocol": {
+        "responses": 5,
+        "address_and_source_ports": true
+      },
+      "individual_channel_normal_stop": true,
+      "selected_real_log_visible": true,
+      "changed_elf_rejected_without_stopping_other_services": true,
+      "individual_channel_restart_protocol": {
+        "challenge": true,
+        "positive_responses": 3,
+        "fragmented": true,
+        "coalesced": true
+      },
+      "reverse_order_whole_stop_completed": true,
+      "owned_pid_markers_removed_after_stop": true,
+      "backup_enabled_only_after_whole_stop": true,
+      "second_launch_channel_protocol": {
+        "challenge": true,
+        "positive_responses": 3,
+        "fragmented": true,
+        "coalesced": true
+      },
+      "second_launch_relay_and_monitor_protocol": {
+        "registered_peers": 2,
+        "bidirectional_messages": 8,
+        "unlogged_accounts_disconnected": [
+          701,
+          702
+        ],
+        "own_auth_response_sent": false
+      },
+      "second_launch_stun_protocol": {
+        "responses": 5,
+        "address_and_source_ports": true
+      },
+      "close_normally_stops_all_owned_elf_hosts": true,
+      "database_normal_shutdown_after_peers": true,
+      "runtime_gaps": []
+    },
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "executed_script_sha256": "e9d30f569d3045fdd65d80470526b606dd81ef3e6eaa2e6716b280839aa0a690"
+  },
+  "database_controls_regression": {
+    "path": "build/probes/20261114T092556162872Z/gui/receipt.json",
+    "receipt_sha256": "3895a299bf5038f5276622e9c32d5401f6faa6537462695455003f40cf1029f6",
+    "checks": {
+      "instance_path_can_be_cleared_and_selected_again": true,
+      "initialize_window_response_ms": 0.092,
+      "gui_secure_initialization": true,
+      "gui_start_checks_sql_identity_and_tls": true,
+      "different_uuid_on_same_port_does_not_stop_first_instance": true,
+      "gui_normal_shutdown": true,
+      "backup_window_response_ms": 0.034,
+      "busy_close_waits_without_canceling_backup": true,
+      "gui_corrupt_restore_reports_error_without_data_writes": true,
+      "restore_window_response_ms": 0.082,
+      "gui_backup_and_restore_native_results": true,
+      "restored_rows_and_removed_extra_schema": true,
+      "close_window_normally_stops_owned_database": true,
+      "gui_process_exit_code": 0,
+      "gui_pending_restore_blocks_start_and_recovery_restores_cold_data": true
+    },
+    "exit_code": 0,
+    "forced_cleanup": false,
+    "executed_script_sha256": "9a11ae34906c35e419c1e93485b07f2f47757328fd07296b3fd368d0a4d97256"
+  },
+  "core_original_exit_codes": {
+    "auction": 0,
+    "bridge": 0,
+    "channel": 0,
+    "community": 0,
+    "coserver": 1,
+    "dbmw_guild": 1,
+    "dbmw_mnt": 1,
+    "dbmw_stat": 1,
+    "game": 0,
+    "guild": 1,
+    "manager": 1,
+    "monitor": 1,
+    "point": 0,
+    "relay": 0,
+    "statics": 1,
+    "stun": 0
+  },
+  "core_runtime_gaps": [
+    "syscall gap nr=291",
+    "syscall gap nr=332"
+  ],
+  "source_database_unchanged_after_all_runs": true,
+  "original_service_inputs": [
+    {
+      "name": "bridge",
+      "original_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+      "executed_elf_sha256": "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "manager",
+      "original_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+      "executed_elf_sha256": "74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "dbmw_guild",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "dbmw_mnt",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "dbmw_stat",
+      "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "executed_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "monitor",
+      "original_elf_sha256": "a099d2b3ebc77bfe1393bec3543a41ba8c20c99d0abc26619241d31964dea6d7",
+      "executed_elf_sha256": "c3971c169c1202847542067d91b3a53ef2661ff6b4c7cabb2b80bf1c1c6d8cdd",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": [
+        {
+          "address": "0x08062877",
+          "offset": 108663,
+          "before": "c6400400",
+          "after": "c6400401",
+          "purpose": "Initialize the application loop flag before stop callbacks can run."
+        },
+        {
+          "address": "0x08063fa4",
+          "offset": 114596,
+          "before": "c6400401",
+          "after": "90909090",
+          "purpose": "Preserve a stop request received during application Load."
+        },
+        {
+          "address": "0x0805aa4c",
+          "offset": 76364,
+          "before": "8b45088944240cc7442408b8aa0508c744240400000000",
+          "after": "c64008018944240cc7442408b8aa050883642404009090",
+          "purpose": "Set running before pthread_create; preserve its original arguments."
+        },
+        {
+          "address": "0x080973ce",
+          "offset": 324558,
+          "before": "c6400801",
+          "after": "90909090",
+          "purpose": "Do not overwrite an early stop after the UDP worker's startup sleep."
+        },
+        {
+          "address": "0x08064042",
+          "offset": 114754,
+          "before": "8b45088b803401000085c074538b45088b80340100008b008b108b45088b8034010000890424ffd28b45088b803401000085c0741e8b45088b80340100008b0083c00c8b108b45088b8034010000890424ffd28b4508c7803401000000000000",
+          "after": "8b45088b983401000085db7453c64308008b43108b00890424e8606bfeff8b4310c700ffffffff891c24e8296affff891c24e80d3203008b4508c780340100000000000090909090909090909090909090909090909090909090909090909090",
+          "purpose": "Stop, close UDP receive fd, invalidate it, join, then delete the thread object."
+        },
+        {
+          "address": "0x080a635a",
+          "offset": 385882,
+          "before": "8b4508c780ac000000000000008b4508c780b000000000000000",
+          "after": "8b55088dbaac00000031c0b904000000f3ab89d0909090909090",
+          "purpose": "Initialize all four occupation/login/logout counters; the original omits offsets 0xb4 and 0xb8."
+        }
+      ]
+    },
+    {
+      "name": "guild",
+      "original_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+      "executed_elf_sha256": "51eae69e23a92df3a429881436d8ee41dad28450094a60b649f08f93f6084069",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "statics",
+      "original_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+      "executed_elf_sha256": "37c3ba4e5fd87bb6eaac598c6eac8c726c5b4602122cfdc22a59590f8903be79",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "coserver",
+      "original_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+      "executed_elf_sha256": "1a626560bcf4d5272a92931cf14b09663aa45ae4f7d1f8a3b19f067aaf6c2f75",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "community",
+      "original_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+      "executed_elf_sha256": "fe1b06e880218fc0ed89c011506aef59b46e0322b999e54a3ebd741c238b8a1e",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "auction",
+      "original_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+      "executed_elf_sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "point",
+      "original_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+      "executed_elf_sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "channel",
+      "original_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "executed_elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "relay",
+      "original_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "executed_elf_sha256": "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "stun",
+      "original_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+      "executed_elf_sha256": "63d94ee108d3f0b2f0f6aa433a2b97c96438da66447117b66d106750efb97528",
+      "host_sha256": "eb5f81d6f4bc71e971b4c46916d326e01db969318112a11854a3a67ea13eb2d6",
+      "loader_sha256": "09161025e77fda5d9514ef753504c97377aa59439ad8e03309b2ee17de301d6d",
+      "patches": []
+    },
+    {
+      "name": "game",
+      "original_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "executed_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "zergsvr",
+      "original_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+      "executed_elf_sha256": "c2def44c445d372c544fd49f79dc79ac62a72750a04035818f3eceb407f26c17",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "secagent",
+      "original_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+      "executed_elf_sha256": "4416aeffccc8b2064c5548d3867638789bb10912d6ce8ea50289b13bbcee2b5b",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    },
+    {
+      "name": "gunnersvr",
+      "original_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+      "executed_elf_sha256": "ce26717f3fd8c69c2b079c120f00d3f93e0cd6cc53dcc24aa2d5639fec2b8a8b",
+      "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
+      "loader_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "patches": []
+    }
+  ],
+  "private_config_sha256": {
+    "i686/home/neople/auction/cfg/auction_siroco.cfg": "9869c716113b2ae762680a233cd0db05f503d95831c6286c89a2584012a43e24",
+    "i686/home/neople/auction/cfg/bridge.cfg": "96755361e3e7d11210b9dffc9043091e70bb3e931948b2fabb2789f5f7373708",
+    "i686/home/neople/bridge/cfg/bridge.cfg": "3a1f60325724c8de1e65cb84f3e79e251485be3af6dd8e90e7f68d6edc1ee3ca",
+    "i686/home/neople/channel/cfg/channel.cfg": "5f73e00a2cf5dc4ec4748543d6392a9ea8c1b5c3601e235165d580ddb88cd7e9",
+    "i686/home/neople/community/cfg/community.cfg": "c4528dc998c2ffb8ecd9721e61c3259bde9f48583edf42f532f2d4a2b0b06e77",
+    "i686/home/neople/coserver/cfg/coserver.cfg": "01811a81bf8e950b92facc7be4abcf40431ddda882e2a4dd7675b55b3012e52e",
+    "i686/home/neople/dbmw_guild/cfg/dbmw_gld_siroco.cfg": "b97510417cf7bd19ce4ef620153f6f0435d0d86d36cb5c0ddf1709656092ba41",
+    "i686/home/neople/dbmw_mnt/cfg/dbmw_mnt_siroco.cfg": "37c3472e69f9f15d6eb9e9a1c416a9a0cd80d2d51a90c9894877be5a637e4deb",
+    "i686/home/neople/dbmw_stat/cfg/dbmw_stat_siroco.cfg": "a641d460d2c70d1a527536618e2fab5a8a95d3db5d4434557de5ca06ff36f664",
+    "i686/home/neople/game/cfg/db_info_tw.cfg": "1eede41ef1a889ab7bbc61c0d0817f2580068116401c4e3339bf6413a7a7b989",
+    "i686/home/neople/game/cfg/siroco11.cfg": "16212fd14f2821b8882725c6e34128ae06076f368ce100506f9df523d9483018",
+    "i686/home/neople/game/cfg/siroco56.cfg": "69ac5edf98ba2895b7053e84b8b0387bcbd5ffe7872ef9ec1f4b0915f12fa490",
+    "i686/home/neople/guild/cfg/gld_siroco.cfg": "9c7e4be20164895172f22e68074bb500c6b8c449891151f171cde2ff53330f31",
+    "i686/home/neople/manager/cfg/manager.cfg": "9489151ab8a457454d7c5dfca2534a282aa48592fbf155e296d65daa56297771",
+    "i686/home/neople/monitor/cfg/mnt_siroco.cfg": "9396600bed6edc8376cdc186e55653a70efb50fee340f2e06666828341121b44",
+    "i686/home/neople/point/cfg/point_siroco.cfg": "14706d52936d3a2dacb387420c7fc610b81e5bfdeb246e77eaa9e72e71cc6f09",
+    "i686/home/neople/relay/cfg/relay_200.cfg": "b103fdbbc81c64c9dd460b3c612819730dc6a3b672d571c76366a2df43f77e60",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/clientcodedata/crypt/dir.cfg": "bfa28b5b2aee4fd2e67fb68d7d2146277bcc707166167c4d7bfd196fe52bc4bd",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/clientcodedata/cryptdata/dir.cfg": "9bc65256f336f810519459ed05f28179a602faf4e3cde2a31f6b26a5699b5db9",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/clientcodedata/dir.cfg": "b4da208543340049d6fffcf0fd870f049b6b279e765a8be68fb7feedeb6fb76a",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/p2pcodedata/bin/dir.cfg": "7db186e8f617f07cab800a4031593fcbacf8fa1addacd3cab9d6a0fd408e732e",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/p2pcodedata/crypt/dir.cfg": "bfa28b5b2aee4fd2e67fb68d7d2146277bcc707166167c4d7bfd196fe52bc4bd",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/p2pcodedata/cryptdata/dir.cfg": "2fc1164145724d8a64935bffcdb65c8e7f03d81733dca20611ba6d61476adaae",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/p2pcodedata/dir.cfg": "8046753aeb99712e0b57503211155a365e94fe8d356e79a3066a7f44c4e83bc6",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/servercodedata/bin/dir.cfg": "7db186e8f617f07cab800a4031593fcbacf8fa1addacd3cab9d6a0fd408e732e",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/servercodedata/crypt/dir.cfg": "560b35db5fe52637221ff3ba8f04a96811e02f875088b345a4e4bba794e88d94",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/servercodedata/cryptdata/dir.cfg": "2fc1164145724d8a64935bffcdb65c8e7f03d81733dca20611ba6d61476adaae",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/servercodedata/dir.cfg": "7002d970d060344d6e888fafe3d15cd9255ad90a41487f4feaa75fa0d79788c8",
+    "i686/home/neople/secsvr/zergsvr/cfg/data/versionhash.cfg": "1f44edaf4c84247733574f0a0fe188ba460c3190ed10f9c7e9d1e96414dd7097",
+    "i686/home/neople/secsvr/zergsvr/cfg/dib/__+_ dib.cfg": "10016c6e9fc9395bd04876e5aa7b40a04eb5a5720ec65d92b3f752ebb11bc69c",
+    "i686/home/neople/secsvr/zergsvr/cfg/dib/dib.cfg": "6425c83f616384e78b3dccdce70d6232fbafb5f75c81d377703f8d218933eb8a",
+    "i686/home/neople/statics/cfg/stat_siroco.cfg": "93ac72ab27a06946fd2530b6b909f39d790d65b54cb75d59874532b689c271df"
+  },
+  "core_assets": {
+    "i686/home/neople/game/Script.pvf": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
+    "i686/dp2/libdp2pre.so": "49e5414bcff823dc33a593d157144fc63fb01bb29a28cd61fe102f28f914fb72",
+    "i686/dp2/libdp2.so": "cd84a1b2493692f53a47a00a5b5f4d51e36c6ffdec9b19b26b95a02a61f776f2",
+    "i686/dp2/df_game_r.lua": "86220165123f13203c7005fdb85b3d74efc0e1810326c4f1161d5443d8f3d702",
+    "i686/dp2/df_game_r.js": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b",
+    "i686/dp2/frida/frida.config": "c224cbb52eaf910498ada15bdc8b603a7474aa045b12c0b46495aa60b341c950",
+    "services.ini": "3555041f196091a5907fc0bb339c6348e3ea270fdcfdf719e213cf63820ea522"
+  },
+  "current_probe_sources": {
+    "tools/prepare_service_instance.py": "7f8c635285a9a9a97749b1d40bb92a4167e00c6de9e9acabd5be2f2e04622714",
+    "tools/test_gui_services.py": "e9d30f569d3045fdd65d80470526b606dd81ef3e6eaa2e6716b280839aa0a690",
+    "tools/probe_gui_core.py": "c35229edd65d6ad7ea674e0ff609337f354a7b9ec0b59a3bbd8e50b0f917dcc7",
+    "tools/test_gui.py": "08993afd8873ce19b498bad09355af8436332ba8ca2b867487a0b8867735be9a"
+  },
+  "probe_source_notes": [
+    "The core probe was launched before its exception text changed from str(error) to exception type plus text. Successful execution is unchanged. The reconstructed executed source is retained under the ignored probe directory and matches its recorded hash.",
+    "The database control regression executed tools/test_gui.py from ee84f66. Its later edit only clarifies that its scope/limits concern database controls; original service controls are covered here separately."
+  ],
+  "prior_failures_and_corrections": [
+    {
+      "probe": "build/probes/20261114T091708322282Z/gui-services/receipt.json",
+      "result": "Failed verifier expectation: channel does not emit Application Stop!; select its real log and check guest exit status=0."
+    },
+    {
+      "probe": "build/probes/20261114T092037008095Z/gui-services/receipt.json",
+      "result": "Actual repeated-start failure: stale foreground PID files prevented monitor/DBMW initialization. Fixed only by deleting an exited owned host marker whose contents still match its PID."
+    },
+    {
+      "probe": "build/probes/20261114T092250457973Z/gui-services/receipt.json",
+      "result": "Not a passing result even though its command returned 0: the verifier assumed every normal exit was 0 and stored an empty AssertionError string. Original CApplication normal cleanup returns 1. Final verifier requires baseline codes and real cleanup markers, and records exception type so this failure cannot disappear."
+    }
+  ],
+  "limits": [
+    "Developer Windows 10 10.0.19044 only. No clean ordinary-user offline Win7/10/11 acceptance.",
+    "Nineteen entries are selectable; full startup/stop tested core 16. Security trio topology and necessity remain unverified.",
+    "Process running is not application/business readiness. No original client positive login or playable business acceptance.",
+    "Instance preparation currently uses a development Python copy/configuration tool and a secure private seed. Product first-run resource/seed import remains pending.",
+    "Backup/restore require a prior whole-stop; automatic stop/maintenance/restart coordination remains pending.",
+    "ELF hosts are assigned to the GUI KILL_ON_JOB_CLOSE Job before execution. This stage tested normal GUI close, not deliberate GUI termination. MySQL retains its separate wrapper Job; GUI restart does not yet reattach the database session.",
+    "Password editing, plugin/Frida switches, level selection and filtered/redacted log export remain pending.",
+    "No final minimized offline ZIP or 210000000-byte acceptance. PE normal imports do not prove full runtime closure."
+  ]
+}

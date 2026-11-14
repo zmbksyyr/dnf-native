@@ -1,11 +1,12 @@
-// Independent Win32 console. Database actions invoke this project's native SFX.
-#include "win32_files.h"
+// Independent Win32 console for original ELF hosts and the native MySQL SFX.
+#include "service_processes.h"
 #include <algorithm>
 #include <cwchar>
 #include <memory>
 #include <thread>
 
-enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS };
+enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS,
+       SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
@@ -156,8 +157,26 @@ struct App {
     HFONT font = nullptr;
     std::wstring exe, initial, current;
     Session session;
+    std::vector<Service> services;
+    HANDLE service_job = nullptr;
     bool busy = false, closing = false;
     std::thread worker;
+
+    bool services_running() const {
+        return std::any_of(services.begin(), services.end(), [](const Service &service) { return running(service); });
+    }
+    void show_services() {
+        HWND list = GetDlgItem(window, SERVICE_LIST);
+        LRESULT selected = SendMessageW(list, LB_GETCURSEL, 0, 0);
+        SendMessageW(list, WM_SETREDRAW, FALSE, 0); SendMessageW(list, LB_RESETCONTENT, 0, 0);
+        for (const auto &service : services) {
+            std::wstring row = service.name + (service.automatic ? L"" : L"（可选）") + L"  |  " + service.state;
+            if (service.pid) row += L"  |  PID " + std::to_wstring(service.pid);
+            SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(row.c_str()));
+        }
+        if (!services.empty()) SendMessageW(list, LB_SETCURSEL, selected == LB_ERR ? 0 : selected, 0);
+        SendMessageW(list, WM_SETREDRAW, TRUE, 0); InvalidateRect(list, nullptr, TRUE);
+    }
 
     void append(const std::wstring &text) {
         SYSTEMTIME now; GetLocalTime(&now);
@@ -168,23 +187,40 @@ struct App {
         SendMessageW(output, EM_SCROLLCARET, 0, 0);
     }
     void controls() {
+        // The worker may be changing process ownership. Inspect it after join.
+        if (busy) {
+            for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,FOLDER,LOGS,
+                           SERVICE_LIST,ELF_START,ELF_STOP,ALL_START,ALL_STOP,SERVICE_LOGS})
+                EnableWindow(GetDlgItem(window, id), FALSE);
+            return;
+        }
+        bool active = services_running();
         bool initialized = !current.empty() && present(current + L"\\data\\auto.cnf");
         bool pending = !current.empty() && present(current + L"\\restore.pending");
-        for (int id : {INSTANCE, BROWSE, PORT}) EnableWindow(GetDlgItem(window, id), !busy && !session.process && (id != PORT || !initialized));
+        for (int id : {INSTANCE, BROWSE, PORT}) EnableWindow(GetDlgItem(window, id), !active && !session.process && (id != PORT || !initialized));
         EnableWindow(GetDlgItem(window, INITIALIZE), !busy && !session.process && !current.empty() && !initialized && !pending);
         EnableWindow(GetDlgItem(window, START), !busy && !session.process && initialized && !pending);
-        EnableWindow(GetDlgItem(window, STOP), !busy && session.process);
-        for (int id : {BACKUP, RESTORE}) EnableWindow(GetDlgItem(window, id), !busy && !session.process && initialized && !pending);
+        EnableWindow(GetDlgItem(window, STOP), session.process && !active);
+        for (int id : {BACKUP, RESTORE}) EnableWindow(GetDlgItem(window, id), !active && !session.process && initialized && !pending);
         EnableWindow(GetDlgItem(window, RECOVER), !busy && !session.process && pending);
         for (int id : {FOLDER, LOGS}) EnableWindow(GetDlgItem(window, id), !busy && !current.empty());
+        LRESULT index = SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_GETCURSEL, 0, 0);
+        bool selected = index >= 0 && static_cast<size_t>(index) < services.size();
+        EnableWindow(GetDlgItem(window, SERVICE_LIST), !services.empty());
+        EnableWindow(GetDlgItem(window, ELF_START), selected && session.process && !running(services[index]) && !pending);
+        EnableWindow(GetDlgItem(window, ELF_STOP), selected && running(services[index]));
+        EnableWindow(GetDlgItem(window, SERVICE_LOGS), selected && !services[index].out.empty());
+        EnableWindow(GetDlgItem(window, ALL_START), !services.empty() && initialized && !pending);
+        EnableWindow(GetDlgItem(window, ALL_STOP), active || session.process);
     }
     void load() {
-        if (busy || session.process) return;
+        if (busy || session.process || services_running()) return;
         std::wstring value = window_text(path);
         if (value.empty()) {
-            current.clear(); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
+            current.clear(); services.clear(); show_services(); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
         }
         current = full_path(value);
+        services = load_services(current); show_services();
         bool initialized = present(current + L"\\data\\auto.cnf");
         if (present(current + L"\\server.cnf")) {
             std::string config = read_file(current + L"\\server.cnf");
@@ -194,16 +230,34 @@ struct App {
         SetWindowTextW(status, present(current + L"\\restore.pending") ? L"需要恢复未完成的还原" : initialized ? L"已选择实例，可启动数据库" : L"尚未初始化数据库");
         controls();
     }
-    void action(int id, const std::wstring &target = L"") {
+    void action(int id, const std::wstring &target = L"", int selected = -1) {
         current = full_path(window_text(path));
         const std::wstring instance = current, tool = exe, port_text = window_text(port);
         const Session owned = session;
         busy = true; controls();
         SetWindowTextW(status, L"正在执行操作…");
-        worker = std::thread([this, id, instance, tool, target, port_text, owned] {
+        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected] {
             auto result = std::make_unique<Result>();
             try {
-                if (id == START) {
+                if (id == ALL_START || id == ALL_STOP || id == ELF_START || id == ELF_STOP) {
+                    if (id == ALL_START && !owned.process) result->started = start_database(window, tool, instance);
+                    if (id == ALL_START || id == ALL_STOP) {
+                        if (id == ALL_START) {
+                            for (auto &service : services) if (service.automatic) start_service(service, instance, service_job);
+                            result->status = L"已启动默认服务进程（业务未验证）";
+                        } else {
+                            for (auto item = services.rbegin(); item != services.rend(); ++item) stop_service(*item);
+                            if (owned.process) { stop_database(window, tool, instance, owned); result->stopped = true; }
+                            result->status = L"服务进程已退出，数据库已停止";
+                        }
+                    } else {
+                        if (selected < 0 || static_cast<size_t>(selected) >= services.size()) throw std::runtime_error("Choose a service first");
+                        if (id == ELF_START) start_service(services[selected], instance, service_job);
+                        else stop_service(services[selected]);
+                        result->status = services[selected].name + L"：" + services[selected].state;
+                    }
+                    result->details = result->status;
+                } else if (id == START) {
                     result->started = start_database(window, tool, instance);
                     result->status = L"数据库 SQL 检查通过（实例身份及 TLS 已核对）";
                     result->details = result->status + L"\r\n服务器日志：" + result->started.log;
@@ -283,6 +337,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 control(L"BUTTON", button.second, WS_TABSTOP, button.first);
             control(L"STATIC", L"备份与还原前请停止数据库。操作日志保存在实例目录中。", 0, 205);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, 206);
+            control(L"STATIC", L"原版服务进程（运行状态不代表业务就绪）", 0, 207);
+            control(L"LISTBOX", L"", LBS_NOTIFY | WS_VSCROLL | WS_BORDER | WS_TABSTOP, SERVICE_LIST);
+            for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{ELF_START,L"启动所选"},{ELF_STOP,L"停止所选"},{ALL_START,L"整体启动"},{ALL_STOP,L"整体停止"},{SERVICE_LOGS,L"查看所选日志"}})
+                control(L"BUTTON", button.second, WS_TABSTOP, button.first);
             SendMessageW(app->output, EM_LIMITTEXT, 4 * 1024 * 1024, 0);
             app->load(); SetTimer(window, 1, 500, nullptr);
             return 0;
@@ -293,11 +351,14 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             place(201,16,20,80,24); place(INSTANCE,100,16,width-212,30); place(BROWSE,width-100,16,84,30);
             place(202,16,64,135,26); place(203,165,64,45,26); place(PORT,212,60,80,28); place(204,310,64,width-326,26);
             for (int i = 0; i < 8; ++i) place(INITIALIZE+i,16+i*((width-32)/8),104,(width-32)/8-8,34);
-            place(205,16,154,width-32,26); place(206,16,190,width-32,height-206);
+            place(205,16,154,width-32,26); place(207,16,190,width-32,26);
+            place(SERVICE_LIST,16,220,width-200,200);
+            for (int i = 0; i < 5; ++i) place(ELF_START+i,width-172,220+i*40,156,32);
+            place(206,16,436,width-32,height-452);
             return 0;
         }
         case WM_GETMINMAXINFO:
-            reinterpret_cast<MINMAXINFO *>(lparam)->ptMinTrackSize = {880, 480}; return 0;
+            reinterpret_cast<MINMAXINFO *>(lparam)->ptMinTrackSize = {880, 640}; return 0;
         case STATUS_MESSAGE:
             SetWindowTextW(app->status, reinterpret_cast<const wchar_t *>(lparam)); return 0;
         case DONE_MESSAGE: {
@@ -305,12 +366,19 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->worker.join(); app->busy = false;
             if (result->stopped && app->session.process) { CloseHandle(app->session.process); app->session = {}; }
             if (result->started.process) app->session = result->started;
-            SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls();
-            if (app->closing && result->success && !app->session.process) PostMessageW(window, WM_CLOSE, 0, 0);
+            app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls();
+            if (app->closing && result->success && !app->session.process && !app->services_running()) PostMessageW(window, WM_CLOSE, 0, 0);
             else app->closing = false;
             return 0;
         }
         case WM_TIMER:
+            if (!app->busy) {
+                bool changed = false;
+                for (auto &service : app->services) if (refresh_service(service)) {
+                    app->append(service.name + L"：" + service.state + L"\r\n诊断日志：" + service.err); changed = true;
+                }
+                if (changed) { app->show_services(); app->controls(); }
+            }
             if (!app->busy && app->session.process && WaitForSingleObject(app->session.process, 0) == WAIT_OBJECT_0) {
                 std::wstring text = L"数据库进程已退出，退出码 " + std::to_wstring(exit_code(app->session.process));
                 app->append(text + L"\r\n服务器日志：" + app->session.log); SetWindowTextW(app->status, text.c_str());
@@ -320,6 +388,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         case WM_COMMAND: {
             int id = LOWORD(wparam);
             if (id == INSTANCE && HIWORD(wparam) == EN_CHANGE) { if (app->status && app->output) app->load(); return 0; }
+            if (id == SERVICE_LIST && HIWORD(wparam) == LBN_SELCHANGE) { if (!app->busy) app->controls(); return 0; }
             if (HIWORD(wparam) != BN_CLICKED || app->busy) return 0;
             if (id == BROWSE) {
                 auto chosen = choose_folder(window, L"选择本地实例目录", app->current);
@@ -336,11 +405,20 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     target += name;
                 } else if (MessageBoxW(window, L"使用选定备份还原当前数据库？\n程序会先保存预备份，验证后再切换，并保留原数据冷快照。", L"确认还原", MB_YESNO | MB_ICONQUESTION) != IDYES) return 0;
                 app->action(id, target);
-            } else if (id >= INITIALIZE && id <= RECOVER) app->action(id);
+            } else if (id == SERVICE_LOGS) {
+                LRESULT index = SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_GETCURSEL, 0, 0);
+                if (index >= 0 && static_cast<size_t>(index) < app->services.size()) {
+                    const auto &service = app->services[index];
+                    app->append(service.name + L"\r\n" + service.out + L"\r\n" + decode(read_file(service.out)) + L"\r\n" + service.err + L"\r\n" + decode(read_file(service.err)));
+                }
+            } else if (id >= ELF_START && id <= ALL_STOP)
+                app->action(id, L"", static_cast<int>(SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_GETCURSEL, 0, 0)));
+            else if (id >= INITIALIZE && id <= RECOVER) app->action(id);
             return 0;
         }
         case WM_CLOSE:
-            if (app->busy) { SetWindowTextW(app->status, L"正在执行数据库操作，请等待完成后关闭"); return 0; }
+            if (app->busy) { SetWindowTextW(app->status, L"正在执行操作，请等待完成后关闭"); return 0; }
+            if (app->services_running()) { app->closing = true; app->action(ALL_STOP); return 0; }
             if (app->session.process) { app->closing = true; app->action(STOP); return 0; }
             DestroyWindow(window); return 0;
         case WM_DESTROY:
@@ -357,6 +435,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         SetProcessDPIAware();
         App state; app = &state;
+        WSADATA sockets; require(WSAStartup(MAKEWORD(2,2), &sockets) == 0, "Initialize service networking");
+        state.service_job = CreateJobObjectW(nullptr, nullptr); require(state.service_job != nullptr, "Create ELF host job");
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {}; limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        require(SetInformationJobObject(state.service_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)), "Configure ELF host ownership");
         wchar_t module[32768]; require(GetModuleFileNameW(nullptr, module, 32768) != 0, "Find native application directory");
         std::wstring folder(module); folder.resize(folder.find_last_of(L'\\'));
         state.exe = folder + L"\\mysql-standalone.exe";
@@ -370,7 +452,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         type.hCursor = LoadCursorW(nullptr, IDC_ARROW); type.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
         require(RegisterClassW(&type) != 0, "Register native window");
         HWND window = CreateWindowExW(0, type.lpszClassName, L"DNF Native 控制台", WS_OVERLAPPEDWINDOW,
-                                       CW_USEDEFAULT,CW_USEDEFAULT,1040,660,nullptr,nullptr,instance,nullptr);
+                                       CW_USEDEFAULT,CW_USEDEFAULT,1040,800,nullptr,nullptr,instance,nullptr);
         require(window != nullptr, "Create native window");
         ShowWindow(window, show); UpdateWindow(window);
         MSG message;
@@ -378,6 +460,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
             if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
         }
         CoUninitialize();
+        CloseHandle(state.service_job); WSACleanup();
         return 0;
     } catch (const std::exception &error) {
         MessageBoxW(nullptr, decode(error.what()).c_str(), L"DNF Native", MB_OK | MB_ICONERROR);
