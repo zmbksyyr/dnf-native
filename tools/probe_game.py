@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--timeout", type=float, default=30)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--preload", action="store_true", help="Use the original DP2 preload chain")
+    parser.add_argument("--env", action="append", default=[], help="Add a guest NAME=VALUE environment setting")
     parser.add_argument("--db-config", type=Path, help="Private JSON connection settings for an isolated test database")
     args = parser.parse_args()
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -55,12 +56,16 @@ def main():
                 raise ValueError("Expected one original master database setting")
         config.write_text(text, encoding="utf-8")
     elf, ld = guest_dir / "df_game_r", instance / "lib/ld-2.17.so"
+    # GLib resolves the home directory while Frida is loading on another thread.
+    # Supply the guest user's normal HOME instead of triggering NSS dlopen there.
     command = [str(ROOT / "build/i686/dnf-host.exe"), "--root", str(instance), hashlib.sha256(ld.read_bytes()).hexdigest(),
+               "--env", "HOME=/home/neople",
                "--cwd", "/home/neople/game", "--run", str(elf), hashlib.sha256(elf.read_bytes()).hexdigest(),
                "/home/neople/game/df_game_r", "siroco11", "nofork"]
     if args.preload:
         shutil.copytree(ROOT / "originals/dp123/dp2", instance / "dp2")
         command[4:4] = ["--env", "LD_PRELOAD=/dp2/libdp2pre.so", "--env", "LD_LIBRARY_PATH=/dp2/lib:/home/neople/game"]
+    command[4:4] = [part for value in args.env for part in ["--env", value]]
     env = dict(os.environ)
     if args.trace:
         env["DNF_NATIVE_TRACE"] = "1"
