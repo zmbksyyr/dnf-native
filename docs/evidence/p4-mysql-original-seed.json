@@ -1,0 +1,205 @@
+{
+  "recorded_utc": "2026-11-14T07:33:40.177748+00:00",
+  "scope": "Real original application-seed restore through the secure single EXE; no GUI rollback or client acceptance.",
+  "build": {
+    "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
+    "cabinet_bytes": 15097663,
+    "cabinet_sha256": "b81848ab73b9692ca5f06ddd9a0d8eae9d831468c177ad8ad6b19596e1abe3d9",
+    "output_bytes": 15906304,
+    "output_sha256": "af4772daf8220010edd6c5e1c6ab70c46685d4cf48c15227ec6eba9c26dccdba",
+    "source_sha256": "b04561a2753709bf052b6ba7704f5486b99a29846557fc0f7241708b2a5ad18b"
+  },
+  "sources": {
+    "delivery/mysql_standalone.cpp": "b04561a2753709bf052b6ba7704f5486b99a29846557fc0f7241708b2a5ad18b",
+    "tools/build_mysql_standalone.py": "74f0e53193b6ed1b62491eefc5aa537ea107a1d66007458d649f1fe293c84129",
+    "tools/test_mysql_standalone.py": "f9ab33775a699b089c073cde6d295de9c9180ddc9e356136d45631ba98b6a2d5",
+    "tools/probe_mysql_seed.py": "a0e63b4b0ed06d8d5d8267077feb7ae6eaab63b48752f4581cedac6ba437c2af"
+  },
+  "native_seed_test": {
+    "recorded_utc": "20261114T073159912888Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T073159912888Z\\mysql-secure-seed",
+    "scope": "Secure single-EXE initialization and real original application-seed backup/restore; no GUI or DNF client acceptance.",
+    "exe_sha256": "af4772daf8220010edd6c5e1c6ab70c46685d4cf48c15227ec6eba9c26dccdba",
+    "script_sha256": "a0e63b4b0ed06d8d5d8267077feb7ae6eaab63b48752f4581cedac6ba437c2af",
+    "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+    "databases": [
+      "d_channel",
+      "d_guild",
+      "d_taiwan",
+      "d_taiwan_secu",
+      "d_technical_report",
+      "taiwan_billing",
+      "taiwan_cain",
+      "taiwan_cain_2nd",
+      "taiwan_cain_auction_cera",
+      "taiwan_cain_auction_gold",
+      "taiwan_cain_log",
+      "taiwan_cain_web",
+      "taiwan_game_event",
+      "taiwan_login",
+      "taiwan_login_play",
+      "taiwan_mng_manager",
+      "taiwan_prod",
+      "taiwan_se_event"
+    ],
+    "checks": {
+      "native_secure_initialization": true,
+      "original_application_seed_imported": true,
+      "all_application_databases_backup_restore_identical": true,
+      "private_game_account_prepared": true
+    },
+    "forced_cleanup": false,
+    "table_counts": {
+      "d_channel": 5,
+      "d_guild": 26,
+      "d_taiwan": 109,
+      "d_taiwan_secu": 7,
+      "d_technical_report": 42,
+      "taiwan_billing": 12,
+      "taiwan_cain": 81,
+      "taiwan_cain_2nd": 32,
+      "taiwan_cain_auction_cera": 9,
+      "taiwan_cain_auction_gold": 9,
+      "taiwan_cain_log": 97,
+      "taiwan_cain_web": 17,
+      "taiwan_game_event": 51,
+      "taiwan_login": 44,
+      "taiwan_login_play": 1,
+      "taiwan_mng_manager": 20,
+      "taiwan_prod": 26,
+      "taiwan_se_event": 13
+    },
+    "backup_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+    "backup_bytes": 977716,
+    "reexport_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
+    "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+    "mysqladmin_shutdown_exit_code": 0,
+    "server_exit_code": 0,
+    "seed_source_unchanged": true,
+    "limits": [
+      "Developer Windows 10 only; not a clean Win7/10/11 offline matrix.",
+      "Original application schemas only; source MySQL system accounts are not imported.",
+      "Game account is deliberately broad for private diagnosis; no product privilege policy or GUI rollback acceptance."
+    ]
+  },
+  "seed_receipt_sha256": "4c440af5726b3076ce87fcd233efcb2b3cb141152820c2bc616b2fa192cd76e8",
+  "native_single_exe_test": {
+    "recorded_utc": "20261114T073159858808Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T073159858808Z\\mysql-sfx",
+    "exe_sha256": "af4772daf8220010edd6c5e1c6ab70c46685d4cf48c15227ec6eba9c26dccdba",
+    "exe_bytes": 15906304,
+    "scope": "Secure native initialization, TLS query, backup and restore from only the standalone EXE; developer Windows 10 only.",
+    "checks": {
+      "concurrent_prepare": 4,
+      "secure_initialize_without_tcp": true,
+      "initialize_fresh_private_data": true,
+      "private_windows_permissions": true,
+      "passwordless_root_refused": true,
+      "query_write_read_over_tls": true,
+      "logical_backup_restore_rows": 2,
+      "loaded_vc_runtime_app_local": true,
+      "server_shutdown_complete": true,
+      "existing_data_reinitialization_refused": true,
+      "modified_cache_refused": true
+    },
+    "forced_cleanup": false,
+    "versions": {
+      "mysqld": "5.7.44",
+      "mysql": "5.7.44",
+      "mysqladmin": "5.7.44",
+      "mysqldump": "5.7.44"
+    },
+    "private_permissions": [
+      {
+        "name": "data",
+        "protected": true,
+        "current_user_only": true
+      },
+      {
+        "name": "server.cnf",
+        "protected": true,
+        "current_user_only": true
+      },
+      {
+        "name": "client.private.cnf",
+        "protected": true,
+        "current_user_only": true
+      },
+      {
+        "name": "mysql-initialize.private.log",
+        "protected": true,
+        "current_user_only": true
+      },
+      {
+        "name": "mysql-bootstrap.private.log",
+        "protected": true,
+        "current_user_only": true
+      }
+    ],
+    "database_identity": "5.7.44\t7b4f4791-dffd-11f1-841f-345a6041c9d0",
+    "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+    "logical_backup_sha256": "e13004b893b40217c492006a42c0a53fd155509d3e8b6f9be5df3b9f335a9d6b",
+    "runtime_modules": [
+      {
+        "name": "ucrtbase.dll",
+        "app_local": false,
+        "sha256": "de8d08d01291df93821314176381f3d1ae863e6c5584a7f8ea42f0b94b15ef65"
+      },
+      {
+        "name": "msvcp140.dll",
+        "app_local": true,
+        "sha256": "75872c426555ac8af55b5a7f6d4aea8831af74353b22612850a2bfc40e3b67e1"
+      },
+      {
+        "name": "vcruntime140.dll",
+        "app_local": true,
+        "sha256": "270ba17bf89cc2eb6e6ce536eb78e4614ab5499f653ab7e07fe9e3d33bf3b6e3"
+      },
+      {
+        "name": "vcruntime140_1.dll",
+        "app_local": true,
+        "sha256": "f3754fc6ec87bcf84e05f3287b5de7bd305a30a0e1db7d478cb6353600682784"
+      }
+    ],
+    "mysqladmin_shutdown_exit_code": 0,
+    "server_exit_code": 0,
+    "limits": [
+      "Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
+      "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
+      "Native initialization generates a local credential; GUI password configuration and cross-machine migration remain untested.",
+      "No GUI backup/rollback workflow or final complete offline package acceptance."
+    ]
+  },
+  "single_exe_receipt_sha256": "4c2924fb535af36e7b738c0a4d527ce5b1822ef4a14a522426dd58e7d9a9b39d",
+  "original_failure": {
+    "receipt_sha256": "e817b18731e21ac49922dd826fdfe092f4233ee0c04630a6d9e686cd0f5df516",
+    "backup_bytes": 963548,
+    "reexport_bytes": 962492,
+    "backup_cr": 1056,
+    "reexport_cr": 0,
+    "passed": false,
+    "cause": "Official Windows batch_readline removes one CR before every LF even in binary mode; result-file bypasses the matching mysqldump stdout conversion.",
+    "fix": "Capture original mysqldump text stdout as bytes; use mysql stdin with --comments --binary-mode. No executable patches, SQL rewriting or result normalization."
+  },
+  "initialize_shutdown_failure": {
+    "receipt_sha256": "f131e0470c8b5e704030728d986b042f0a69621782ceaab05f19401cce246c3c",
+    "native_tool_output_sha256": "f5959caff41536405c8b20cd4ff88a656f25df34c3cda7027837ac01751d1574",
+    "mysqladmin_error": "Lost connection to MySQL server during query",
+    "native_owned_child_terminated_before_server_wait": true,
+    "fix": "SQL SHUTDOWN through the configured local named pipe; always wait for server independently and retain both outcomes."
+  },
+  "read_only_source_research": {
+    "url": "https://raw.githubusercontent.com/mysql/mysql-server/mysql-5.7.44/client/readline.cc",
+    "sha256": "52276882f8ff30789a988d71e51e4815acabe1bf456f5dd06165354d0df68dc7",
+    "lines": "66-97",
+    "use": "Confirm Windows newline behavior; no source code copied into product or tests."
+  },
+  "limits": [
+    "Developer Windows 10 only; not a clean Win7/10/11 offline matrix.",
+    "Original application schemas only; source MySQL system accounts are not imported.",
+    "Game account is deliberately broad for private diagnosis; no product privilege policy or GUI rollback acceptance.",
+    "No GUI backup, cold presnapshot or automatic rollback workflow implemented."
+  ]
+}

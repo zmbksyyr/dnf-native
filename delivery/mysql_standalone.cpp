@@ -393,9 +393,10 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     write_private(instance + L"\\bootstrap.private.cnf", bootstrap + password + "\"\n", CREATE_ALWAYS);
     if (sql("SELECT VERSION(),@@server_uuid,@@lower_case_table_names;\n"))
         throw std::runtime_error("New credential verification failed; private files retained");
-    Child stop = launch(root, instance, L"mysqladmin", {L"--defaults-file=bootstrap.private.cnf", L"shutdown"},
-                        input.handle, server_log.handle, server_log.handle);
-    if (stop.wait(30000) || server.wait(30000)) throw std::runtime_error("Initialized database did not stop normally");
+    int stop_code = sql("SHUTDOWN;\n");
+    int server_code = server.wait(30000);
+    if (stop_code || server_code) throw std::runtime_error("Initialized database shutdown failed (client " +
+                                  std::to_string(stop_code) + ", server " + std::to_string(server_code) + ")");
     require(DeleteFileW((instance + L"\\bootstrap.private.cnf").c_str()), "Remove temporary bootstrap credential");
     std::puts("Initialized official MySQL 5.7.44; generated credential saved in client.private.cnf; server stopped.");
     return 0;
