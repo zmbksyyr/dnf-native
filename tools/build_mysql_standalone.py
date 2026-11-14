@@ -1,5 +1,6 @@
 """Build an independent Win32 SFX containing official MySQL and app-local runtimes."""
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -15,11 +16,14 @@ TOOLS = ["mysqld.exe", "mysql.exe", "mysqladmin.exe", "mysqldump.exe"]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", type=Path, default=ROOT / "build/mysql-standalone")
+    args = parser.parse_args()
     official = json.loads((ROOT / ".local/mysql-import.json").read_text(encoding="utf-8"))
     runtime = json.loads((ROOT / ".local/mysql-runtime-import.json").read_text(encoding="utf-8"))
     if not official["passed"] or official["archive_sha256"] != MYSQL_ZIP_SHA256 or not runtime["passed"]:
         raise ValueError("Run the official MySQL and Microsoft runtime imports first")
-    work = ROOT / "build/mysql-standalone"
+    work = args.build_dir.resolve()
     payload = work / "payload"
     payload.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -70,7 +74,7 @@ def main():
     source = ROOT / "delivery/mysql_standalone.cpp"
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               "-I", str(work), str(source), str(resource_object), "-lcabinet", "-lbcrypt", "-lshell32", "-o", str(output)]
+               "-I", str(work), str(source), str(resource_object), "-lcabinet", "-lbcrypt", "-lshell32", "-ladvapi32", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
     receipt = {"payload_id": payload_id, "files": files, "cabinet_bytes": cabinet.stat().st_size,
                "cabinet_sha256": sha256(cabinet), "output_bytes": output.stat().st_size,

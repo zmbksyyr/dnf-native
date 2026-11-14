@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P1 实施中。** 原版 x64 STUN 已完成 UDP 协议往返；manager 初始化和停服、channel TCP 握手、bridge 数据库和频道脚本、relay 转发均有本机实测。已修复原版 libuv 的 epoll 管道登记错误及 bridge 的 select 空转。完整 game 自然启动现已越过返回 134 的旧终止点，完成频道脚本、GameWorld 和登录状态初始化，原版 Lua 热重载通过。停服时原程序写出 shutdown complete 后仍在 Frida 处异常退出 125，尚未解决。19 个 ELF 原址映射及基础原语通过，完整服务业务和 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：原生服务链与交付组件实施中。** 原版 core 16 服务已完成本机联合自然启动与停服；game 的 DP2/Lua/Frida 加载和完整清理通过，channel、relay、STUN 有真实协议往返，monitor 首次统计写库已修复。MySQL 5.7.44 单文件及原生安全初始化、TLS、备份还原已实测。修正配置后的完整联跑仍在验证；原始客户端业务、自研 GUI、完整离线包及干净 Win7/10/11 验收尚未完成。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -87,4 +87,4 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --peers-only-seconds 75` 只观察 15 个 core peer，记录真实 monitor 统计写库并正常停服，用于辅助服务诊断。该模式不运行 game。monitor 私有副本同时包含已记录的 UDP 停服与首次计数初始化修复；独立 monitor 对照可用 `--fix-statistics` 选择后一项。
 
-MySQL 单文件引导首版：先执行 `python tools/import_mysql_runtime.py` 和 `python tools/build_mysql_standalone.py`，产物为 `build/mysql-standalone/mysql-standalone.exe`。`python tools/test_mysql_standalone.py` 在新的私有中文目录里验证初始化、TLS 与备份还原。命令格式为 `mysql-standalone.exe prepare INSTANCE` 或 `mysql-standalone.exe TOOL INSTANCE [官方参数]`，TOOL 为 mysqld/mysql/mysqladmin/mysqldump；工具工作目录为实例目录，客户端配置使用相对文件名。首版约 15.9 MB，尚非最终离线包或 Win7/11 验收。
+MySQL 单文件：先执行 `python tools/import_mysql_runtime.py` 和 `python tools/build_mysql_standalone.py`，产物为 `build/mysql-standalone/mysql-standalone.exe`。`python tools/test_mysql_standalone.py` 在新的私有中文目录里验证安全初始化、权限、TLS 与备份还原。`mysql-standalone.exe initialize INSTANCE [PORT]` 只接受新实例，用官方临时密码通过仅本机命名管道设置随机密码；成功后数据库已停止，凭据存于当前 Windows 用户独享的 `client.private.cnf`。启动用 `mysql-standalone.exe mysqld INSTANCE --defaults-file=server.cnf --console`，客户端用 `mysql-standalone.exe TOOL INSTANCE --defaults-file=client.private.cnf [官方参数]`，TOOL 为 mysql/mysqladmin/mysqldump。工具工作目录固定为实例目录，配置使用相对文件名。约 15.9 MB，尚非最终离线包或 Win7/11 验收。

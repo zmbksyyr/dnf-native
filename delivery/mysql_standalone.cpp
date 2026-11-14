@@ -3,10 +3,12 @@
 #include <bcrypt.h>
 #include <fdi.h>
 #include <shlobj.h>
+#include <sddl.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -209,27 +211,194 @@ static std::wstring quote(const std::wstring &argument) {
     return result + L'\"';
 }
 
-static int run(const std::wstring &root, const std::wstring &instance, const std::wstring &tool, int count, wchar_t **arguments) {
+class Child {
+    HANDLE process;
+public:
+    explicit Child(HANDLE value) : process(value) {}
+    Child(const Child &) = delete;
+    Child &operator=(const Child &) = delete;
+    bool running() const { return WaitForSingleObject(process, 0) == WAIT_TIMEOUT; }
+    int wait(DWORD timeout) {
+        DWORD result = WaitForSingleObject(process, timeout);
+        if (result == WAIT_TIMEOUT) throw std::runtime_error("Official MySQL tool timed out");
+        require(result == WAIT_OBJECT_0, "Wait for MySQL tool");
+        DWORD code = 1;
+        require(GetExitCodeProcess(process, &code), "Read MySQL tool exit status");
+        return static_cast<int>(code);
+    }
+    ~Child() {
+        if (running()) {
+            std::fputs("mysql-standalone: terminating unfinished owned child after failure\n", stderr);
+            TerminateProcess(process, 1);
+            WaitForSingleObject(process, 5000);
+        }
+        CloseHandle(process);
+    }
+};
+
+static Child launch(const std::wstring &root, const std::wstring &instance, const std::wstring &tool,
+                    const std::vector<std::wstring> &arguments, HANDLE input, HANDLE output, HANDLE error) {
     std::wstring application = root + L"\\bin\\" + tool + L".exe";
     std::wstring command = quote(application);
-    for (int index = 0; index < count; ++index) command += L" " + quote(arguments[index]);
+    for (const std::wstring &argument : arguments) command += L" " + quote(argument);
     if (tool == L"mysqld") command += L" " + quote(L"--basedir=" + root) + L" " + quote(L"--datadir=" + instance + L"\\data");
     STARTUPINFOW startup = {};
     startup.cb = sizeof(startup);
     startup.dwFlags = STARTF_USESTDHANDLES;
-    startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    startup.hStdInput = input;
+    startup.hStdOutput = output;
+    startup.hStdError = error;
     PROCESS_INFORMATION process = {};
     require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
                            nullptr, instance.c_str(), &startup, &process), "Start official MySQL tool");
     CloseHandle(process.hThread);
-    WaitForSingleObject(process.hProcess, INFINITE);
-    DWORD code = 1;
-    bool ok = GetExitCodeProcess(process.hProcess, &code);
-    CloseHandle(process.hProcess);
-    require(ok, "Read MySQL tool exit status");
-    return static_cast<int>(code);
+    return Child(process.hProcess);
+}
+
+static int run(const std::wstring &root, const std::wstring &instance, const std::wstring &tool, int count, wchar_t **arguments) {
+    Child child = launch(root, instance, tool, {arguments, arguments + count}, GetStdHandle(STD_INPUT_HANDLE),
+                         GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE));
+    return child.wait(INFINITE);
+}
+
+class File {
+public:
+    HANDLE handle;
+    explicit File(HANDLE value) : handle(value) { require(value != INVALID_HANDLE_VALUE, "Open instance file"); }
+    File(const File &) = delete;
+    File &operator=(const File &) = delete;
+    ~File() { if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle); }
+};
+
+static PSECURITY_DESCRIPTOR private_security() {
+    HANDLE token;
+    require(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token), "Read current Windows user");
+    DWORD size = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &size);
+    std::vector<BYTE> buffer(size);
+    bool ok = GetTokenInformation(token, TokenUser, buffer.data(), size, &size);
+    CloseHandle(token);
+    require(ok, "Read current user SID");
+    wchar_t *sid = nullptr;
+    require(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER *>(buffer.data())->User.Sid, &sid), "Format current user SID");
+    std::wstring sddl = L"D:P(A;OICI;FA;;;" + std::wstring(sid) + L")";
+    LocalFree(sid);
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    require(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr),
+            "Build private instance permissions");
+    return descriptor;
+}
+
+static File private_file(const std::wstring &path, DWORD disposition = CREATE_NEW) {
+    PSECURITY_DESCRIPTOR descriptor = private_security();
+    SECURITY_ATTRIBUTES security{sizeof(security), descriptor, TRUE};
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &security, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+    LocalFree(descriptor);
+    return File(file);
+}
+
+static void write_private(const std::wstring &path, const std::string &text, DWORD disposition = CREATE_NEW) {
+    File file = private_file(path, disposition);
+    DWORD bytes = 0;
+    require(WriteFile(file.handle, text.data(), static_cast<DWORD>(text.size()), &bytes, nullptr) && bytes == text.size(),
+            "Write private instance file");
+    require(FlushFileBuffers(file.handle), "Flush private instance file");
+}
+
+static std::string read_file(const std::wstring &path) {
+    File file(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                          FILE_ATTRIBUTE_NORMAL, nullptr));
+    std::string text;
+    char buffer[4096];
+    for (;;) {
+        DWORD bytes = 0;
+        require(ReadFile(file.handle, buffer, sizeof(buffer), &bytes, nullptr), "Read instance log");
+        if (!bytes) return text;
+        text.append(buffer, bytes);
+    }
+}
+
+static std::string random_secret() {
+    BYTE bytes[24];
+    if (BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG))
+        throw std::runtime_error("Generate instance secret failed");
+    std::string result;
+    for (BYTE value : bytes) { result += "0123456789abcdef"[value >> 4]; result += "0123456789abcdef"[value & 15]; }
+    return result;
+}
+
+static int initialize(const std::wstring &root, const std::wstring &instance, unsigned port) {
+    // This operation only accepts a fresh instance; failures retain its data and private diagnostics.
+    for (const wchar_t *name : {L"data", L"server.cnf", L"client.private.cnf", L"bootstrap.private.cnf"})
+        if (GetFileAttributesW((instance + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES)
+            throw std::runtime_error("Initialize requires a fresh instance without data or database configuration");
+    PSECURITY_DESCRIPTOR descriptor = private_security();
+    SECURITY_ATTRIBUTES security{sizeof(security), descriptor, FALSE};
+    bool created = CreateDirectoryW((instance + L"\\data").c_str(), &security);
+    LocalFree(descriptor);
+    require(created, "Create private data directory");
+    std::string password = random_secret();
+    std::string server_config = "[mysqld]\nbind-address=127.0.0.1\nport=" + std::to_string(port) +
+                                "\nlower_case_table_names=1\ncharacter_set_server=latin1\n";
+    write_private(instance + L"\\server.cnf", server_config);
+    write_private(instance + L"\\client.private.cnf", "[client]\nprotocol=TCP\nhost=127.0.0.1\nport=" +
+                  std::to_string(port) + "\nuser=root\npassword=" + password + "\nssl-mode=REQUIRED\n");
+    File input(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+    require(SetHandleInformation(input.handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT), "Prepare child input");
+    {
+        File log = private_file(instance + L"\\mysql-initialize.private.log");
+        Child child = launch(root, instance, L"mysqld", {L"--defaults-file=server.cnf", L"--initialize", L"--console"},
+                             input.handle, log.handle, log.handle);
+        if (child.wait(120000)) throw std::runtime_error("Secure initialization failed; see private initialize log");
+    }
+    std::string log = read_file(instance + L"\\mysql-initialize.private.log");
+    const std::string marker = "A temporary password is generated for root@localhost: ";
+    size_t start = log.find(marker);
+    if (start == std::string::npos) throw std::runtime_error("Official initialization temporary credential is missing");
+    start += marker.size();
+    std::string temporary = log.substr(start, log.find_first_of("\r\n", start) - start);
+    if (temporary.empty()) throw std::runtime_error("Official initialization temporary credential is empty");
+    std::string escaped;
+    for (char value : temporary) { if (value == '\\' || value == '"') escaped += '\\'; escaped += value; }
+    std::string pipe = "DNFInitialize" + random_secret();
+    std::string bootstrap = "[client]\nprotocol=PIPE\nsocket=" + pipe + "\nuser=root\npassword=\"";
+    write_private(instance + L"\\bootstrap.private.cnf", bootstrap + escaped + "\"\n");
+    File server_log = private_file(instance + L"\\mysql-bootstrap.private.log");
+    Child server = launch(root, instance, L"mysqld", {L"--defaults-file=server.cnf", L"--skip-networking",
+                          L"--enable-named-pipe", L"--socket=" + wide(pipe.c_str()), L"--console"},
+                          input.handle, server_log.handle, server_log.handle);
+    auto sql = [&](const std::string &query) {
+        SECURITY_ATTRIBUTES pipe_security{sizeof(pipe_security), nullptr, TRUE};
+        HANDLE reader, writer;
+        require(CreatePipe(&reader, &writer, &pipe_security, 0), "Create private SQL input");
+        File read_end(reader), write_end(writer);
+        require(SetHandleInformation(writer, HANDLE_FLAG_INHERIT, 0), "Protect SQL input writer");
+        Child client = launch(root, instance, L"mysql", {L"--defaults-file=bootstrap.private.cnf", L"--connect-expired-password",
+                              L"--batch", L"--skip-column-names"}, reader, server_log.handle, server_log.handle);
+        DWORD bytes = 0;
+        require(WriteFile(writer, query.data(), static_cast<DWORD>(query.size()), &bytes, nullptr) && bytes == query.size(),
+                "Send private initialization SQL");
+        // mysql consumes stdin until EOF. Close the parent writer before waiting.
+        CloseHandle(write_end.handle);
+        write_end.handle = INVALID_HANDLE_VALUE;
+        return client.wait(10000);
+    };
+    ULONGLONG deadline = GetTickCount64() + 30000;
+    for (;;) {
+        if (!server.running()) throw std::runtime_error("Private bootstrap server exited; see private bootstrap log");
+        if (sql("ALTER USER 'root'@'localhost' IDENTIFIED BY '" + password + "';\n") == 0) break;
+        if (GetTickCount64() >= deadline) throw std::runtime_error("Temporary credential activation timed out; private files retained");
+        Sleep(100);
+    }
+    write_private(instance + L"\\bootstrap.private.cnf", bootstrap + password + "\"\n", CREATE_ALWAYS);
+    if (sql("SELECT VERSION(),@@server_uuid,@@lower_case_table_names;\n"))
+        throw std::runtime_error("New credential verification failed; private files retained");
+    Child stop = launch(root, instance, L"mysqladmin", {L"--defaults-file=bootstrap.private.cnf", L"shutdown"},
+                        input.handle, server_log.handle, server_log.handle);
+    if (stop.wait(30000) || server.wait(30000)) throw std::runtime_error("Initialized database did not stop normally");
+    require(DeleteFileW((instance + L"\\bootstrap.private.cnf").c_str()), "Remove temporary bootstrap credential");
+    std::puts("Initialized official MySQL 5.7.44; generated credential saved in client.private.cnf; server stopped.");
+    return 0;
 }
 
 static void print_path(const std::wstring &path) {
@@ -249,16 +418,27 @@ int wmain(int argc, wchar_t **argv) {
             std::printf("dnf-native MySQL bootstrap: official MySQL 5.7.44, payload %s\n", payload_id);
             return 0;
         }
-        if (argc < 3) throw std::runtime_error("Usage: mysql-standalone.exe prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
+        if (argc < 3) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT] | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
         std::wstring tool = argv[1];
-        if (tool != L"prepare" && tool != L"mysqld" && tool != L"mysql" && tool != L"mysqladmin" && tool != L"mysqldump")
+        if (tool != L"initialize" && tool != L"prepare" && tool != L"mysqld" && tool != L"mysql" && tool != L"mysqladmin" && tool != L"mysqldump")
             throw std::runtime_error("Unknown MySQL operation");
+        unsigned port = 3306;
+        if (tool == L"initialize") {
+            if (argc > 4) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT]");
+            if (argc == 4) {
+                size_t used = 0;
+                unsigned long value = std::stoul(argv[3], &used);
+                if (used != std::wcslen(argv[3]) || value < 1 || value > 65535) throw std::runtime_error("Invalid database port");
+                port = static_cast<unsigned>(value);
+            }
+        }
         std::vector<wchar_t> path(32768);
         DWORD length = GetFullPathNameW(argv[2], static_cast<DWORD>(path.size()), path.data(), nullptr);
         require(length && length < path.size(), "Resolve instance directory");
         std::wstring instance(path.data(), length);
         std::wstring root = prepare(instance);
         if (tool == L"prepare") { print_path(root); return 0; }
+        if (tool == L"initialize") return initialize(root, instance, port);
         return run(root, instance, tool, argc - 3, argv + 3);
     } catch (const std::exception &error) {
         std::fprintf(stderr, "mysql-standalone: %s\n", error.what());

@@ -453,3 +453,11 @@ game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）
 官方客户端不能读取本机中文绝对 defaults-file 路径，而相对 ASCII 文件名可用。控制器沿用已固定的实例工作目录，以相对配置名传递凭据，未依赖仍含中文的 8.3 别名；中文绝对备份文件路径在实际 dump/restore 中通过。证据见 [单文件实测](evidence/p4-mysql-standalone.json)。
 
 该首版保留全部官方 share，尚未声称最终最小闭包。Windows 10 实际使用系统 UCRT，Win7/11 与干净离线机未测；产品首次安全凭据配置、GUI 备份/还原/回滚、DNF 与 SFX 集成及 ≤210 MB 完整 ZIP 仍未完成。测试 --initialize-insecure 限于新建的 loopback 私有实例，不是产品默认策略。
+
+## 2026-11-14 · 原生 MySQL 安全首次初始化
+
+单文件引导新增 initialize INSTANCE [PORT]：官方 --initialize 生成临时密码，通过禁止 TCP 的本机命名管道设置 CNG 随机密码，使用新凭据执行真实查询后正常停库。生成 server.cnf 和 client.private.cnf，后者强制 TLS；data、配置和私有日志的 DACL 限于当前 Windows 用户。密码不进入命令行和普通输出。失败保留数据与私有诊断，已有实例明确拒绝重新初始化。
+
+新版本为 15,906,304 字节。只复制 EXE，在新的中文目录里、PATH 限 System32 实测：独占预定 TCP 端口时初始化成功；敏感目录和四个文件均只有当前用户访问规则；新凭据重启查询成功，空密码 root 返回认证错误 1045；TLS、二进制两行备份/还原、缓存校验、VC DLL 本地加载和正常停服全部通过。安全初始化重试与官方重新初始化均被拒绝，全部 data 文件内容哈希保持相同。证据见 [安全初始化](evidence/p4-mysql-secure-initialize.json)。
+
+本轮只实测开发机 Windows 10。GUI 密码管理、跨用户迁移、预快照/失败回滚、最终完整离线包与 Win7/11 尚未完成。MySQL 单文件接入修正配置后的完整 core 联跑正在进行，尚不计通过。
