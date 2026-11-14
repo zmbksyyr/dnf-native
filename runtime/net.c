@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include "run.h"
+#include <winternl.h>
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
@@ -134,54 +135,87 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     return count;
 }
 
+static intptr_t pipe_events(NrRun *run, unsigned fd, short requested) {
+    typedef NTSTATUS (NTAPI *QueryFile)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
+    QueryFile query = (QueryFile)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationFile");
+    if (!query) return -38;
+    IO_STATUS_BLOCK io;
+    FILE_PIPE_LOCAL_INFORMATION info;
+    if (query(run->files[fd], &io, &info, sizeof(info), FilePipeLocalInformation) < 0) return -5;
+    short events = 0;
+    if (run->file_access[fd] & 1) {
+        if (info.ReadDataAvailable) events |= requested & (1 | 64);
+        if (info.NamedPipeState == 4) events |= 16; /* FILE_PIPE_CLOSING_STATE */
+    }
+    if (run->file_access[fd] & 2) {
+        if (info.WriteQuotaAvailable >= 4096) events |= requested & (4 | 256);
+        if (info.NamedPipeState == 4) events |= 8;
+    }
+    return events;
+}
+
 static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
     struct { int32_t fd; int16_t events, revents; } entries[256];
     if (args[1] > 256) return -22;
     size_t bytes = (size_t)args[1] * sizeof(entries[0]);
     if (!nr_memory(args[0], bytes, 1)) return -14;
     memcpy(entries, (const void *)args[0], bytes);
-    WSAPOLLFD polls[256]; unsigned indices[256]; ULONG count = 0;
-    int ready = 0;
-    for (unsigned i = 0; i < args[1]; ++i) {
-        entries[i].revents = 0;
-        int fd = entries[i].fd;
-        if (fd < 0) continue;
-        if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
-        if (entries[i].events & ~(1 | 2 | 4 | 64 | 256)) return -38;
-        if (run->file_access[fd] != 4) {
-            /* Regular files are immediately ready on Linux. Pipes use the
-               same result for the startup poll path; blocking reads still
-               retain their normal ReadFile behavior. */
-            short ready_events = 0;
-            if ((run->file_access[fd] & 1) && (entries[i].events & (1 | 2 | 64)))
-                ready_events |= entries[i].events & (1 | 2 | 64);
-            if ((run->file_access[fd] & 2) && (entries[i].events & (4 | 256)))
-                ready_events |= entries[i].events & (4 | 256);
-            entries[i].revents = ready_events;
-            if (ready_events) ++ready;
-            continue;
+    ULONGLONG start = GetTickCount64();
+    int timeout = (int)args[2], ready;
+    for (;;) {
+        WSAPOLLFD polls[256]; unsigned indices[256]; ULONG count = 0;
+        int has_pipes = 0;
+        ready = 0;
+        for (unsigned i = 0; i < args[1]; ++i) {
+            entries[i].revents = 0;
+            int fd = entries[i].fd;
+            if (fd < 0) continue;
+            if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
+            if (entries[i].events & ~(1 | 2 | 4 | 64 | 256)) return -38;
+            if (run->file_access[fd] != 4) {
+                short events = 0;
+                if (run->files[fd] && GetFileType(run->files[fd]) == FILE_TYPE_PIPE) {
+                    intptr_t state = pipe_events(run, (unsigned)fd, entries[i].events);
+                    if (state < 0) return state;
+                    events = (short)state;
+                    has_pipes = 1;
+                } else {
+                    /* Regular files are immediately ready on Linux. */
+                    if (run->file_access[fd] & 1) events |= entries[i].events & (1 | 64);
+                    if (run->file_access[fd] & 2) events |= entries[i].events & (4 | 256);
+                }
+                entries[i].revents = events;
+                if (events) ++ready;
+                continue;
+            }
+            polls[count].fd = (SOCKET)run->sockets[fd];
+            polls[count].events = 0; polls[count].revents = 0;
+            if (entries[i].events & (1 | 64)) polls[count].events |= POLLRDNORM;
+            if (entries[i].events & 2) polls[count].events |= POLLPRI;
+            if (entries[i].events & (4 | 256)) polls[count].events |= POLLWRNORM;
+            indices[count++] = i;
         }
-        polls[count].fd = (SOCKET)run->sockets[fd];
-        polls[count].events = 0; polls[count].revents = 0;
-        if (entries[i].events & (1 | 64)) polls[count].events |= POLLRDNORM;
-        if (entries[i].events & 2) polls[count].events |= POLLPRI;
-        if (entries[i].events & (4 | 256)) polls[count].events |= POLLWRNORM;
-        indices[count++] = i;
-    }
-    int milliseconds = ready ? 0 : (int)args[2];
-    if (!count) Sleep(milliseconds < 0 ? INFINITE : (DWORD)milliseconds);
-    else if (WSAPoll(polls, count, milliseconds) == SOCKET_ERROR) return socket_error();
-    for (ULONG i = 0; i < count; ++i) {
-        unsigned at = indices[i];
-        short events = 0;
-        if (polls[i].revents & POLLRDNORM) events |= entries[at].events & (1 | 64);
-        if (polls[i].revents & POLLPRI) events |= entries[at].events & 2;
-        if (polls[i].revents & POLLWRNORM) events |= entries[at].events & (4 | 256);
-        if (polls[i].revents & POLLERR) events |= 8;
-        if (polls[i].revents & POLLHUP) events |= 16;
-        if (polls[i].revents & POLLNVAL) events |= 32;
-        entries[at].revents = events;
-        if (events) ++ready;
+        ULONGLONG elapsed = GetTickCount64() - start;
+        int expired = timeout >= 0 && elapsed >= (unsigned)timeout;
+        int milliseconds = ready || expired ? 0 : timeout < 0 ? -1 : timeout - (int)elapsed;
+        /* Anonymous pipe handles have no waitable readiness event. Bound the
+           sleep/socket wait so both kinds of descriptors are checked. */
+        if (has_pipes && (milliseconds < 0 || milliseconds > 10)) milliseconds = 10;
+        if (!count) Sleep(milliseconds < 0 ? INFINITE : (DWORD)milliseconds);
+        else if (WSAPoll(polls, count, milliseconds) == SOCKET_ERROR) return socket_error();
+        for (ULONG i = 0; i < count; ++i) {
+            unsigned at = indices[i];
+            short events = 0;
+            if (polls[i].revents & POLLRDNORM) events |= entries[at].events & (1 | 64);
+            if (polls[i].revents & POLLPRI) events |= entries[at].events & 2;
+            if (polls[i].revents & POLLWRNORM) events |= entries[at].events & (4 | 256);
+            if (polls[i].revents & POLLERR) events |= 8;
+            if (polls[i].revents & POLLHUP) events |= 16;
+            if (polls[i].revents & POLLNVAL) events |= 32;
+            entries[at].revents = events;
+            if (events) ++ready;
+        }
+        if (ready || expired) break;
     }
     memcpy((void *)args[0], entries, bytes);
     return ready;

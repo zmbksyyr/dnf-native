@@ -9,6 +9,7 @@ import platform
 import socket
 import struct
 import subprocess
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / ".local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin"
@@ -51,6 +52,8 @@ def main():
                         received += chunk
                     if received != REQUEST:
                         raise RuntimeError("Guest TCP payload differed")
+                    # Exercise socket readiness while the guest also waits on an empty pipe.
+                    time.sleep(0.1)
                     peer.sendall(REPLY)
                     # Keep the peer open and silent so the guest must hit SO_RCVTIMEO.
                     eof = peer.recv(1) == b""

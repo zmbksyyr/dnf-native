@@ -28,9 +28,9 @@ static result net(unsigned operation, word a, word b, word c, word d, word e) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, CLOSE=3, IOCTL=16, POLL=7, CLOCK=228, EXIT=60};
+enum {READ=0, WRITE=1, CLOSE=3, IOCTL=16, POLL=7, CLOCK=228, PIPE2=293, EXIT=60};
 #else
-enum {READ=3, WRITE=4, CLOSE=6, IOCTL=54, POLL=168, CLOCK=265, EXIT=1};
+enum {READ=3, WRITE=4, CLOSE=6, IOCTL=54, POLL=168, CLOCK=265, PIPE2=331, EXIT=1};
 #endif
 
 static void check(int condition, word line) {
@@ -43,7 +43,7 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     char reply[sizeof(expected) - 1];
     struct { unsigned short family, port; unsigned address; unsigned char zero[8]; } address =
         {2, (NR_PORT >> 8) | ((NR_PORT & 255) << 8), 0x0100007f, {0}};
-    struct { int fd; short events, revents; } poll;
+    struct { int fd; short events, revents; } poll, mixed[2];
     int report[14] = {0}, one = 1;
     result fd = net(1, 2, 1, 0, 0, 0);
     CHECK(fd >= 0);
@@ -74,9 +74,13 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         result count = call(WRITE, fd, (word)(request + sent), sizeof(request) - 1 - sent);
         CHECK(count > 0); sent += (word)count;
     }
-    poll.fd = (int)fd; poll.events = 1;
-    report[7] = (int)call(POLL, (word)&poll, 1, 5000); report[8] = poll.revents;
-    CHECK(report[7] == 1 && report[8] == 1);
+    int pipe[2];
+    CHECK(call(PIPE2, (word)pipe, 0x80800, 0) == 0);
+    mixed[0].fd = (int)fd; mixed[0].events = 1;
+    mixed[1].fd = pipe[0]; mixed[1].events = 1;
+    report[7] = (int)call(POLL, (word)mixed, 2, 5000); report[8] = mixed[0].revents;
+    CHECK(report[7] == 1 && report[8] == 1 && mixed[1].revents == 0);
+    CHECK(call(CLOSE, pipe[0], 0, 0) == 0 && call(CLOSE, pipe[1], 0, 0) == 0);
     word received = 0;
     while (received < sizeof(reply)) {
         result count = call(READ, fd, (word)(reply + received), sizeof(reply) - received);

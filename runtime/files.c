@@ -696,10 +696,10 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (!(run->file_access[a] & 1)) { *result = -9; return 1; }
         if (c > 0x7ffff000) c = 0x7ffff000;
         if (!nr_memory(b, c, 1)) { *result = -14; return 1; }
-        if (run->nonblock[a] && c) {
+        if (run->nonblock[a] && c && GetFileType(file) == FILE_TYPE_PIPE) {
             DWORD available = 0;
             if (!PeekNamedPipe(file, NULL, 0, NULL, &available, NULL)) {
-                *result = file_error(); return 1;
+                *result = GetLastError() == ERROR_BROKEN_PIPE ? 0 : file_error(); return 1;
             }
             if (!available) { *result = -11; return 1; }
         }
