@@ -514,6 +514,9 @@ int nr_run(NrRun *run) {
     swprintf(event_name, 80, L"Local\\dnf-native-terminate-%lu", GetCurrentProcessId());
     run->terminate_event = CreateEventW(NULL, FALSE, FALSE, event_name);
     if (!run->terminate_event) return 1;
+    swprintf(event_name, 80, L"Local\\dnf-native-sigusr2-%lu", GetCurrentProcessId());
+    run->usr2_event = CreateEventW(NULL, FALSE, FALSE, event_name);
+    if (!run->usr2_event) return 1;
     run->thread_count = 1;
     run->threads[0].tid = GetCurrentProcessId();
     if (!nr_thread_init(run)) return 1;

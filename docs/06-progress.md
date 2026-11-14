@@ -317,3 +317,11 @@ shutdown complete 后仍出现访问异常，地址对应原版 Frida 偏移 `0x
 bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。长观察退出后，正式宿主已按当前源码重新构建，双架构 select/poll、TCP、epoll 及原版 Lua/luv 定时器检查通过。自然启动用的是包含 epoll 修复的原宿主；select 修复另有独立构建和正式构建证据，不混用两者结论。
 
 证据见 [自然启动与停服](evidence/p2-game-epoll-natural-startup.json)、[Frida 卸载诊断](evidence/p2-frida-teardown-diagnostic.json)。下一实际缺口为 game 的跨进程 SIGUSR2、Frida 正常卸载及后续服务互通；共享库零入口是已观察到的 loader 限制。Win7/Win11、客户端业务和最终交付均未验收。
+
+## 2026-11-14 · 跨进程 SIGUSR2
+
+原版 game 的正常关服使用信号 12，而 runtime 的跨进程 kill 原先只支持 0/15。沿现有命名事件增加 SIGUSR2 通知，接收后仍使用原有 pending、屏蔽、handler 与恢复路径；没有新增通用 IPC 框架。
+
+自编独立 ELF 进程分别发送 kill(pid, 0)、12 和 15。接收方先屏蔽 12，核对 15 已处理而 12 未处理，再解除屏蔽确认 12 到达。修复前四种发送/接收架构组合全部失败；修复后 32→32、64→32、32→64、64→64 的双方均自行返回 42，无强制回收。同一正式构建的双架构入口/信号检查通过。
+
+证据见 [跨进程信号](evidence/p2-process-signals.json)，复现命令为 `python tools/build.py`、`python tools/test_process_signal.py` 和 `python tools/test_entry.py`。本次通过范围是信号原语；原版 game 的完整正常关服仍受 Frida/DP2 卸载异常阻塞。实测系统为 Windows 10 x64 10.0.19044。

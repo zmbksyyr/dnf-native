@@ -62,7 +62,7 @@ typedef struct {
     NrVm vm[NR_VM_SLOTS];
     NrSignal actions[65];
     uint64_t signal_pending;
-    HANDLE terminate_event;
+    HANDLE terminate_event, usr2_event;
     unsigned char *signal_code;
     NrThread threads[64];
     volatile LONG thread_count;
