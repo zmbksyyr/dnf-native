@@ -1,6 +1,9 @@
 /* Real TCP byte exchange and Linux poll/timeout ABI checks; no libc. */
 typedef __UINTPTR_TYPE__ word;
 typedef __INTPTR_TYPE__ result;
+#ifndef NR_LINGER_ON
+#define NR_LINGER_ON 0
+#endif
 
 static result call(word n, word a, word b, word c) {
     result r;
@@ -54,6 +57,10 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     report[11] = (int)net(14, fd, 1, 9, (word)&one, sizeof(one));
     report[12] = (int)net(14, fd, 6, 1, (word)&one, sizeof(one));
     CHECK(report[11] == 0 && report[12] == 0);
+    int linger[2] = {NR_LINGER_ON, 0};
+    CHECK(net(14, fd, 1, 13, (word)linger, 4) == -22);
+    CHECK(net(14, fd, 1, 13, 1, sizeof(linger)) == -14);
+    CHECK(net(14, fd, 1, 13, (word)linger, sizeof(linger)) == 0);
     CHECK(net(3, fd, (word)&address, sizeof(address), 0, 0) == 0);
 
     poll.fd = (int)fd; poll.events = 1; poll.revents = 99;

@@ -397,6 +397,16 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     if (operation == 4) { *result = listen(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 13) { *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 14) {
+        if (args[1] == 1 && args[2] == 13) {
+            if (args[4] < 8) { *result = -22; return 1; }
+            if (!nr_memory(args[3], 8, 0)) { *result = -14; return 1; }
+            int32_t input[2]; memcpy(input, (const void *)args[3], sizeof(input));
+            if (input[1] < 0 || input[1] > USHRT_MAX) { *result = -38; return 1; }
+            /* Linux uses two 32-bit ints; Winsock uses two 16-bit fields. */
+            struct linger option = {(u_short)(input[0] != 0), (u_short)input[1]};
+            *result = setsockopt(s, SOL_SOCKET, SO_LINGER, (const char *)&option, sizeof(option)) == 0 ? 0 : socket_error();
+            return 1;
+        }
         if (args[1] == 1 && (args[2] == 20 || args[2] == 21)) {
             if (args[4] != 2 * sizeof(uintptr_t)) { *result = -22; return 1; }
             if (!nr_memory(args[3], args[4], 0)) { *result = -14; return 1; }
