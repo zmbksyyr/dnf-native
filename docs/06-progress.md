@@ -223,3 +223,23 @@ DP2 ??? `libdp2.so` ?? RWE PT_LOAD ? sectionless packed ELF???????????????? exec
 物品阶段由外部只读 Win32 采样定位，实际 guest 调用链包含 `CItemList::load_item_files`、`ImportEquipmentScript`、装备动画处理及字符串分配/析构。再按原版反汇编读取加载函数的迭代器，并独立枚举不可变的装备索引树，核对该表共 72,779 项；采样得到 56 个不同物品 ID，位次从 56,126 推进到 56,461。这证明该窗口仍在推进物品解析，不是此前怀疑的锁等待，因此没有添加猜测性的 futex fallback 或 TLS 缓存。
 
 原版日志先输出 Loading Items 的时间前缀，再执行工作并追加 Success，故该行的 `01:08:42` 不能作为完成时间；后续 `01:25:59` 的新加载行才给出物品完成的上界。证据见 [game 物品加载](evidence/p2-game-item-loading.json)。当前主要未完成项仍为 DataManager 后续初始化、完整业务链及服务互通。
+
+## 2026-11-14 · channel 真实 TCP 握手与接收栈
+
+本阶段沿原版 channel 的真实收包路径解决两个具体问题。实现提交 `386885e` 先补齐 `SO_LINGER`：Linux 的两个 32 位整数转换为 Winsock 的两个 16 位字段，双架构均核对禁用时正常 EOF、启用零秒时 TCP reset。继续发送真实报文后，trace 确认 channel 接受连接时查询 `SO_RCVBUF`；实现提交 `c1d46c8` 补齐 i386 socketcall 和 x64 `getsockopt` 的发送、接收缓冲区大小查询，支持输出长度截断及实际错误返回。容量来自 Winsock，未仿制 Linux 内核缓冲区记账和倍增规则。
+
+查询补齐后仍出现 TLS 间接调用失败。独立诊断构建确认 TLS 基址有效，失败的是栈地址：runtime 报告 512 KiB 的 `RLIMIT_STACK`，glibc 据此给四个 pthread 分配 `0x81000` 字节，而原版 `TCPUser::onRead_` 单个栈帧就需要 `0xa0064` 字节。当前将初始 guest 栈及报告的默认限制调整为 8 MiB，实际 pthread 栈随 glibc 分配；没有删除内存范围检查、修改 TLS 行为或改写原版 ELF。诊断代码仅存在于忽略目录，最终构建使用正式源码。
+
+本项目自编 `tools/test_channel.py` 从原版 ELF 的协议注册、报头、连接回调和 AES 初始化反汇编独立确定报文，使用系统 BCrypt 生成 AES-128 ECB 测试请求，没有使用参考工程源码、加密表或编译产物。原版 channel 在私有 loopback 配置上先返回错误握手结果，再对 32 次正确请求逐字节返回成功，覆盖分开发送一个报头和一次发送两个报文。测试不保存临时协商密钥。结束时通过 runtime 事件请求 SIGTERM，原版 handler 自行返回 0，无强制回收或 runtime gap；`run` 模式不写 PID 文件，此处没有计作原版 PID stop 辅助命令或所有 worker 清理已验证。
+
+最终独立构建通过双架构网络、管道 poll、入口/信号、TLS、加载器回归，原版 STUN 的 50 次 UDP 响应和 manager 初始化、原版 stop 正常退出继续通过。构建和回归先使用 `build/staged/`，避免替换旧 game 长观察持有的原宿主，证据分别记录哈希；旧 game 退出后，正式 `tools/build.py`、`test_channel.py`、`test_net.py` 也已通过。正常复现使用 README 中的检查命令。
+
+证据见 [channel TCP 协议与回归](evidence/p2-channel-protocol.json)。仅验证 Windows 10 x64 10.0.19044；频道信息、bridge 数据库与互通、客户端业务、Win7/Win11 和整个阶段退出仍未通过。relay 和 bridge 已观察到原版网络线程启动，但 bridge 仍含待配置的数据库占位值，这些观察不计协议或业务通过。
+
+## 2026-11-14 · game 频道脚本失败的实际终点
+
+此前后台长观察在 1506.919 秒自行结束，没有超时清理。原版 game、DP2、Lua、Frida 和脚本实际越过物品、等级经验、PVP 等加载，进入频道脚本获取；`01:51:00` 开始后，`01:56:02` 输出 `Init Get Channel Data(channel_info.etc) Fail`。随后日志虽出现 `Init DataManager Success`、`Init GameManager Success` 和 `Init Arad GameScriptManager Success`，原版最终明确报告 `Init ChannelType Fail`，Frida dispose 后以访问异常退出，宿主返回 125。**DataManager 的 Success 文本不能覆盖此前失败，也不能作为完整资源初始化通过。** 私有 MySQL 日志记录正常 Shutdown complete，本次没有独立保存其退出码。
+
+原版反汇编确认 `CDataManager::init` 在 `0x0835d2c3` 调用 `CmmChannelProxy::SendCheckChannelScript`；返回失败会直接跳过频道脚本导入。`GameWorld::_GetChannelType` 在自动类型下按 server group/channel number 查询脚本，找不到记录返回 19，`InitChannelType` 据此返回 false。本次独立 game 配置指向 loopback TCP 7000，运行期间没有 bridge peer，故下一步应补齐真实 bridge/频道脚本链路并复测，不强制频道类型或跳过原版检查。dispose 访问异常仍须单独定位，不能只用缺失 peer 解释它。
+
+证据见 [game 频道脚本失败](evidence/p2-game-channel-type-failure.json)。该次使用旧宿主，不混入本阶段 channel 修复构建的测试结果。

@@ -1,0 +1,616 @@
+{
+  "recorded_utc": "2026-11-14T01:56:53.409384+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "implementation_commits": [
+    "386885e",
+    "c1d46c8"
+  ],
+  "scope": "Original channel TCP connect interface; not full channel information, bridge/database integration or service business acceptance.",
+  "channel": {
+    "recorded_utc": "20261114T015129279042Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T015129279042Z\\channel",
+    "scope": "Original channel TCP connect protocol only; loopback port 7001, no bridge/database/client business acceptance.",
+    "command": [
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\staged\\i686\\dnf-host.exe",
+      "--root",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T015129279042Z\\channel",
+      "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "--env",
+      "HOME=/home/neople",
+      "--cwd",
+      "/home/neople/channel",
+      "--run",
+      "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T015129279042Z\\channel\\home\\neople\\channel\\df_channel_r",
+      "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "/home/neople/channel/df_channel_r",
+      "channel",
+      "run"
+    ],
+    "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+    "elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+    "ld_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+    "config_sha256": "701a760d20fb4f047bef1bdf1d9eb40ba943c086ca58bb1ce96e1cc9d1a9c483",
+    "checks": {
+      "negative_handshake": true,
+      "positive_responses": 32,
+      "fragmented_request": true,
+      "coalesced_requests": true
+    },
+    "error": null,
+    "gaps": [],
+    "exit_code": 0,
+    "sigterm_event_sent": true,
+    "forced_cleanup": false,
+    "log_sha256": {
+      "stderr.log": "019d0d61e1a65dcf8a843b0a17459a0b01191e5fb6a408b5598fa040ab6ee6c2",
+      "stdout.log": "7c27b79b84cc2e69fa74cb160b0804ee57d6fa4af01361f54c30076742f286df"
+    }
+  },
+  "provenance": {
+    "source": "Original SHA-256-checked channel ELF imported from the user archive; no reference implementation code or products used.",
+    "disassembly_sites": {
+      "registerProtocols": "0x0804dc78",
+      "onCS_CONNECT": "0x08050a5e",
+      "tagSC_CONNECT": "0x080518aa",
+      "CRijndael_Initialize": "0x08062bf6",
+      "TCPUser_onRead": "0x0805d88c"
+    },
+    "wire": "11-byte little-endian header, connect IDs 11/12, AES-128 ECB block carrying dnf_game; response result checked byte-for-byte. Windows BCrypt supplies test-client AES; transient key is not included in evidence."
+  },
+  "root_causes": [
+    {
+      "probe": "build/probes/20261114T014436089941Z/channel",
+      "failure": "getsockopt SOL_SOCKET/SO_RCVBUF (socketcall op=15 level=1 option=8) unsupported",
+      "evidence": "socket op=15 args=0xb,0x1,0x8,0x69a0284,0x69a0288,0x0"
+    },
+    {
+      "probe": "build/probes/20261114T014707725879Z/channel",
+      "failure": "512 KiB default pthread stack was smaller than the original onRead_ stack frame (0xa0064 bytes)",
+      "evidence": "TLS indirect call stack pointer 0x6f401a4 failed guest range validation; TLS base 0x6fe0b40 remained valid. Earlier trace records four pthread stack mmap allocations of 0x81000 bytes.",
+      "diagnostics": "Temporary diagnostic TLS source built only under ignored build/. Final staged hosts use unmodified runtime/tls.c."
+    }
+  ],
+  "builds": [
+    {
+      "arch": "i686",
+      "sources": {
+        "runtime\\adapt.c": "ff00de6930f4dd2f22ce92bfd7fbeec629075b25967961d04bf445976e47257f",
+        "runtime\\elf.c": "2e34c8803263e443188b719f6a8a4d2a877cc3ee1e637729f50f8025f89f8cb6",
+        "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+        "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+        "runtime\\files.c": "af4a21755a063481e3630126ba24c66d03c75ade4b2470d6d5a38fd8685640dc",
+        "runtime\\main.c": "db49b6463bee354b979caff9218f66073b7928632c5ab1c43a7ddb7ca9d7a78b",
+        "runtime\\net.c": "f24d1adee8ac37aa10652f0e6cc7afae58af3aa605ce40c2eda2e0b1c52e046d",
+        "runtime\\run.c": "2e05daf3cdd3b6d9597eeabc99d653b43302dc9fd3d594fc9376f97528c4419b",
+        "runtime\\run.h": "55243516a73963094429b8c4a61d3799e81f77ae07e425890f1ab57f2fb117a7",
+        "runtime\\signal.c": "32790ab5fcb2c68bc1732ed363699dffd957e9e8413984463ab6e1ca8bbdc86b",
+        "runtime\\thread.c": "4d403a044ba8d397e8e860f4d8e2a18345069c791e91358a89c5cac68c04548f",
+        "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+        "runtime\\vm.c": "6d5a14e149fd37d3fad8e4aea07cd3e59d07ca97c050f9cd9f682b487e896285"
+      },
+      "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+      "output_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2"
+    },
+    {
+      "arch": "x86_64",
+      "sources": {
+        "runtime\\adapt.c": "ff00de6930f4dd2f22ce92bfd7fbeec629075b25967961d04bf445976e47257f",
+        "runtime\\elf.c": "2e34c8803263e443188b719f6a8a4d2a877cc3ee1e637729f50f8025f89f8cb6",
+        "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+        "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+        "runtime\\files.c": "af4a21755a063481e3630126ba24c66d03c75ade4b2470d6d5a38fd8685640dc",
+        "runtime\\main.c": "db49b6463bee354b979caff9218f66073b7928632c5ab1c43a7ddb7ca9d7a78b",
+        "runtime\\net.c": "f24d1adee8ac37aa10652f0e6cc7afae58af3aa605ce40c2eda2e0b1c52e046d",
+        "runtime\\run.c": "2e05daf3cdd3b6d9597eeabc99d653b43302dc9fd3d594fc9376f97528c4419b",
+        "runtime\\run.h": "55243516a73963094429b8c4a61d3799e81f77ae07e425890f1ab57f2fb117a7",
+        "runtime\\signal.c": "32790ab5fcb2c68bc1732ed363699dffd957e9e8413984463ab6e1ca8bbdc86b",
+        "runtime\\thread.c": "4d403a044ba8d397e8e860f4d8e2a18345069c791e91358a89c5cac68c04548f",
+        "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+        "runtime\\vm.c": "6d5a14e149fd37d3fad8e4aea07cd3e59d07ca97c050f9cd9f682b487e896285"
+      },
+      "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+      "output_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd"
+    }
+  ],
+  "regressions": {
+    "net-checks": {
+      "evidence_sha256": "7a4b3c575cd95f567c6b2b704ebeffb862ca60978f346bbdd14351aac7e548e2",
+      "results": [
+        {
+          "arch": "i686",
+          "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        },
+        {
+          "arch": "i686",
+          "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        }
+      ]
+    },
+    "poll-checks": {
+      "evidence_sha256": "384d1d0aeeb4759567e89486da87685fc16ee9e02520bd57d8d0abbb8e56a2a4",
+      "results": [
+        {
+          "arch": "i686",
+          "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "passed": true
+        }
+      ]
+    },
+    "entry-checks": {
+      "evidence_sha256": "04176e226d1b007a9f2d5aed37a8f9862b0eb1282eae1ba9184bec7587ac778d",
+      "results": [
+        {
+          "case": "i686/entry",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "case": "i686/unimplemented-tls",
+          "exit_code": 126,
+          "passed": true
+        },
+        {
+          "case": "i686/syscalls",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "case": "x86_64/entry",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "case": "x86_64/unimplemented-tls",
+          "exit_code": 126,
+          "passed": true
+        },
+        {
+          "case": "x86_64/syscalls",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "case": "x86_64/redzone",
+          "exit_code": 42,
+          "passed": true
+        }
+      ]
+    },
+    "tls-checks": {
+      "evidence_sha256": "e9aa1392a8fbdafcad6269b8489026b22358d8c93c2f4efcaf9426fcafd74c88",
+      "results": [
+        {
+          "arch": "i686",
+          "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+          "exit_code": 42,
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "host_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd",
+          "exit_code": 42,
+          "passed": true
+        }
+      ]
+    },
+    "ld-start-checks": {
+      "evidence_sha256": "53fa191a5f1e5ea64bfbdf4f07851b324d07bf6b423e61e128a237167b9307dd",
+      "results": [
+        {
+          "case": "i686/usage",
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "case": "i686/missing-program",
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "case": "x86_64/usage",
+          "exit_code": 127,
+          "passed": true
+        },
+        {
+          "case": "x86_64/missing-program",
+          "exit_code": 127,
+          "passed": true
+        }
+      ]
+    },
+    "stun": {
+      "host_sha256": "4c1899c42a8f0a9ba57c0731b99d94428aea84efcffb269de38d2ab47a8ef6dd",
+      "responses": 50,
+      "syscall_gaps": [],
+      "evidence_sha256": "b4918aac7c35c1e215633128584bd9de2954ecbe2285e30fbb66166fe8ad37cb",
+      "cleanup": "Forced termination after the protocol test, as recorded by the existing test."
+    },
+    "manager": {
+      "host_sha256": "e7a7ebca35c61f7aa45e3b17209a9099c6d84887b8f127315740f565424ed0e2",
+      "exit_code": 1,
+      "forced_cleanup": false,
+      "pid_removed": true,
+      "shutdown_markers": {
+        "Recv SIGTERM signal": true,
+        "Thread Free Success!": true,
+        "Application End!": true,
+        "Application Stop!": true
+      },
+      "syscall_gaps": [],
+      "evidence_sha256": "7db346f2abe912cd418579fea50319b9b6acafdee622e4de3e371171e4128d57"
+    }
+  },
+  "limits": [
+    "Only Windows 10 x64 10.0.19044 tested.",
+    "Buffer queries expose actual Winsock capacities; Linux kernel buffer bookkeeping/doubling is not reproduced.",
+    "Channel run mode receives SIGTERM through the runtime event; this is not its PID-file stop helper and does not prove every worker cleanup.",
+    "Regressions initially used build/staged while the older game was alive. After that run exited, canonical tools/build.py, test_channel.py and test_net.py also passed; both build identities are recorded."
+  ],
+  "canonical_build": {
+    "recorded_utc": "2026-11-14T02:02:01.774693+00:00",
+    "channel": {
+      "recorded_utc": "20261114T015848296008Z",
+      "os": "Windows-10-10.0.19044-SP0",
+      "probe": "build\\probes\\20261114T015848296008Z\\channel",
+      "scope": "Original channel TCP connect protocol only; loopback port 7001, no bridge/database/client business acceptance.",
+      "command": [
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+        "--root",
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T015848296008Z\\channel",
+        "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+        "--env",
+        "HOME=/home/neople",
+        "--cwd",
+        "/home/neople/channel",
+        "--run",
+        "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T015848296008Z\\channel\\home\\neople\\channel\\df_channel_r",
+        "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+        "/home/neople/channel/df_channel_r",
+        "channel",
+        "run"
+      ],
+      "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+      "elf_sha256": "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd",
+      "ld_sha256": "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd",
+      "config_sha256": "701a760d20fb4f047bef1bdf1d9eb40ba943c086ca58bb1ce96e1cc9d1a9c483",
+      "checks": {
+        "negative_handshake": true,
+        "positive_responses": 32,
+        "fragmented_request": true,
+        "coalesced_requests": true
+      },
+      "error": null,
+      "gaps": [],
+      "exit_code": 0,
+      "sigterm_event_sent": true,
+      "forced_cleanup": false,
+      "log_sha256": {
+        "stderr.log": "f1848078acee22eb070f54753a24bc41b01507078b51c703c24adfabd3e3d501",
+        "stdout.log": "dc1646268f0f42121c6ce5bf56194ad7f25d8667403d0fbf536e253324a62e54"
+      }
+    },
+    "builds": [
+      {
+        "arch": "i686",
+        "sources": {
+          "runtime\\adapt.c": "ff00de6930f4dd2f22ce92bfd7fbeec629075b25967961d04bf445976e47257f",
+          "runtime\\elf.c": "2e34c8803263e443188b719f6a8a4d2a877cc3ee1e637729f50f8025f89f8cb6",
+          "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+          "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+          "runtime\\files.c": "af4a21755a063481e3630126ba24c66d03c75ade4b2470d6d5a38fd8685640dc",
+          "runtime\\main.c": "db49b6463bee354b979caff9218f66073b7928632c5ab1c43a7ddb7ca9d7a78b",
+          "runtime\\net.c": "f24d1adee8ac37aa10652f0e6cc7afae58af3aa605ce40c2eda2e0b1c52e046d",
+          "runtime\\run.c": "430eca4aa206fe729616a26b5849086aa70ae1b8ad324360643063fb144e5940",
+          "runtime\\run.h": "55243516a73963094429b8c4a61d3799e81f77ae07e425890f1ab57f2fb117a7",
+          "runtime\\signal.c": "32790ab5fcb2c68bc1732ed363699dffd957e9e8413984463ab6e1ca8bbdc86b",
+          "runtime\\thread.c": "4d403a044ba8d397e8e860f4d8e2a18345069c791e91358a89c5cac68c04548f",
+          "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+          "runtime\\vm.c": "6d5a14e149fd37d3fad8e4aea07cd3e59d07ca97c050f9cd9f682b487e896285"
+        },
+        "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+        "output_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008"
+      },
+      {
+        "arch": "x86_64",
+        "sources": {
+          "runtime\\adapt.c": "ff00de6930f4dd2f22ce92bfd7fbeec629075b25967961d04bf445976e47257f",
+          "runtime\\elf.c": "2e34c8803263e443188b719f6a8a4d2a877cc3ee1e637729f50f8025f89f8cb6",
+          "runtime\\elf.h": "97e4638b69e42482eab84b41a90633a6ae8eecc783c4b49ae0fe04ef0d473124",
+          "runtime\\entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+          "runtime\\files.c": "af4a21755a063481e3630126ba24c66d03c75ade4b2470d6d5a38fd8685640dc",
+          "runtime\\main.c": "db49b6463bee354b979caff9218f66073b7928632c5ab1c43a7ddb7ca9d7a78b",
+          "runtime\\net.c": "f24d1adee8ac37aa10652f0e6cc7afae58af3aa605ce40c2eda2e0b1c52e046d",
+          "runtime\\run.c": "430eca4aa206fe729616a26b5849086aa70ae1b8ad324360643063fb144e5940",
+          "runtime\\run.h": "55243516a73963094429b8c4a61d3799e81f77ae07e425890f1ab57f2fb117a7",
+          "runtime\\signal.c": "32790ab5fcb2c68bc1732ed363699dffd957e9e8413984463ab6e1ca8bbdc86b",
+          "runtime\\thread.c": "4d403a044ba8d397e8e860f4d8e2a18345069c791e91358a89c5cac68c04548f",
+          "runtime\\tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+          "runtime\\vm.c": "6d5a14e149fd37d3fad8e4aea07cd3e59d07ca97c050f9cd9f682b487e896285"
+        },
+        "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+        "output_sha256": "cb18cadb4e0547504f57b90b5f3e04924df45b9fcd1dfdbcf3bb856e0a72f268"
+      }
+    ],
+    "net": {
+      "recorded_utc": "2026-11-14T01:59:05.707686+00:00",
+      "os": "Windows-10-10.0.19044-SP0",
+      "scope": "Own Linux ELF fixtures and loopback Python peer only; not original service or cross-system acceptance.",
+      "results": [
+        {
+          "arch": "i686",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=i386-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DNR_PORT=64875",
+            "-DNR_LINGER_ON=0",
+            "-Wl,--image-base=0x8048000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\net.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\net"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\net",
+            "28efc87ee51f0e37d1ba3370a194d91bf77a4034cfcc18b8ea6fe5c8c6cdc3d3",
+            "net"
+          ],
+          "port": 64875,
+          "fixture_sha256": "28efc87ee51f0e37d1ba3370a194d91bf77a4034cfcc18b8ea6fe5c8c6cdc3d3",
+          "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "error": null,
+          "linger_on": false,
+          "peer_eof": true,
+          "peer_reset": false,
+          "server_received_hex": "6e61746976652d746370006775657374",
+          "server_sent_hex": "6e61746976652d746370007265706c79",
+          "guest_returned_hex": "6e61746976652d746370007265706c79",
+          "checks": {
+            "poll_empty": 0,
+            "poll_write_count": 1,
+            "poll_write_events": 4,
+            "poll_negative_count": 0,
+            "poll_negative_events": 0,
+            "poll_invalid_count": 1,
+            "poll_invalid_events": 32,
+            "poll_read_count": 1,
+            "poll_read_events": 1,
+            "receive_timeout_result": -11,
+            "receive_timeout_ms": 109,
+            "keepalive_result": 0,
+            "nodelay_result": 0,
+            "timeout_option_result": 0
+          },
+          "stderr": "adapt sha256=28efc87ee51f0e37d1ba3370a194d91bf77a4034cfcc18b8ea6fe5c8c6cdc3d3 sections=1 syscall_traps=0 tls_traps=0\r\nenter guest bits=32 entry=0x8049140 stack=0x61af710 argc=1\r\n",
+          "passed": true
+        },
+        {
+          "arch": "i686",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=i386-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DNR_PORT=64877",
+            "-DNR_LINGER_ON=1",
+            "-Wl,--image-base=0x8048000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\net.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\net"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\i686\\net",
+            "5a72e3a2f6bf4b2a389ef6e598fc0fad440a51cefcf549cf57db612d8f449d56",
+            "net"
+          ],
+          "port": 64877,
+          "fixture_sha256": "5a72e3a2f6bf4b2a389ef6e598fc0fad440a51cefcf549cf57db612d8f449d56",
+          "host_sha256": "8757f9b385c860f6ff96d5929c7b376c0a48cc1e364784cb8035922b93b44008",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "error": null,
+          "linger_on": true,
+          "peer_eof": false,
+          "peer_reset": true,
+          "server_received_hex": "6e61746976652d746370006775657374",
+          "server_sent_hex": "6e61746976652d746370007265706c79",
+          "guest_returned_hex": "6e61746976652d746370007265706c79",
+          "checks": {
+            "poll_empty": 0,
+            "poll_write_count": 1,
+            "poll_write_events": 4,
+            "poll_negative_count": 0,
+            "poll_negative_events": 0,
+            "poll_invalid_count": 1,
+            "poll_invalid_events": 32,
+            "poll_read_count": 1,
+            "poll_read_events": 1,
+            "receive_timeout_result": -11,
+            "receive_timeout_ms": 113,
+            "keepalive_result": 0,
+            "nodelay_result": 0,
+            "timeout_option_result": 0
+          },
+          "stderr": "adapt sha256=5a72e3a2f6bf4b2a389ef6e598fc0fad440a51cefcf549cf57db612d8f449d56 sections=1 syscall_traps=0 tls_traps=0\r\nenter guest bits=32 entry=0x8049140 stack=0x69bfba0 argc=1\r\n",
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=x86_64-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DNR_PORT=64879",
+            "-DNR_LINGER_ON=0",
+            "-Wl,--image-base=0x400000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\net.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\net"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\net",
+            "59dc4ee42a5eb549b0bbabce2003364f88b40a68d7e8acc4f94fdf0e8ab4abfe",
+            "net"
+          ],
+          "port": 64879,
+          "fixture_sha256": "59dc4ee42a5eb549b0bbabce2003364f88b40a68d7e8acc4f94fdf0e8ab4abfe",
+          "host_sha256": "cb18cadb4e0547504f57b90b5f3e04924df45b9fcd1dfdbcf3bb856e0a72f268",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "error": null,
+          "linger_on": false,
+          "peer_eof": true,
+          "peer_reset": false,
+          "server_received_hex": "6e61746976652d746370006775657374",
+          "server_sent_hex": "6e61746976652d746370007265706c79",
+          "guest_returned_hex": "6e61746976652d746370007265706c79",
+          "checks": {
+            "poll_empty": 0,
+            "poll_write_count": 1,
+            "poll_write_events": 4,
+            "poll_negative_count": 0,
+            "poll_negative_events": 0,
+            "poll_invalid_count": 1,
+            "poll_invalid_events": 32,
+            "poll_read_count": 1,
+            "poll_read_events": 1,
+            "receive_timeout_result": -11,
+            "receive_timeout_ms": 103,
+            "keepalive_result": 0,
+            "nodelay_result": 0,
+            "timeout_option_result": 0
+          },
+          "stderr": "adapt sha256=59dc4ee42a5eb549b0bbabce2003364f88b40a68d7e8acc4f94fdf0e8ab4abfe sections=1 syscall_traps=68 tls_traps=0\r\nenter guest bits=64 entry=0x4011a0 stack=0x9d93dff610 argc=1\r\n",
+          "passed": true
+        },
+        {
+          "arch": "x86_64",
+          "build": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\clang.exe",
+            "--target=x86_64-linux-gnu",
+            "-fuse-ld=lld",
+            "-nostdlib",
+            "-static",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-fno-pic",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DNR_PORT=64881",
+            "-DNR_LINGER_ON=1",
+            "-Wl,--image-base=0x400000",
+            "-Wl,-e,_start",
+            "D:\\cache\\dnf-runtime\\dnf-native\\tests\\net.c",
+            "-o",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\net"
+          ],
+          "command": [
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\x86_64\\dnf-host.exe",
+            "--run",
+            "D:\\cache\\dnf-runtime\\dnf-native\\build\\fixtures\\x86_64\\net",
+            "6095be1f5378488bdeeac31248540cdb40214a1dd9c195bc5c507df8379dff48",
+            "net"
+          ],
+          "port": 64881,
+          "fixture_sha256": "6095be1f5378488bdeeac31248540cdb40214a1dd9c195bc5c507df8379dff48",
+          "host_sha256": "cb18cadb4e0547504f57b90b5f3e04924df45b9fcd1dfdbcf3bb856e0a72f268",
+          "exit_code": 42,
+          "forced_cleanup": false,
+          "error": null,
+          "linger_on": true,
+          "peer_eof": false,
+          "peer_reset": true,
+          "server_received_hex": "6e61746976652d746370006775657374",
+          "server_sent_hex": "6e61746976652d746370007265706c79",
+          "guest_returned_hex": "6e61746976652d746370007265706c79",
+          "checks": {
+            "poll_empty": 0,
+            "poll_write_count": 1,
+            "poll_write_events": 4,
+            "poll_negative_count": 0,
+            "poll_negative_events": 0,
+            "poll_invalid_count": 1,
+            "poll_invalid_events": 32,
+            "poll_read_count": 1,
+            "poll_read_events": 1,
+            "receive_timeout_result": -11,
+            "receive_timeout_ms": 109,
+            "keepalive_result": 0,
+            "nodelay_result": 0,
+            "timeout_option_result": 0
+          },
+          "stderr": "adapt sha256=6095be1f5378488bdeeac31248540cdb40214a1dd9c195bc5c507df8379dff48 sections=1 syscall_traps=68 tls_traps=0\r\nenter guest bits=64 entry=0x4011a0 stack=0x41f77ffab0 argc=1\r\n",
+          "passed": true
+        }
+      ]
+    }
+  }
+}

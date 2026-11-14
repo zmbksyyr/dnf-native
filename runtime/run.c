@@ -5,7 +5,7 @@
 #include <string.h>
 
 /* glibc derives pthread's default from RLIMIT_STACK. Channel's receive path
-   alone needs over 640 KiB, so use the Linux service environment's 8 MiB. */
+   alone needs over 640 KiB, so use an 8 MiB default. */
 #define NR_STACK_BYTES (8 * 1024 * 1024)
 
 static NrRun *active;

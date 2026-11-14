@@ -2,7 +2,7 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化和正常停服；原版 i386 game 已连接 MySQL、打开 13 类业务库并进入真实 DataManager 资源加载。19 个 ELF 原址映射、双架构 VM/文件/网络/执行原语和官方 MySQL 5.7.44 数据往返检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
+**当前状态：P1 实施中。** 原版 x64 STUN 已在本机完成 50 次 UDP 协议往返；原版 i386 manager 已通过原有 `nofork` 路径完成配置初始化和正常停服；原版 channel 已通过 32 次正确 TCP 握手及拆包、连包检查；原版 i386 game 已连接 MySQL、打开 13 类业务库并进入真实 DataManager 资源加载。19 个 ELF 原址映射、双架构 VM/文件/网络/执行原语和官方 MySQL 5.7.44 数据往返检查通过，完整服务业务及 Win7/Win11 尚未验证。实际范围与缺口见[实施记录](docs/06-progress.md)。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -38,8 +38,11 @@ python tools/probe_manager.py
 python tools/test_vm.py
 python tools/test_files.py
 python tools/test_net.py
+python tools/test_channel.py
 python tools/import_mysql.py
 python tools/probe_mysql.py
 ```
 
 协议检查使用 STUN 原有 `test` 前台模式，绑定原 UDP 端口 2311–2313，结束后强制回收本次启动的测试进程；manager 使用原有 `nofork` 模式，再通过第二个原版 manager 的 `stop` 命令完成 SIGTERM 和应用资源清理。测试实例写在 `build/probes/` 的独立目录。后台派生、manager 管理协议和最终验收仍未通过。[第三方来源](THIRD_PARTY.md)记录实际引入的指令库和用户库。
+
+channel 检查使用原版 `channel run`，需要 TCP/UDP 7001 空闲，配置仅修改独立副本中的 loopback 地址；完成握手后经 runtime 事件发送 SIGTERM，核对目标自行返回 0。该结果不包含 bridge、频道信息或游戏客户端业务。开发时已有旧宿主运行，可用 `python tools/test_channel.py --host build/staged/i686/dnf-host.exe` 明确选择独立构建。
