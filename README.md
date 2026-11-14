@@ -82,3 +82,5 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 安全组件的本地路由及停服对照使用 `python tools/probe_security.py --host build/staged/i686/dnf-host.exe --local-routes --fix-cleanup-order --observe-seconds 10`。这两个选项分别修改私有配置和校验后调整私有 zerg ELF 的清理顺序；receipt 保留修改前后哈希与补丁，输入原件不变。原路由尚有未提供的依赖，不等于完整安全业务通过。
 
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --core --dp2-cleanup --stop-after-started 120 --timeout 2100` 观察完整 core 16 服务的联合启动/停止。私有地址使用 loopback，channel/relay 测试容量为 16，monitor 应用已记录的私有 UDP 停服补丁。receipt 与应用日志共同用于审阅；首次运行仍暴露 game getsockopt 缺口，不计完整互通或客户端验收。
+
+联合观察期间可用 `python tools/probe_core_protocols.py --channel-port 7001 --output build/core-protocols.json` 检查现有私有 channel/relay/STUN 实例。该工具使用 relay 测试账号 701/702，核对握手、双向转发、定向断开和 UDP 响应；端口须与实际监听一致。结果仅涵盖自编协议请求。

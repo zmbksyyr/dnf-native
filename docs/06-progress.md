@@ -417,3 +417,11 @@ game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）
 双架构真实 TCP 样件使用另一个已绑定但未监听的端口制造拒绝连接，旧构建在 SO_ERROR 查询失败；修复后连接成功、EINPROGRESS、poll 的失败事件、111、读取后清除，以及原有传输、getpeername、超时和普通/abortive 关闭全部通过。最终正式双架构构建的 epoll、并发 close/select 和 rename/msync 回归通过，构建身份见 [SO_ERROR 证据](evidence/p3-so-error.json)。该清除处理限定于非阻塞连接错误，不宣称完整 Linux socket error queue。
 
 已用包含上述修复的正式宿主启动新的 16 服务联合复测，继续要求原版自然启动、120 秒观察和正常关服。该轮尚未结束，不能把原语通过替代 game 网络缺口消失或完整互通结论。仅实测 Windows 10 x64 10.0.19044。
+
+## 2026-11-14 · 联跑实例协议响应与 channel 配置修正
+
+直接连接正在联跑的原版实例，核对 channel 随机挑战、成功握手、拆包和连包；relay 两个自编账号登记、八次双向逐字节转发、UDP 定向断开及另一连接保留；STUN 五类地址/长度响应与响应源端口，全部通过。新增 tools/probe_core_protocols.py 可复现这些请求；它连接现有私有实例，不负责启动或停止服务。
+
+实际 channel 监听 5555，且日志记录 bridge ipport=0。原因是联跑脚本只替换数字 IP，遗漏了原配置的 this_ip = Public IP。原版 Script::get_key_val 只接受一个节名或两个键值 token；该占位行无法形成有效 this_ip，get_server_section 提前返回，后续端口和 bridge 字段没有载入。这不是 bridge 下发端口。现已在私有配置准备步骤中明确设置 this_ip = 127.0.0.1。
+
+对联跑 channel 的另一个私有副本仅修改这一行，保留 max_client=16：实际监听 7001，建立到现有原版 bridge:7000 的连接，拆包/连包握手通过，SIGTERM 后自行返回 0，无 runtime gap 或强制回收。独立 channel 原有 32 次成功响应回归也通过。证据见 [联跑协议与配置](evidence/p3-core-protocols.json)。正在运行的整轮仍保留旧私有配置，修正后的单服务对照不能计作整轮修正通过；完整互通、客户端及最终交付仍未验收。

@@ -41,6 +41,8 @@ def start_core(instance, db, services):
         for config in (guest / "cfg").glob("*.cfg"):
             text = config.read_text(encoding="utf-8")
             text = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "127.0.0.1", text)
+            if name == "channel":
+                text = re.sub(r"(?m)^this_ip\s*=.*$", "this_ip = 127.0.0.1", text)
             if name in ["channel", "relay"]:
                 text = re.sub(r"(?m)^max_client\s*=.*$", "max_client = 16", text)
             fields = []
