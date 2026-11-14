@@ -240,28 +240,33 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     }
     if (number == MUNMAP) {
         if (!v) { *result = -38; return 1; }
-        if (address == (uintptr_t)v->base && length == v->size) {
-            if (v->section) {
-                if (!UnmapViewOfFile(v->base)) { *result = -22; return 1; }
-                CloseHandle(v->section);
-            } else if (v->image.file) nr_elf_close(&v->image);
-            else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
-            if (v->source) CloseHandle(v->source);
-            if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
-            if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
-            memset(v, 0, sizeof(*v));
-            *result = 0;
-        } else {
+        if (address != (uintptr_t)v->base || length != v->size) {
             if (v->section) { *result = -38; return 1; }
+            size_t pages = v->size / 4096, bytes = (pages + 7) / 8;
             if (!v->mapped_pages) {
-                size_t bytes = (v->size / 4096 + 7) / 8;
                 v->mapped_pages = HeapAlloc(GetProcessHeap(), 0, bytes);
                 if (!v->mapped_pages) { *result = -12; return 1; }
                 memset(v->mapped_pages, 255, bytes);
+                if (pages % 8) v->mapped_pages[bytes - 1] = (unsigned char)((1u << (pages % 8)) - 1);
             }
             *result = VirtualFree((void *)address, length, MEM_DECOMMIT) ? 0 : -22;
-            if (!*result) mark_pages(v, address, length, 0);
+            if (*result) return 1;
+            mark_pages(v, address, length, 0);
+            for (size_t i = 0; i < bytes; ++i)
+                if (v->mapped_pages[i]) return 1;
+            /* Alignment trims followed by freeing the middle can remove every
+               guest page without a single unmap covering the reservation. */
         }
+        if (v->section) {
+            if (!UnmapViewOfFile(v->base)) { *result = -22; return 1; }
+            CloseHandle(v->section);
+        } else if (v->image.file) nr_elf_close(&v->image);
+        else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
+        if (v->source) CloseHandle(v->source);
+        if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
+        if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
+        memset(v, 0, sizeof(*v));
+        *result = 0;
         return 1;
     }
     int owned = v != NULL;

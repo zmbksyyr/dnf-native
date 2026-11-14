@@ -73,6 +73,18 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(UNMAP(base, bytes) == 0);
     CHECK(PROTECT(base, bytes, 3) == -12);
 
+    /* Allocators trim alignment head/tail pages and later unmap the middle.
+       Releasing every page in separate calls must also release the reservation. */
+    for (unsigned i = 0; i < 1500; ++i) {
+        word trimmed = (word)call6(MMAP, 0, bytes, 3, 0x22, (word)-1, 0);
+        CHECK(trimmed && trimmed < (word)-4095);
+        *(volatile unsigned char *)(trimmed + 8 * page) = (unsigned char)i;
+        CHECK(UNMAP(trimmed, 8 * page) == 0);
+        CHECK(UNMAP(trimmed + 16 * page, page) == 0);
+        CHECK(*(volatile unsigned char *)(trimmed + 8 * page) == (unsigned char)i);
+        CHECK(UNMAP(trimmed + 8 * page, 8 * page) == 0);
+    }
+
 #ifndef __x86_64__
     word remap = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);
     CHECK(remap && remap < (word)-4095);
