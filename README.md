@@ -86,3 +86,5 @@ python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --scrip
 联合观察期间可用 `python tools/probe_core_protocols.py --channel-port 7001 --output build/core-protocols.json` 检查现有私有 channel/relay/STUN 实例。该工具使用 relay 测试账号 701/702，核对握手、双向转发、定向断开和 UDP 响应；端口须与实际监听一致。结果仅涵盖自编协议请求。
 
 `python tools/probe_game_chain.py --database-source PRIVATE_TEST_INSTANCE --peers-only-seconds 75` 只观察 15 个 core peer，记录真实 monitor 统计写库并正常停服，用于辅助服务诊断。该模式不运行 game。monitor 私有副本同时包含已记录的 UDP 停服与首次计数初始化修复；独立 monitor 对照可用 `--fix-statistics` 选择后一项。
+
+MySQL 单文件引导首版：先执行 `python tools/import_mysql_runtime.py` 和 `python tools/build_mysql_standalone.py`，产物为 `build/mysql-standalone/mysql-standalone.exe`。`python tools/test_mysql_standalone.py` 在新的私有中文目录里验证初始化、TLS 与备份还原。命令格式为 `mysql-standalone.exe prepare INSTANCE` 或 `mysql-standalone.exe TOOL INSTANCE [官方参数]`，TOOL 为 mysqld/mysql/mysqladmin/mysqldump；工具工作目录为实例目录，客户端配置使用相对文件名。首版约 15.9 MB，尚非最终离线包或 Win7/11 验收。

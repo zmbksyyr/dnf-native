@@ -1,0 +1,121 @@
+{
+  "recorded_utc": "2026-11-14T07:02:04.636799+00:00",
+  "scope": "First independent MySQL single-EXE bootstrap, Unicode instance and real official-tool lifecycle; not a final release or three-OS acceptance.",
+  "build": {
+    "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
+    "cabinet_bytes": 15097663,
+    "cabinet_sha256": "35cd1b494e3ea94fae31888c4015d1617d8dbbe0171c2f30033e3937eab1f190",
+    "output_bytes": 15882240,
+    "output_sha256": "86d9608d6d6ba7f408dc2c025940425c60f55d757328c1a5de1b9966d5fdb4b2",
+    "source_sha256": "0b0007048af368e076d09c2e3f5b460206e139797591181e325950d9520cee3c",
+    "official_mysql_source": {
+      "url": "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-winx64.zip",
+      "archive_sha256": "aed661fe8120254a1dc30f5a4d5de346681922f4847cf025e2d4084eca78e70e"
+    }
+  },
+  "payload_file_count": 114,
+  "uncompressed_payload_bytes": 59214189,
+  "payload_manifest_sha256": "c70031dbd8ae91821cfad7b1d6debbcd3dad6cc0bfee0583b020339f028fe65e",
+  "build_receipt_sha256": "d3efa184ebb53578349481343ba9b6a6d27eb1dd7eb53b7cc62a599a77f5ced3",
+  "sources": {
+    "delivery\\mysql_standalone.cpp": "0b0007048af368e076d09c2e3f5b460206e139797591181e325950d9520cee3c",
+    "tools\\build_mysql_standalone.py": "91519295e529c2f4446c1a1e7a37e9eb64e4b3766f960f539e6a7b6b718cfd44",
+    "tools\\test_mysql_standalone.py": "ecfdc770bf9688ce2aa3e6136a40a4442a118a826c1a0bae9d21f2218dd21feb"
+  },
+  "native_test": {
+    "recorded_utc": "20261114T065919292639Z",
+    "os": "Windows-10-10.0.19044-SP0",
+    "probe": "build\\probes\\20261114T065919292639Z\\mysql-sfx",
+    "exe_sha256": "86d9608d6d6ba7f408dc2c025940425c60f55d757328c1a5de1b9966d5fdb4b2",
+    "exe_bytes": 15882240,
+    "scope": "Real MySQL initialization, TLS query, backup and restore from only the standalone EXE; developer Windows 10 only.",
+    "checks": {
+      "concurrent_prepare": 4,
+      "initialize_fresh_private_data": true,
+      "query_write_read_over_tls": true,
+      "logical_backup_restore_rows": 2,
+      "loaded_vc_runtime_app_local": true,
+      "server_shutdown_complete": true,
+      "existing_data_reinitialization_refused": true,
+      "modified_cache_refused": true
+    },
+    "forced_cleanup": false,
+    "versions": {
+      "mysqld": "5.7.44",
+      "mysql": "5.7.44",
+      "mysqladmin": "5.7.44",
+      "mysqldump": "5.7.44"
+    },
+    "database_identity": "5.7.44\teaa9fdff-dff8-11f1-b6fc-345a6041c9d0",
+    "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+    "logical_backup_sha256": "85cd8de507b09baa105c5871f2b38d8cdfbd6d4ac4b8253dc3a8e51e297772dc",
+    "runtime_modules": [
+      {
+        "name": "ucrtbase.dll",
+        "app_local": false,
+        "sha256": "de8d08d01291df93821314176381f3d1ae863e6c5584a7f8ea42f0b94b15ef65"
+      },
+      {
+        "name": "msvcp140.dll",
+        "app_local": true,
+        "sha256": "75872c426555ac8af55b5a7f6d4aea8831af74353b22612850a2bfc40e3b67e1"
+      },
+      {
+        "name": "vcruntime140.dll",
+        "app_local": true,
+        "sha256": "270ba17bf89cc2eb6e6ce536eb78e4614ab5499f653ab7e07fe9e3d33bf3b6e3"
+      },
+      {
+        "name": "vcruntime140_1.dll",
+        "app_local": true,
+        "sha256": "f3754fc6ec87bcf84e05f3287b5de7bd305a30a0e1db7d478cb6353600682784"
+      }
+    ],
+    "mysqladmin_shutdown_exit_code": 0,
+    "server_exit_code": 0,
+    "limits": [
+      "Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
+      "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
+      "Fresh private initialization is insecure only for this loopback test; no application default initialization policy is implemented here.",
+      "No GUI backup/rollback workflow or final complete offline package acceptance."
+    ]
+  },
+  "native_test_receipt_sha256": "37578365ab56a8a9d2e59af0363c0cce1270a91e9134ccf57f7c79c70f3d2430",
+  "static_import_check": {
+    "examined_pe_count": 50,
+    "sfx_imports": [
+      "Cabinet.dll",
+      "bcrypt.dll",
+      "SHELL32.dll",
+      "msvcrt.dll",
+      "KERNEL32.dll"
+    ],
+    "system_dlls_remaining": [
+      "advapi32.dll",
+      "bcrypt.dll",
+      "cabinet.dll",
+      "crypt32.dll",
+      "dbghelp.dll",
+      "kernel32.dll",
+      "msvcrt.dll",
+      "secur32.dll",
+      "shell32.dll",
+      "user32.dll",
+      "ws2_32.dll"
+    ],
+    "receipt_sha256": "26d3d471516b06d7a8cfbc3ce659663078a876fa5c17d180841ee6b2e2c2b609",
+    "scope": "Ordinary and delay imports from llvm-readobj; not a dynamic LoadLibrary trace or Win7 API availability proof."
+  },
+  "defaults_path_observation": {
+    "absolute_unicode_defaults_file": "Official mysql --version returns 1: Could not open required defaults file.",
+    "relative_ascii_defaults_file": "Official mysql --version returns 0; full TLS backup/restore passes with the bootstrap working directory set to the instance.",
+    "short_path": "8.3 result still contains Chinese characters on this volume, and is rejected by the official defaults loader.",
+    "policy": "Controller config uses a fixed relative ASCII filename inside the Unicode instance; no dependency on 8.3 aliases."
+  },
+  "limits": [
+    "Windows 7/11 and a clean offline Windows 10 installation are not tested.",
+    "Official share is retained whole for this first payload; it is not yet a measured minimal closure.",
+    "Windows 10 selects system UCRT. App-local UCRT on Win7 remains unverified.",
+    "No production first-run password setup, GUI backup/restore/rollback, DNF integration or complete <=210 MB ZIP acceptance."
+  ]
+}

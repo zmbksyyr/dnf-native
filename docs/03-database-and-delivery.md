@@ -1,10 +1,16 @@
 # 数据库、GUI 与离线交付方案
 
-本文件是[运行方案](02-technical-plan.md)的配套设计。数据库固定为官方 Windows x64 MySQL 5.7.44；GUI 在本项目内用 Win32/C++ 从零实现。官方文件导入和原始数据逻辑往返已有本机可复现实验，GUI 和最终单文件交付仍未实现。
+本文件是[运行方案](02-technical-plan.md)的配套设计。数据库固定为官方 Windows x64 MySQL 5.7.44；GUI 在本项目内用 Win32/C++ 从零实现。官方文件导入和原始数据逻辑往返已有本机可复现实验；独立单文件引导首版已完成本机实测，GUI 和最终交付仍未完成。
 
 ## 1. MySQL 单文件发布
 
 `mysql-standalone.exe` 是本项目独立编写的引导程序，内部封装官方 5.7.44 的最小完整 payload。解压后执行真实官方 `mysqld/mysql/mysqladmin/mysqldump`，而不是仿制数据库。源码、四个 PE、DLL、字符集、必要 share/plugin 文件和分发材料分别锁定来源与哈希。
+
+当前首版为 15,882,240 字节，使用系统 Cabinet FDI 解压内嵌 LZX CAB，CNG 校验文件哈希，以 Win32 CreateProcessW 调用四个官方工具。`prepare INSTANCE` 解压到实例内 `.mysql/payload-<manifest hash>`；`mysqld|mysql|mysqladmin|mysqldump INSTANCE [官方参数]` 执行工具并转交标准输入输出与退出码，mysqld 的 basedir/datadir 固定在该实例内。并发准备使用文件锁，展开后校验再提交目录；已有缓存逐文件校验，失败明确返回错误，不覆盖数据库。
+
+官方 5.7 客户端的 defaults loader 在本机不能读取中文绝对配置路径。子进程工作目录固定为实例目录，控制器使用 `--defaults-file=client.private.cnf` 这类固定相对文件名；该方式已在中文/空格/括号实例目录中完成 TLS 读写和备份还原。8.3 路径仍可能含中文，不能依赖它解决此问题。首版保留整个官方 share 目录，尚未做最终按访问记录裁剪。
+
+复现命令为 `python tools/import_mysql_runtime.py`、`python tools/build_mysql_standalone.py`、`python tools/test_mysql_standalone.py`。首版测试只在开发机 Windows 10 完成，包含四工具版本、四进程并发准备、私有新库初始化、TLS、两行二进制数据备份/还原、已有库拒绝重新初始化、修改缓存拒绝运行与正常停服。VC++ 三个 DLL 的实际加载位置为实例缓存；Windows 10 的 UCRT 仍由系统提供，Win7 本地 UCRT 尚未实测。测试的 --initialize-insecure 仅用于隔离的 loopback 实例，产品首次凭据配置与 GUI 备份/回滚流程仍未实现。证据见 [单文件引导](evidence/p4-mysql-standalone.json)。
 
 不得把“只携带四个 EXE”视为完整闭包。静态普通/延迟导入、运行期 DLL/插件/数据文件访问、中文路径、初始化、查询、备份、还原及 TLS 连接都参与闭包判定。VC++ 2019/UCRT 采用可分发且经 Win7/10/11 验证的本地部署组合，不能要求另装 VC Redist，也不能直接从开发机 System32 抄取 DLL。开发工具使用何种 CRT 不改变这一产品要求。
 

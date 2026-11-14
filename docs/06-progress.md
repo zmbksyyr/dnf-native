@@ -441,3 +441,15 @@ game 使用上一正式构建，仍记录 msync（144）和 inotify（291/332）
 新增 --peers-only-seconds 复用现有准备/停服步骤，实际运行 bridge 与另外 14 个原版 core 服务，省去 game 自然加载以定位 peer 问题。本轮观察 75 秒，原版 monitor 经真实 DBMW 写入两条新统计，四项计数均为零，未出现原来的 1264。修正后的 channel 实际监听 TCP/UDP 7001，握手、relay 转发与定向断开、STUN 响应全部通过。14 个 peer 均自行退出，无提前退出、runtime gap 或强制回收；bridge 返回 0，源私有库不变。
 
 本次 mysqladmin 返回 1 并报告 shutdown 时连接丢失；实际 MySQL 服务器返回 0，日志完整记录 Normal shutdown 和 Shutdown complete，未强制终止。保留这两项不同结果，不将客户端错误改写为成功。证据见 [monitor 首次统计修复](evidence/p3-monitor-statistics.json)。本轮未运行 game，不计修正后的完整 16 服务或客户端验收；GUI、MySQL 单文件、离线包和 Windows 7/11 仍未完成。
+
+## 2026-11-14 · 官方 MySQL 的本地运行库与单文件首版
+
+先从四个官方 PE 的实际导入确认 VC++/UCRT 依赖，再从微软固定版本分发包导入三个 VC++ 2019 DLL 与 SDK x64 UCRT 的 42 个 DLL，全部 Microsoft 签名通过。未复制 System32 文件，未执行 VC/SDK 安装器。7-Zip 只作为开发解包工具使用。来源和逐文件身份见 [运行库导入](evidence/p4-mysql-runtime-import.json)。
+
+独立实现 delivery/mysql_standalone.cpp，以系统 FDI 解压内嵌 CAB，CNG 校验 payload，Win32 原生接口启动官方四工具。首版 EXE 为 15,882,240 字节，包含 114 个文件；不嵌入数据库、参考产物或 7-Zip。首次展开的目录分隔符问题已按实测修正；已有缓存校验及并发文件锁均通过实际测试。
+
+只复制单个 EXE，在 PATH 限于 Windows System32 的中文/空格/括号目录里测试：四个官方工具均为 5.7.44；四进程并发准备归于同一有效 payload；新私有库初始化成功；TLS 加密连接读写、两行二进制内容逻辑备份/还原逐字节匹配；正常停服 mysqld 和 mysqladmin 均返回 0，无强制回收。直接检查真实 mysqld 模块，三个 VC++ DLL 均来自实例缓存；已有数据拒绝重新初始化，修改缓存明确拒绝运行。
+
+官方客户端不能读取本机中文绝对 defaults-file 路径，而相对 ASCII 文件名可用。控制器沿用已固定的实例工作目录，以相对配置名传递凭据，未依赖仍含中文的 8.3 别名；中文绝对备份文件路径在实际 dump/restore 中通过。证据见 [单文件实测](evidence/p4-mysql-standalone.json)。
+
+该首版保留全部官方 share，尚未声称最终最小闭包。Windows 10 实际使用系统 UCRT，Win7/11 与干净离线机未测；产品首次安全凭据配置、GUI 备份/还原/回滚、DNF 与 SFX 集成及 ≤210 MB 完整 ZIP 仍未完成。测试 --initialize-insecure 限于新建的 loopback 私有实例，不是产品默认策略。
