@@ -343,3 +343,11 @@ bridge 和 MySQL 均自行返回 0，源私有数据库逐文件身份不变。�
 自编 i386/x64 共享库均由标准链接器生成 e_entry=0，通过上游 glibc 的 dlopen 实际执行构造函数、调用导出并运行析构，双方返回 42；修复前均在 dlopen 失败。错误非零 DSO 入口、将零入口库当程序运行、零入口 PT_INTERP 均拒绝。负例同时发现旧宿主可能将解释器 ELF 头当入口执行，该行为现已在映射前拒绝。独立构建上的双架构入口/信号、上游 ld.so，以及原版 19 ELF 原址映射和原有四项拒绝检查通过。
 
 证据见 [共享库零入口](evidence/p2-shared-entry.json)，复现命令为 `python tools/build.py`、`python tools/test_shared_entry.py`。本轮为避免覆盖联合复测正在使用的正式宿主，使用 build/staged 独立构建并传 --hosts build/staged。联合 game 自然启动/关服观察仍使用包含 SIGUSR2 修复的正式宿主，不将两组构建混用为同一验收结果。
+
+## 2026-11-14 · 原版 game 自然启动与完整正常关服
+
+完整联合复测已通过：原版 game 加载原版 DP2、Lua/JS、Frida 和 PVF，连接私有 MySQL 与原版 bridge；1275.298 秒出现原版启动成功标记，继续观察 120.083 秒后通过跨进程事件发送 SIGUSR2。原版依次输出 RECV SIGUSR2、ALL USER LOGOUT COMPLETE 和 GAME SERVER SHUTDOWN COMPLETE，随后 Frida dispose、DP2 unload，game 自行返回 0，总计 1455.341 秒，无访问异常或强制回收。私有 Lua 仅追加已提交的提前关闭 luv 句柄回调，Gadget 使用 full teardown；没有修改原版 ELF/DSO 指令或省略原始应用脚本。
+
+bridge 完整频道脚本响应匹配原文件，并自行返回 0。MySQL 日志记录 InnoDB 正常关闭和 Shutdown complete，服务器返回 0，无强制回收，源私有库逐文件身份不变。停库辅助命令 mysqladmin 返回 1，旧探测器未保留其 stderr，故不把辅助命令计为成功；该问题不影响已经取得的 game 正常关服证据。仍记录 msync（144）、inotify（291/332）探测 fallback，未声明这些调用已经实现。
+
+证据见 [game 完整关服](evidence/p2-game-clean-shutdown.json)。复现命令为 `python tools/probe_game_chain.py --database-source <停止的私有恢复库> --dp2-cleanup --stop-after-started 120 --timeout 2100`。本次使用含 SIGUSR2 修复的原宿主，后续零入口与 select 修复不混入本轮构建结论。通过范围是 game、bridge、私有数据库的自然启动及正常关服，实测系统仍为 Windows 10 x64 10.0.19044；16 服务就绪、客户端业务、GUI、最终包和另外两个系统均未验收。
