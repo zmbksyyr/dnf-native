@@ -17,7 +17,7 @@ static result call(word n, word a, word b, word c) {
 
 static result net(unsigned operation, word a, word b, word c, word d, word e) {
 #ifdef __x86_64__
-    word number = operation == 1 ? 41 : operation == 3 ? 42 : 54;
+    word number = operation == 1 ? 41 : operation == 3 ? 42 : operation == 15 ? 55 : 54;
     register word r10 __asm__("r10") = d;
     register word r8 __asm__("r8") = e;
     result r;
@@ -57,6 +57,22 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     report[11] = (int)net(14, fd, 1, 9, (word)&one, sizeof(one));
     report[12] = (int)net(14, fd, 6, 1, (word)&one, sizeof(one));
     CHECK(report[11] == 0 && report[12] == 0);
+    for (int option = 7; option <= 8; ++option) {
+        int value = 0, length = 4;
+        CHECK(net(15, fd, 1, option, (word)&value, (word)&length) == 0);
+        CHECK(value > 0 && length == 4);
+        unsigned char small[4] = {0, 0, 0xa5, 0x5a}; length = 2;
+        CHECK(net(15, fd, 1, option, (word)small, (word)&length) == 0);
+        CHECK(length == 2 && small[0] == (value & 255) && small[1] == ((value >> 8) & 255));
+        CHECK(small[2] == 0xa5 && small[3] == 0x5a);
+        length = 0;
+        CHECK(net(15, fd, 1, option, 1, (word)&length) == 0 && length == 0);
+        length = -1;
+        CHECK(net(15, fd, 1, option, (word)&value, (word)&length) == -22);
+        CHECK(net(15, fd, 1, option, (word)&value, 1) == -14);
+        length = 4;
+        CHECK(net(15, fd, 1, option, 1, (word)&length) == -14 && length == 4);
+    }
     int linger[2] = {NR_LINGER_ON, 0};
     CHECK(net(14, fd, 1, 13, (word)linger, 4) == -22);
     CHECK(net(14, fd, 1, 13, 1, sizeof(linger)) == -14);

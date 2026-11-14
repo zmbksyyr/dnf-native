@@ -303,7 +303,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         case 41: operation = 1; break; case 49: operation = 2; break; case 42: operation = 3; break;
         case 50: operation = 4; break; case 43: operation = 5; break; case 51: operation = 6; break;
         case 44: operation = 11; break; case 45: operation = 12; break; case 48: operation = 13; break;
-        case 54: operation = 14; break; default: break;
+        case 54: operation = 14; break; case 55: operation = 15; break; default: break;
     }
 #else
     if (number == 102) {
@@ -396,6 +396,20 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
     if (operation == 4) { *result = listen(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
     if (operation == 13) { *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
+    if (operation == 15) {
+        if (args[1] != 1 || (args[2] != 7 && args[2] != 8)) { *result = -38; return 1; }
+        if (!nr_memory(args[4], 4, 1)) { *result = -14; return 1; }
+        int capacity; memcpy(&capacity, (const void *)args[4], 4);
+        if (capacity < 0) { *result = -22; return 1; }
+        int bytes = capacity < 4 ? capacity : 4;
+        if (bytes && !nr_memory(args[3], (size_t)bytes, 1)) { *result = -14; return 1; }
+        int value, length = sizeof(value);
+        int option = args[2] == 7 ? SO_SNDBUF : SO_RCVBUF;
+        if (getsockopt(s, SOL_SOCKET, option, (char *)&value, &length)) { *result = socket_error(); return 1; }
+        if (bytes) memcpy((void *)args[3], &value, (size_t)bytes);
+        memcpy((void *)args[4], &bytes, 4);
+        *result = 0; return 1;
+    }
     if (operation == 14) {
         if (args[1] == 1 && args[2] == 13) {
             if (args[4] < 8) { *result = -22; return 1; }
