@@ -255,9 +255,28 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
     if (number == MADVISE) {
         if (!v || !mapped(v, address, length)) *result = -12;
         else if (args[2] != 4 || v->image.file || v->section) *result = -38;
-        else if (!nr_memory(address, length, 1)) *result = -38;
-        else if (!VirtualFree((void *)address, length, MEM_DECOMMIT)) *result = -12;
-        else *result = VirtualAlloc((void *)address, length, MEM_COMMIT, PAGE_READWRITE) ? 0 : -12;
+        else {
+            /* DONTNEED discards anonymous contents without changing mappings
+               or permissions. A pthread stack can include PROT_NONE guards;
+               requiring writable memory rejects glibc's stack-cache cleanup. */
+            uintptr_t cursor = address, end = address + length;
+            *result = 0;
+            while (cursor < end) {
+                MEMORY_BASIC_INFORMATION info;
+                if (!VirtualQuery((const void *)cursor, &info, sizeof(info))) { *result = -12; break; }
+                size_t bytes = info.RegionSize - (cursor - (uintptr_t)info.BaseAddress);
+                if (bytes > end - cursor) bytes = end - cursor;
+                if (info.State == MEM_COMMIT) {
+                    /* MEM_RESET marks anonymous pages discardable while
+                       preserving their mapping, protection and live stack
+                       accesses. It is the closest Windows primitive to
+                       Linux MADV_DONTNEED and avoids decommitting a range
+                       that another guest thread may still be unwinding. */
+                    if (!VirtualAlloc((void *)cursor, bytes, MEM_RESET, PAGE_READWRITE)) { *result = -12; break; }
+                } else if (info.State != MEM_RESERVE) { *result = -12; break; }
+                cursor += bytes;
+            }
+        }
         return 1;
     }
     if (number == MUNMAP) {

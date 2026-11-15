@@ -12,13 +12,113 @@ enum {ACTION = 174, MASK = 175, KILL = 37, TGKILL = 270};
 #define SP(c) ((c)->Esp)
 #endif
 
+enum { SA_SIGINFO = 4, SA_RESTORER = 0x04000000, SA_RESTART = 0x10000000, SA_RESETHAND = 0x80000000u };
+void nr_signal_enter(void);
+
+/* Linux UAPI sigcontext/ucontext layouts, independent of Windows CONTEXT.
+   Floating-point state stays in the saved native context; fpstate=NULL
+   makes that current limitation visible to handlers. */
+#ifdef _WIN64
+typedef struct {
+    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
+    uint64_t rdi, rsi, rbp, rbx, rdx, rax, rcx, rsp, rip, flags;
+    uint16_t cs, gs, fs, ss;
+    uint64_t err, trapno, oldmask, cr2, fpstate, reserved[8];
+} NrSigContext;
+#else
+typedef struct {
+    uint32_t gs, fs, es, ds, edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    uint32_t trapno, err, eip, cs, flags, esp_at_signal, ss, fpstate, oldmask, cr2;
+} NrSigContext;
+#endif
+typedef struct {
+    uintptr_t flags, link, stack;
+    uint32_t stack_flags;
+#ifdef _WIN64
+    uint32_t pad;
+#endif
+    uintptr_t stack_size;
+    NrSigContext machine;
+    unsigned char mask[8];
+} NrUserContext;
+typedef struct {
+    uintptr_t restorer;
+#ifndef _WIN64
+    uintptr_t signal, info_address, context_address;
+    unsigned char info[128];
+#endif
+    NrUserContext context;
+#ifdef _WIN64
+    unsigned char info[128];
+#endif
+} NrSignalFrame;
+_Static_assert(sizeof(NrSignalFrame) <= sizeof(((NrThread *)0)->signal_frame_data), "signal staging size");
+_Static_assert(offsetof(NrUserContext, machine) == (sizeof(void *) == 8 ? 40 : 20), "Linux ucontext mcontext");
+_Static_assert(offsetof(NrUserContext, mask) == (sizeof(void *) == 8 ? 296 : 108), "Linux ucontext sigmask");
+
+static void save_machine(NrSigContext *s, const CONTEXT *c, NrThread *thread) {
+#ifdef _WIN64
+    s->r8=c->R8; s->r9=c->R9; s->r10=c->R10; s->r11=c->R11;
+    s->r12=c->R12; s->r13=c->R13; s->r14=c->R14; s->r15=c->R15;
+    s->rdi=c->Rdi; s->rsi=c->Rsi; s->rbp=c->Rbp; s->rbx=c->Rbx;
+    s->rdx=c->Rdx; s->rax=c->Rax; s->rcx=c->Rcx; s->rsp=c->Rsp; s->rip=c->Rip;
+    s->cs=c->SegCs; s->ss=c->SegSs; s->fs=c->SegFs; s->gs=c->SegGs;
+#else
+    s->edi=c->Edi; s->esi=c->Esi; s->ebp=c->Ebp; s->esp=c->Esp; s->esp_at_signal=c->Esp;
+    s->ebx=c->Ebx; s->edx=c->Edx; s->ecx=c->Ecx; s->eax=c->Eax; s->eip=c->Eip;
+    s->cs=c->SegCs; s->ss=c->SegSs; s->ds=c->SegDs; s->es=c->SegEs; s->fs=c->SegFs;
+    s->gs=thread->tls_base ? 12 * 8 + 3 : 0;
+#endif
+    s->flags=c->EFlags;
+    s->oldmask=(uintptr_t)thread->signal_mask;
+}
+
+static void restore_machine(CONTEXT *c, const NrSigContext *s) {
+#ifdef _WIN64
+    c->R8=s->r8; c->R9=s->r9; c->R10=s->r10; c->R11=s->r11;
+    c->R12=s->r12; c->R13=s->r13; c->R14=s->r14; c->R15=s->r15;
+    c->Rdi=s->rdi; c->Rsi=s->rsi; c->Rbp=s->rbp; c->Rbx=s->rbx;
+    c->Rdx=s->rdx; c->Rax=s->rax; c->Rcx=s->rcx; c->Rsp=s->rsp; c->Rip=s->rip;
+#else
+    c->Edi=s->edi; c->Esi=s->esi; c->Ebp=s->ebp; c->Esp=s->esp;
+    c->Ebx=s->ebx; c->Edx=s->edx; c->Ecx=s->ecx; c->Eax=s->eax; c->Eip=s->eip;
+#endif
+    /* Only user arithmetic/control flags can change. Keep Windows selectors
+       and host TLS; guest TLS remains the runtime's logical FS/GS base. */
+    c->EFlags=(c->EFlags & ~0x40dd5u) | (s->flags & 0x40dd5u);
+}
+
+int nr_restore_signal(NrRun *run, CONTEXT *c) {
+    NrThread *thread=nr_current();
+    CONTEXT restored=thread->saved_context;
+    uint64_t mask=thread->saved_mask;
+    if (thread->signal_uses_info) {
+        NrSignalFrame frame;
+        EnterCriticalSection(&run->memory_lock);
+        int valid=nr_memory(thread->signal_frame_address, sizeof(frame), 0);
+        if (valid) memcpy(&frame, (void *)thread->signal_frame_address, sizeof(frame));
+        LeaveCriticalSection(&run->memory_lock);
+        if (!valid || frame.context.machine.fpstate) return 0;
+        restore_machine(&restored, &frame.context.machine);
+        memcpy(&mask, frame.context.mask, 8);
+        if (!nr_memory(PC(&restored), 1, 0) || !nr_memory(SP(&restored), 1, 0)) return 0;
+    }
+    *c=restored;
+    thread->signal_mask=mask & ~((1ULL<<8) | (1ULL<<18));
+    thread->in_signal=0;
+    return 1;
+}
+
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
     NrThread *thread = nr_current();
     uintptr_t a = args[0], b = args[1], c = args[2];
     if (number == TGKILL) {
         if (!a || !b || a != GetCurrentProcessId() || b != thread->tid) { *result = -3; return 1; }
         if (c > 64) { *result = -22; return 1; }
-        if (c) run->signal_pending |= 1ULL << (c - 1);
+        if (c) {
+            run->signal_sender[c]=(int32_t)GetCurrentProcessId(); run->signal_origin[c]=-6;
+            run->signal_pending |= 1ULL << (c - 1);
+        }
         *result = 0; return 1;
     }
     if (number == ACTION) {
@@ -29,9 +129,7 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         if (b) {
             memcpy(&action, (const void *)b, 3 * sizeof(uintptr_t));
             memcpy(&action.mask, (const void *)(b + 3 * sizeof(uintptr_t)), 8);
-            /* SA_SIGINFO needs Linux siginfo/ucontext frames, which this
-               initial one-thread handler path does not yet provide. */
-            if (action.flags & ~(uintptr_t)(0x04000000 | 0x10000000 | 0x80000000u)) {
+            if (action.flags & ~(uintptr_t)(SA_SIGINFO | SA_RESTORER | SA_RESTART | SA_RESETHAND)) {
                 *result = -38; return 1;
             }
         }
@@ -70,6 +168,7 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         }
         if (b) {
             if (b == 19 || b == 18) { *result = -38; return 1; }
+            run->signal_sender[b]=(int32_t)GetCurrentProcessId(); run->signal_origin[b]=0;
             run->signal_pending |= 1ULL << (b - 1);
         }
         *result = 0; return 1;
@@ -79,8 +178,12 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
 
 int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread = nr_current();
-    if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) run->signal_pending |= 1ULL << 14;
-    if (WaitForSingleObject(run->usr2_event, 0) == WAIT_OBJECT_0) run->signal_pending |= 1ULL << 11;
+    if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) {
+        run->signal_origin[15]=128; run->signal_sender[15]=0; run->signal_pending |= 1ULL << 14;
+    }
+    if (WaitForSingleObject(run->usr2_event, 0) == WAIT_OBJECT_0) {
+        run->signal_origin[12]=128; run->signal_sender[12]=0; run->signal_pending |= 1ULL << 11;
+    }
     if (thread->in_signal) return 1;
     uint64_t ready = run->signal_pending & ~thread->signal_mask;
     for (unsigned signal = 1; signal <= 64; ++signal) {
@@ -91,26 +194,51 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
         if (action.handler == 1 || (!action.handler && (signal == 17 || signal == 23 || signal == 28))) continue;
         if (!action.handler) ExitProcess(128 + signal);
         if (!nr_memory(action.handler, 1, 0) || !run->signal_code) return 0;
-        uintptr_t stack = SP(c);
-        uintptr_t restorer = (action.flags & 0x04000000) && action.restorer ? action.restorer : (uintptr_t)run->signal_code;
-#ifdef _WIN64
-        stack = ((stack - 128 - 8) & ~(uintptr_t)15) - 8;
-        uintptr_t frame[] = {restorer};
-#else
-        stack = ((stack - 16) & ~(uintptr_t)15) - 4;
-        uintptr_t frame[] = {restorer, signal};
+        int info=(action.flags & SA_SIGINFO) != 0;
+        size_t bytes=info ? sizeof(NrSignalFrame) : 2*sizeof(uintptr_t);
+        uintptr_t stack=SP(c);
+        size_t redzone=sizeof(void *)==8 ? 128 : 0;
+        if (stack < bytes + redzone + 16) return 0;
+        stack=((stack-bytes-redzone)&~(uintptr_t)15)-sizeof(uintptr_t);
+        if (!nr_memory(stack,bytes,1)) return 0;
+        uintptr_t restorer=(action.flags & SA_RESTORER) && action.restorer ? action.restorer : (uintptr_t)run->signal_code;
+        NrSignalFrame *frame=(NrSignalFrame *)thread->signal_frame_data;
+        memset(frame,0,sizeof(*frame));
+        frame->restorer=restorer;
+        uintptr_t info_address=stack+offsetof(NrSignalFrame,info);
+        uintptr_t context_address=stack+offsetof(NrSignalFrame,context);
+#ifndef _WIN64
+        frame->signal=signal;
+        frame->info_address=info_address;
+        frame->context_address=context_address;
 #endif
-        if (!nr_memory(stack, sizeof(frame), 1)) return 0;
+        if (info) {
+            int32_t signo=(int32_t)signal, code=run->signal_origin[signal];
+            int32_t pid=run->signal_sender[signal], uid=code==128 ? 0 : 1000;
+            memcpy(frame->info,&signo,4);
+            memcpy(frame->info+8,&code,4);
+            size_t payload=sizeof(void *)==8 ? 16 : 12;
+            memcpy(frame->info+payload,&pid,4);
+            memcpy(frame->info+payload+4,&uid,4);
+            frame->context.stack_flags=2; /* SS_DISABLE; no alternate stack. */
+            save_machine(&frame->context.machine,c,thread);
+            memcpy(frame->context.mask,&thread->signal_mask,8);
+        }
         thread->saved_context = *c;
         thread->saved_mask = thread->signal_mask;
         thread->signal_mask |= action.mask;
-        if (!(action.flags & 0x40000000)) thread->signal_mask |= bit;
-        if (action.flags & 0x80000000u) memset(&run->actions[signal], 0, sizeof(NrSignal));
-        memcpy((void *)stack, frame, sizeof(frame));
+        thread->signal_mask |= bit;
+        thread->signal_mask &= ~((1ULL<<8) | (1ULL<<18));
+        if (action.flags & SA_RESETHAND) memset(&run->actions[signal], 0, sizeof(NrSignal));
+        thread->signal_uses_info=info;
+        thread->signal_frame_address=stack;
         SP(c) = stack;
-        PC(c) = action.handler;
+        PC(c) = (uintptr_t)nr_signal_enter;
 #ifdef _WIN64
-        c->Rdi = signal;
+        c->Rax=action.handler; c->Rdi=stack; c->Rsi=(uintptr_t)frame; c->Rcx=bytes;
+        c->Rdx=signal; c->R8=info_address; c->R9=context_address;
+#else
+        c->Eax=action.handler; c->Edi=stack; c->Esi=(uintptr_t)frame; c->Ecx=(DWORD)bytes;
 #endif
         thread->in_signal = 1;
         return 1;

@@ -25,6 +25,9 @@ typedef struct {
     uint64_t signal_mask, saved_mask;
     CONTEXT saved_context, initial_context;
     int in_signal;
+    int signal_uses_info;
+    uintptr_t signal_frame_address;
+    uint64_t signal_frame_data[64];
     uintptr_t clear_tid, robust_head;
     DWORD tid;
     HANDLE handle;
@@ -76,6 +79,7 @@ typedef struct {
     CRITICAL_SECTION memory_lock;
     NrSignal actions[65];
     uint64_t signal_pending;
+    int32_t signal_sender[65], signal_origin[65];
     HANDLE terminate_event, usr2_event;
     unsigned char *signal_code;
     NrThread threads[64];
@@ -95,6 +99,7 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_deliver_signal(NrRun *run, CONTEXT *context);
+int nr_restore_signal(NrRun *run, CONTEXT *context);
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 NrThread *nr_current(void);
 DWORD nr_thread_tls_slot(void);

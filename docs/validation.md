@@ -12,9 +12,9 @@
 
 ## P5/P6 交付链回归（2026-11-16）
 
-最终源码宿主、GUI、数据库维护程序和统一资源包已在外部 `P6-20261116/package/` 生成。新实例回归通过中文/空格路径双实例、资源缺失和损坏拒绝、存档保持、实例锁、取消删除与 reparse point 保护，15 个辅助服务的 channel/relay/STUN 协议，以及 game/DP2/Frida 自然启动约 29.906 秒和正常关闭。资源编码往返、19 项固定映射、eventfd、文件/maps、信号、TLS、VM 并发、诊断、robust mutex、Frida item reset 和 Lua/luv timer 均通过；未发生强制清理。
+最终源码宿主、GUI、数据库维护程序和统一资源包已在外部 `P6-20261116-madvise3/package/` 生成。新实例回归通过中文/空格路径双实例、资源缺失和损坏拒绝、存档保持、实例锁、取消删除与 reparse point 保护，15 个辅助服务的 channel/relay/STUN 协议，以及 game/DP2/Frida 自然启动和正常关闭。资源编码往返、19 项固定映射、eventfd、文件/maps、双架构 `SA_SIGINFO`/`rt_sigreturn`、TLS、VM 并发、匿名 `MADV_DONTNEED` 保留映射、诊断、robust mutex、Frida item reset 和 Lua/luv timer 均通过；未发生强制清理。
 
-固定停库副本的 MySQL 维护回归通过完整逻辑备份、损坏备份拒绝、失败导入现场保留、影子还原字节核对、账号/例程/事件/触发器、冷快照和 rename 窗口恢复；源数据未改变。GUI 服务专项完成 19 项分组/筛选、15 个 peer 协议、单服停止/重启、真实日志、ELF 哈希拒绝、逆序停服、数据库身份和备份流程，全部正常关闭；最终收据的 `runtime_gaps` 明确保留 i386 `rt_sigaction`（174/flags）和 x64 STUN `rt_sigaction`（13）缺口，因此该专项不能标成零 ABI 缺口通过。原始收据分别为外部 `probes/20261115T161134156596Z/instance-workflow/receipt.json`、`probes/20261115T161409615934Z/mysql-maintenance/receipt.json` 和 `probes/20261115T161440174143Z/gui-services/receipt.json`。
+固定停库副本的 MySQL 维护回归通过完整逻辑备份、损坏备份拒绝、失败导入现场保留、影子还原字节核对、账号/例程/事件/触发器、冷快照和 rename 窗口恢复；源数据未改变。GUI 服务专项完成 19 项分组/筛选、15 个 peer 协议、单服停止/重启、真实日志、ELF 哈希拒绝、逆序停服、数据库身份和备份流程，全部正常关闭；最新收据的 `runtime_gaps` 为空，且未发生强制清理。最新专项收据为外部 `probes/20261115T165539418613Z/gui-services/receipt.json`；较早的 `probes/20261115T164114515975Z/gui-services/receipt.json` 保留了 `rt_sigaction` 缺口，不能继续代表当前源码。实例和数据库收据仍分别为外部 `probes/20261115T161134156596Z/instance-workflow/receipt.json` 和 `probes/20261115T161409615934Z/mysql-maintenance/receipt.json`。
 
 ## eventfd 与插件路径（2026-11-15）
 

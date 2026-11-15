@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import TOOLCHAIN, BUILD
+from runtime_support import unpack_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = TOOLCHAIN
@@ -40,6 +41,38 @@ def command(arch, fixture):
 def main():
     receivers = {arch: build(arch, "signal-receiver") for arch in ARCHES}
     records = []
+    for arch, (triple, base) in ARCHES.items():
+        fixture = BUILD / "fixtures" / arch / "signal-siginfo"
+        fixture.parent.mkdir(parents=True, exist_ok=True)
+        build_command = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib", "-static",
+                         "-ffreestanding", "-fno-stack-protector", "-fno-pic", "-O2", "-Wall", "-Wextra", "-Werror",
+                         "-Wl,--image-base=" + base, "-Wl,-e,_start", str(ROOT / "tests/signal_siginfo.c"), "-o", str(fixture)]
+        subprocess.run(build_command, check=True)
+        result = subprocess.run(command(arch, fixture), capture_output=True, timeout=10)
+        stdout, stderr = result.stdout.decode(), result.stderr.decode(errors="replace")
+        # One deliberate SA_ONSTACK rejection must remain visible.
+        gaps=[line for line in stderr.splitlines() if "syscall gap" in line]
+        passed = result.returncode == 42 and stdout == "native-siginfo-ok\n" and len(gaps)==1
+        records.append({"receiver_arch": arch, "sender_arch": arch, "case": "sa_siginfo",
+                        "host_sha256": sha(BUILD / arch / "dnf-host.exe"),
+                        "fixture_sha256": sha(fixture), "exit_code": result.returncode,
+                        "stdout": stdout, "stderr": stderr, "passed": passed})
+        print(arch, "SA_SIGINFO delivery", "PASS" if passed else "FAIL", flush=True)
+        directory=unpack_runtime(BUILD / "fixtures/signal-glibc" / arch,arch)
+        lib="lib64" if arch=="x86_64" else "lib"
+        program,loader=directory/"signal-glibc",directory/lib/"ld-2.17.so"
+        subprocess.run([str(BIN/"clang.exe"),"--target="+triple,"-fuse-ld=lld","-nostdlib","-fno-stack-protector",
+                        "-fno-pic","-no-pie","-O2","-Wall","-Wextra","-Werror","-DNR_GLIBC",
+                        "-Wl,--image-base="+base,"-Wl,-e,_start","-Wl,--dynamic-linker=/"+lib+"/ld-2.17.so",
+                        str(ROOT/"tests/signal_siginfo.c"),"-L"+str(directory/lib),"-l:libpthread.so.0","-l:libc.so.6","-o",str(program)],check=True)
+        result=subprocess.run([str(BUILD/arch/"dnf-host.exe"),"--root",str(directory),sha(loader),
+                               "--run",str(program),sha(program),"signal-glibc"],capture_output=True,timeout=15)
+        stderr=result.stderr.decode(errors="replace")
+        passed=result.returncode==42 and result.stdout==b"native-glibc-siginfo-ok\n" and "syscall gap" not in stderr
+        records.append({"receiver_arch":arch,"case":"glibc-sigaction-raise","exit_code":result.returncode,
+                        "host_sha256":sha(BUILD/arch/"dnf-host.exe"),"program_sha256":sha(program),"loader_sha256":sha(loader),
+                        "stderr":stderr,"passed":passed})
+        print(arch,"original glibc sigaction/raise/restorer","PASS" if passed else "FAIL",flush=True)
     for receive_arch in ARCHES:
         for send_arch in ARCHES:
             receiver = subprocess.Popen(command(receive_arch, receivers[receive_arch]), stdin=subprocess.PIPE,
@@ -75,7 +108,7 @@ def main():
             records.append(record)
             print(send_arch, "->", receive_arch, "PASS" if passed else "FAIL", flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-              "scope": "Own native ELF processes: kill(0), SIGUSR2 while blocked, SIGTERM and delivery after unblocking. No game shutdown acceptance.",
+              "scope": "Own native ELF processes: SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM. No game shutdown acceptance.",
               "results": records}
     (BUILD / "process-signal-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(row["passed"] for row in records):

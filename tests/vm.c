@@ -19,9 +19,9 @@ static __attribute__((noinline)) result call6(word n, word a, word b, word c, wo
 }
 
 #ifdef __x86_64__
-enum {WRITE = 1, MMAP = 9, MPROTECT = 10, MUNMAP = 11, EXIT = 60};
+enum {WRITE = 1, MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, EXIT = 60};
 #else
-enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, MREMAP = 163, EXIT = 1};
+enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, EXIT = 1};
 #endif
 
 static void check(int condition, word line) {
@@ -33,6 +33,7 @@ static void check(int condition, word line) {
 #define CHECK(c) check((c), __LINE__)
 #define PROTECT(address, size, flags) call6(MPROTECT, (address), (size), (flags), 0, 0, 0)
 #define UNMAP(address, size) call6(MUNMAP, (address), (size), 0, 0, 0, 0)
+#define DISCARD(address, size) call6(MADVISE, (address), (size), 4, 0, 0, 0)
 
 __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     /* Seventeen pages cross both a bitmap byte and the Windows 64 KiB unit. */
@@ -61,6 +62,30 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(data[0] == 0);
     data[0] = 0x27;
     CHECK(PROTECT(base, bytes, 3) == -12);
+
+    /* glibc discards cached pthread stacks across mixed protections. Readonly
+       and inaccessible pages must stay mapped and retain their protections. */
+    word cached = (word)call6(MMAP, 0, 5 * page, 3, 0x22, (word)-1, 0);
+    CHECK(cached && cached < (word)-4095);
+    for (unsigned i = 0; i < 5; ++i) *(volatile unsigned char *)(cached + i * page) = 0x39;
+    CHECK(PROTECT(cached, page, 0) == 0);
+    CHECK(PROTECT(cached + page, page, 1) == 0);
+    CHECK(PROTECT(cached + 2 * page, page, 5) == 0);
+    CHECK(DISCARD(cached, 4 * page) == 0);
+    CHECK(PROTECT(cached + page, page, 3) == 0);
+    CHECK(PROTECT(cached + 2 * page, page, 3) == 0);
+    CHECK(*(volatile unsigned char *)(cached + page) == 0x39 || *(volatile unsigned char *)(cached + page) == 0);
+    CHECK(*(volatile unsigned char *)(cached + 2 * page) == 0x39 || *(volatile unsigned char *)(cached + 2 * page) == 0);
+    CHECK(*(volatile unsigned char *)(cached + 3 * page) == 0x39 || *(volatile unsigned char *)(cached + 3 * page) == 0);
+    CHECK(*(volatile unsigned char *)(cached + 4 * page) == 0x39);
+    CHECK(PROTECT(cached, 4 * page, 3) == 0);
+    CHECK(*(volatile unsigned char *)cached == 0x39 || *(volatile unsigned char *)cached == 0);
+    CHECK(UNMAP(cached + page, page) == 0);
+    *(volatile unsigned char *)cached = 0x28;
+    CHECK(DISCARD(cached, 4 * page) == -12);
+    CHECK(*(volatile unsigned char *)cached == 0x28);
+    CHECK(DISCARD(cached + 1, page) == -22);
+    CHECK(UNMAP(cached, 5 * page) == 0);
     CHECK((word)call6(MMAP, last, page, 0, 0x32, (word)-1, 0) == last);
     CHECK(PROTECT(last, page, 0) == 0);
     CHECK(PROTECT(base, bytes, 3) == 0);

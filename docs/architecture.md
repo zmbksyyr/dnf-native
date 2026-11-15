@@ -32,12 +32,12 @@ flowchart TD
 | --- | --- |
 | `diagnostics.c` | ELF 模块身份、符号定位、重复 ENOSYS 和异常现场；以加载器/VM 原表为准 |
 | `run.c` | Linux 初始上下文、异常分发、基础 syscall、内存有效性检查 |
-| `vm.c` | mmap/mprotect/munmap/madvise/msync 和有限 x86 mremap |
+| `vm.c` | mmap/mprotect/munmap/madvise/msync 和有限 x86 mremap；匿名区支持 DONTNEED 的保留映射语义 |
 | `files.c` | 实例根目录映射、文件/目录/锁、部分 procfs 和共享文件 |
 | `ipc.c` | eventfd 64 位计数、阻塞/非阻塞、信号量及 poll/epoll/select 就绪联动 |
 | `net.c` | TCP/UDP、select/poll、LT epoll、已支持的 socket 选项 |
 | `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集及非 PI robust owner death |
-| `signal.c` | 当前服务所需处理器、掩码、SIGTERM/SIGUSR2 及上下文恢复 |
+| `signal.c` | 当前服务所需处理器、掩码、SA_SIGINFO/SA_RESTORER、SIGTERM/SIGUSR2 及上下文恢复 |
 | `tls.c` | Linux FS/GS TLS 指令适配和返回路径 |
 
 映射表最多 4096 项，记录已使用前缀并复用空槽。VM 修改、内存检查和异常读取使用同一进程内临界区，防止 guest 线程争用映射槽。文件与 socket 共用 256 项描述符，线程表为 64 项；这些是当前容量边界。
@@ -81,7 +81,8 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 - `/dev/shm` 的真实共享文件映射已有路径；System V shm/sem 不等于文件映射，尚无通用实现。
 - 网络以现有 TCP/UDP、select/poll、LT epoll 路径为主；AF_UNIX、完整 sendmsg/recvmsg 辅助数据、ET/ONESHOT 等未完成。
 - 非 PI robust list 注册及正常线程退出时的 owner death、pending 节点与进程内唤醒已有实现；PI 锁、跨进程 futex、强制终止后的恢复、线程退出槽复用、pthread cancel 和通用线程定向信号未完整覆盖。
-- SA_SIGINFO、备用信号栈、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
+- SA_SIGINFO 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；浮点扩展状态、备用信号栈、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
+- 匿名私有映射的 `madvise(MADV_DONTNEED)` 使用 Windows `MEM_RESET` 保留地址、权限和并发访问；Windows 不保证 Linux 下一次读一定立即得到零页，因此不能把它扩展为通用页面回收或跨进程共享语义。
 - 打开目标上的 POSIX rename、符号链接、任意私有文件 COW、跨多个预留区固定映射及部分 msync 行为存在边界。
 - inotify_init/init1 仍可返回 ENOSYS，当前 Frida 路径可 fallback；不能宣称通用文件热加载支持。
 - 保留原地址不等于任意等级 ELF/PVF 都兼容；每个新组合都需要匹配资源和独立业务验证。
