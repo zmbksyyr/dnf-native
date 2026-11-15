@@ -22,7 +22,7 @@ from bootstrap import sha256, BUILD
 from runtime_support import tree_identity
 from probe_core_protocols import channel, relay, stun
 from gui_support import user, kernel, windows, wait_for, click, ready, screenshot
-from gui_support import rows, select
+from gui_support import rows, select_service, service_row
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -136,7 +136,7 @@ def main():
         assert ini["plugins"]["mode"] == ("off" if not dp2 else "frida" if frida else "lua")
 
     def fixture(frida):
-        select(window, 15)
+        select_service(window, "game")
         previous = set((instance / "service-logs").glob("game-*.stdout.private.log"))
         click(window, 221)
         ready(window, "game：进程运行中", 30)
@@ -144,10 +144,10 @@ def main():
         marker = b"dnf-native-plugin-probe-hold"
         wait_for(lambda: marker in log.read_bytes(), "actual Lua/Frida fixture", 90)
         assert all(not user.IsWindowEnabled(user.GetDlgItem(window, key)) for key in [230, 231, 232])
-        pid = int(rows(window)[15].rsplit("PID ", 1)[1])
+        pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         observed = loaded_plugins(pid, instance)
         assert observed == {"dp2": True, "frida": frida}, observed
-        wait_for(lambda: "已退出，代码 42" in rows(window)[15], "intentional fixture exit", 30)
+        wait_for(lambda: "已退出，代码 42" in service_row(window, "game"), "intentional fixture exit", 30)
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 232)), "plugin editing after game exit")
         output = log.read_bytes()
         if frida:
@@ -185,17 +185,17 @@ def main():
         assert not checked(231) and not user.IsWindowEnabled(user.GetDlgItem(window, 231))
         checks["dp2_off_also_disables_frida"] = True
         lua.write_bytes(lua_before); js.write_bytes(js_before)
-        select(window, 15); click(window, 221); ready(window, "game：进程运行中", 30)
+        select_service(window, "game"); click(window, 221); ready(window, "game：进程运行中", 30)
         started = time.monotonic()
         log_dir = instance / "i686/home/neople/game/log"
         wait_for(lambda: any(b"All DB Open Success" in path.read_bytes() for path in log_dir.rglob("*.init")), "original game database initialization", 90)
-        pid = int(rows(window)[15].rsplit("PID ", 1)[1])
+        pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         checks["dp2_off_live_modules"] = loaded_plugins(pid, instance)
         assert checks["dp2_off_live_modules"] == {"dp2": False, "frida": False}
         next_update = 0
         while not any(b"server has been started successfully" in path.read_bytes() for path in log_dir.rglob("*.init")):
             elapsed = time.monotonic() - started
-            if elapsed > args.timeout or process.poll() is not None or any("已退出" in row for row in rows(window)[:16]):
+            if elapsed > args.timeout or process.poll() is not None or any("已退出" in row for row in rows(window) if "（可选）" not in row):
                 raise RuntimeError("Original game with DP2 disabled did not complete natural startup")
             if elapsed >= next_update:
                 print("DP2 disabled: original game initialization", round(elapsed, 1), "seconds", flush=True)
@@ -205,7 +205,7 @@ def main():
         checks["protocols_with_dp2_disabled"] = {"channel": channel(7001), "relay": relay(True), "stun": stun()}
         screenshot(window, probe / "plugins-off-running.png")
         click(window, 222); ready(window, "game：已退出", 210)
-        checks["dp2_off_game_stop_code_zero"] = "代码 0" in rows(window)[15]
+        checks["dp2_off_game_stop_code_zero"] = "代码 0" in service_row(window, "game")
         save(True, True)
         checks["plugins_editable_again_after_natural_game_stop"] = True
         user.PostMessageW(window, 0x10, 0, 0); process.wait(timeout=180)

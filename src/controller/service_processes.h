@@ -14,6 +14,10 @@ struct Service {
     HANDLE process = nullptr;
     DWORD pid = 0;
     std::wstring state = L"未启动", out, err;
+    // The runtime channel is an observable boundary, not business readiness.
+    // Keep the distinction explicit so the controller cannot present a live
+    // process as a protocol or gameplay success.
+    std::wstring readiness = L"未启动";
 };
 
 static std::wstring setting(const std::wstring &file, const std::wstring &section, const std::wstring &key) {
@@ -89,13 +93,16 @@ static bool refresh_service(Service &service) {
         if (text == std::to_string(service.pid)) require(DeleteFileW(service.pid_file.c_str()), "Remove exited owned service PID marker");
     }
     service.state = L"已退出，代码 " + std::to_wstring(code);
+    service.readiness = L"宿主已退出（接口/业务未验证）";
     CloseHandle(service.process); service.process = nullptr;
     return true;
 }
 
-static void start_service(Service &service, const std::wstring &instance, HANDLE job) {
+static void start_service(Service &service, const std::wstring &instance, HANDLE job) try {
     refresh_service(service);
     if (service.process) return;
+    service.state = L"正在启动";
+    service.readiness = L"宿主启动中";
     directory(instance + L"\\service-logs");
     std::wstring tag = service.name + L"-" + std::to_wstring(GetTickCount64());
     service.out = instance + L"\\service-logs\\" + tag + L".stdout.private.log";
@@ -125,10 +132,19 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     for (;;) {
         if (refresh_service(service)) throw std::runtime_error("ELF host exited during startup; inspect service logs");
         HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, (L"Local\\dnf-native-terminate-" + std::to_wstring(service.pid)).c_str());
-        if (event) { CloseHandle(event); service.state = L"进程运行中（业务未验证）"; return; }
+        if (event) {
+            CloseHandle(event);
+            service.state = L"进程运行中（业务未验证）";
+            service.readiness = L"运行时通道已接入（接口/业务未验证）";
+            return;
+        }
         if (GetTickCount64() >= deadline) throw std::runtime_error("ELF host signal channel timed out; process retained for diagnosis");
         Sleep(25);
     }
+} catch (...) {
+    service.state = running(service) ? L"启动未确认，进程保留" : L"启动失败";
+    service.readiness = running(service) ? L"启动超时（进程保留，查看诊断）" : L"启动失败（查看诊断）";
+    throw;
 }
 
 static void stop_service(Service &service) {
@@ -137,6 +153,8 @@ static void stop_service(Service &service) {
     HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, (prefix + std::to_wstring(service.pid)).c_str());
     require(event != nullptr, "Open owned ELF host stop event");
     bool ok = SetEvent(event); CloseHandle(event); require(ok, "Request original service shutdown");
+    service.state = L"正在停止";
+    service.readiness = L"停止请求已发送";
     if (service.name == L"stun") {
         SOCKET socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket == INVALID_SOCKET) throw std::runtime_error("Create STUN receive wake socket");
@@ -148,6 +166,7 @@ static void stop_service(Service &service) {
     }
     if (WaitForSingleObject(service.process, service.name == L"game" ? 180000 : 30000) != WAIT_OBJECT_0) {
         service.state = L"停止超时，进程保留";
+        service.readiness = L"停止超时（进程保留）";
         throw std::runtime_error("Service stop timed out; dependent services and database retained");
     }
     refresh_service(service);

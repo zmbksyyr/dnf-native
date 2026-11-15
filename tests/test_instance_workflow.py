@@ -19,7 +19,7 @@ from bootstrap import sha256, BUILD
 from probe_core_protocols import channel, relay, stun
 from gui_support import (user, windows, wait_for, click, ready, status, title,
                       select_folder, screenshot, hidden_startup, responsive)
-from gui_support import rows, select
+from gui_support import rows, select_service
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -171,15 +171,20 @@ def main():
         record["first_instance"] = str(first)
         choose(first)
         click(window, 111); ready(window, "数据库 SQL 检查通过")
+        # Use the instance's actual startup order; visual grouping has its own order.
+        import configparser
+        services = configparser.ConfigParser(interpolation=None)
+        services.read(first / "services.ini", encoding="utf-16")
         for index in range(15):
-            select(window, index); click(window, 221)
-            ready(window, rows(window)[index].split()[0] + "：进程运行中", 30)
+            name = services["services"]["service" + str(index)]
+            select_service(window, name); click(window, 221)
+            ready(window, name + "：进程运行中", 30)
         time.sleep(20)
         record["started_rows"] = rows(window)
         assert sum("进程运行中" in row for row in rows(window)) == 15, "Original peer exited: " + repr(rows(window))
         checks["trimmed_peer_protocols"] = {"channel": channel(7001), "relay": relay(True), "stun": stun()}
         # Use the real game with the retained DP2/Lua/Frida resources.
-        select(window, 15); click(window, 221); ready(window, "game：进程运行中", 30)
+        select_service(window, "game"); click(window, 221); ready(window, "game：进程运行中", 30)
         log_dir = first / "i686/home/neople/game/log"
         start = time.monotonic()
         wait_for(lambda: any(b"server has been started successfully" in p.read_bytes() for p in log_dir.rglob("*.init")), "trimmed game natural startup", 180)

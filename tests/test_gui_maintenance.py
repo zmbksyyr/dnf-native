@@ -1,11 +1,13 @@
 """Verify that GUI backup coordinates an orderly stop of owned services."""
 
 import argparse
+import configparser
 import ctypes as c
 import datetime
 import json
 from pathlib import Path
 import platform
+import re
 import subprocess
 
 import sys
@@ -13,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import external_output, sha256, BUILD
 from gui_support import user, windows, wait_for, click, ready, title, select_folder, screenshot
-from gui_support import rows, choose_log_source
+from gui_support import rows, service_row, choose_log_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,6 +40,7 @@ def main():
         ready(window, "已启动默认服务进程", 120)
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 224)), "whole-stop enabled")
         running = sum("进程运行中" in row for row in rows(window))
+        peers = [row.split("  |  ", 1)[0].removesuffix("（可选）") for row in rows(window) if "进程运行中" in row]
         if running < 15:
             raise RuntimeError(f"Expected at least 15 owned peer services, got {running}")
         if user.IsWindowEnabled(user.GetDlgItem(window, 112)) or not user.IsWindowEnabled(user.GetDlgItem(window, 113)):
@@ -49,13 +52,22 @@ def main():
         click(window, 113)
         select_folder(process, target)
         ready(window, "备份完成", 300)
-        stopped = rows(window)
-        if not all("已退出" in row for row in stopped[:15]):
+        if not all("已退出" in service_row(window, name) for name in peers):
             raise RuntimeError("Backup completed before every owned service stopped")
         choose_log_source(window, "\u63a7\u5236\u53f0\u64cd\u4f5c")
         output = title(user.GetDlgItem(window, 206))
         if "维护前已按逆序停止服务和数据库" not in output:
             raise RuntimeError("Maintenance log did not record the coordinated stop")
+        manifest = configparser.ConfigParser(interpolation=None)
+        manifest.read(instance / "services.ini", encoding="utf-16")
+        order = [manifest["services"]["service" + str(i)] for i in range(manifest.getint("services", "count"))]
+        trace = re.findall(r"正在停止服务：([^\r\n]+)", output)
+        expected = [name for name in reversed(order) if name in peers]
+        if trace != expected:
+            raise RuntimeError(f"Actual maintenance stop order differs: {trace!r}; expected {expected!r}")
+        receipt["checks"]["actual_reverse_stop_trace"] = trace
+        if "备份完成" not in title(user.GetDlgItem(window, 274)) or str(target) not in title(user.GetDlgItem(window, 274)):
+            raise RuntimeError("Maintenance result and target were not displayed")
         if not list(target.glob("backup-*/manifest.txt")):
             raise RuntimeError("Coordinated backup did not create a manifest")
         receipt["checks"]["backup_stops_services_before_offline_operation"] = True

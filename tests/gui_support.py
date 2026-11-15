@@ -184,7 +184,7 @@ def hidden_startup():
     return startup
 
 
-def rows(window):
+def list_rows(window):
     box = user.GetDlgItem(window, 220)
     result = []
     for index in range(user.SendMessageW(box, 0x18B, 0, 0)):  # LB_GETCOUNT
@@ -193,9 +193,38 @@ def rows(window):
         result.append(text.value)
     return result
 
+
+def rows(window):
+    # Group headers have no service identity and must never count as a service.
+    return [text for text in list_rows(window) if not text.startswith(("▾ ", "▸ "))]
+
 def select(window, index):
-    user.SendMessageW(user.GetDlgItem(window, 220), 0x186, index, 0)
-    user.SendMessageW(window, 0x111, 220 | (1 << 16), user.GetDlgItem(window, 220))
+    box = user.GetDlgItem(window, 220)
+    visible = -1
+    target = None
+    for row in range(user.SendMessageW(box, 0x18B, 0, 0)):
+        text = c.create_unicode_buffer(user.SendMessageW(box, 0x18A, row, 0) + 1)
+        user.SendMessageW(box, 0x189, row, c.addressof(text))
+        if text.value.startswith(("▾ ", "▸ ")):
+            continue
+        visible += 1
+        if visible == index:
+            target = row
+            break
+    if target is None:
+        raise RuntimeError("Service row index is not visible: " + str(index))
+    user.SendMessageW(box, 0x186, target, 0)
+    user.SendMessageW(window, 0x111, 220 | (1 << 16), box)
+
+
+def service_row(window, name):
+    return next(row for row in rows(window) if row.split("  |  ", 1)[0].removesuffix("（可选）") == name)
+
+
+def select_service(window, name):
+    index = next(i for i, row in enumerate(rows(window))
+                 if row.split("  |  ", 1)[0].removesuffix("（可选）") == name)
+    select(window, index)
 
 
 def log_sources(window):
