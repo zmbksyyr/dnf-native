@@ -6,7 +6,6 @@ import hashlib
 import json
 from pathlib import Path
 import platform
-import shutil
 import socket
 import struct
 import subprocess
@@ -15,9 +14,10 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from test_channel import receive, request_stop
+from probe_core_protocols import receive
+from runtime_support import request_stop, unpack_runtime
 
-from bootstrap import LOCAL, BUILD, ORIGINALS
+from bootstrap import BUILD
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_SHA256 = "30a5741015b3701cee2d9b388140ac1711345bbe8d879b6f152e74a9334ea6b0"
@@ -46,6 +46,7 @@ def main():
                         help="Private JSON: host, port, user, password, database (plain bridge credentials)")
     parser.add_argument("--port", type=int, default=7000, help="Private loopback TCP/UDP service port")
     parser.add_argument("--host", type=Path, default=BUILD / "i686/dnf-host.exe")
+    parser.add_argument("--client", type=Path, default=BUILD / "mysql-tools/mysql/bin/mysql.exe")
     parser.add_argument("--game-proxy", action="store_true", help="Also call the original game channel proxy through DP2/Frida")
     args = parser.parse_args()
     db = json.loads(args.db_config.read_text(encoding="utf-8"))
@@ -54,10 +55,8 @@ def main():
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = BUILD / "probes" / stamp / "bridge"
     instance.mkdir(parents=True)
-    for name in ["lib", "usr"]:
-        shutil.copytree(LOCAL / "sysroot/i686" / name, instance / name)
+    unpack_runtime(instance, "i686", ("lib/", "usr/", "home/neople/bridge/"))
     guest = instance / "home/neople/bridge"
-    shutil.copytree(ORIGINALS / "dp123/home/neople/bridge", guest)
     for name in ["log", "pid"]:
         (guest / name).mkdir(exist_ok=True)
     config = guest / "cfg/bridge.cfg"
@@ -71,7 +70,7 @@ def main():
     client_config.write_text("[client]\nprotocol=TCP\nhost=" + db["host"] + "\nport=3306\nuser=" + db["user"] +
                              "\npassword=\"" + db["password"].replace("\\", "\\\\").replace('"', '\\"') +
                              "\"\n", encoding="ascii")
-    query = subprocess.run([str(LOCAL / "mysql-5.7.44/bin/mysql.exe"), "--defaults-file=" + str(client_config),
+    query = subprocess.run([str(args.client.resolve(strict=True)), "--defaults-file=" + str(client_config),
                             "--batch", "--skip-column-names", "--database=" + db["database"],
                             "--execute=SELECT script_version FROM ch_script_version;"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
@@ -142,10 +141,7 @@ def main():
                 checks["script_responses"] += 1
                 checks["coalesced_requests"] = True
             if args.game_proxy:
-                game_elf = ORIGINALS / "dp123/home/neople/game/df_game_r"
-                if sha(game_elf) != "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979":
-                    raise ValueError("Game proxy fixture requires the recorded original game ELF")
-                subprocess.run([sys.executable, str(ROOT / "tests/probe_game.py"), "--preload", "--timeout", "40",
+                subprocess.run([sys.executable, "-B", str(ROOT / "tests/game_fixture.py"), "--timeout", "40",
                                 "--lua-script", str(ROOT / "tests/channel_proxy.lua"),
                                 "--frida-script", str(ROOT / "tests/channel_proxy.js"),
                                 "--env", "DNF_NATIVE_BRIDGE_PORT=" + str(args.port)], cwd=ROOT, check=True)

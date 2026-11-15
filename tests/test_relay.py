@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import platform
 import re
-import shutil
 import socket
 import struct
 import subprocess
@@ -16,9 +15,10 @@ import time
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from test_channel import receive, request_stop
+from probe_core_protocols import receive, packet
+from runtime_support import request_stop, unpack_runtime
 
-from bootstrap import LOCAL, BUILD, ORIGINALS
+from bootstrap import BUILD
 
 ROOT = Path(__file__).resolve().parents[1]
 RELAY_SHA256 = "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb"
@@ -26,10 +26,6 @@ RELAY_SHA256 = "39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def packet(identifier, sender, recipient, body=b""):
-    return struct.pack("<HHII", identifier, 12 + len(body), sender, recipient) + body
 
 
 def main():
@@ -41,10 +37,8 @@ def main():
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = BUILD / "probes" / stamp / "relay"
     instance.mkdir(parents=True)
-    for name in ["lib", "usr"]:
-        shutil.copytree(LOCAL / "sysroot/i686" / name, instance / name)
+    unpack_runtime(instance, "i686", ("lib/", "usr/", "home/neople/relay/"))
     guest = instance / "home/neople/relay"
-    shutil.copytree(ORIGINALS / "dp123/home/neople/relay", guest)
     for name in ["log", "pid"]:
         (guest / name).mkdir(exist_ok=True)
     config = guest / "cfg/relay_200.cfg"

@@ -11,7 +11,6 @@ from bootstrap import LOCAL, TOOLCHAIN, BUILD
 ROOT = Path(__file__).resolve().parents[1]
 
 
-
 def main():
     env = dict(os.environ)
     env["PATH"] = str(TOOLCHAIN) + os.pathsep + env.get("PATH", "")

@@ -11,10 +11,9 @@ import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from bootstrap import sha256, BUILD
-from test_gui import (user, windows, wait_for, click, ready, status, title,
-                      select_folder, screenshot)
-from test_gui_services import rows
+from bootstrap import external_output, sha256, BUILD
+from gui_support import user, windows, wait_for, click, ready, title, select_folder, screenshot
+from gui_support import rows, choose_log_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,7 +23,7 @@ def main():
     parser.add_argument("--instance", type=Path, required=True)
     parser.add_argument("--gui", type=Path, required=True)
     args = parser.parse_args()
-    instance, gui = args.instance.resolve(strict=True), args.gui.resolve(strict=True)
+    instance, gui = external_output(args.instance).resolve(strict=True), args.gui.resolve(strict=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = BUILD / "probes" / stamp / "gui-maintenance"
     probe.mkdir(parents=True)
@@ -53,14 +52,7 @@ def main():
         stopped = rows(window)
         if not all("已退出" in row for row in stopped[:15]):
             raise RuntimeError("Backup completed before every owned service stopped")
-        combo = user.GetDlgItem(window, 240)
-        for index in range(user.SendMessageW(combo, 0x146, 0, 0)):
-            text = c.create_unicode_buffer(user.SendMessageW(combo, 0x149, index, 0) + 1)
-            user.SendMessageW(combo, 0x148, index, c.addressof(text))
-            if "控制台操作" in text.value:
-                user.SendMessageW(combo, 0x14E, index, 0)
-                user.SendMessageW(window, 0x111, 240 | (1 << 16), combo)
-                break
+        choose_log_source(window, "\u63a7\u5236\u53f0\u64cd\u4f5c")
         output = title(user.GetDlgItem(window, 206))
         if "维护前已按逆序停止服务和数据库" not in output:
             raise RuntimeError("Maintenance log did not record the coordinated stop")

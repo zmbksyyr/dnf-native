@@ -1,6 +1,8 @@
 """Check channel/relay/STUN protocols on an already running private core chain."""
 
 import argparse
+import ctypes
+from ctypes import wintypes as w
 import datetime
 import hashlib
 import json
@@ -12,8 +14,54 @@ import time
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from test_channel import encrypt, receive
-from test_relay import packet
+from bootstrap import external_output
+
+
+def encrypt(key, data):
+    """Use Windows AES-128 ECB; no copied Rijndael code or third-party package."""
+    bcrypt = ctypes.WinDLL("bcrypt")
+    pointer, ulong = ctypes.c_void_p, w.ULONG
+    bcrypt.BCryptOpenAlgorithmProvider.argtypes = [ctypes.POINTER(pointer), w.LPCWSTR, w.LPCWSTR, ulong]
+    bcrypt.BCryptSetProperty.argtypes = [pointer, w.LPCWSTR, pointer, ulong, ulong]
+    bcrypt.BCryptGenerateSymmetricKey.argtypes = [pointer, ctypes.POINTER(pointer), pointer, ulong, pointer, ulong, ulong]
+    bcrypt.BCryptEncrypt.argtypes = [pointer, pointer, ulong, pointer, pointer, ulong, pointer, ulong, ctypes.POINTER(ulong), ulong]
+    bcrypt.BCryptDestroyKey.argtypes = [pointer]
+    bcrypt.BCryptCloseAlgorithmProvider.argtypes = [pointer, ulong]
+
+    def check(status):
+        if status:
+            raise RuntimeError("Windows AES status: " + hex(status & 0xffffffff))
+
+    algorithm, handle = pointer(), pointer()
+    check(bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(algorithm), "AES", None, 0))
+    try:
+        mode = ctypes.create_unicode_buffer("ChainingModeECB")
+        check(bcrypt.BCryptSetProperty(algorithm, "ChainingMode", mode, ctypes.sizeof(mode), 0))
+        secret = ctypes.create_string_buffer(key)
+        check(bcrypt.BCryptGenerateSymmetricKey(algorithm, ctypes.byref(handle), None, 0, secret, len(key), 0))
+        try:
+            source, output = ctypes.create_string_buffer(data), ctypes.create_string_buffer(len(data))
+            count = ulong()
+            check(bcrypt.BCryptEncrypt(handle, source, len(data), None, None, 0, output, len(data), ctypes.byref(count), 0))
+            return output.raw[:count.value]
+        finally:
+            bcrypt.BCryptDestroyKey(handle)
+    finally:
+        bcrypt.BCryptCloseAlgorithmProvider(algorithm, 0)
+
+
+def receive(peer, size):
+    data = b""
+    while len(data) < size:
+        chunk = peer.recv(size - len(data))
+        if not chunk:
+            raise RuntimeError("Channel closed before its complete response")
+        data += chunk
+    return data
+
+
+def packet(identifier, sender, recipient, body=b""):
+    return struct.pack("<HHII", identifier, 12 + len(body), sender, recipient) + body
 
 
 def channel(port, host="127.0.0.1"):
@@ -129,6 +177,7 @@ def main():
     parser.add_argument("--relay-monitor-auth", action="store_true",
                         help="Expect the running original monitor to reject the unlogged test accounts")
     args = parser.parse_args()
+    output = external_output(args.output)
     receipt = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
                "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -140,7 +189,8 @@ def main():
             receipt["results"][name] = {"passed": True, "checks": check()}
         except Exception as error:
             receipt["results"][name] = {"passed": False, "error": str(error)}
-    args.output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(receipt))
     if not all(result["passed"] for result in receipt["results"].values()):
         raise SystemExit(1)

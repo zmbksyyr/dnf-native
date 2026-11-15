@@ -1,7 +1,6 @@
 """Exercise the delivered ZIP resources and real Win32 instance lifecycle."""
 
 import argparse
-import configparser
 import ctypes as c
 import datetime
 import json
@@ -18,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import sha256, BUILD
 from probe_core_protocols import channel, relay, stun
-from test_gui import (user, windows, wait_for, click, ready, status, title,
+from gui_support import (user, windows, wait_for, click, ready, status, title,
                       select_folder, screenshot, hidden_startup, responsive)
-from test_gui_services import rows, select
+from gui_support import rows, select
 
 ROOT = Path(__file__).resolve().parents[1]
 

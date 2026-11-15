@@ -9,9 +9,8 @@ import re
 import shutil
 import zipfile
 
-from audit_resources import elf_metadata
 from bootstrap import external_output, sha256, BUILD
-from resource_baseline import RESOURCES, verify_baseline
+from resource_baseline import RESOURCES, verify_baseline, elf_dependencies
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -45,7 +44,7 @@ def main():
             if hashlib.sha256(data).hexdigest() != expected:
                 raise ValueError("Native member hash differs: " + name)
             if data.startswith(b"\x7fELF"):
-                dependencies[name.split("/")[0]][name] = elf_metadata(data)["needed"]
+                dependencies[name.split("/")[0]][name] = elf_dependencies(data)
         for helper, entry in [("frida_item_reset.js", "i686/dp2/df_game_r.js"),
                               ("dp2_cleanup.lua", "i686/dp2/df_game_r.lua")]:
             code = (ROOT / "src/runtime" / helper).read_bytes().replace(b"\r\n", b"\n")

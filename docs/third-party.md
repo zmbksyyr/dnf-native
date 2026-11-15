@@ -15,7 +15,7 @@
 
 Zydis/Zycore 由 `tools/bootstrap.py` 按固定提交获取；miniz 原样上游代码仅补充静态导出宏，编译关闭写 ZIP、deflate、zlib 和 stdio 接口。ZIP 读写使用 Win32 HANDLE，以支持中文目录。
 
-来源与身份详见[资源基底](../resources/baseline.json)、[Linux 用户库导入](evidence/p1-user-libraries.json)、[Microsoft 运行库导入](evidence/p4-mysql-runtime-import.json)及[工具链记录](evidence/toolchain.json)。这些导入记录为历史记录，正常构建直接读取仓库内 ZIP。
+来源与身份详见[资源基底](../resources/baseline.json)、[Linux 用户库导入](evidence/history.json#/records/p1-user-libraries.json)、[Microsoft 运行库导入](evidence/history.json#/records/p4-mysql-runtime-import.json)及[工具链记录](evidence/history.json#/records/toolchain.json)。这些导入记录为历史记录，正常构建直接读取仓库内 ZIP。
 
 `dnf-winport/rednf` 只作为只读行为线索；口令格式、relay/monitor 行为及 NTFS inode 处理由原版 ELF、独立实验和 Microsoft 规范复核。项目没有将参考工程代码、字节表、生成器或其构建产物接入运行链。原版资源基底继承此前已记录的来源与变更，整理目录不使它们变为项目独创内容。
 

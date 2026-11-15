@@ -26,5 +26,5 @@
 
 - 当前使用与构建：`docs/README.md`；实现与边界：`docs/architecture.md`；验证及历史证据：`docs/validation.md`；第三方来源与必要许可声明：`docs/third-party.md`。
 - 源码按功能集中于 `src/runtime/`、`src/controller/`、`src/database/`，共享 Win32 文件接口为 `src/win32_files.h`；第三方源码为 `src/third_party/`。
-- 正常构建从 `resources/` 的 ZIP 基底开始，入口为 `python -B tools/build_all.py`；旧 CAB/原始输入重建工具归入 `tools/legacy/`，不能混入当前交付入口。
-- 构建、导入和打包工具位于 `tools/`，测试与探针位于 `tests/`。根目录的项目文档仅保留本文件。
+- 正常构建从 `resources/` 的 ZIP 基底开始，入口为 `python -B tools/build_all.py`；`tools/` 仅保留当前工具准备、构建、资源核验与打包依赖，旧 CAB/原始输入重建工具从 Git 历史追溯。
+- 测试与公共夹具位于 `tests/`，运行资源直接取自仓库 ZIP 或明确指定的私有实例。Python 入口和它们启动的 Python 子进程均使用 `-B`，避免仓库内产生 `__pycache__/`。根目录的项目文档仅保留本文件。

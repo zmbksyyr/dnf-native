@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import sha256, BUILD
-from probe_mysql import tree_identity
+from runtime_support import tree_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 

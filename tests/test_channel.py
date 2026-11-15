@@ -1,15 +1,12 @@
 """Check the original channel TCP handshake in an isolated loopback instance."""
 
 import argparse
-import ctypes
-from ctypes import wintypes as w
 import datetime
 import hashlib
 import json
 from pathlib import Path
 import platform
 import re
-import shutil
 import socket
 import struct
 import subprocess
@@ -18,7 +15,9 @@ import time
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from bootstrap import LOCAL, BUILD, ORIGINALS
+from bootstrap import BUILD
+from probe_core_protocols import encrypt, receive
+from runtime_support import request_stop, unpack_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 CHANNEL_SHA256 = "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd"
@@ -26,70 +25,6 @@ CHANNEL_SHA256 = "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def encrypt(key, data):
-    """Use Windows AES-128 ECB; no copied Rijndael code or third-party package."""
-    bcrypt = ctypes.WinDLL("bcrypt")
-    pointer, ulong = ctypes.c_void_p, w.ULONG
-    bcrypt.BCryptOpenAlgorithmProvider.argtypes = [ctypes.POINTER(pointer), w.LPCWSTR, w.LPCWSTR, ulong]
-    bcrypt.BCryptSetProperty.argtypes = [pointer, w.LPCWSTR, pointer, ulong, ulong]
-    bcrypt.BCryptGenerateSymmetricKey.argtypes = [pointer, ctypes.POINTER(pointer), pointer, ulong, pointer, ulong, ulong]
-    bcrypt.BCryptEncrypt.argtypes = [pointer, pointer, ulong, pointer, pointer, ulong, pointer, ulong, ctypes.POINTER(ulong), ulong]
-    bcrypt.BCryptDestroyKey.argtypes = [pointer]
-    bcrypt.BCryptCloseAlgorithmProvider.argtypes = [pointer, ulong]
-
-    def check(status):
-        if status:
-            raise RuntimeError("Windows AES status: " + hex(status & 0xffffffff))
-
-    algorithm, handle = pointer(), pointer()
-    check(bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(algorithm), "AES", None, 0))
-    try:
-        mode = ctypes.create_unicode_buffer("ChainingModeECB")
-        check(bcrypt.BCryptSetProperty(algorithm, "ChainingMode", mode, ctypes.sizeof(mode), 0))
-        secret = ctypes.create_string_buffer(key)
-        check(bcrypt.BCryptGenerateSymmetricKey(algorithm, ctypes.byref(handle), None, 0, secret, len(key), 0))
-        try:
-            source, output = ctypes.create_string_buffer(data), ctypes.create_string_buffer(len(data))
-            count = ulong()
-            check(bcrypt.BCryptEncrypt(handle, source, len(data), None, None, 0, output, len(data), ctypes.byref(count), 0))
-            return output.raw[:count.value]
-        finally:
-            bcrypt.BCryptDestroyKey(handle)
-    finally:
-        bcrypt.BCryptCloseAlgorithmProvider(algorithm, 0)
-
-
-def receive(peer, size):
-    data = b""
-    while len(data) < size:
-        chunk = peer.recv(size - len(data))
-        if not chunk:
-            raise RuntimeError("Channel closed before its complete response")
-        data += chunk
-    return data
-
-
-def request_stop(pid, signal=15):
-    # Same runtime events used by cross-process guest kill(). This run mode
-    # does not write a PID file, so its original stop helper cannot target it.
-    if signal not in [12, 15]:
-        raise ValueError("Only SIGUSR2 and SIGTERM have runtime events")
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.OpenEventW.argtypes = [w.DWORD, w.BOOL, w.LPCWSTR]
-    kernel.OpenEventW.restype = w.HANDLE
-    kernel.SetEvent.argtypes = [w.HANDLE]
-    kernel.CloseHandle.argtypes = [w.HANDLE]
-    prefix = "Local\\dnf-native-sigusr2-" if signal == 12 else "Local\\dnf-native-terminate-"
-    event = kernel.OpenEventW(2, False, prefix + str(pid))
-    if not event:
-        raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        if not kernel.SetEvent(event):
-            raise ctypes.WinError(ctypes.get_last_error())
-    finally:
-        kernel.CloseHandle(event)
 
 
 def main():
@@ -100,10 +35,8 @@ def main():
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = BUILD / "probes" / stamp / "channel"
     instance.mkdir(parents=True)
-    for name in ["lib", "usr"]:
-        shutil.copytree(LOCAL / "sysroot/i686" / name, instance / name)
+    unpack_runtime(instance, "i686", ("lib/", "usr/", "home/neople/channel/"))
     guest = instance / "home/neople/channel"
-    shutil.copytree(ORIGINALS / "dp123/home/neople/channel", guest)
     for name in ["log", "pid"]:
         (guest / name).mkdir(exist_ok=True)
     config = guest / "cfg/channel.cfg"

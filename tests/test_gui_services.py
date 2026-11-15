@@ -1,12 +1,14 @@
 """Exercise native GUI orchestration against an already prepared private instance."""
 
 import argparse
+import configparser
 import ctypes as c
 import datetime
 import json
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 import time
 
@@ -15,43 +17,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import sha256, BUILD
 from probe_core_protocols import channel, relay, stun
-from test_gui import user, kernel, windows, wait_for, click, ready, status, title, responsive, screenshot
+from gui_support import (user, kernel, windows, wait_for, click, ready, status, title,
+                         responsive, screenshot, select_folder, rows, select, hidden_startup, choose_log_source)
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def rows(window):
-    box = user.GetDlgItem(window, 220)
-    result = []
-    for index in range(user.SendMessageW(box, 0x18B, 0, 0)):  # LB_GETCOUNT
-        text = c.create_unicode_buffer(user.SendMessageW(box, 0x18A, index, 0) + 1)
-        user.SendMessageW(box, 0x189, index, c.addressof(text))
-        result.append(text.value)
-    return result
-
-
-def select(window, index):
-    user.SendMessageW(user.GetDlgItem(window, 220), 0x186, index, 0)
-    user.SendMessageW(window, 0x111, 220 | (1 << 16), user.GetDlgItem(window, 220))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance", type=Path, required=True)
-    parser.add_argument("--gui", type=Path, default=BUILD / "gui-services/DNF-Native.exe")
+    parser.add_argument("--gui", type=Path, default=BUILD / "package/DNF-Native.exe")
     args = parser.parse_args()
-    instance, gui = args.instance.resolve(strict=True), args.gui.resolve(strict=True)
-    prepared = json.loads((instance / "prepare-receipt.json").read_text(encoding="utf-8"))
-    if not prepared["peers_only"]:
-        raise SystemExit("This short probe requires a --peers-only private instance")
+    source, gui = args.instance.resolve(strict=True), args.gui.resolve(strict=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = BUILD / "probes" / stamp / "gui-services"
-    probe.mkdir(parents=True)
+    instance = probe / "instance"
+    shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
+    manifest = configparser.ConfigParser(interpolation=None)
+    manifest.read(instance / "services.ini", encoding="utf-16")
+    manifest["game"]["automatic"] = "0"
+    with (instance / "services.ini").open("w", encoding="utf-16") as stream:
+        manifest.write(stream)
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
-               "script_sha256": sha256(Path(__file__)), "prepare_receipt_sha256": sha256(instance / "prepare-receipt.json"),
+               "script_sha256": sha256(Path(__file__)), "source_services_sha256": sha256(source / "services.ini"),
                "scope": "Real GUI orchestration and original 15-peer protocols; game and security topology not exercised.",
                "checks": {}, "forced_cleanup": False}
-    process = subprocess.Popen([str(gui), "--instance", str(instance)])
+    process = subprocess.Popen([str(gui), "--instance", str(instance)], startupinfo=hidden_startup())
     window = None
     elf = instance / "i686/home/neople/channel/df_channel_r"
     original = elf.read_bytes()
@@ -69,12 +60,12 @@ def main():
         receipt["started_rows"] = rows(window)
         assert sum("进程运行中" in row for row in rows(window)) >= 15
         checks["fifteen_original_peer_processes"] = True
-        checks["database_stop_disabled_but_backup_enabled_while_services_run"] = (
+        checks["direct_stop_disabled_and_both_maintenance_actions_enabled_while_services_run"] = (
             not user.IsWindowEnabled(user.GetDlgItem(window, 112)) and
             user.IsWindowEnabled(user.GetDlgItem(window, 113)) and
-            not user.IsWindowEnabled(user.GetDlgItem(window, 114)) and
+            user.IsWindowEnabled(user.GetDlgItem(window, 114)) and
             not user.IsWindowEnabled(user.GetDlgItem(window, 101)))
-        if not checks["database_stop_disabled_but_backup_enabled_while_services_run"]:
+        if not checks["direct_stop_disabled_and_both_maintenance_actions_enabled_while_services_run"]:
             raise RuntimeError("GUI did not expose the coordinated backup action while services were active")
         time.sleep(25)  # Original auction/point need their own startup work.
         checks["channel_protocol"] = channel(7001)
@@ -88,14 +79,7 @@ def main():
         click(window, 225)
         # Application files now have their own live view; select the runtime's
         # actual stderr explicitly when checking its guest-exit diagnostic.
-        combo = user.GetDlgItem(window, 240)
-        for log_index in range(user.SendMessageW(combo, 0x146, 0, 0)):
-            text = c.create_unicode_buffer(user.SendMessageW(combo, 0x149, log_index, 0) + 1)
-            user.SendMessageW(combo, 0x148, log_index, c.addressof(text))
-            if '标准错误' in text.value:
-                user.SendMessageW(combo, 0x14E, log_index, 0)
-                user.SendMessageW(window, 0x111, 240 | (1 << 16), combo)
-                break
+        choose_log_source(window, "\u6807\u51c6\u9519\u8bef")
         wait_for(lambda: "guest exit status=0" in title(user.GetDlgItem(window, 206)), "actual service log displayed")
         checks["selected_real_log_visible"] = True
         print("GUI: individual stop and log display passed", flush=True)
@@ -138,6 +122,7 @@ def main():
         wait_for(lambda: "正在停止服务和数据库" in status(window), "coordinated maintenance starts")
         ready(window, "备份完成", 300)
         assert all("已退出" in row for row in rows(window)[:15])
+        choose_log_source(window, "\u63a7\u5236\u53f0\u64cd\u4f5c")
         assert "维护前已按逆序停止服务和数据库" in title(user.GetDlgItem(window, 206))
         checks["backup_stops_services_and_database_before_running"] = True
         owned = [int(re.search(r"PID (\d+)", row)[1]) for row in rows(window)[:15] if re.search(r"PID (\d+)", row)]

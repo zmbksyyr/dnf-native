@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-11-15T12:27:40.860467+00:00",
+  "base_commit": "fbb11f3559854bf704481a8cdc4e382b2da2abc5",
+  "scope": "Repository cleanup and current build/regression verification. No runtime implementation, native.zip or mysql.zip content changes; no new complete business acceptance.",
+  "environment": {
+    "os": "Windows-10-10.0.19044-SP0",
+    "python": "3.14.6",
+    "host_bits": 64,
+    "compiler": "LLVM-MinGW 20261104 MSVCRT; Zydis 4.1.1"
+  },
+  "cleanup": {
+    "tools_before": 18,
+    "tools_after": 7,
+    "python_modules_before": 59,
+    "python_modules_after": 39,
+    "removed_scripts": [
+      "tests/probe_dbmw.py",
+      "tests/probe_game.py",
+      "tests/probe_game_chain.py",
+      "tests/probe_gui_core.py",
+      "tests/probe_manager.py",
+      "tests/probe_monitor.py",
+      "tests/probe_mysql.py",
+      "tests/probe_mysql_seed.py",
+      "tests/probe_security.py",
+      "tests/test_gui.py",
+      "tests/test_gui_setup.py",
+      "tests/test_stun.py",
+      "tools/audit_compatibility.py",
+      "tools/audit_resources.py",
+      "tools/import_inputs.py",
+      "tools/import_linux.py",
+      "tools/import_mysql.py",
+      "tools/import_mysql_runtime.py",
+      "tools/legacy/build_review_package.py",
+      "tools/legacy/build_service_cabinet.py",
+      "tools/legacy/build_service_resources.py",
+      "tools/legacy/prepare_service_instance.py",
+      "tools/legacy_db_password.py"
+    ],
+    "historical_records_merged": 81,
+    "history_archive": "docs/evidence/history.json",
+    "shared_helpers": [
+      "tests/gui_support.py",
+      "tests/runtime_support.py",
+      "tests/game_fixture.py",
+      "tests/probe_core_protocols.py"
+    ],
+    "repository_build_or_cache_directories": false
+  },
+  "validation": {
+    "complete_build_and_package": true,
+    "syntax_and_import_modules": 39,
+    "historical_contents_and_git_hashes_verified": 81,
+    "static_checks": {
+      "elf_dependency_members": 121,
+      "path_rejections": [
+        {
+          "entry": "tools/build_all.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tools/build_mysql.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tools/build_gui.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tools/build_instance_package.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tests/probe_core_protocols.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tests/test_gui_logs.py",
+          "repository_output_rejected": true
+        },
+        {
+          "entry": "tests/test_gui_maintenance.py",
+          "repository_output_rejected": true
+        }
+      ],
+      "runtime_fixture_repository_output_rejected": true
+    },
+    "primitive_scripts": [
+      {
+        "test": "test_elf",
+        "exit_code": 0
+      },
+      {
+        "test": "test_entry",
+        "exit_code": 0
+      },
+      {
+        "test": "test_vm",
+        "exit_code": 0
+      },
+      {
+        "test": "test_vm_concurrent",
+        "exit_code": 0
+      },
+      {
+        "test": "test_tls",
+        "exit_code": 0
+      },
+      {
+        "test": "test_futex",
+        "exit_code": 0
+      },
+      {
+        "test": "test_files",
+        "exit_code": 0
+      },
+      {
+        "test": "test_file_sync",
+        "exit_code": 0
+      },
+      {
+        "test": "test_net",
+        "exit_code": 0
+      },
+      {
+        "test": "test_poll",
+        "exit_code": 0
+      },
+      {
+        "test": "test_epoll",
+        "exit_code": 0
+      },
+      {
+        "test": "test_select_close",
+        "exit_code": 0
+      },
+      {
+        "test": "test_shared_entry",
+        "exit_code": 0
+      },
+      {
+        "test": "test_process_signal",
+        "exit_code": 0
+      },
+      {
+        "test": "test_ld",
+        "exit_code": 0
+      }
+    ],
+    "integration_scripts": [
+      {
+        "test": "test_luv.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_frida.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_channel.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_relay.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_resource_encodings.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_mysql_tools.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_instance_workflow.py",
+        "exit_code": 0
+      }
+    ],
+    "maintenance_scripts": [
+      {
+        "test": "test_gui_services.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_mysql_maintenance.py",
+        "exit_code": 0
+      },
+      {
+        "test": "test_gui_maintenance.py",
+        "exit_code": 0
+      }
+    ],
+    "bridge_with_real_game_proxy": {
+      "scope": "Pinned bridge version/script protocols and real game channel proxy using a private ZIP instance.",
+      "bridge_exit_code": 0,
+      "mysqladmin_exit_code": 0,
+      "server_exit_code": 0,
+      "normal_database_shutdown": true
+    },
+    "instance_workflow": {
+      "verified_checks": [
+        "cold_start_idle_and_create_available",
+        "each_missing_resource_named_and_creation_disabled",
+        "native_zip_has_browsable_paths_and_trimmed_files",
+        "changed_zip_rejected_before_instance_writes",
+        "nonempty_creation_target_unchanged",
+        "creation_response_ms",
+        "first_created_selected_and_official_tools_released",
+        "database_runs_from_instance_and_delete_disabled_while_running",
+        "second_created_and_automatically_selected",
+        "second_controller_cannot_start_or_delete_owned_instance",
+        "switch_to_existing_preserves_saved_database",
+        "delete_cancel_preserves_entire_instance",
+        "delete_removes_whole_tree_and_clears_selection",
+        "shared_resources_unchanged",
+        "trimmed_peer_protocols",
+        "trimmed_game_natural_startup_seconds",
+        "game_dp2_frida_startup_and_normal_shutdown"
+      ],
+      "game_natural_startup_seconds": 30.06,
+      "forced_cleanup": false
+    },
+    "maintenance_details": {
+      "gui-services": {
+        "verified_checks": [
+          "nineteen_service_entries",
+          "start_window_response_ms",
+          "fifteen_original_peer_processes",
+          "direct_stop_disabled_and_both_maintenance_actions_enabled_while_services_run",
+          "channel_protocol",
+          "relay_and_real_monitor_rejection",
+          "stun_protocol",
+          "individual_channel_normal_stop",
+          "selected_real_log_visible",
+          "changed_elf_rejected_without_stopping_other_services",
+          "individual_channel_restart_protocol",
+          "reverse_order_whole_stop_completed",
+          "owned_pid_markers_removed_after_stop",
+          "backup_enabled_after_whole_stop",
+          "second_launch_channel_protocol",
+          "second_launch_relay_and_monitor_protocol",
+          "second_launch_stun_protocol",
+          "backup_stops_services_and_database_before_running",
+          "close_normally_stops_all_owned_elf_hosts",
+          "database_normal_shutdown_after_peers",
+          "runtime_gaps"
+        ],
+        "forced_cleanup": false
+      },
+      "mysql-maintenance": {
+        "verified_checks": [
+          "running_instance_refused",
+          "native_full_logical_backup",
+          "corrupt_backup_refused_without_data_writes",
+          "failed_sql_import_preserved_active_database",
+          "native_shadow_restore_byte_exact",
+          "innodb_myisam_binary_rows_and_extra_schema_removal",
+          "accounts_routines_events_and_triggers_restored",
+          "cold_snapshot_and_logical_prebackup_retained",
+          "automatic_rollback_after_original_datadir_rename",
+          "rename_window_recovery",
+          "owned_server_exits_when_wrapper_is_terminated"
+        ],
+        "forced_cleanup": false
+      },
+      "gui-maintenance": {
+        "verified_checks": [
+          "backup_enabled_while_owned_services_run",
+          "backup_stops_services_before_offline_operation"
+        ],
+        "forced_cleanup": false
+      }
+    },
+    "frida_fixture": {
+      "passed": true,
+      "markers": [
+        "dnf-native-original-game-hook-ok",
+        "dnf-native-js-lua-roundtrip-ok calls=32",
+        "dnf-native-lua-js-roundtrip-ok calls=32",
+        "dnf-native-cache1000-constructed milliseconds=",
+        "dnf-native-reset61-boundaries-and-restore-ok"
+      ],
+      "cache1000_milliseconds": 109,
+      "unimplemented_syscall_numbers": [
+        291,
+        332
+      ]
+    }
+  },
+  "source_sha256": {
+    "tools/bootstrap.py": "61c9cf3f3637dfc7c3b4519a1e512f999005cea3e881496f5c6ca2bac5699edf",
+    "tools/build.py": "24537b1969fd81f405735d3898438ec91cbea01c7a32b635dc61d9e3af4fb203",
+    "tools/build_all.py": "be85b917087d19dc3f69797319bb6d857f26e013d4ea3b5d5a0a9c8f7aa16576",
+    "tools/build_gui.py": "8f5ffda9d87966c0efa808b3cde9906ac7bb913e4bd0a4238d3139ebb34b7f9f",
+    "tools/build_instance_package.py": "105d9976db846d30d56f8e873c20ef2a7001e9d436fe54e25265ef3c6e49ea13",
+    "tools/build_mysql.py": "c14464d595c15d500d3a17ec0a9ec296b935e480473db9d6258670f73697a471",
+    "tools/resource_baseline.py": "9588f234c47a1336de682057b114cd71e0b2b5970e9460dbe6e1c5eae3d9a80a",
+    "tests/game_fixture.py": "305cccc996ac048b20940db6b4aa19d31cfbc74a986c062b028e7e54fc407f2a",
+    "tests/gui_support.py": "fd6986b110788f0cc5baf7d565c69a0149734322b15dd039965cb3a8dd4c5c91",
+    "tests/probe_core_protocols.py": "c943cf338531d65d95b72f46fcd5e3cac86ee86575c3e78961e3a5b70103b6ca",
+    "tests/runtime_support.py": "3dbbde55bf9f86fd3aea555064c3e73ec85f6b937c37cc371f992a2735f98eef",
+    "tests/test_bridge.py": "80efb25bcd63ca1184b69191c60b014f136b03f697b77b73b937597786fb2125",
+    "tests/test_channel.py": "528564d8a118ac6a255babd4320fe1806d22b0daca096300f1ce78cc21ec5281",
+    "tests/test_elf.py": "d20fa98000d4c08e7cfc67596b1920fd19898a119a51aed3960391c63516f6a2",
+    "tests/test_entry.py": "f91ccda4b42e4f2d3b1c5b9b6e8fcc1f7f0fe5dc879a51c2cab8080bdb4e5268",
+    "tests/test_epoll.py": "11bc4abf07bf92a3ad4f00076d18ad38c0c2e545093897b42bb98e3a93639735",
+    "tests/test_file_sync.py": "0c682663badb7f524ce3488469fb609967bed6e77fc86cc4e78846d6459bacef",
+    "tests/test_files.py": "866a4e197710972419be83ad7ff6bf87276b67b2597350b7fe7aafa24d8e73bc",
+    "tests/test_frida.py": "c2a3c255657195c58ece16cc38631158f8295a95e36a183f0e795ecad8a86414",
+    "tests/test_futex.py": "89e1fc40a756048799c87a6e2c8d9528175580a13d136b0956b0f21949721495",
+    "tests/test_gui_logs.py": "fdaf9118a98330eaad69d1e88fb28b1814043dd9466c5c97941b6346000c4d38",
+    "tests/test_gui_maintenance.py": "f1ae640cd3af5d15ca3eaa7d840bfa78321d32f46e74190e8ca5d75fca3b3c42",
+    "tests/test_gui_plugins.py": "2a6b3695f917ae7280849457fd19e2534d77e0b2df889e0a007cc3bbe7cc4dac",
+    "tests/test_gui_services.py": "56ab2fa9bf1dd74ac5ee7f98300f921d13293ab515c02760c5ad53fd777822cd",
+    "tests/test_instance_workflow.py": "06972b3d776f32f2a2ec489f21bfeb7c5ca1ceda2a0bb4ecce7fc4bea4e0b4e8",
+    "tests/test_ld.py": "4cc4035c50a51eb2e848d6d3d86fb1f6e4d25c905932c96359f7cccd7a1ba43f",
+    "tests/test_luv.py": "b1b74a834c1f2717e52269c5c332c009e5ecfd49a9e9ebe4a938b5f0341b6d92",
+    "tests/test_mysql_maintenance.py": "905b42ee431e45799709b59dd766b149beda42ef4853bd9ccd615606516de8f0",
+    "tests/test_mysql_tools.py": "576a1a111718c4f624502fac729f9d3b783c0600ebe8dbe7aa6a43ca8b9b02e7",
+    "tests/test_net.py": "b333b35fe90b4acb4f5fa8340a381c54efc7b432533c4c97e0a54db7693a2244",
+    "tests/test_poll.py": "14549e555148dd1de1e4aa10e777e3f8281e23d32c8fc3e8722a4f66eb7953f1",
+    "tests/test_process_signal.py": "9e9b2b039f47a8dbc72f1e2139d64656494804c99619acd7f6e6aa71af5fdf64",
+    "tests/test_relay.py": "7ab2e0ac6256b47c2fa6a9f75a5c405069ab853732234fccc6aa62f8041621cf",
+    "tests/test_resource_encodings.py": "1bd03c376199655ceab7cc476642a1a9308a78f2c61af16497b002a799e7d0a2",
+    "tests/test_select_close.py": "c2bd000a8d8927441398cee1a2e3789739252c9ad12cee5c5aba66b723bc5884",
+    "tests/test_shared_entry.py": "a8bd93140e7e33dae724c05f1f423ae67bf4c6ef7ea1f62dd3eaf2f58bf05ff9",
+    "tests/test_tls.py": "916aba30103a8d3f194cee77b9b9fb42494653211436013e5edf31b9d41df360",
+    "tests/test_vm.py": "a6d031850ac4233ee2a66cd7982925e9f46c899fee239af822bf34f90afca49a",
+    "tests/test_vm_concurrent.py": "788ce1fb15a1951ad5e65ad96d2a36533054a0dd3e7b24735567047a5a003f4a"
+  },
+  "tested_package": "../x/dnf-native-output/package-cleanup",
+  "package_files": {
+    "DNF-Native.exe": "82942eefdad7c9bcd48337bfaf9ad5ebe6d1f065a2348b202f3b91b0a89e08da",
+    "resources/dnf-host-x64.exe": "9600a8603c2a91ffefee10a4f891b1edaa877c17e7ca28f3c835fc3053e8ae54",
+    "resources/dnf-host-x86.exe": "b06e86119b8c66405c9f645acfbf01f8caad352faf17a752f58df738004fbd89",
+    "resources/mysql-control.exe": "6cf0b0ae5b983b5145c69afc74b3687b8ce48b10e7e15e75115f9170de2c2595",
+    "resources/mysql.zip": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc",
+    "resources/native.zip": "8b14ce63fa667d6e9116324b97bfd05111bf2e180837e352281536a5e590e7a5",
+    "resources/README.md": "fa788073dbb7608cbeb490aca5303175d8f70f39a50e72a2640733f28e1c80fa",
+    "resources/resources.ini": "f18751243ddcd3fa4f4b3f66c8a199e5304b636a84ed631f4859dcda003b42b8",
+    "resources/third-party.md": "1faaf3658ebcb576beb8303d3bee985315d828b38ac3af48424db67d907b52f1"
+  },
+  "private_evidence": "../x/dnf-native-output/cleanup-checks and probes; credentials, private logs and runtime instances excluded from Git.",
+  "limitations": [
+    "Only the stated developer Windows 10 x64 baseline was tested; no new Win7/Win11 or production load acceptance.",
+    "Historical relay intermittent fault, STUN TLS, security topology and custom PVF limitations remain unresolved.",
+    "Frida hook/RPC/cache fixtures pass but i386 inotify_init/inotify_init1 (291/332) remain unimplemented and logged.",
+    "The exhaustive GUI plugin-mode and log-viewer suites were retained and imports checked; not rerun in this cleanup."
+  ]
+}

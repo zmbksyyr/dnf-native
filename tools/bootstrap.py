@@ -10,7 +10,6 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT.parent / "x/dnf-native-output"
-ORIGINALS = BUILD / "originals"
 LOCAL = Path(os.environ.get("DNF_NATIVE_LOCAL", str(BUILD / ".local"))).resolve()
 VERSION = "20261104"
 NAME = f"llvm-mingw-{VERSION}-msvcrt-x86_64"

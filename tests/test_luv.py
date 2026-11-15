@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", type=Path, default=BUILD / "i686/dnf-host.exe")
     args = parser.parse_args()
-    command = [sys.executable, str(ROOT / "tests/probe_game.py"), "--preload", "--timeout", "60",
+    command = [sys.executable, "-B", str(ROOT / "tests/game_fixture.py"), "--timeout", "60",
                "--host", str(args.host.resolve()), "--lua-script", str(ROOT / "tests/luv_timer.lua")]
     subprocess.run(command, cwd=ROOT, check=True)
     probe = json.loads((BUILD / "game-probe.json").read_text(encoding="utf-8"))

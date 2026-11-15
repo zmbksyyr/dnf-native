@@ -14,9 +14,8 @@
 | `src/win32_files.h` | 控制台和维护程序共用的 Win32 文件接口 |
 | `src/third_party/miniz/` | 内置 ZIP 解压所需的上游代码 |
 | `resources/` | 随仓库管理的固定 ZIP 基底及校验清单 |
-| `tools/` | 开发工具准备、构建、资源检查、打包及可选输入导入 |
-| `tests/` | C/汇编/Lua/JS 夹具、Python 回归与诊断探针 |
-| `tools/legacy/` | 历史 CAB、目录包和原始输入重建脚本 |
+| `tools/` | 当前构建所需的 7 个开发准备、资源核验、编译与打包脚本 |
+| `tests/` | 当前回归、C/汇编/Lua/JS 夹具，以及共用的窗口、协议和资源辅助函数 |
 | `docs/` | 本文、[实现说明](architecture.md)、[验证记录](validation.md)、[第三方声明](third-party.md)与历史 JSON 证据 |
 
 根目录只保留 `AGENTS.md` 这一份项目文档，另有必要的 Git 配置。开发缓存、构建输出、运行测试实例、日志和收据统一存放于仓库外的 `../x/dnf-native-output/`，仓库内禁止创建 `build/`；自定义构建输出也必须在 `../x/` 下。
@@ -69,7 +68,19 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 默认中间目录分别为 `../x/dnf-native-output/i686`、`../x/dnf-native-output/x86_64`、`../x/dnf-native-output/mysql-tools` 和 `../x/dnf-native-output/gui`。输出目录必须尚不存在；再次打包使用新的 `--output`。构建收据记录源码、编译器命令和产物哈希，打包校验 GUI、维护程序及宿主与其收据一致。
 
-正常构建不需要原始安装包、原数据库、旧 CAB、历史宿主或参考工程。`tools/import_*.py` 和 `tools/legacy/` 保留给原始来源复核及历史实验恢复，需要额外的独立输入副本，不属于默认构建依赖。
+正常构建和基底回归不需要原始安装包、原数据库、旧 CAB、历史宿主或参考工程。旧导入、CAB 重建和阶段诊断脚本已撤除，原内容可从清理前提交 `fbb11f3` 追溯。需要数据库的专项测试使用明确指定的私有实例。
+
+`tools/` 的职责如下，全部属于当前构建链：
+
+| 文件 | 用途 |
+| --- | --- |
+| `bootstrap.py` | 固定工具链与 Zydis 开发依赖、共享路径与哈希函数 |
+| `resource_baseline.py` | 基底文件身份核验及 ELF 直接依赖读取 |
+| `build.py` | 双架构 ELF 宿主 |
+| `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
+| `build_gui.py` | Win32 GUI 与 ZIP 解压组件 |
+| `build_instance_package.py` | 核对资源、源码和构建收据，生成当前产品包 |
+| `build_all.py` | 按顺序调用上述构建步骤 |
 
 ## 产品使用
 
@@ -110,8 +121,11 @@ python -B tests/test_vm.py
 python -B tests/test_vm_concurrent.py
 python -B tests/test_tls.py
 python -B tests/test_futex.py
+python -B tests/test_ld.py
+python -B tests/test_luv.py
+python -B tests/test_frida.py --item-reset
 python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package
 python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe
 ```
 
-后两项分别验证实际字符编码转换，以及真实 Win32 双实例生命周期、辅助服务协议和 game/DP2/Frida 启停。GUI 测试需要可交互 Windows 桌面和空闲的服务端口，会在 `../x/dnf-native-output/probes/` 创建独立实例。其他测试所需输入及本轮实际执行结果见[验证记录](validation.md)。
+后两项分别验证实际字符编码转换，以及真实 Win32 双实例生命周期、辅助服务协议和 game/DP2/Frida 启停。Lua/Frida 专项以自写夹具的退出码 42 验证接口，不计为游戏自然启动或业务通过。GUI 测试需要可交互 Windows 桌面和空闲的服务端口，会在 `../x/dnf-native-output/probes/` 创建独立实例。其他测试所需输入及本轮实际执行结果见[验证记录](validation.md)。

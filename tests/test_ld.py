@@ -10,7 +10,8 @@ import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from bootstrap import LOCAL, BUILD
+from bootstrap import BUILD
+from runtime_support import unpack_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,10 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     records, failures = [], []
     for arch, relative in [("i686", "lib/ld-2.17.so"), ("x86_64", "lib64/ld-2.17.so")]:
-        elf = LOCAL / "sysroot" / arch / relative
+        directory = unpack_runtime(BUILD / "fixtures/ld" / arch, arch)
+        elf = directory / relative
         sha = hashlib.sha256(elf.read_bytes()).hexdigest()
         for case, args in [("usage", []), ("missing-program", ["--help"])]:
-            command = [str(BUILD / arch / "dnf-host.exe"), "--root", str(LOCAL / "sysroot" / arch), sha,
+            command = [str(BUILD / arch / "dnf-host.exe"), "--root", str(directory), sha,
                        "--run", str(elf), sha, "ld.so", *args]
             process = subprocess.run(command, capture_output=True, timeout=20)
             stdout = process.stdout.decode("utf-8", "replace")

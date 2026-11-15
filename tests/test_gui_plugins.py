@@ -19,10 +19,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import sha256, BUILD
-from probe_mysql import tree_identity
+from runtime_support import tree_identity
 from probe_core_protocols import channel, relay, stun
-from test_gui import user, kernel, windows, wait_for, click, ready, status, screenshot
-from test_gui_services import rows, select
+from gui_support import user, kernel, windows, wait_for, click, ready, screenshot
+from gui_support import rows, select
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -69,7 +69,7 @@ def loaded_plugins(pid, instance):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-instance", type=Path, required=True, help="Stopped private instance; never used in place")
-    parser.add_argument("--gui", type=Path, default=BUILD / "gui-plugins/DNF-Native.exe")
+    parser.add_argument("--gui", type=Path, default=BUILD / "package/DNF-Native.exe")
     parser.add_argument("--hosts", type=Path, help="Use hosts from ARCH/dnf-host.exe in this build directory, in the new private instance only")
     parser.add_argument("--nosegneg", action="store_true", help="Select the packaged CentOS glibc variant for the game performance comparison")
     parser.add_argument("--timeout", type=float, default=2100)

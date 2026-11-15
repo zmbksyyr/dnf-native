@@ -1,7 +1,0 @@
-{
-  "name": "llvm-mingw-20261104-msvcrt-x86_64",
-  "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-msvcrt-x86_64.zip",
-  "archive_sha256": "6f9c316699759f088de26f5ca0e1df35c1d4e8ee3600f31229821c5717fd0d2b",
-  "source": "Official mstorsjo/llvm-mingw release asset; GitHub published SHA-256",
-  "role": "Development compiler only; not a product runtime dependency"
-}

@@ -5,14 +5,14 @@ import hashlib
 import json
 from pathlib import Path
 import platform
-import shutil
 import struct
 import subprocess
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from bootstrap import LOCAL, TOOLCHAIN, BUILD
+from bootstrap import TOOLCHAIN, BUILD
+from runtime_support import unpack_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = TOOLCHAIN
@@ -30,7 +30,7 @@ def main():
     for arch, triple, lib, base in [("i686", "i386-linux-gnu", "lib", "0x8048000"),
                                    ("x86_64", "x86_64-linux-gnu", "lib64", "0x400000")]:
         directory = BUILD / "fixtures/select-close" / arch
-        shutil.copytree(LOCAL / "sysroot" / arch, directory, dirs_exist_ok=True)
+        unpack_runtime(directory, arch)
         ld = directory / lib / "ld-2.17.so"
         fixture = directory / "select-close"
         command = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib",

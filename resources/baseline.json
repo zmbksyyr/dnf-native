@@ -1,7 +1,7 @@
 {
   "version": 1,
   "origin": "Verified DNF-Native-1.0/resources snapshot, imported read-only from x on 2026-11-15",
-  "evidence": "docs/evidence/p20-instance-delivery.json",
+  "evidence": "docs/evidence/history.json#/records/p20-instance-delivery.json",
   "files": {
     "native.zip": {
       "bytes": 257681089,

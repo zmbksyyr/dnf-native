@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from bootstrap import BUILD, ORIGINALS
+from bootstrap import BUILD
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME_SHA256 = "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979"
@@ -24,9 +24,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--item-reset", action="store_true", help="Also check native item reset and original cache construction")
     args = parser.parse_args()
-    game = ORIGINALS / "dp123/home/neople/game/df_game_r"
-    if hashlib.sha256(game.read_bytes()).hexdigest() != GAME_SHA256:
-        raise SystemExit("Bridge fixture requires the pinned original game ELF")
     script = ROOT / "tests/frida_bridge.js"
     markers = list(MARKERS)
     sources = ["tests/test_frida.py", "tests/frida_bridge.js", "tests/frida_bridge.lua"]
@@ -38,7 +35,7 @@ def main():
         script.write_text((ROOT / sources[-2]).read_text(encoding="utf-8") + "\n" +
                           (ROOT / sources[-1]).read_text(encoding="utf-8") + "\n" + text, encoding="utf-8")
         markers += ["dnf-native-cache1000-constructed milliseconds=", "dnf-native-reset61-boundaries-and-restore-ok"]
-    command = [sys.executable, str(ROOT / "tests/probe_game.py"), "--preload", "--timeout", "90",
+    command = [sys.executable, "-B", str(ROOT / "tests/game_fixture.py"), "--timeout", "90",
                "--lua-script", str(ROOT / "tests/frida_bridge.lua"),
                "--frida-script", str(script)]
     subprocess.run(command, cwd=ROOT, check=True)
@@ -47,7 +44,7 @@ def main():
     stdout = (instance / "stdout.log").read_text(encoding="utf-8", errors="replace")
     stderr = (instance / "stderr.log").read_text(encoding="utf-8", errors="replace")
     hook = re.search(r"dnf-native-original-game-hook-ok original=(-?\d+) hooked=(-?\d+) restored=(-?\d+)", stdout)
-    passed = (probe["exit_code"] == 42 and not probe["forced_cleanup"] and
+    passed = (probe["elf_sha256"] == GAME_SHA256 and probe["exit_code"] == 42 and not probe["forced_cleanup"] and
               all(marker in stdout for marker in markers) and hook and hook[1] == hook[3] and hook[1] != hook[2] and
               "unhandled exception" not in stderr)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
