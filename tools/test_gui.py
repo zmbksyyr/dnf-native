@@ -248,9 +248,18 @@ def main():
         user.SendMessageW(user.GetDlgItem(window, 101), 0x000C, 0, c.addressof(chosen))
         ready(window, "尚未初始化")
         checks["instance_path_can_be_cleared_and_selected_again"] = True
-        with socket.socket() as reserved:
-            reserved.bind(("127.0.0.1", 0))
-            port = reserved.getsockname()[1]
+        # A delivery that includes native game resources creates a complete
+        # game instance.  Its original bridge configuration is intentionally
+        # fixed to the product port 3306; database-only GUI fixtures may keep
+        # using an ephemeral port so they do not collide with another test.
+        if (package_root / "native" / "resources.ini").exists():
+            port = 3306
+            with socket.socket() as reserved:
+                reserved.bind(("127.0.0.1", port))
+        else:
+            with socket.socket() as reserved:
+                reserved.bind(("127.0.0.1", 0))
+                port = reserved.getsockname()[1]
         text = c.create_unicode_buffer(str(port))
         user.SendMessageW(user.GetDlgItem(window, 103), 0x000C, 0, c.addressof(text))
         click(window, 110)
