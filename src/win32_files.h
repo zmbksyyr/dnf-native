@@ -13,6 +13,31 @@ inline void require(bool ok, const char *operation) {
     if (!ok) throw std::runtime_error(std::string(operation) + " (Win32 " + std::to_string(GetLastError()) + ")");
 }
 
+inline std::wstring instance_directory(const std::wstring &value) {
+    if (value.empty()) throw std::runtime_error("Choose an instance directory first");
+    std::vector<wchar_t> buffer(32768);
+    DWORD size = GetFullPathNameW(value.c_str(), static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
+    require(size && size < buffer.size(), "Resolve instance path");
+    std::wstring path(buffer.data(), size);
+    while (path.size() > 3 && path.back() == L'\\') path.pop_back();
+    if (path.compare(0, 4, L"\\\\?\\") == 0) {
+        path = path.compare(4, 4, L"UNC\\") == 0 ? L"\\\\" + path.substr(8) : path.substr(4);
+    }
+    if (path.size() < MAX_PATH) return path;
+    // The official MySQL 5.7 process cannot use an extended-length working
+    // directory. An existing filesystem short name still refers to the same
+    // directory, so locks, database identity and cold copies remain in place.
+    std::wstring extended = path.compare(0, 2, L"\\\\") == 0 ? L"\\\\?\\UNC\\" + path.substr(2) : L"\\\\?\\" + path;
+    size = GetShortPathNameW(extended.c_str(), buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (size && size < buffer.size()) {
+        std::wstring short_path(buffer.data(), size);
+        if (short_path.compare(0, 8, L"\\\\?\\UNC\\") == 0) short_path = L"\\\\" + short_path.substr(8);
+        else if (short_path.compare(0, 4, L"\\\\?\\") == 0) short_path.erase(0, 4);
+        if (short_path.size() < MAX_PATH) return short_path;
+    }
+    throw std::runtime_error("Instance path exceeds the official MySQL working-directory limit and has no usable short name; choose a shorter directory");
+}
+
 inline void directory(const std::wstring &path) {
     int result = SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
     if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)

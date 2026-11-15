@@ -22,13 +22,7 @@ enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
 static std::wstring full_path(const std::wstring &value) {
-    if (value.empty()) throw std::runtime_error("Choose an instance directory first");
-    std::vector<wchar_t> buffer(32768);
-    DWORD size = GetFullPathNameW(value.c_str(), static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
-    require(size && size < buffer.size(), "Resolve instance path");
-    std::wstring result(buffer.data(), size);
-    while (result.size() > 3 && result.back() == L'\\') result.pop_back();
-    return result;
+    return instance_directory(value);
 }
 
 #include "service_ip.h"
@@ -930,10 +924,15 @@ static std::wstring choose_folder(HWND owner, const wchar_t *title, const std::w
     info.lpfn = browse_callback; info.lParam = reinterpret_cast<LPARAM>(initial.c_str());
     PIDLIST_ABSOLUTE item = SHBrowseForFolderW(&info);
     if (!item) return {};
-    wchar_t path[MAX_PATH];
-    bool ok = SHGetPathFromIDListW(item, path);
+    wchar_t *path = nullptr;
+    HRESULT result = SHGetNameFromIDList(item, SIGDN_FILESYSPATH, &path);
     CoTaskMemFree(item);
-    return ok ? path : L"";
+    if (FAILED(result)) return {};
+    std::vector<wchar_t> display(32768);
+    DWORD length = GetLongPathNameW(path, display.data(), static_cast<DWORD>(display.size()));
+    std::wstring chosen = length && length < display.size() ? std::wstring(display.data(), length) : std::wstring(path);
+    CoTaskMemFree(path);
+    return chosen;
 }
 
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -1221,7 +1220,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 auto chosen = choose_folder(window, L"选择用于新实例的空文件夹（可在此新建文件夹）", app->current);
                 if (!chosen.empty()) {
                     SetWindowTextW(app->path, chosen.c_str());
-                    if (!known_instance(chosen)) app->action(CREATE_INSTANCE);
+                    if (!known_instance(full_path(chosen))) app->action(CREATE_INSTANCE);
                     else SetWindowTextW(app->status, L"该目录已有实例，请选择新的空文件夹");
                 }
                 return 0;
@@ -1315,7 +1314,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         state.initial = L"";
         int count; wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
         require(args != nullptr, "Read application arguments");
-        if (count == 3 && std::wstring(args[1]) == L"--instance") state.initial = full_path(args[2]);
+        if (count == 3 && std::wstring(args[1]) == L"--instance") {
+            state.initial = args[2];
+            full_path(state.initial);
+        }
         else if (count != 1) { LocalFree(args); throw std::runtime_error("Usage: DNF-Native.exe [--instance DIRECTORY]"); }
         LocalFree(args);
         WNDCLASSW type = {}; type.hInstance = instance; type.lpfnWndProc = window_proc; type.lpszClassName = L"DNFNativeController";

@@ -2,6 +2,32 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## 长路径实例修复（2026-11-16）
+
+P13 复现普通 271 字符根目录无法加载服务清单；加扩展前缀后虽能加载 19 项，子进程仍因长工作目录报 Win32 267。官方 MySQL 5.7.44 使用显式应用路径、短工作目录及绝对配置后，仍拒绝本次长 `datadir`。同一目录已有的 NTFS 短名可正常完成数据库 SQL、身份和 TLS 检查，因此修复集中在共享路径入口与文件夹选择器，没有更换数据库或扩展运行时。
+
+- `tests/test_gui_long_path.py` 在当前 NTFS 卷创建 274 字符目录，从固定 ZIP 新建完整实例；显示保留长名，长短名文件身份一致，两个窗口持有同一实例锁，19 项清单正常加载。
+- 原版 game 自然初始化 31.148 秒，channel、relay/monitor、STUN 协议通过；直接向 `mysql-control` 传入原长名的 SQL 查询也通过。
+- GUI 协调备份完成自然 game 退出、Frida dispose 与 DP2 unload；经实际确认框执行影子还原，提交后重新启动数据库核对 UUID/TLS，再正常停止。GUI 退出 0，无运行时异常或强制清理，仅有已知 inotify 291/332 缺口。最终脚本原始收据为 `probes/20261115T214400854554Z/gui-long-path/receipt.json`。
+- 当前维护程序的 `test_mysql_maintenance.py` 通过全库逻辑备份、影子还原、损坏备份拒绝、导入失败保留、三种目录切换窗口恢复、账号/存储程序/事件/触发器往返及所属子进程退出；源数据身份不变。收据为 `probes/20261115T213925033826Z/mysql-maintenance/receipt.json`。其中中断恢复是构造的磁盘状态，所属进程实验是刻意终止 wrapper；不计作掉电实验或自然停服。
+- 普通中文/空格路径的 `test_instance_workflow.py` 重新通过资源缺失/损坏拒绝、新建双实例、数据库保存读回、实例占用、删除取消与完整删除、辅助协议及 game/DP2/Frida 自然启停（30.332 秒）；GUI 退出 0，无运行时异常或强制清理，只有已知 inotify 缺口。收据为 `probes/20261115T214618299902Z/instance-workflow/receipt.json`，资源前后哈希一致。
+- 对 345 字符、不存在且无法取得短名的目标，CLI 在写入前退出 1 并给出明确路径错误，没有创建目标。未测试禁用短名的卷、任意子目录深度或全部 UNC 场景，不修改系统短名设置。
+
+原始失败与中间夹具错误继续保留于 `P13-20261116-long-path/`：首版文件夹选择器显示短名，已修复后重新跑完整流程；另有漏点还原确认框、快速探针等待错误状态文本的问题，均不作为产品通过依据。最终程序未修改原版 ELF、数据库程序和固定 ZIP；宿主沿用已验证的 P9/P11 程序。
+
+最终交付为 `P13-20261116-long-path/delivery/`，GUI、维护程序、宿主、ZIP 与 `resources.ini` 均与上述实际回归使用的 `package2/` 字节一致，仅更新随包文档。阶段收据和源码/程序/验证记录哈希保存在该外部阶段目录。
+
+## 当前客户端实际启动（2026-11-16）
+
+P12 使用 P11 最终产品包、独立服务实例和用户客户端的完整副本。环境为 Windows 10 x64 10.0.19044；32 位 `DNF.exe` SHA-256 为 `246b838163fa7c71aa0445fa4aafde04e7ac72aa72855a4b2a7eaeed5eeae264`。客户端副本使用与固定服务匹配的原版 PVF，配置为 `mode=fixonly`、`simplified_pvf=false`，未将 jbz69 定制 PVF 的兼容计入本轮。
+
+- 服务副本自然初始化 31.034 秒。测试只在副本库创建合成账号；客户端原有 gate 私钥与固定服务公钥不匹配，另用 Windows CAPI 生成新的测试用 RSA 配对，仅替换服务副本公钥并正常重启 game。token 采用原版字段布局和 RSA PKCS#1 type 1 运算，没有跳过认证，也没有使用历史私钥。
+- 实际启动客户端后，在认证前弹出“图表系统建立失败”。同一会话的自写 32 位 D3D9 探针显示 `Direct3DCreate9` 成功、适配器列表为空，进程位于已断开的 RDP session 2。系统显卡型号存在不能代替当前进程可枚举适配器。恢复有可用显卡的桌面后应先复查探针，再继续客户端业务；当前未到认证，不能判断 token 已通过或服务端业务已通过。
+- 通过客户端对话框实际按钮关闭，最终进程已不存在，未强制结束；未保留最终退出码，不记录为退出 0。服务正常逆序停止、GUI 退出 0，无运行时异常或强制清理，仅有已知 inotify 291/332 缺口。服务副本测试公钥在停服后恢复。
+- 原客户端 `DNF.exe`、`ijl15.dll`、`Script.pvf` 与 `GameSettings.toml` 前后哈希一致，未运行或修改原目录。合成账号、测试私钥、客户端副本和私有日志全部保留于仓库外，未进入 Git。
+
+原始服务收据：`probes/20261115T210911437839Z/client-business/server-receipt.json`；图形失败、独立 D3D9 实验、公钥恢复及原客户端身份记录位于 `P12-20261116-client-business/`。这是一次被图形环境阻塞的客户端尝试，完整认证、建角、战斗、退出与冷重启存档仍未在当前版本验收。
+
 ## Frida 热加载与旧实例升级（2026-11-16）
 
 P11 使用 P9 最终交付的 GUI 与双架构宿主，未改运行时代码或固定资源。环境仍为 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT；不能外推到其他操作系统。
@@ -149,6 +175,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | Frida 热加载 | `python -B tests/test_frida_reload.py [--host HOST_X86_EXE]` | 固定原版 Gadget 的覆盖写入/原子替换、实际新版 RPC 结果；不含 game 自然启动或客户端业务 |
 | 编码 | `python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package` | ZIP 内实际 GBK、GB18030、BIG5、BIG5-HKSCS、EUC-KR、UHC 与 UTF-8 字节往返 |
 | 真实实例与 core | `python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 真实资源故障拒绝、双实例、占用、删除、15 个辅助服务协议及 game/DP2/Frida 启停 |
+| 长路径实例 | `python -B tests/test_gui_long_path.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 274 字符根目录的新建、同目录锁、原版启动/协议、CLI 与 GUI 维护；要求文件系统已有可用短名 |
 | 数据库维护 | `python -B tests/test_mysql_maintenance.py --exe ../x/dnf-native-output/package/resources/mysql-control.exe --database-source PRIVATE_STOPPED_INSTANCE` | 私有停库副本的备份、影子还原、失败保留与中断恢复 |
 | GUI 停服维护 | `python -B tests/test_gui_maintenance.py --instance PRIVATE_INSTANCE --gui ../x/dnf-native-output/package/DNF-Native.exe` | GUI 从运行态逆序停服再备份 |
 
@@ -176,6 +203,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 ## 未完成事项
 
+- **当前客户端图形环境**：P12 客户端在认证前失败，同会话 32 位 D3D9 适配器为零；需要可用显卡桌面才能继续当前版本业务验收，历史业务结果不能代替。
 - **长期运行与容量**：历史 relay `0x0805b91a` 异常已在 P7 定位为并发描述符重复分配并修复，见本文后部的前后证据；本轮 GUI 两轮协议通过仍不替代生产负载和长期运行验收。
 - **STUN TLS**：曾有历史 guest TLS 站点失败现场，不能由普通 UDP 回归扩展为所有 x64 ELF 支持。
 - **Frida 文件监视接口**：i386 `inotify_init` / `inotify_init1`（syscall 291/332）仍未实现；P11 已实测当前 Gadget 轮询回退可完成覆盖写入及原子替换后的热加载与新版 RPC。该需求已有可复现路径，通用 inotify 及所有脚本/编辑器组合仍未支持。

@@ -255,10 +255,7 @@ int wmain(int argc, wchar_t **argv) {
                 port = static_cast<unsigned>(value);
             }
         }
-        std::vector<wchar_t> path(32768);
-        DWORD length = GetFullPathNameW(argv[2], static_cast<DWORD>(path.size()), path.data(), nullptr);
-        require(length && length < path.size(), "Resolve instance directory");
-        std::wstring instance(path.data(), length);
+        std::wstring instance = instance_directory(argv[2]);
         if (tool == L"prepare") { print_path(prepare(instance)); return 0; }
         if (tool == L"mysqld" || tool == L"initialize" || maintenance) {
             directory(instance + L"\\.mysql");
