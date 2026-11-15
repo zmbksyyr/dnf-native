@@ -109,11 +109,22 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 修改服务 IP 要在全部停止后应用；修改 DP2/Lua 和 Frida 开关要先停止 game。日志查看直接读取 stdout、stderr、服务应用日志和 MySQL 日志，可选自动、UTF-8、936、950、949 编码，并支持刷新和跟随滚动。
 
+固定基底中的 Frida 配置为 `on_change=reload`。已验证覆盖写入和临时文件原子替换两种 JS 保存方式，原版 Gadget 均通过轮询回退在约 5 秒后加载新版，并实际返回新版 RPC 结果；这不是即时通知。该验证在 game 自然启动前的 DP2/Lua 夹具中完成，不能扩展为任意脚本、通用 inotify 或客户端业务通过。
+
 维护连接配置保存在实例的 `client.private.cnf`。手动修改数据库密码后需同步更新该文件；公开记录不保存真实凭据。官方 `mysqld/mysql/mysqladmin/mysqldump` 都可在实例的 `mysql/bin/` 直接使用。
 
 “备份”及“还原”会先逆序停止本窗口持有的服务，再核对数据库身份并正常停止。操作结束保持停止。备份目录应位于实例目录外。还原包含预备份、影子副本导入、重启与导出一致性核对、冷目录切换和失败恢复，详见[实现说明](architecture.md#数据库维护)。
 
 “删除实例”经确认永久删除整个实例目录，包括自定义内容；需要的数据先备份。取消操作保留原目录，内部目录链接不递归删除外部目标。关闭窗口会正常停止本窗口持有的服务与数据库。
+
+升级既有实例时，采用独立产品包和实例副本：
+
+1. 用旧版正常停止全部服务和数据库，关闭窗口；保留旧产品包，对停止后的整个实例目录做完整副本。数据库逻辑备份可以另存，但不能代替配置、插件、PVF 等实例文件的备份。
+2. 将新版产品包放入新目录，使用“选择实例”打开上述实例副本。保留原 `services.ini`、数据库和配置；不要在旧实例上使用“创建实例”，也不要将新 ZIP 直接覆盖到旧实例。
+3. 分别检查数据库、所需服务的原生日志与协议，再验证自己的客户端和插件。旧 `i686/`、`x86_64/` 布局继续按清单解析，无需搬移目录。
+4. 需要回退时，先正常停止并关闭新版，再用保留的旧产品包打开升级前的完整冷副本。升级后产生的新数据不包含在旧副本中，不能靠覆盖运行中的 `data/` 合并。
+
+当前升级验证覆盖一个固定旧布局副本的辅助协议、停服维护及 game 自然初始化、插件释放；其他自定义资源和数据库版本仍须按实际组合验证。三个安全组件的现有配置依赖未随包提供的配置服务/安全监控端点；不能仅改成本地配置并自连端口就当作完整安全模式，详见[验证记录](validation.md)。
 
 ## 验证入口
 
@@ -129,6 +140,7 @@ python -B tests/test_descriptors.py
 python -B tests/test_ld.py
 python -B tests/test_luv.py
 python -B tests/test_frida.py --item-reset
+python -B tests/test_frida_reload.py
 python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package
 python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe
 ```
@@ -144,4 +156,4 @@ python -B tests/test_gui_services.py --instance <私有实例目录> --gui ../x/
 
 停服专项覆盖 manager、三个 DBMW 在网络线程刚创建时停止，以及 manager/DBMW 稳定运行后的停止，核对真实线程 join、原版退出日志、退出码及磁盘 ELF 不变。`service shutdown failed` 与未处理异常一样会使集成验收失败。
 
-当前 P9 已补齐真实 game/Frida 触发的 `SA_NODEFER`、跨映射 `munmap` 和验证码字体的普通私有文件映射。双架构原语、原版 Frida hook/RPC 与 game 自然启停均通过；该启动路径仍记录 inotify 未实现，完整客户端和安全链不据此视为通过。原始收据见[验证记录](validation.md)。
+当前已补齐真实 game/Frida 触发的 `SA_NODEFER`、跨映射 `munmap` 和验证码字体的普通私有文件映射。双架构原语、原版 Frida hook/RPC、两种保存方式的轮询热加载与 game 自然启停均通过；inotify 本身仍未实现。安全组件加载已通过，现有配置与服务拓扑阻塞完整安全链，完整客户端和跨系统验证也未完成。原始收据见[验证记录](validation.md)。

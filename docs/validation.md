@@ -2,6 +2,29 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## Frida 热加载与旧实例升级（2026-11-16）
+
+P11 使用 P9 最终交付的 GUI 与双架构宿主，未改运行时代码或固定资源。环境仍为 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT；不能外推到其他操作系统。
+
+- 新增 `test_frida_reload.py`：从仓库 ZIP 释放独立副本，以自写 Lua/JS 夹具验证原版 Gadget `on_change=reload`。覆盖写入后 5.368 秒、临时文件原子替换后 5.014 秒，Lua 均收到新版 JS 的实际 RPC 返回值；正常按夹具预期退出 42，无异常或强制清理。只允许现存 inotify 291/332 缺口，其他运行时缺口使测试失败。收据：`probes/20261115T204835098486Z/frida-reload/receipt.json`。这是 game 自然启动前的接口验证；证明当前 Gadget 的轮询回退可用于这两种保存方式，没有实现通用 inotify。
+- 旧 `i686/`、`x86_64/` 布局实例的独立副本完成 19 项列表、两轮 15-peer 协议、单服启停、哈希拒绝、逆序停服、协调备份及正常关闭；`runtime_faults/runtime_gaps` 均为空，无强制清理。收据：`probes/20261115T204801243691Z/gui-services/receipt.json`。该脚本未运行 game 或安全拓扑。
+- 另一个旧布局副本完成 game 原生初始化（30.932 秒）、整体正常停服和插件释放，日志包含 `main() exited OK`、Frida dispose、DP2 unload；所有服务无运行时异常或强制清理，只剩 game 的 inotify 291/332 缺口。原生日志在本次运行前移开，避免以旧启动标记误判。收据：`probes/20261115T205212232098Z/legacy-startup/receipt.json`。
+- 测试前后原实例的数据库及频道配置目录身份相同，原清单哈希与两轮副本收据一致；仅运行独立副本。身份记录、验证副本和源码哈希位于 `P11-20261116-reload-upgrade/`，升级与冷副本回退步骤见使用文档。未实测其他自定义数据库版本，也未将副本验证计作客户端业务通过。
+
+## 原版安全组件诊断（2026-11-16）
+
+P10 用当前 x86 宿主和固定原版 zergsvr、gunnersvr、secagent 实际运行。三个组件均通过原版 loader、用户库及共享 mmap pipe 初始化，未出现 syscall 缺口、访问异常或强制清理；完整安全链仍失败，具体阻塞如下：
+
+| 原始配置下的组件 | 实际结果 |
+| --- | --- |
+| zergsvr | 向配置服务取信息失败，`init_instance fail. ret=290010039`，退出 183 |
+| gunnersvr | 连接 `127.0.0.1:9000` 的安全监控失败，`init_app fail. ret=5092`；尽管退出码为 0，初始化仍失败 |
+| secagent | 原生日志记录游戏通道、游戏数据及 DPSDK 配置加载成功；缺少 `cfg/restrict.txt`，限制功能关闭，不能据此认定安全业务通过 |
+
+原始配置收据：`probes/20261115T203912478274Z/security/receipt.json`。只在新诊断副本将 zerg 模式由 `cfgsvr` 改成原版支持的 `cfgfile` 后，原程序拒绝 `svcid.xml` 重复条目（`ret=5016`，退出 152）；收据：`probes/20261115T204117221564Z/security/receipt.json`。再仅删除三条字节相同的重复条目后，三个进程进入循环并正常停止，但 `[31|570001]` 安全监控与 `[30|570011]` zerg 均指向 9000，形成自连；`[2|1]` 配置端点 9001 无实际对端，日志仍有未认证 peer 超时及通道发送失败。该轮 `connect monitor succ` 和进程退出 0 均不能作为安全协议通过，收据：`probes/20261115T204227444589Z/security/receipt.json`。
+
+固定 ZIP 不含这套安全组件对应的独立配置中心/监控可执行资源；现有 DNF monitor 不能冒充其角色。没有修改仓库 ZIP、产品默认配置或引入参考工程组件。诊断脚本、配置差异、原版反汇编及收据汇总位于 `P10-20261116-security/`。下一步需要匹配的原版对端和拓扑，不能用扩大 syscall 实现、自连或默认成功替代。
+
 ## game/Frida 信号与文件映射（2026-11-16）
 
 P9 修复来自实际原版路径的三个缺口：Frida 注册 `0x44000004`（SIGINFO/RESTORER/NODEFER）被拒；验证码字体 `/home/neople/game/captcha_font/SeoulHangangL.ttf` 的 9093120 字节只读私有映射被送进 ELF 加载器；连续内存的 munmap 横跨多条匿名记录被拒。触发收据为 `probes/20261115T202233188700Z/startup-compat/receipt.json`，保留原始诊断。运行环境为 Windows 10 x64 10.0.19044，工具链为 LLVM-MinGW 20261104 MSVCRT。
@@ -123,6 +146,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | 内存与并发 | `python -B tests/test_vm.py`、`tests/test_vm_concurrent.py` | 双架构映射语义及八线程并发路径 |
 | TLS/线程 | `python -B tests/test_tls.py`、`tests/test_futex.py` | 已实现 TLS 和 futex 路径 |
 | 文件、同步、网络原语 | `tests/test_files.py`、`tests/test_file_sync.py`、`tests/test_net.py`、`tests/test_poll.py`、`tests/test_epoll.py`、`tests/test_select_close.py`、`tests/test_process_signal.py` | 对应夹具，均以 `python -B` 执行 |
+| Frida 热加载 | `python -B tests/test_frida_reload.py [--host HOST_X86_EXE]` | 固定原版 Gadget 的覆盖写入/原子替换、实际新版 RPC 结果；不含 game 自然启动或客户端业务 |
 | 编码 | `python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package` | ZIP 内实际 GBK、GB18030、BIG5、BIG5-HKSCS、EUC-KR、UHC 与 UTF-8 字节往返 |
 | 真实实例与 core | `python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 真实资源故障拒绝、双实例、占用、删除、15 个辅助服务协议及 game/DP2/Frida 启停 |
 | 数据库维护 | `python -B tests/test_mysql_maintenance.py --exe ../x/dnf-native-output/package/resources/mysql-control.exe --database-source PRIVATE_STOPPED_INSTANCE` | 私有停库副本的备份、影子还原、失败保留与中断恢复 |
@@ -154,9 +178,9 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 - **长期运行与容量**：历史 relay `0x0805b91a` 异常已在 P7 定位为并发描述符重复分配并修复，见本文后部的前后证据；本轮 GUI 两轮协议通过仍不替代生产负载和长期运行验收。
 - **STUN TLS**：曾有历史 guest TLS 站点失败现场，不能由普通 UDP 回归扩展为所有 x64 ELF 支持。
-- **Frida 文件监视接口**：本轮插件夹具仍记录 i386 `inotify_init` / `inotify_init1`（syscall 291/332）未实现。hook、双向 RPC、reset 边界和恢复专项通过不代表这些接口已支持，诊断保留在外部收据中。
+- **Frida 文件监视接口**：i386 `inotify_init` / `inotify_init1`（syscall 291/332）仍未实现；P11 已实测当前 Gadget 轮询回退可完成覆盖写入及原子替换后的热加载与新版 RPC。该需求已有可复现路径，通用 inotify 及所有脚本/编辑器组合仍未支持。
 - **jbz69 定制 PVF**：原服务 PVF 为 48984，客户端定制 PVF 为 66282；未找到匹配的原版 Linux ELF。缺失模板、BIG5/UTF-8 编码及资源字段差异仍阻塞 Loading Items。模板别名、临时 iconv 映射和 `.str` 重编码实验均未形成可交付兼容结果；认证公钥加载成功不能解释成定制 PVF 可用。
-- **安全与负载**：安全三件套/TSS 完整拓扑、真实大连接数、生产负载、所有插件组合和完整客户端矩阵没有验收。256 描述符及 64 线程槽等限制见[实现说明](architecture.md)。
+- **安全与负载**：P10 已验证原版安全组件加载，完整拓扑被缺失的配置中心/安全监控对端及现有配置冲突阻塞；真实大连接数、生产负载、所有插件组合和完整客户端矩阵没有验收。256 描述符及 64 线程槽等限制见[实现说明](architecture.md)。
 - **操作系统**：干净 Windows 7/11、跨机器迁移及所有离线依赖组合未完成矩阵验证。
 
 ## 历史路径与来源对应

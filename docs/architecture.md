@@ -78,6 +78,8 @@ flowchart TD
 
 `services.ini` 保存 19 个服务的宿主位数、根目录、原 ELF 与 loader 哈希、参数、环境、停服信号和自动启动标志。顺序是 bridge、manager、三个 DBMW、monitor、guild、statics、coserver、community、auction、point、channel、relay、stun、game；zergsvr/secagent/gunnersvr 默认不自动启动。
 
+安全组件已用固定原版 ELF 实测加载，但资源中的拓扑不完整：zerg 默认向配置服务取信息；改用原版支持的 `cfgfile` 后，`svcid.xml` 的完全重复条目会被拒绝。仅在诊断副本去重后，安全监控 `[31|570001]` 与 zerg `[30|570011]` 仍共用 `127.0.0.1:9000`，形成自连，配置端点 `[2|1]` 的 9001 没有实际对端。DNF monitor 与这个安全监控角色不同；产品保留原配置及三个独立入口，没有发布不完整的诊断拓扑。
+
 `service_processes.h` 先以挂起状态创建宿主、加入本窗口的 Job，再恢复执行并等待停服通道。该通道仅说明 runtime 已接入，GUI 明确显示“业务未验证”。正常停止使用本项目命名事件向原程序交付信号；STUN 另发 UDP 数据唤醒阻塞接收。超时保留进程和依赖供诊断。正常停服后仅清理由本窗口已退出宿主拥有的 PID 标记。
 
 实例选择持有独占 `.instance.lock`。删除仅允许已识别、已停止的真实实例目录，需要确认；递归处理普通目录，遇 reparse point 只移除链接自身。资源 ZIP 和外部原件不作为运行实例写入。
@@ -106,7 +108,7 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 - SA_SIGINFO/SA_NODEFER 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、嵌套投递、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；浮点扩展状态、备用信号栈、同步异常转交、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
 - 匿名私有映射的 `madvise(MADV_DONTNEED)` 使用 Windows `MEM_RESET` 保留地址、权限和并发访问；Windows 不保证 Linux 下一次读一定立即得到零页，因此不能把它扩展为通用页面回收或跨进程共享语义。
 - 打开目标上的 POSIX rename、符号链接、普通文件执行映射、EOF 外整页的 SIGBUS、跨多个预留区固定映射及部分 msync 行为存在边界。
-- inotify_init/init1 仍可返回 ENOSYS，当前 Frida 路径可 fallback；不能宣称通用文件热加载支持。
+- inotify_init/init1 仍返回 ENOSYS；固定原版 Frida Gadget 的 `GPollFileMonitor` 轮询回退已通过覆盖写入、原子替换和新版 RPC 结果验证，延迟约 5 秒。无需为此路径增加文件监视兼容层；通用 inotify、全部编辑器行为和业务运行中的任意脚本热加载不在已验证范围。
 - 保留原地址不等于任意等级 ELF/PVF 都兼容；每个新组合都需要匹配资源和独立业务验证。
 
 ## 基底与源码的关系

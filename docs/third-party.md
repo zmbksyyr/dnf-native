@@ -23,6 +23,8 @@ DBMW/manager 停服修正曾参考 `rednf/remake/source/DNFServer/GameServer/DBM
 
 P9 的嵌套信号和普通私有文件映射独立实现依据为 Linux [sigaction(2)](https://man7.org/linux/man-pages/man2/sigaction.2.html)、[mmap/munmap(2)](https://man7.org/linux/man-pages/man2/mmap.2.html) 的 ABI 语义，以及 Microsoft [CreateFileMappingW](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingw)、[MapViewOfFile](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile) 和 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect) 的文件视图与保护约束。需求来自固定 game/Frida 的 syscall 日志；与现有 ELF snapshot 路径分开，未移植参考 compat 代码。Linux EOF 外整页的 SIGBUS、同步异常转交及地址复用限制均保留明确边界。
 
+安全组件诊断只读参考了 `rednf/remake/secsvr/README.md`、`source/zergsvr/src/commlib/framework/comm_svrd_config.cpp` 与 `source/zergsvr/src/commsvr/zergsvr/zerg_configure.cpp`，用于发现组件角色和 `cfgfile` 模式线索。原版 ELF 自身的字符串、反汇编和独立运行验证了该模式、重复条目拒绝及后续拓扑缺口；配置变更只用于外部诊断副本，未复制参考代码或配置，未修改固定 ZIP。Frida 热加载回归使用自写 Lua/JS 夹具直接验证原版 Gadget 的轮询行为，没有接入参考监视实现。
+
 ## 原始许可材料
 
 下列文本取自原 `LICENSES/` 和已验证交付包的 Linux 许可材料；合并时统一换行并清理行尾空白，每段路径与 SHA-256 标识原文件。原 miniz 源码目录的 `LICENSE` 与 `LICENSES/miniz.txt` 相同，合并保留一份。
