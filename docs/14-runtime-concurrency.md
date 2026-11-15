@@ -20,4 +20,6 @@
 
 审阅包已重新生成，GUI 字节保持不变。最新 ZIP 为 190382482 字节，SHA-256 `4decacc69356383bfb7778ee0d22d567a37ff84cbdd58e43fe87eec3d0aab118`，CAB 为 175510859 字节；CRC、成员哈希和 ≤210 MB 检查通过。资源内包含当前双架构宿主及上一阶段的原生物品 reset。
 
+验证结束后归档并移除了三组可重建的完整 core/首次创建副本，归档 CRC 和每个成员 SHA-256 均通过；保留首次创建 receipt、截图和阶段摘要。释放约 2.035 GiB，build 现约 17.365 GiB；归档和收据为 `build/cleanup-concurrency-stage-diagnostics.zip` 与 `build/cleanup-concurrency-stage-receipt.json`。
+
 客户端登录前的图表系统初始化错误、定制 jbz69 PVF 缺失模板、一次历史 STUN guest TLS 现场仍保留，尚未声称修复。安全三件套、负载测试、Win7/Win11 和客户端业务的完整矩阵仍未完成。本阶段提交后等待审阅。

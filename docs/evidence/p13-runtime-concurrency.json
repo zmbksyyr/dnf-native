@@ -92,5 +92,26 @@
     "exit_code": 0,
     "forced_cleanup": false,
     "scope": "Current synchronized hosts, full GUI core including game; normal stop after readiness, no client authentication."
+  },
+  "cleanup": {
+    "recorded_utc": "2026-11-15T00:24:29.248166+00:00",
+    "scope": "Reconstructible full-core and first-run payloads archived with CRC/per-file SHA256 before deletion; current receipts and screenshots restored.",
+    "removed_paths": [
+      "probes/20261115T001102730133Z",
+      "probes/20261114T183044510837Z",
+      "probes/20261115T000656615221Z"
+    ],
+    "before_bytes": 20830711381,
+    "after_bytes": 18645690464,
+    "released_bytes": 2185020917,
+    "archive_path": "cleanup-concurrency-stage-diagnostics.zip",
+    "archive_bytes": 1532290675,
+    "archive_sha256": "cc4064757752b751740ce904f168eb73a8e918e19783cb1c00ef8e3620c4bfe3",
+    "archive_crc_passed": true,
+    "member_hashes_passed": true,
+    "restored_members": [
+      "probes/20261115T001102730133Z/gui-setup/created.png",
+      "probes/20261115T001102730133Z/gui-setup/receipt.json"
+    ]
   }
 }
