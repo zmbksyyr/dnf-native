@@ -2,30 +2,8 @@
 #pragma once
 #include <bcrypt.h>
 #include <cstdint>
-#include "resource_cabinet.h"
-
-static std::string file_sha256(const std::wstring &path) {
-    BCRYPT_ALG_HANDLE algorithm = nullptr;
-    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0))
-        throw std::runtime_error("Open resource SHA256 provider failed");
-    BCRYPT_HASH_HANDLE hash = nullptr;
-    if (BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0)) {
-        BCryptCloseAlgorithmProvider(algorithm, 0); throw std::runtime_error("Create resource SHA256 failed");
-    }
-    try {
-        File file(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr));
-        BYTE buffer[65536], digest[32]; DWORD count;
-        for (;;) {
-            require(ReadFile(file.handle, buffer, sizeof(buffer), &count, nullptr), "Read resource for SHA256");
-            if (!count) break;
-            if (BCryptHashData(hash, buffer, count, 0)) throw std::runtime_error("Hash resource failed");
-        }
-        if (BCryptFinishHash(hash, digest, sizeof(digest), 0)) throw std::runtime_error("Finish resource SHA256 failed");
-        std::string result;
-        for (BYTE value : digest) { result += "0123456789abcdef"[value >> 4]; result += "0123456789abcdef"[value & 15]; }
-        BCryptDestroyHash(hash); BCryptCloseAlgorithmProvider(algorithm, 0); return result;
-    } catch (...) { BCryptDestroyHash(hash); BCryptCloseAlgorithmProvider(algorithm, 0); throw; }
-}
+#include "resource_zip.h"
+#include "resource_check.h"
 
 static std::string ascii(const std::wstring &text) {
     if (std::any_of(text.begin(), text.end(), [](wchar_t c) { return c > 127; })) throw std::runtime_error("Expected ASCII resource metadata");
@@ -113,27 +91,20 @@ static void checked_sql_file(const std::wstring &exe, const std::wstring &instan
 }
 
 static void create_game_instance(HWND window, const std::wstring &exe, const std::wstring &resources,
-                                 const std::wstring &instance, Session &live) {
+                                 const std::wstring &instance, Session &live, HANDLE &instance_lock) {
     std::wstring manifest = resources + L"\\resources.ini";
     std::wstring version = setting(manifest, L"resources", L"version");
-    bool cabinet = version == L"2";
-    if (version != L"1" && !cabinet) throw std::runtime_error("Local game resources are missing or incompatible");
+    if (version != L"3") throw std::runtime_error("Local ZIP resources are missing or incompatible");
+    PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在核对本地游戏与数据库资源…"));
+    verify_package(resources);
     unsigned count = GetPrivateProfileIntW(L"resources", L"count", 0, manifest.c_str());
     if (!count) throw std::runtime_error("Local game resource list is empty");
     std::vector<std::pair<std::wstring, std::string>> files;
-    PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在核对本地游戏资源…"));
     for (unsigned i = 0; i < count; ++i) {
         std::wstring section = L"file" + std::to_wstring(i);
-        auto path = resource_path(setting(manifest, section, L"path"));
-        std::string hash = ascii(setting(manifest, section, L"sha256"));
-        if (!cabinet && file_sha256(resources + L"\\" + path) != hash) throw std::runtime_error("Local game resource hash differs; instance was not created");
-        files.emplace_back(path, hash);
+        files.emplace_back(resource_path(setting(manifest, section, L"path")), ascii(setting(manifest, section, L"sha256")));
     }
     std::string seed_hash = ascii(setting(manifest, L"resources", L"seed_sha256"));
-    if (cabinet) {
-        if (file_sha256(resources + L"\\resources.cab") != ascii(setting(manifest, L"resources", L"cabinet_sha256")))
-            throw std::runtime_error("Local game cabinet hash differs; instance was not created");
-    } else if (file_sha256(resources + L"\\seed.sql") != seed_hash) throw std::runtime_error("Application seed identity differs");
     if (present(instance)) {
         if (!(GetFileAttributesW(instance.c_str()) & FILE_ATTRIBUTE_DIRECTORY))
             throw std::runtime_error("Instance path must be a directory; existing file was not changed");
@@ -146,39 +117,33 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
             if (occupied) throw std::runtime_error("Create game instance requires an empty directory; existing files were not changed");
         }
     } else directory(instance);
+    instance_lock = lease_instance(instance);
     PSECURITY_DESCRIPTOR security = private_security();
     bool secured = SetFileSecurityW(instance.c_str(), DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, security);
     LocalFree(security); require(secured, "Protect game instance directory");
     write_private(instance + L"\\instance.pending", "Native game instance creation has not completed. Private diagnostics retained.\n");
     PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在复制游戏资源并安全初始化数据库…"));
-    std::wstring seed = resources + L"\\seed.sql", service_template = resources + L"\\services.template.ini";
-    if (cabinet) {
-        directory(instance + L"\\.mysql");
-        seed = instance + L"\\.mysql\\setup-seed.sql";
-        service_template = instance + L"\\.mysql\\setup-services.ini";
-        auto target = [&](const std::wstring &path) {
-            return path == L"seed.sql" ? seed : path == L"services.template.ini" ? service_template : instance + L"\\" + path;
-        };
-        std::map<std::string, std::wstring> objects;
-        for (const auto &[path, hash] : files) objects.emplace(hash, target(path));
-        PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在解压并核对本地游戏资源…"));
-        extract_resource_cabinet(resources + L"\\resources.cab", objects);
-        for (const auto &[path, hash] : files) {
-            std::wstring destination = target(path);
-            if (objects.at(hash) != destination) {
-                directory(destination.substr(0, destination.find_last_of(L'\\')));
-                require(CopyFileW(objects.at(hash).c_str(), destination.c_str(), TRUE), "Copy identical resource to original path");
-            }
-            if (file_sha256(destination) != hash) throw std::runtime_error("Extracted game resource identity differs; incomplete instance retained");
-        }
-        if (file_sha256(seed) != seed_hash) throw std::runtime_error("Extracted application seed identity differs");
-    } else for (const auto &[path, hash] : files) {
-        if (path == L"seed.sql" || path == L"services.template.ini") continue;
-        std::wstring target = instance + L"\\" + path;
-        directory(target.substr(0, target.find_last_of(L'\\')));
-        require(CopyFileW((resources + L"\\" + path).c_str(), target.c_str(), TRUE), "Copy local game resource");
-        if (file_sha256(target) != hash) throw std::runtime_error("Copied game resource identity differs; incomplete instance retained");
+    directory(instance + L"\\.mysql");
+    std::wstring seed = instance + L"\\.mysql\\setup-seed.sql";
+    std::wstring service_template = instance + L"\\.mysql\\setup-services.ini";
+    std::map<std::string, std::wstring> targets;
+    for (const auto &[path, hash] : files) {
+        std::wstring destination = path == L"seed.sql" ? seed : path == L"services.template.ini" ? service_template : instance + L"\\" + path;
+        std::string entry(path.begin(), path.end()); std::replace(entry.begin(), entry.end(), '\\', '/');
+        targets.emplace(entry, destination);
     }
+    PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在解压原生服务端 ZIP…"));
+    ResourceZip(resources + L"\\native.zip").extract(targets);
+    for (const auto &[path, hash] : files) {
+        std::string entry(path.begin(), path.end()); std::replace(entry.begin(), entry.end(), '\\', '/');
+        if (file_sha256(targets.at(entry)) != hash) throw std::runtime_error("Extracted game resource identity differs");
+    }
+    if (file_sha256(seed) != seed_hash) throw std::runtime_error("Application seed identity differs");
+    PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在释放实例专属 MySQL 程序…"));
+    ResourceZip mysql_zip(resources + L"\\mysql.zip");
+    targets.clear();
+    for (const auto &[name, index] : mysql_zip.files()) targets.emplace(name, instance + L"\\mysql\\" + zip_path(name));
+    mysql_zip.extract(targets);
     // The original configs include literal advertised-address placeholders.
     // Normalize after verifying the copied resources, including older cabinets.
     for (const auto &[path, hash] : files) {
@@ -254,10 +219,8 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     }
     stop_database(window, exe, instance, live); CloseHandle(live.process); live = {};
     require(CopyFileW(service_template.c_str(), (instance + L"\\services.ini").c_str(), TRUE), "Commit instance service list");
-    if (cabinet) {
-        require(DeleteFileW(seed.c_str()), "Remove imported setup seed");
-        require(DeleteFileW(service_template.c_str()), "Remove setup service template");
-    }
+    require(DeleteFileW(seed.c_str()), "Remove imported setup seed");
+    require(DeleteFileW(service_template.c_str()), "Remove setup service template");
     write_private(instance + L"\\instance-setup.txt", "Application seed SHA256=" + seed_hash + "\nImport re-export: byte identical.\nApplication accounts: generated per instance.\nDatabase stopped normally.\n");
     require(DeleteFileW((instance + L"\\instance.pending").c_str()), "Commit completed game instance");
 }

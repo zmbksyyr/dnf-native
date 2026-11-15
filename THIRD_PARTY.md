@@ -7,6 +7,8 @@
 
 `tools/bootstrap.py` 从官方仓库获取固定提交，构建不使用参考 DNF 工程。上游源码位于忽略的 `.local/sources/`，以上许可证随含相应代码的交付物保留。
 
+GUI 使用 [miniz 3.1.0](https://github.com/richgel999/miniz/tree/174573d60290f447c13a2b1b3405de2b96e27d6c) 的 ZIP 读取与 inflate 实现，将普通 ZIP 资源直接释放到实例，不调用外部解压程序。源码保存在 `third_party/miniz/`，许可证见 [miniz.txt](LICENSES/miniz.txt)。所用上游文件保持原样；`miniz_export.h` 是本项目为静态链接提供的导出宏定义。编译关闭 ZIP 写入、压缩、zlib API 和 stdio 接口，文件读写使用 Win32 HANDLE，以支持中文目录。
+
 Linux 用户库来自 [CentOS 7.9.2009 Vault](https://vault.centos.org/7.9.2009/os/x86_64/)，开发工具链来自 [LLVM-MinGW 20261104 MSVCRT](https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104)。[用户库来源记录](docs/evidence/p1-user-libraries.json)包含元数据身份和十个 RPM 的 SHA-256；[工具链记录](docs/evidence/toolchain.json)包含下载身份。RPM 脚本未执行。原始许可证、文档和链接元数据保留在本地导入树；最终用户库依赖闭包、对应源代码和随包许可证尚待交付阶段封样，当前没有制作或发布运行包。
 
 数据库开发实验使用 [Oracle 官方 MySQL 5.7.44 Windows x64 ZIP](https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-winx64.zip)，SHA-256 `aed661fe8120254a1dc30f5a4d5de346681922f4847cf025e2d4084eca78e70e`。`tools/import_mysql.py` 校验官方包、六个工具版本和 Oracle Authenticode，并保留官方 LICENSE、README 和 share 文件；mysql_upgrade/mysqlcheck 仅为本阶段恢复开发工具，最终 payload 尚未封样。当前不分发 MySQL；最终发布须保留官方许可材料并完成依赖闭包检查。

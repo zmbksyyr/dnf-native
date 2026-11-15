@@ -44,17 +44,11 @@ public:
     ~Digest() { if (hash) BCryptDestroyHash(hash); if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0); }
 };
 
-static std::wstring prepare(const std::wstring &) {
-    wchar_t module[32768];
-    DWORD length = GetModuleFileNameW(nullptr, module, 32768);
-    require(length && length < 32768, "Locate MySQL controller");
-    std::wstring folder(module, length);
-    folder.resize(folder.find_last_of(L"/\\"));
-    folder.resize(folder.find_last_of(L"/\\"));
-    std::wstring root = folder + L"\\mysql";
+static std::wstring prepare(const std::wstring &instance) {
+    std::wstring root = instance + L"\\mysql";
     for (const wchar_t *tool : {L"mysqld", L"mysql", L"mysqladmin", L"mysqldump"})
         require(GetFileAttributesW((root + L"\\bin\\" + tool + L".exe").c_str()) != INVALID_FILE_ATTRIBUTES,
-                "Official MySQL directory is missing");
+                "This instance's official MySQL programs are missing");
     return root;
 }
 
@@ -241,7 +235,7 @@ static void print_path(const std::wstring &path) {
 int wmain(int argc, wchar_t **argv) {
     try {
         if (argc == 2 && std::wstring(argv[1]) == L"--version") {
-            std::puts("dnf-native MySQL instance controller; external official MySQL 5.7.44");
+            std::puts("dnf-native MySQL instance controller; instance-local official MySQL 5.7.44");
             return 0;
         }
         if (argc < 3) throw std::runtime_error("Usage: mysql-control.exe initialize INSTANCE [PORT] | backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");

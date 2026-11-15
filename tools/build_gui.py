@@ -33,9 +33,16 @@ def main():
     subprocess.run([str(BIN / "x86_64-w64-mingw32-windres.exe"), "-i", str(resource), "-o", str(obj)], check=True)
     output = work / "DNF-Native.exe"
     source = ROOT / "delivery/controller_gui.cpp"
+    zip_objects = []
+    zip_defines = ["-DMINIZ_NO_STDIO", "-DMINIZ_NO_TIME", "-DMINIZ_NO_ZLIB_APIS", "-DMINIZ_NO_DEFLATE_APIS"]
+    for name in ["miniz", "miniz_tinfl", "miniz_zip"]:
+        target = work / (name + ".o")
+        subprocess.run([str(BIN / "x86_64-w64-mingw32-clang.exe"), "-O2", *zip_defines,
+                        "-c", str(ROOT / "third_party/miniz" / (name + ".c")), "-o", str(target)], check=True)
+        zip_objects.append(str(target))
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-mwindows", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               str(source), str(obj), "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-lcabinet", "-luxtheme", "-lcomctl32", "-o", str(output)]
+               str(source), str(obj), *zip_objects, *zip_defines, "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-luxtheme", "-lcomctl32", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
     for name in ["mysql", "runtime"]:
         if (mysql_dir / name).resolve() != (work / name).resolve():
@@ -43,7 +50,7 @@ def main():
     target = work / "runtime/mysql-control.exe"
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/service_ip.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_cabinet.h", Path(__file__)]},
+                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/service_ip.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_zip.h", ROOT / "delivery/resource_check.h", ROOT / "delivery/instance_files.h", Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

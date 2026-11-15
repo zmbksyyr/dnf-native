@@ -13,7 +13,7 @@ enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, REST
        SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS,
        DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE,
        LOG_SOURCE = 240, LOG_ENCODING, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
-       SERVICE_IP = 250, IP_APPLY };
+       SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
@@ -29,6 +29,7 @@ static std::wstring full_path(const std::wstring &value) {
 }
 
 #include "service_ip.h"
+#include "instance_files.h"
 
 static std::wstring decode(const std::string &bytes) {
     if (bytes.empty()) return {};
@@ -164,7 +165,7 @@ static void stop_database(HWND window, const std::wstring &exe, const std::wstri
 
 #include "instance_setup.h"
 
-struct Result { bool success = false, stopped = false, created = false; Session started; std::wstring status, details; };
+struct Result { bool success = false, stopped = false, created = false, deleted = false; Session started; std::wstring status, details; };
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, status = nullptr, output = nullptr;
@@ -173,7 +174,7 @@ struct App {
     std::wstring exe, initial, current, resources, runtime;
     Session session;
     std::vector<Service> services;
-    HANDLE service_job = nullptr;
+    HANDLE service_job = nullptr, instance_lock = nullptr;
     bool busy = false, closing = false;
     int operation = 0;
     std::thread worker;
@@ -185,7 +186,17 @@ struct App {
     int px(int value) const { return MulDiv(value, dpi, 96); }
     int grid_columns(int width) const { return std::max(1,(width-72)/(width < 1280 ? 140 : 126)); }
     int grid_rows = 2;
-    int database_top() const { return 232 + grid_rows * 54; }
+    int database_top() const { return 288 + grid_rows * 54; }
+    bool resources_ready = false;
+    void check_resources() {
+        std::wstring missing = missing_resources(resources);
+        resources_ready = missing.empty();
+        SetWindowTextW(GetDlgItem(window, 218), resources_ready ? L"资源齐全：MySQL · x86/x64 host · 原生服务端 ZIP" : (L"缺少资源：" + missing).c_str());
+    }
+    void close_instance_lease() {
+        if (instance_lock) { CloseHandle(instance_lock); instance_lock = nullptr; }
+    }
+
 
     void display_log(const std::wstring &text) {
         bool follow = SendMessageW(GetDlgItem(window, LOG_FOLLOW), BM_GETCHECK, 0, 0) == BST_CHECKED;
@@ -350,7 +361,7 @@ struct App {
         // The worker may be changing process ownership. Inspect it after join.
         if (busy) {
             for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,
-                           SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE})
+                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE})
                 EnableWindow(GetDlgItem(window, id), FALSE);
             for (int id : {FOLDER,LOGS,SERVICE_LIST,SERVICE_LOGS}) EnableWindow(GetDlgItem(window,id), !current.empty());
             SetWindowTextW(GetDlgItem(window,ALL_START),operation==ALL_START ? L"正在启动…" : L"整体启动");
@@ -360,6 +371,9 @@ struct App {
         SetWindowTextW(GetDlgItem(window,ALL_START),L"整体启动");
         SetWindowTextW(GetDlgItem(window,ALL_STOP),L"整体停止");
         bool active = services_running();
+        EnableWindow(GetDlgItem(window, CREATE_INSTANCE), resources_ready && !active && !session.process);
+        EnableWindow(GetDlgItem(window, DELETE_INSTANCE), !current.empty() && known_instance(current) && !active && !session.process);
+        EnableWindow(GetDlgItem(window, CHECK_RESOURCES), TRUE);
         bool initialized = !current.empty() && present(current + L"\\data\\auto.cnf");
         bool restore_pending = !current.empty() && present(current + L"\\restore.pending");
         bool pending = restore_pending || (!current.empty() && present(current + L"\\instance.pending"));
@@ -394,9 +408,20 @@ struct App {
         if (busy || session.process || services_running()) return;
         std::wstring value = window_text(path);
         if (value.empty()) {
-            current.clear(); services.clear(); show_services(); show_plugins(); scan_logs(true); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
+            close_instance_lease(); current.clear(); services.clear(); show_services(); show_plugins(); scan_logs(true); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
         }
-        current = full_path(value);
+        std::wstring chosen = full_path(value);
+        if (_wcsicmp(chosen.c_str(), current.c_str())) {
+            HANDLE next_lock = nullptr;
+            try { if (known_instance(chosen)) next_lock = lease_instance(chosen); }
+            catch (const std::exception &) {
+                SetWindowTextW(path, current.c_str());
+                SetWindowTextW(status, L"该实例正在另一个窗口中使用，请先关闭该窗口");
+                controls(); return;
+            }
+            close_instance_lease(); instance_lock = next_lock;
+        }
+        current = chosen;
         services = load_services(current, runtime); show_services(); show_plugins(); scan_logs(true);
         SetWindowTextW(service_ip, configured_service_ip(services).c_str());
         SetWindowTextW(GetDlgItem(window, INITIALIZE), present(resources + L"\\resources.ini") ? L"创建实例" : L"初始化");
@@ -418,9 +443,18 @@ struct App {
         worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets] {
             auto result = std::make_unique<Result>();
             try {
-                if (id == INITIALIZE && present(assets + L"\\resources.ini")) {
+                if (id == DELETE_INSTANCE) {
+                    if (!known_instance(instance) || instance.size() <= 3 ||
+                        (GetFileAttributesW(instance.c_str()) & FILE_ATTRIBUTE_REPARSE_POINT))
+                        throw std::runtime_error("Select a real instance directory before deleting");
+                    close_instance_lease();
+                    remove_instance_tree(instance);
+                    result->deleted = true;
+                    result->status = L"实例文件夹已整体删除";
+                    result->details = result->status + L"：" + instance;
+                } else if (id == CREATE_INSTANCE || (id == INITIALIZE && present(assets + L"\\resources.ini"))) {
                     if (port_text != L"3306") throw std::runtime_error("Original bridge requires database port 3306 for a game instance");
-                    create_game_instance(window, tool, assets, instance, result->started);
+                    create_game_instance(window, tool, assets, instance, result->started, instance_lock);
                     result->created = true;
                     result->status = L"游戏实例创建完成，数据库已停止";
                     result->details = result->status + L"\r\n已核对原始应用库逐字节导出，服务账号分别生成。";
@@ -699,6 +733,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return child;
             };
             control(L"STATIC", L"全局控制", SS_CENTERIMAGE, 214);
+            control(L"STATIC", L"正在检查资源…", SS_ENDELLIPSIS, 218);
+            control(L"BUTTON", L"检查资源", WS_TABSTOP, CHECK_RESOURCES);
+            control(L"BUTTON", L"创建实例", WS_TABSTOP, CREATE_INSTANCE);
+            control(L"BUTTON", L"删除实例", WS_TABSTOP, DELETE_INSTANCE);
             control(L"STATIC", L"0 / 0 运行中", SS_CENTERIMAGE, 213);
             control(L"STATIC", L"实例目录", 0, 201);
             app->path = control(L"EDIT", app->initial.c_str(), ES_AUTOHSCROLL | WS_TABSTOP, INSTANCE);
@@ -744,7 +782,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             for (int id : {202,207,209,214}) SendMessageW(GetDlgItem(window, id), WM_SETFONT, reinterpret_cast<WPARAM>(app->strong_font), TRUE);
             ShowWindow(GetDlgItem(window, 208), SW_HIDE);
             SendMessageW(app->output, EM_LIMITTEXT, 4 * 1024 * 1024, 0);
-            app->load(); SetTimer(window, 1, 500, nullptr);
+            ShowWindow(GetDlgItem(window, INITIALIZE), SW_HIDE);
+            app->check_resources(); app->load(); SetTimer(window, 1, 500, nullptr);
             return 0;
         }
         case WM_SIZE: {
@@ -758,14 +797,16 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             place(INSTANCE,202,38,width-710,26); place(BROWSE,width-500,33,64,36);
             place(FOLDER,width-424,33,90,36); place(LOGS,width-324,33,90,36);
             place(ALL_STOP,width-222,33,90,36); place(ALL_START,width-122,33,92,36);
-            place(207,40,126,80,24); place(213,126,122,130,28);
-            place(216,40,171,56,24); place(SERVICE_IP,108,167,142,26); place(IP_APPLY,266,162,66,36);
-            place(217,346,171,300,24);
-            place(DP2_ENABLE,width-630,122,96,26); place(FRIDA_ENABLE,width-520,122,80,26);
-            place(PLUGINS_SAVE,width-430,119,80,32);
-            place(ELF_START,width-336,119,96,32); place(ELF_STOP,width-230,119,96,32);
-            place(SERVICE_LOGS,width-126,119,110,32);
-            place(SERVICE_LIST,32,206,width-64,app->grid_rows*54);
+            place(218,40,88,width-450,24); place(CHECK_RESOURCES,width-398,83,92,34);
+            place(CREATE_INSTANCE,width-296,83,118,34); place(DELETE_INSTANCE,width-168,83,118,34);
+            place(207,40,182,80,24); place(213,126,178,130,28);
+            place(216,40,227,56,24); place(SERVICE_IP,108,223,142,26); place(IP_APPLY,266,218,66,36);
+            place(217,346,227,300,24);
+            place(DP2_ENABLE,width-630,178,96,26); place(FRIDA_ENABLE,width-520,178,80,26);
+            place(PLUGINS_SAVE,width-430,175,80,32);
+            place(ELF_START,width-336,175,96,32); place(ELF_STOP,width-230,175,96,32);
+            place(SERVICE_LOGS,width-126,175,110,32);
+            place(SERVICE_LIST,32,262,width-64,app->grid_rows*54);
             HWND services = GetDlgItem(window, SERVICE_LIST);
             SendMessageW(services, LB_SETCOLUMNWIDTH, (app->px(width-64))/columns, 0);
             LRESULT selected = SendMessageW(services, LB_GETCURSEL, 0, 0);
@@ -802,15 +843,15 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 RECT panel = {app->px(24),top,width-app->px(24),bottom};
                 rounded(dc,panel,RGB(255,255,255),RGB(228,234,243),app->px(24));
             };
-            card(app->px(20),app->px(84)); card(app->px(106),db-app->px(18)); card(db,db+app->px(76)); card(logs,area.bottom-app->px(54));
+            card(app->px(20),app->px(140)); card(app->px(162),db-app->px(18)); card(db,db+app->px(76)); card(logs,area.bottom-app->px(54));
             RECT path_border = {app->px(198),app->px(32),width-app->px(432),app->px(70)};
             rounded(dc,path_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
             RECT port_border = {app->px(260),db+app->px(22),app->px(326),db+app->px(54)};
             rounded(dc,port_border,RGB(255,255,255),RGB(225,233,246),app->px(14));
-            RECT ip_border = {app->px(102),app->px(162),app->px(256),app->px(198)};
+            RECT ip_border = {app->px(102),app->px(218),app->px(256),app->px(254)};
             rounded(dc,ip_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
             HPEN line = CreatePen(PS_SOLID,1,RGB(239,243,249)); HGDIOBJ old=SelectObject(dc,line);
-            for (int y : {app->px(84),app->px(157),logs+app->px(53),logs+app->px(88),static_cast<int>(area.bottom)-app->px(38)}) {
+            for (int y : {app->px(76),app->px(213),logs+app->px(53),logs+app->px(88),static_cast<int>(area.bottom)-app->px(38)}) {
                 MoveToEx(dc,app->px(24),y,nullptr);LineTo(dc,width-app->px(24),y);
             }
             SelectObject(dc,old);DeleteObject(line);EndPaint(window, &paint); return 0;
@@ -835,6 +876,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->worker.join(); app->busy = false;
             if (result->stopped && app->session.process) { CloseHandle(app->session.process); app->session = {}; }
             if (result->started.process) app->session = result->started;
+            if (result->deleted) {
+                app->current.clear(); app->services.clear();
+                SetWindowTextW(app->path, L""); app->show_plugins();
+            }
             if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); }
             app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls(); app->scan_logs();
             if (!result->success) {
@@ -878,6 +923,23 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return 0;
             }
             if (HIWORD(wparam) != BN_CLICKED) return 0;
+            if (id == CHECK_RESOURCES && !app->busy) { app->check_resources(); app->controls(); return 0; }
+            if (id == CREATE_INSTANCE && !app->busy) {
+                auto chosen = choose_folder(window, L"选择用于新实例的空文件夹（可在此新建文件夹）", app->current);
+                if (!chosen.empty()) {
+                    SetWindowTextW(app->path, chosen.c_str());
+                    if (!known_instance(chosen)) app->action(CREATE_INSTANCE);
+                    else SetWindowTextW(app->status, L"该目录已有实例，请选择新的空文件夹");
+                }
+                return 0;
+            }
+            if (id == DELETE_INSTANCE && !app->busy) {
+                if (app->services_running() || app->session.process || !known_instance(app->current)) return 0;
+                std::wstring question = L"永久删除整个实例文件夹及全部内容？\n\n" + app->current + L"\n\n此操作无法撤销。";
+                if (MessageBoxW(window, question.c_str(), L"删除实例", MB_YESNO | MB_DEFBUTTON2 | MB_ICONWARNING) == IDYES)
+                    app->action(DELETE_INSTANCE);
+                return 0;
+            }
             if (id == SERVICE_LOGS) { app->scan_logs(true); return 0; }
             if (id == FOLDER || id == LOGS) {
                 std::wstring path = full_path(window_text(app->path)) + (id == LOGS ? L"\\.mysql" : L"");
@@ -926,7 +988,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (app->session.process) { app->closing = true; app->action(STOP); return 0; }
             DestroyWindow(window); return 0;
         case WM_DESTROY:
-            KillTimer(window, 1);
+            KillTimer(window, 1); app->close_instance_lease();
             for (HFONT font : {app->font, app->strong_font, app->log_font}) DeleteObject(font);
             DeleteObject(app->background); DeleteObject(app->surface); PostQuitMessage(0); return 0;
         }
@@ -948,18 +1010,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         require(SetInformationJobObject(state.service_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)), "Configure ELF host ownership");
         wchar_t module[32768]; require(GetModuleFileNameW(nullptr, module, 32768) != 0, "Find native application directory");
         std::wstring gui_folder(module); gui_folder.resize(gui_folder.find_last_of(L'\\'));
-        // The release layout keeps the controller in gui/ and the two
-        // runtime directories beside it. Development builds may still place
-        // the executable directly in their build directory.
-        std::wstring folder = gui_folder;
-        if (folder.size() >= 4 && _wcsicmp(folder.substr(folder.size() - 3).c_str(), L"gui") == 0 &&
-            present(folder.substr(0, folder.find_last_of(L'\\')) + L"\\compatibility"))
-            folder.resize(folder.find_last_of(L'\\'));
-        state.runtime = folder + L"\\compatibility";
-        if (!present(state.runtime)) state.runtime = gui_folder + L"\\runtime";
+        state.runtime = gui_folder + L"\\resources";
         state.exe = state.runtime + L"\\mysql-control.exe";
-        state.resources = folder + L"\\native";
-        state.initial = folder + L"\\instances\\default";
+        state.resources = state.runtime;
+        state.initial = L"";
         int count; wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
         require(args != nullptr, "Read application arguments");
         if (count == 3 && std::wstring(args[1]) == L"--instance") state.initial = full_path(args[2]);
