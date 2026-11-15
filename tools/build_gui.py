@@ -1,4 +1,4 @@
-"""Build the independent Win32 GUI with a verified current MySQL SFX beside it."""
+"""Build the Win32 GUI with external official MySQL tools and a maintenance helper."""
 
 import argparse
 import json
@@ -14,15 +14,16 @@ BIN = ROOT / ".local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mysql-exe", type=Path, default=ROOT / "build/mysql-standalone/mysql-standalone.exe")
+    parser.add_argument("--mysql-dir", type=Path, default=ROOT / "build/mysql-tools")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/gui")
     args = parser.parse_args()
-    mysql = args.mysql_exe.resolve(strict=True)
-    receipt = json.loads((mysql.parent / "build-receipt.json").read_text(encoding="utf-8"))
-    sources = ["delivery/mysql_standalone.cpp", "delivery/mysql_operations.h", "delivery/win32_files.h"]
+    mysql_dir = args.mysql_dir.resolve(strict=True)
+    mysql = mysql_dir / "runtime/mysql-control.exe"
+    receipt = json.loads((mysql_dir / "build-receipt.json").read_text(encoding="utf-8"))
+    sources = ["delivery/mysql_control.cpp", "delivery/mysql_operations.h", "delivery/win32_files.h"]
     if (sha256(mysql) != receipt["output_sha256"] or
             receipt.get("source_files") != {name: sha256(ROOT / name) for name in sources}):
-        raise SystemExit("Rebuild the MySQL SFX from current sources before building the GUI")
+        raise SystemExit("Rebuild the MySQL tools from current sources before building the GUI")
     work = args.build_dir.resolve()
     work.mkdir(parents=True, exist_ok=True)
     manifest = ROOT / "delivery/controller_gui.manifest"
@@ -34,15 +35,16 @@ def main():
     source = ROOT / "delivery/controller_gui.cpp"
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-mwindows", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               str(source), str(obj), "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-lcabinet", "-o", str(output)]
+               str(source), str(obj), "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-lcabinet", "-luxtheme", "-lcomctl32", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
-    target = work / "mysql-standalone.exe"
-    if mysql != target:
-        shutil.copy2(mysql, target)
+    for name in ["mysql", "runtime"]:
+        if (mysql_dir / name).resolve() != (work / name).resolve():
+            shutil.copytree(mysql_dir / name, work / name, dirs_exist_ok=True)
+    target = work / "runtime/mysql-control.exe"
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_cabinet.h", Path(__file__)]},
-              "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql.parent / "build-receipt.json"),
+                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/service_ip.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_cabinet.h", Path(__file__)]},
+              "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print("Native GUI:", output, output.stat().st_size, "bytes", flush=True)

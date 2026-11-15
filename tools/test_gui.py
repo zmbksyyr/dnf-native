@@ -30,6 +30,8 @@ user.GetWindowTextW.argtypes = [w.HWND, w.LPWSTR, c.c_int]
 user.GetClassNameW.argtypes = [w.HWND, w.LPWSTR, c.c_int]
 user.GetWindowThreadProcessId.argtypes = [w.HWND, c.POINTER(w.DWORD)]
 user.IsWindowEnabled.argtypes = [w.HWND]
+user.GetWindowLongW.argtypes = [w.HWND,c.c_int]
+user.GetWindowLongW.restype = w.LONG
 user.IsWindow.argtypes = [w.HWND]
 user.SendMessageTimeoutW.argtypes = [w.HWND, w.UINT, c.c_size_t, c.c_ssize_t, w.UINT, w.UINT, c.POINTER(c.c_size_t)]
 callback_type = c.WINFUNCTYPE(w.BOOL, w.HWND, c.c_ssize_t)
@@ -76,7 +78,14 @@ def click(window, identifier):
     if not button:
         raise RuntimeError("Requested GUI button is disabled: " + str(identifier))
     wait_for(lambda: user.IsWindowEnabled(button), "button enabled: " + str(identifier), 5)
-    user.PostMessageW(button, 0x00F5, 0, 0)  # BM_CLICK through the actual control.
+    if user.IsWindowVisible(button):
+        user.PostMessageW(button, 0x00F5, 0, 0)  # BM_CLICK through the actual control.
+    else:
+        # BM_CLICK hit-testing ignores controls in a hidden test window.
+        # Deliver its normal BN_CLICKED notification after checking enablement.
+        if user.GetWindowLongW(button,-16) & 15 == 3:  # BS_AUTOCHECKBOX
+            user.SendMessageW(button,0xF1,0 if user.SendMessageW(button,0xF0,0,0) else 1,0)
+        user.PostMessageW(window, 0x111, identifier, button)
 
 
 def status(window):
@@ -118,6 +127,7 @@ def select_folder(process, target):
         written = c.c_size_t()
         if not address or not kernel.WriteProcessMemory(handle, address, text, c.sizeof(text), c.byref(written)):
             raise c.WinError(c.get_last_error())
+        user.ShowWindow(dialog,0)
         user.SendMessageW(dialog, 0x400 + 103, 1, address)
     finally:
         if address:
@@ -141,6 +151,10 @@ def screenshot(window, path):
     gdi.GetDIBits.argtypes = [w.HDC, w.HBITMAP, w.UINT, w.UINT, c.c_void_p, c.c_void_p, w.UINT]
     gdi.DeleteObject.argtypes = [w.HANDLE]
     gdi.DeleteDC.argtypes = [w.HDC]
+    hidden = not user.IsWindowVisible(window)
+    if hidden:
+        user.ShowWindow(window,4)  # Brief capture without activation.
+        user.UpdateWindow(window)
     rect = w.RECT()
     user.GetWindowRect(window, c.byref(rect))
     width, height = rect.right - rect.left, rect.bottom - rect.top
@@ -172,6 +186,15 @@ def screenshot(window, path):
         gdi.DeleteObject(bitmap)
         gdi.DeleteDC(memory)
         user.ReleaseDC(window, dc)
+        if hidden:
+            user.ShowWindow(window,0)
+
+
+def hidden_startup():
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = 0
+    return startup
 
 
 def main():
@@ -179,7 +202,7 @@ def main():
     parser.add_argument("--exe", type=Path, default=ROOT / "build/gui/DNF-Native.exe")
     args = parser.parse_args()
     exe = args.exe.resolve(strict=True)
-    mysql = exe.parent / "mysql-standalone.exe"
+    mysql = exe.parent / "runtime/mysql-control.exe"
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = ROOT / "build/probes" / stamp / "gui"
     instance = probe / "实例 (native)"
@@ -211,7 +234,7 @@ def main():
         return invoke("mysql", ["--defaults-file=client.private.cnf", "--batch", "--skip-column-names"], text.encode("ascii"))
 
     try:
-        process = subprocess.Popen([str(exe), "--instance", str(instance)], env=env)
+        process = subprocess.Popen([str(exe), "--instance", str(instance)], env=env, startupinfo=hidden_startup())
         processes.append(process)
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "main window")
         empty = c.create_unicode_buffer("")
@@ -247,7 +270,7 @@ def main():
         other = probe / "other-instance"
         invoke("initialize", [port], target=other)
         shutil.copy2(instance / "client.private.cnf", other / "client.private.cnf")
-        conflict = subprocess.Popen([str(exe), "--instance", str(other)], env=env)
+        conflict = subprocess.Popen([str(exe), "--instance", str(other)], env=env, startupinfo=hidden_startup())
         processes.append(conflict)
         other_window = wait_for(lambda: next(iter(windows(conflict.pid, "DNFNativeController")), None), "second window")
         click(other_window, 111)
@@ -328,7 +351,7 @@ def main():
         operation.mkdir()
         (instance / "data").rename(operation / "previous-data")
         (instance / "restore.pending").write_text(leaf, encoding="ascii")
-        reopened = subprocess.Popen([str(exe), "--instance", str(instance)], env=env)
+        reopened = subprocess.Popen([str(exe), "--instance", str(instance)], env=env, startupinfo=hidden_startup())
         processes.append(reopened)
         reopened_window = wait_for(lambda: next(iter(windows(reopened.pid, "DNFNativeController")), None), "recovery window")
         ready(reopened_window, "需要恢复未完成的还原")
@@ -355,8 +378,8 @@ def main():
                     subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=10)
                     process.wait(timeout=10)
         receipt["limits"] = ["Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
-                  "This probe exercises MySQL controls; original service orchestration is verified separately. Plugin, password and level controls remain pending.",
-                             "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
+                  "This probe exercises MySQL controls; original service orchestration is verified separately. This database probe does not exercise gameplay or service IP changes.",
+                             "This isolated database probe starts maintenance with the database already stopped; running-service coordination is covered separately.",
                              "No final complete offline ZIP or gameplay acceptance."]
         (probe / "receipt.json").write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(receipt, ensure_ascii=True))

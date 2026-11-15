@@ -13,10 +13,10 @@ from test_channel import encrypt, receive
 from test_relay import packet
 
 
-def channel(port):
+def channel(port, host="127.0.0.1"):
     header = struct.pack("<BBIIB", 0x7c, 11, 27, 0, 0)
     reply_header = struct.pack("<BBIIB", 0x7c, 12, 47, 0, 1)
-    with socket.create_connection(("127.0.0.1", port), timeout=5) as peer:
+    with socket.create_connection((host, port), timeout=5) as peer:
         peer.sendall(header + bytes(16))
         reply = receive(peer, 47)
         if reply[:11] != reply_header or reply[11:15] != bytes(4) or not any(reply[15:31]):
@@ -34,14 +34,14 @@ def channel(port):
     return {"challenge": True, "positive_responses": 3, "fragmented": True, "coalesced": True}
 
 
-def relay(monitor_auth=False):
+def relay(monitor_auth=False, host="127.0.0.1"):
     peers = []
     accounts = [701, 702]
     stage = "connect"
     try:
         for account in accounts:
             stage = "registration for account " + str(account)
-            peer = socket.create_connection(("127.0.0.1", 7200), timeout=5)
+            peer = socket.create_connection((host, 7200), timeout=5)
             peers.append(peer)
             peer.sendall(packet(0, account, 0) + packet(1, account, account, b"registered"))
             expected = packet(3, account, account, b"registered")
@@ -68,7 +68,7 @@ def relay(monitor_auth=False):
                 while len(closed) != len(peers):
                     if time.monotonic() >= deadline:
                         raise RuntimeError("Unlogged relay accounts were not both rejected")
-                    wake.sendto(struct.pack("<HHHIIB", 1, 15, 0, 0, 0, 0), ("127.0.0.1", 8200))
+                    wake.sendto(struct.pack("<HHHIIB", 1, 15, 0, 0, 0, 0), (host, 8200))
                     for index, peer in enumerate(peers):
                         if index in closed:
                             continue
@@ -85,7 +85,7 @@ def relay(monitor_auth=False):
                     "unlogged_accounts_disconnected": accounts, "own_auth_response_sent": False}
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             stage = "targeted disconnect"
-            udp.sendto(struct.pack("<HHHIIB", 2500, 15, 0, 0, accounts[0], 0), ("127.0.0.1", 8200))
+            udp.sendto(struct.pack("<HHHIIB", 2500, 15, 0, 0, accounts[0], 0), (host, 8200))
         if peers[0].recv(1) != b"":
             raise RuntimeError("Relay targeted disconnect differs")
         peers[1].sendall(packet(1, accounts[1], accounts[1], b"still connected"))

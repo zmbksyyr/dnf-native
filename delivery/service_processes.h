@@ -23,7 +23,7 @@ static std::wstring setting(const std::wstring &file, const std::wstring &sectio
     return std::wstring(value, size);
 }
 
-static std::vector<Service> load_services(const std::wstring &instance) {
+static std::vector<Service> load_services(const std::wstring &instance, const std::wstring &runtime) {
     std::wstring file = instance + L"\\services.ini";
     std::vector<Service> services;
     if (GetFileAttributesW(file.c_str()) == INVALID_FILE_ATTRIBUTES) return services;
@@ -38,7 +38,7 @@ static std::vector<Service> load_services(const std::wstring &instance) {
         service.name = setting(file, L"services", L"service" + std::to_wstring(i));
         if (service.name.empty()) throw std::runtime_error("Service name is missing");
         auto get = [&](const wchar_t *key) { return setting(file, service.name, key); };
-        service.host = instance + L"\\" + get(L"host");
+        service.host = runtime + L"\\" + get(L"host");
         service.root = instance + L"\\" + get(L"root");
         service.cwd = get(L"cwd");
         service.elf = service.root + get(L"elf");

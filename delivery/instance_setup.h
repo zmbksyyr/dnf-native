@@ -218,7 +218,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     std::string encoded = legacy_password(instance + L"\\i686\\home\\neople\\dbmw_guild\\df_dbmw_r", game);
     std::string query = "CREATE USER 'dnf_game'@'127.0.0.1' IDENTIFIED BY '" + game + "';";
     // Keep permissions at the application's existing schema boundary. This is
-    // independent from the generated private root maintenance credential.
+    // independent from the root maintenance credential.
     for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'dnf_game'@'127.0.0.1';";
     // Original stored routines use this definer. Keep their definitions intact;
     // the locked account is only an execution identity, never a login account.

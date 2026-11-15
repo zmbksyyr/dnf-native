@@ -12,7 +12,7 @@ import time
 
 from bootstrap import sha256
 from probe_core_protocols import channel, relay, stun
-from test_gui import user, windows, wait_for, click, ready, title, screenshot, responsive
+from test_gui import user, windows, wait_for, click, ready, title, screenshot, responsive, hidden_startup
 from test_gui_services import rows, select
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,7 +54,7 @@ def main():
     (log_dir / 'siroco11').mkdir(parents=True)
     fixture = log_dir / 'gui-viewer.fixture.log'
     fixture.write_text('原文标记一\n原文标记二\n', encoding='utf-8')
-    process = subprocess.Popen([str(gui), '--instance', str(instance)])
+    process = subprocess.Popen([str(gui), '--instance', str(instance)], startupinfo=hidden_startup())
     window = None
     checks = receipt['checks']
     try:
@@ -114,6 +114,7 @@ def main():
             return next((path for path in log_dir.rglob('*.init') if b'server has been started successfully' in path.read_bytes()), None)
         original = wait_for(game_ready, 'original game ready marker', 150)
         checks['original_game_natural_start_seconds_after_launch'] = round(time.monotonic() - started, 3)
+        user.ShowWindow(window,4)  # Native caret scrolling requires a visible window.
         choose_source(window, original.name)
         wait_for(lambda: 'server has been started successfully' in title(output), 'original application init log')
         assert user.SendMessageW(output, 0xCE, 0, 0) > 0
@@ -122,6 +123,7 @@ def main():
         assert expected in title(output)
         checks['actual_application_init_log_visible'] = True
         screenshot(window, probe / 'original-game-log.png')
+        user.ShowWindow(window,0)
         checks['window_response_ms'] = responsive(window)
         choose_source(window, '标准输出')
         wait_for(lambda: len(title(output)) > 20, 'actual stdout')

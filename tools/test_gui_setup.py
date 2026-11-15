@@ -1,4 +1,4 @@
-"""Create native game instances using only two delivered EXEs and local resources."""
+"""Create native game instances using the delivered official tools, compatibility hosts and native cabinet."""
 
 import argparse
 import configparser
@@ -17,7 +17,7 @@ import time
 from bootstrap import sha256
 from probe_mysql import tree_identity
 from probe_core_protocols import channel, relay, stun
-from test_gui import user, windows, wait_for, click, ready, status, responsive, screenshot
+from test_gui import user, windows, wait_for, click, ready, status, responsive, screenshot, hidden_startup
 from test_gui_services import rows, select
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,11 +34,11 @@ def main():
     probe = ROOT / "build/probes" / stamp / "gui-setup"
     delivery = probe / "本地 程序(1)"
     delivery.mkdir(parents=True)
-    for name in ["DNF-Native.exe", "mysql-standalone.exe"]:
-        shutil.copy2(source / name, delivery / name)
-    shutil.copytree(source / "resources", delivery / "resources")
-    source_before = tree_identity(source / "resources")
-    copied_before = tree_identity(delivery / "resources")
+    shutil.copy2(source / "DNF-Native.exe", delivery / "DNF-Native.exe")
+    for name in ["mysql", "runtime", "native"]:
+        shutil.copytree(source / name, delivery / name)
+    source_before = tree_identity(source / "native")
+    copied_before = tree_identity(delivery / "native")
     assert source_before == copied_before
     env = dict(os.environ)
     env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
@@ -46,17 +46,17 @@ def main():
         env.pop(key, None)
     record = {"recorded_utc": stamp, "os": platform.platform(),
               "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
-              "gui_sha256": sha256(delivery / "DNF-Native.exe"), "mysql_sha256": sha256(delivery / "mysql-standalone.exe"),
+              "gui_sha256": sha256(delivery / "DNF-Native.exe"), "mysql_sha256": sha256(delivery / "runtime/mysql-control.exe"),
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False}
     checks = record["checks"]
     instance = probe / "游戏 实例(1)"
-    process = subprocess.Popen([str(delivery / "DNF-Native.exe"), "--instance", str(instance)], env=env)
+    process = subprocess.Popen([str(delivery / "DNF-Native.exe"), "--instance", str(instance)], env=env, startupinfo=hidden_startup())
     window = None
     saved_elf = None
     manifest = configparser.ConfigParser(interpolation=None)
-    manifest.read(delivery / "resources/resources.ini", encoding="utf-16")
+    manifest.read(delivery / "native/resources.ini", encoding="utf-16")
     cabinet = manifest["resources"]["version"] == "2"
-    modified = delivery / ("resources/resources.cab" if cabinet else "resources/hosts/i686/dnf-host.exe")
+    modified = delivery / ("native/resources.cab" if cabinet else "runtime/hosts/i686/dnf-host.exe")
     lua = js = None
     lua_before = js_before = None
 
@@ -65,7 +65,7 @@ def main():
         user.SendMessageW(user.GetDlgItem(window, 101), 0x000C, 0, c.addressof(text))
 
     def query(text, root=instance):
-        result = subprocess.run([str(delivery / "mysql-standalone.exe"), "mysql", str(root), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names"],
+        result = subprocess.run([str(delivery / "runtime/mysql-control.exe"), "mysql", str(root), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names"],
                                 input=text.encode("ascii"), capture_output=True, env=env, timeout=30)
         if result.returncode:
             (probe / "query-error.private.log").write_bytes(result.stdout + result.stderr)
@@ -74,6 +74,8 @@ def main():
 
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "main window")
+        assert user.IsWindowEnabled(user.GetDlgItem(window,110)) and not instance.exists()
+        checks["opening_gui_does_not_start_work_or_disable_initialize"] = True
         saved_elf = modified.read_bytes()
         broken = bytearray(saved_elf); broken[-1] ^= 1; modified.write_bytes(broken)
         click(window, 110)
@@ -91,6 +93,8 @@ def main():
         target(instance); click(window, 110)
         wait_for(lambda: (instance / "instance.pending").exists(), "native copy starts")
         checks["copy_and_initialize_window_response_ms"] = responsive(window)
+        assert all(user.IsWindowEnabled(user.GetDlgItem(window,identifier)) for identifier in [220,240,241,243,244,116])
+        checks["busy_keeps_service_selection_and_log_controls_available"] = True
         ready(window, "游戏实例创建完成", 240)
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 111)), "created instance controls")
         assert len(rows(window)) == 19 and not (instance / "instance.pending").exists()
@@ -109,6 +113,31 @@ def main():
             if name.startswith("game/"):
                 assert re.search(r"(?m)^system_monitoring_ip\s*=\s*0\.0\.0\.0\s*$", config), name
         checks["original_advertised_address_placeholders_are_local"] = True
+        assert not (instance / "hosts").exists(), "Hosts belong to the delivered runtime directory"
+        assert "password=uu5!^%jg\n" in (instance / "client.private.cnf").read_text(encoding="utf-8")
+        checks["fixed_default_root_password_and_external_hosts"] = True
+        before_cfg = {path: path.read_bytes() for path in instance.rglob("*.cfg")}
+        ip_text = c.create_unicode_buffer("127.0.0.2")
+        user.SendMessageW(user.GetDlgItem(window,250),0x000C,0,c.addressof(ip_text))
+        user.SendMessageW(window,0x111,251,user.GetDlgItem(window,251))
+        ready(window,"服务 IP 已更新")
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window,251)),"IP apply finished")
+        changed_cfg = {path: path.read_bytes() for path in before_cfg}
+        assert any(before_cfg[path] != changed_cfg[path] for path in before_cfg)
+        for path, old in before_cfg.items():
+            current = path.read_bytes()
+            for field in [b"master_db_ip",b"db_ip",b"game_db_ip",b"auction_db_ip",b"system_monitoring_ip"]:
+                assert [line for line in old.splitlines() if line.strip().startswith(field+b" ") or line.strip().startswith(field+b"=")] == [line for line in current.splitlines() if line.strip().startswith(field+b" ") or line.strip().startswith(field+b"=")], (path,field)
+        assert b"127.0.0.2" in (instance / "i686/home/neople/monitor/cfg/mnt_siroco.cfg").read_bytes()
+        backups = list((instance / ".settings").iterdir())
+        assert len(backups)==1
+        user.SendMessageW(window,0x111,251,user.GetDlgItem(window,251))
+        ready(window,"服务 IP 已更新")
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window,251)),"same IP finished")
+        assert list((instance / ".settings").iterdir())==backups
+        assert all(path.read_bytes()==text for path,text in changed_cfg.items())
+        checks["service_ip_updates_ini_and_positional_records_with_backups"] = True
+        checks["service_ip_keeps_database_and_monitor_bypass_and_is_idempotent"] = True
         screenshot(window, probe / "created.png")
         click(window, 111); ready(window, "数据库 SQL 检查通过")
         schemas = query("SELECT TABLE_SCHEMA,COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY TABLE_SCHEMA ORDER BY TABLE_SCHEMA;")
@@ -126,6 +155,7 @@ def main():
         assert query("SELECT COUNT(*) FROM d_taiwan.db_connect WHERE db_ip<>'127.0.0.1' OR db_port<>3306 OR db_userid<>'dnf_game' OR db_passwd<>'" + encoded + "';").strip() == b"0"
         checks["original_credential_encoding_matches_connection_table"] = True
         checks["game_account_has_no_global_grants"] = not query("SELECT PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE=CONCAT(CHAR(39),'dnf_game',CHAR(39),'@',CHAR(39),'127.0.0.1',CHAR(39)) AND PRIVILEGE_TYPE<>'USAGE';").strip()
+        checks["ip_locked_while_database_running"] = not user.IsWindowEnabled(user.GetDlgItem(window,251))
         first_accounts = query("SELECT User,Host,authentication_string FROM mysql.user WHERE User IN ('root','dnf_game','dnf_bridge','dnf_frida') ORDER BY User,Host;")
         for index in range(15):
             select(window, index); click(window, 221)
@@ -133,8 +163,8 @@ def main():
         time.sleep(25)
         assert sum("进程运行中" in row for row in rows(window)) == 15, rows(window)
         checks["native_initialized_fifteen_original_peers"] = True
-        checks["channel_protocol"] = channel(7001)
-        checks["relay_and_actual_monitor_protocol"] = relay(True)
+        checks["channel_protocol"] = channel(7001,"127.0.0.2")
+        checks["relay_and_actual_monitor_protocol"] = relay(True,"127.0.0.2")
         checks["stun_protocol"] = stun()
         print("Native GUI first run: original seed, generated accounts and 15-peer protocols passed", flush=True)
         # Exercise the original init_db implementation with the newly generated
@@ -158,13 +188,15 @@ def main():
         second_accounts = query("SELECT User,Host,authentication_string FROM mysql.user WHERE User IN ('root','dnf_game','dnf_bridge','dnf_frida') ORDER BY User,Host;", second)
         first_rows, second_rows = first_accounts.splitlines(), second_accounts.splitlines()
         assert len(first_rows) == len(second_rows) == 4
-        assert all(a.split(b"\t")[:2] == b.split(b"\t")[:2] and a.split(b"\t")[2] != b.split(b"\t")[2] for a,b in zip(first_rows,second_rows))
-        checks["all_four_account_secrets_differ_between_instances"] = True
+        for a,b in zip(first_rows,second_rows):
+            assert a.split(b"\t")[:2] == b.split(b"\t")[:2]
+            assert (a.split(b"\t")[2] == b.split(b"\t")[2]) == a.startswith(b"root\t")
+        checks["default_root_matches_and_three_service_secrets_differ"] = True
         user.PostMessageW(window, 0x10, 0, 0); process.wait(timeout=90)
         assert process.returncode == 0
         checks["second_instance_normal_close"] = True
-        checks["delivery_resources_unchanged"] = tree_identity(delivery / "resources") == copied_before
-        checks["source_resources_unchanged"] = tree_identity(source / "resources") == source_before
+        checks["delivery_resources_unchanged"] = tree_identity(delivery / "native") == copied_before
+        checks["source_resources_unchanged"] = tree_identity(source / "native") == source_before
         assert all(value is not False for value in checks.values())
         record["first_instance"] = str(instance.relative_to(ROOT))
         record["second_instance"] = str(second.relative_to(ROOT))
