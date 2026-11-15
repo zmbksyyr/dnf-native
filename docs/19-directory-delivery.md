@@ -1,5 +1,7 @@
 # 目录式审阅包
 
+> 历史阶段记录。本轮交付结构已由[实例式交付](20-instance-delivery.md)替代；以下路径、CAB 和命令不适用于新版 GUI。
+
 当前交付包位于 `build/release-package/`，根目录只有四个产品目录：
 
 ```text
