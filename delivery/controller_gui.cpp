@@ -168,7 +168,7 @@ struct Result { bool success = false, stopped = false, created = false; Session 
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, status = nullptr, output = nullptr;
-    HFONT font = nullptr, title_font = nullptr, strong_font = nullptr, log_font = nullptr;
+    HFONT font = nullptr, strong_font = nullptr, log_font = nullptr;
     HBRUSH background = nullptr, surface = nullptr;
     std::wstring exe, initial, current, resources, runtime;
     Session session;
@@ -672,7 +672,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, face);
             };
             app->font = font(14, FW_NORMAL, L"Microsoft YaHei UI");
-            app->title_font = font(22, FW_SEMIBOLD, L"Microsoft YaHei UI");
             app->strong_font = font(14, FW_SEMIBOLD, L"Microsoft YaHei UI");
             app->log_font = font(14, FW_NORMAL, L"Consolas");
             app->background = CreateSolidBrush(RGB(244,247,251)); app->surface = CreateSolidBrush(RGB(255,255,255));
@@ -928,7 +927,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             DestroyWindow(window); return 0;
         case WM_DESTROY:
             KillTimer(window, 1);
-            for (HFONT font : {app->font, app->title_font, app->strong_font, app->log_font}) DeleteObject(font);
+            for (HFONT font : {app->font, app->strong_font, app->log_font}) DeleteObject(font);
             DeleteObject(app->background); DeleteObject(app->surface); PostQuitMessage(0); return 0;
         }
     } catch (const std::exception &error) {
