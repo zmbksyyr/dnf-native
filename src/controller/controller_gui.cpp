@@ -858,6 +858,24 @@ static LRESULT CALLBACK popup_proc(HWND window, UINT message, WPARAM wparam, LPA
     return DefSubclassProc(window,message,wparam,lparam);
 }
 
+static LRESULT CALLBACK button_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+                                     UINT_PTR, DWORD_PTR) {
+    // The dialog manager changes default-button styles while moving focus.
+    // Keep the custom renderer when it requests ordinary/default push styles.
+    if (message == BM_SETSTYLE) wparam = (wparam & ~static_cast<WPARAM>(BS_TYPEMASK)) | BS_OWNERDRAW;
+    LRESULT result = DefSubclassProc(window, message, wparam, lparam);
+    // Owner-draw changes appearance, but Enter must still activate the focused
+    // push button through IsDialogMessage's normal command handling.
+    return message == WM_GETDLGCODE ? result | (GetFocus() == window ? DLGC_DEFPUSHBUTTON : DLGC_UNDEFPUSHBUTTON) : result;
+}
+
+static LRESULT CALLBACK readonly_text_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+                                            UINT_PTR, DWORD_PTR) {
+    LRESULT result = DefSubclassProc(window, message, wparam, lparam);
+    // Read-only multiline text must not trap Tab inside the log/detail view.
+    return message == WM_GETDLGCODE && wparam == VK_TAB ? result & ~(DLGC_WANTALLKEYS | DLGC_WANTTAB) : result;
+}
+
 static LRESULT CALLBACK combo_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
                                     UINT_PTR, DWORD_PTR) {
     if (message == WM_ERASEBKGND) return TRUE;
@@ -955,6 +973,9 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     WS_CHILD | WS_VISIBLE | style, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 require(child != nullptr, "Create native control");
                 SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(app->font), TRUE);
+                if (!std::wcscmp(type, L"BUTTON") && !checkbox) SetWindowSubclass(child, button_proc, 1, 0);
+                if (!std::wcscmp(type, L"EDIT") && (style & ES_MULTILINE) && (style & ES_READONLY))
+                    SetWindowSubclass(child, readonly_text_proc, 1, 0);
                 if (!std::wcscmp(type, L"COMBOBOX")) {
                     SetWindowTheme(child,L"",L"");
                     SetWindowSubclass(child,combo_proc,1,0);
@@ -1228,7 +1249,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (id == DELETE_INSTANCE && !app->busy) {
                 if (app->services_running() || app->session.process || !known_instance(app->current)) return 0;
                 std::wstring question = L"永久删除整个实例文件夹及全部内容？\n\n" + app->current + L"\n\n此操作无法撤销。";
-                if (MessageBoxW(window, question.c_str(), L"删除实例", MB_YESNO | MB_DEFBUTTON2 | MB_ICONWARNING) == IDYES)
+                if (MessageBoxW(window, question.c_str(), L"删除实例", MB_OKCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING) == IDOK)
                     app->action(DELETE_INSTANCE);
                 return 0;
             }
@@ -1270,7 +1291,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     std::wstring preview = L"还原当前实例数据库？\n\n实例：" + app->current + L"\n数据库：" + app->database_identity() +
                                            L"\n备份：" + target + L"\n逆序停服：" + app->stop_plan(false) +
                                            L"\n\n先保存预备份，在影子副本验证后切换；保留原数据冷快照。";
-                    if (MessageBoxW(window, preview.c_str(), L"确认还原", MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES) return 0;
+                    if (MessageBoxW(window, preview.c_str(), L"确认还原", MB_OKCANCEL | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDOK) return 0;
                 }
                 app->action(id, target);
             } else if (id == SERVICE_LOGS) {

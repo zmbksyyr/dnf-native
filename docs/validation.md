@@ -2,6 +2,24 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## GUI 键盘操作修复（2026-11-16）
+
+P14 在当前 P13 交付程序上验证焦点后投递键盘消息，实际复现回车不能打开“选择实例”；自绘按钮只返回 `DLGC_BUTTON`，没有按钮激活语义。进一步回归复现 Tab 停在只读多行日志框；原生删除/还原“是/否”框也无法用 Esc 取消。修复只涉及 GUI：补充自绘按钮键盘语义，保留其绘制类型，释放只读多行控件对 Tab 的捕获，并将两种维护确认框改为默认“取消”的确定/取消框。
+
+`tests/test_gui_keyboard.py` 使用停库实例的独立副本，核对真实焦点后把按键投递到 GUI 消息队列，经产品消息循环、`IsDialogMessage` 和原生控件执行，没有直接伪造按钮通知。最终收据 `probes/20261115T220518540267Z/gui-keyboard/receipt.json` 通过以下路径：
+
+- Tab 正向遍历全部 28 个当时可见且可用的 Tab 控件，包含只读日志及详情；方向键更新服务选择和详情、筛选结果；回车折叠和展开服务组。
+- 回车打开实例选择器，Esc 取消且保留原路径；原生筛选下拉框的方向键/F4/Esc、开关的空格操作通过。
+- 删除和还原确认框默认取消，分别以回车和 Esc 取消后，实例完整保留，冷数据身份不变，没有 `restore.pending`。
+- 回车执行数据库启动，原 SQL 身份/TLS检查通过，再以回车正常停库；GUI 退出 0、无强制清理，复制来源的数据身份不变。
+- 遍历和操作后全部按钮的自绘/开关类型保持不变，截图保留当前配色。中间实现曾被 Windows 默认按钮切换改回灰色普通按钮，已通过处理 `BM_SETSTYLE` 修复，未列为交付。
+
+环境仍为 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT；这是队列键盘消息的真实 GUI 验证，未实测物理键盘、Shift+Tab 或其他操作系统。Esc 取消当前原生弹窗，不为控制台新增直接退出路径。诊断探针、失败收据和构建保留于外部 `P14-20261116-keyboard/`。
+
+最终 GUI 的长路径完整回归也通过新建、同实例锁、channel/relay/monitor/STUN 协议、直接长名 CLI SQL、game 自然初始化（30.938 秒）、协调备份、确认后影子还原、UUID/TLS 和正常关闭；原始收据为 `probes/20261115T220539967264Z/gui-long-path/receipt.json`。无运行时异常或强制清理，只有已知 inotify 291/332 缺口。
+
+普通中文/空格路径的完整实例回归通过资源故障拒绝、双实例、数据库读回、删除取消与实际删除、辅助协议及 game/DP2/Frida 自然启停（30.382 秒），资源前后哈希一致，GUI 退出 0、无异常或强制清理，仅有已知 inotify；收据为 `probes/20261115T220759965547Z/instance-workflow/receipt.json`。最终交付位于 `P14-20261116-keyboard/delivery/`，程序、资源和清单与实际回归的 `package5/` 字节一致，仅更新随包文档；宿主、数据库工具和固定 ZIP 均沿用 P13。
+
 ## 长路径实例修复（2026-11-16）
 
 P13 复现普通 271 字符根目录无法加载服务清单；加扩展前缀后虽能加载 19 项，子进程仍因长工作目录报 Win32 267。官方 MySQL 5.7.44 使用显式应用路径、短工作目录及绝对配置后，仍拒绝本次长 `datadir`。同一目录已有的 NTFS 短名可正常完成数据库 SQL、身份和 TLS 检查，因此修复集中在共享路径入口与文件夹选择器，没有更换数据库或扩展运行时。
@@ -176,6 +194,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | 编码 | `python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package` | ZIP 内实际 GBK、GB18030、BIG5、BIG5-HKSCS、EUC-KR、UHC 与 UTF-8 字节往返 |
 | 真实实例与 core | `python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 真实资源故障拒绝、双实例、占用、删除、15 个辅助服务协议及 game/DP2/Frida 启停 |
 | 长路径实例 | `python -B tests/test_gui_long_path.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 274 字符根目录的新建、同目录锁、原版启动/协议、CLI 与 GUI 维护；要求文件系统已有可用短名 |
+| GUI 键盘 | `python -B tests/test_gui_keyboard.py --gui PACKAGE_EXE --instance PRIVATE_STOPPED_INSTANCE` | 独立副本的焦点/Tab、方向键/回车/空格、弹窗取消和数据库启停；投递队列键盘消息，未实测物理键盘 |
 | 数据库维护 | `python -B tests/test_mysql_maintenance.py --exe ../x/dnf-native-output/package/resources/mysql-control.exe --database-source PRIVATE_STOPPED_INSTANCE` | 私有停库副本的备份、影子还原、失败保留与中断恢复 |
 | GUI 停服维护 | `python -B tests/test_gui_maintenance.py --instance PRIVATE_INSTANCE --gui ../x/dnf-native-output/package/DNF-Native.exe` | GUI 从运行态逆序停服再备份 |
 

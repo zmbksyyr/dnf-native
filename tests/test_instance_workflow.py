@@ -72,7 +72,7 @@ def main():
     def confirm_delete(yes):
         click(window, 261)
         dialog = wait_for(lambda: next((w for w in windows(process.pid, "#32770") if title(w) == "删除实例"), None), "delete confirmation")
-        click(dialog, 6 if yes else 7)
+        click(dialog, 1 if yes else 2)
 
     def create_failure(path):
         click(window, 260)

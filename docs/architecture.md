@@ -86,6 +86,8 @@ flowchart TD
 
 实例选择持有独占 `.instance.lock`。删除仅允许已识别、已停止的真实实例目录，需要确认；递归处理普通目录，遇 reparse point 只移除链接自身。资源 ZIP 和外部原件不作为运行实例写入。
 
+键盘导航沿用 `IsDialogMessageW` 和原生控件。自绘按钮在 `WM_GETDLGCODE` 中声明当前焦点按钮的回车语义，处理 `BM_SETSTYLE` 时保留 `BS_OWNERDRAW`，避免 Windows 切换默认按钮时恢复普通灰色样式。只读多行日志/详情框对 Tab 释放 `DLGC_WANTALLKEYS/WANTTAB`，保留其他文本选择和滚动行为。删除和还原使用默认“取消”的确定/取消框；回车默认取消，Esc 由原生模态框取消，不为主窗口增加直接退出快捷键。
+
 IP 更新集中于 `service_ip.h`，修改前备份原配置；DP2/Lua/Frida 环境由服务清单和插件模式生成。`log_view.h` 与 GUI 仅读取原日志末尾至多 256 KiB，支持编码、轮转、截短及跟随，不改写原始日志。控制台操作记录单独显示。
 
 ## 数据库维护

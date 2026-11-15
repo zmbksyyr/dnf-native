@@ -99,7 +99,7 @@ def main():
         confirmation = wait_for(lambda: next((h for h in windows(process.pid, "#32770")
                                              if title(h) == "\u786e\u8ba4\u8fd8\u539f"), None),
                                 "restore confirmation")
-        click(confirmation, 6)
+        click(confirmation, 1)
         ready(window, "\u8fd8\u539f\u5df2\u9a8c\u8bc1\u5e76\u63d0\u4ea4", 300)
         assert not (physical / "restore.pending").exists()
         checks["shadow_restore_verified_and_committed"] = True

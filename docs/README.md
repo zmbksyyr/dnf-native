@@ -111,6 +111,8 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 修改服务 IP 要在全部停止后应用；修改 DP2/Lua 和 Frida 开关要先停止 game。日志查看直接读取 stdout、stderr、服务应用日志和 MySQL 日志，可选自动、UTF-8、936、950、949 编码，并支持刷新和跟随滚动。
 
+键盘可用 Tab 切换控件，方向键选择服务或筛选项，回车执行当前焦点按钮，空格切换开关；只读日志和详情框也可用 Tab 离开。Esc 取消当前选择器、下拉框或维护确认框。删除和还原默认选中“取消”；关闭控制台仍通过窗口关闭入口，并沿用正常停服流程。
+
 固定基底中的 Frida 配置为 `on_change=reload`。已验证覆盖写入和临时文件原子替换两种 JS 保存方式，原版 Gadget 均通过轮询回退在约 5 秒后加载新版，并实际返回新版 RPC 结果；这不是即时通知。该验证在 game 自然启动前的 DP2/Lua 夹具中完成，不能扩展为任意脚本、通用 inotify 或客户端业务通过。
 
 维护连接配置保存在实例的 `client.private.cnf`。手动修改数据库密码后需同步更新该文件；公开记录不保存真实凭据。官方 `mysqld/mysql/mysqladmin/mysqldump` 都可在实例的 `mysql/bin/` 直接使用。
