@@ -202,7 +202,9 @@ def main():
     parser.add_argument("--exe", type=Path, default=ROOT / "build/gui/DNF-Native.exe")
     args = parser.parse_args()
     exe = args.exe.resolve(strict=True)
-    mysql = exe.parent / "runtime/mysql-control.exe"
+    package_root = exe.parent.parent if exe.parent.name.lower() == "gui" and (exe.parent.parent / "compatibility").exists() else exe.parent
+    mysql = package_root / "compatibility/mysql-control.exe"
+    if not mysql.exists(): mysql = exe.parent / "runtime/mysql-control.exe"
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = ROOT / "build/probes" / stamp / "gui"
     instance = probe / "实例 (native)"

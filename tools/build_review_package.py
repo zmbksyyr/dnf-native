@@ -1,4 +1,4 @@
-"""Create the GUI / mysql / runtime / native directory package from verified builds."""
+"""Create the gui / mysql / compatibility / native directory package."""
 
 import argparse
 import configparser
@@ -36,9 +36,13 @@ def main():
     result = subprocess.run(["expand.exe", "-F:*", str(source / "resources.cab"), str(objects)], capture_output=True, timeout=180)
     (work / "expand.log").write_bytes(result.stdout + result.stderr)
     result.check_returncode()
-    shutil.copy2(gui / "DNF-Native.exe", output / "DNF-Native.exe")
-    for name in ["mysql", "runtime"]:
-        shutil.copytree(gui / name, output / name)
+    gui_output = output / "gui"
+    gui_output.mkdir()
+    shutil.copy2(gui / "DNF-Native.exe", gui_output / "DNF-Native.exe")
+    shutil.copytree(gui / "mysql", output / "mysql")
+    compatibility = output / "compatibility"
+    compatibility.mkdir()
+    shutil.copy2(gui / "runtime/mysql-control.exe", compatibility / "mysql-control.exe")
     entries = []
     hosts = {}
     for index in range(ini.getint("resources", "count")):
@@ -47,7 +51,7 @@ def main():
         if sha256(obj) != entry["sha256"]:
             raise SystemExit("Extracted source identity differs: " + entry["path"])
         if entry["path"].startswith("hosts/"):
-            target = output / "runtime" / entry["path"]
+            target = compatibility / entry["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(obj, target)
             hosts[entry["path"]] = entry["sha256"]
@@ -90,7 +94,7 @@ def main():
         for name in files:
             package.write(output / name, name)
     record = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "scope": "Review directory package; original resource contents retained except project hosts moved to runtime. Validation receipts recorded separately.",
+        "scope": "Review directory package with gui, official mysql, compatibility hosts/helper and native cabinet. Validation receipts recorded separately.",
         "files": files, "official_exes": official_exes, "hosts": hosts,
         "archive_bytes": archive.stat().st_size, "archive_sha256": sha256(archive),
         "builder_sha256": sha256(Path(__file__)), "source_manifest_sha256": sha256(source / "resources.ini")}

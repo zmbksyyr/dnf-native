@@ -4,9 +4,9 @@
 
 ## 1. 官方 MySQL 目录发布
 
-交付根目录为 `DNF-Native.exe`、`mysql/`、`runtime/`、`native/`。`mysql/bin/` 保留官方的 `mysqld.exe`、`mysql.exe`、`mysqladmin.exe`、`mysqldump.exe`，字节哈希与已锁定的官方下载包一致；VC/UCRT DLL 就近部署，字符集、share、LICENSE 和再分发材料随目录提供。
+交付根目录为 `gui/`、`mysql/`、`compatibility/`、`native/`。`mysql/bin/` 保留官方的 `mysqld.exe`、`mysql.exe`、`mysqladmin.exe`、`mysqldump.exe`，字节哈希与已锁定的官方下载包一致；VC/UCRT DLL 就近部署，字符集、share、LICENSE 和再分发材料随目录提供。
 
-`runtime/mysql-control.exe` 是本项目的实例维护工具，只负责初始化、子进程管理、备份和还原。它直接调用同级发布包中的官方工具，不嵌入、解压或向实例复制 MySQL。两个架构的自研 ELF 宿主位于 `runtime/hosts/`；`native/resources.cab` 只保存原生文件、用户态依赖和实例种子，宿主不再重复封入 CAB。
+`compatibility/mysql-control.exe` 是本项目的实例维护工具，只负责初始化、子进程管理、备份和还原。它直接调用同级发布包中的官方工具，不嵌入、解压或向实例复制 MySQL。两个架构的自研 ELF 宿主位于 `compatibility/hosts/`；`native/resources.cab` 只保存原生文件、用户态依赖和实例种子，宿主不再重复封入 CAB。
 
 新建数据库的 root 默认密码固定为用户指定的 `uu5!^%jg`。继续使用官方 `mysqld --initialize`，通过临时命名管道设置默认凭据并正常关闭，不重建既有数据库。实例配置保存在 `client.private.cnf`，GUI 不提供密码轮换提示；官方 `mysqladmin.exe` 等可直接调用。游戏、bridge 和 Frida 继续使用各自的实例账号，原版编码密码仍按已核实格式生成。
 
@@ -77,7 +77,7 @@ INSTANCE/
 
 GUI 使用 Win32 控件与 C++ 消息循环，调用实例控制器，不加载参考 `Launcher.cs`、参考 EXE 或历史 GUI。耗时操作在工作线程/子进程执行，以操作 ID 和异步事件更新界面；窗口不能因备份或停服阻塞。
 
-首版 `DNF-Native.exe` 已实现实例选择、端口输入、安全初始化、数据库启停、备份、还原、未完成还原恢复和日志目录入口。所有动作调用相邻的本项目 `mysql-standalone.exe`，不依赖 Python、.NET 或参考 GUI；Win32 公共文件权限/参数转义函数因两个实际调用方提取到 `win32_files.h`。SQL 就绪检查同时核对版本、实例 UUID、本次创建的 pid 文件名与 TLS；关闭窗口正常停止其自有数据库，不根据端口停止其他实例。数据库运行或操作未结束时禁止维护切换。
+首版 `DNF-Native.exe` 已实现实例选择、端口输入、安全初始化、数据库启停、备份、还原、未完成还原恢复和日志目录入口。所有动作调用相邻的本项目 `compatibility/mysql-control.exe`，不依赖 Python、.NET 或参考 GUI；Win32 公共文件权限/参数转义函数因两个实际调用方提取到 `win32_files.h`。SQL 就绪检查同时核对版本、实例 UUID、本次创建的 pid 文件名与 TLS；关闭窗口正常停止其自有数据库，不根据端口停止其他实例。数据库运行或操作未结束时禁止维护切换。
 
 真实窗口测试已覆盖中文路径、初始化、备份和还原期间消息响应、另一 UUID 占用相同端口时失败且原库继续可用、二进制行还原、新增库清除、损坏备份报错、关闭窗口正常停库，以及磁盘上未完成改名状态的恢复按钮。证据见 [Win32 数据库界面](evidence/p6-win32-gui.json)。服务界面接入见下文；日志筛选/脱敏导出、密码编辑、插件与等级配置仍未实现。仅开发机 Windows 10 实测，不能据此声明完整 GUI 或多系统验收完成。
 

@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--gui", type=Path, default=ROOT / "build/gui-setup/DNF-Native.exe")
     args = parser.parse_args()
     source = args.gui.resolve(strict=True).parent
+    package_root = source.parent if source.name.lower() == "gui" and (source.parent / "mysql").exists() else source
     with socket.socket() as available:
         available.bind(("127.0.0.1", 3306))
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -35,9 +36,10 @@ def main():
     delivery = probe / "本地 程序(1)"
     delivery.mkdir(parents=True)
     shutil.copy2(source / "DNF-Native.exe", delivery / "DNF-Native.exe")
-    for name in ["mysql", "runtime", "native"]:
-        shutil.copytree(source / name, delivery / name)
-    source_before = tree_identity(source / "native")
+    for name in ["mysql", "compatibility", "native"]:
+        source_name = "runtime" if name == "compatibility" and not (package_root / name).exists() else name
+        shutil.copytree(package_root / source_name, delivery / name)
+    source_before = tree_identity(package_root / "native")
     copied_before = tree_identity(delivery / "native")
     assert source_before == copied_before
     env = dict(os.environ)
@@ -46,7 +48,7 @@ def main():
         env.pop(key, None)
     record = {"recorded_utc": stamp, "os": platform.platform(),
               "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
-              "gui_sha256": sha256(delivery / "DNF-Native.exe"), "mysql_sha256": sha256(delivery / "runtime/mysql-control.exe"),
+              "gui_sha256": sha256(delivery / "DNF-Native.exe"), "mysql_sha256": sha256(delivery / "compatibility/mysql-control.exe"),
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False}
     checks = record["checks"]
     instance = probe / "游戏 实例(1)"
@@ -56,7 +58,7 @@ def main():
     manifest = configparser.ConfigParser(interpolation=None)
     manifest.read(delivery / "native/resources.ini", encoding="utf-16")
     cabinet = manifest["resources"]["version"] == "2"
-    modified = delivery / ("native/resources.cab" if cabinet else "runtime/hosts/i686/dnf-host.exe")
+    modified = delivery / ("native/resources.cab" if cabinet else "compatibility/hosts/i686/dnf-host.exe")
     lua = js = None
     lua_before = js_before = None
 
@@ -65,7 +67,7 @@ def main():
         user.SendMessageW(user.GetDlgItem(window, 101), 0x000C, 0, c.addressof(text))
 
     def query(text, root=instance):
-        result = subprocess.run([str(delivery / "runtime/mysql-control.exe"), "mysql", str(root), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names"],
+        result = subprocess.run([str(delivery / "compatibility/mysql-control.exe"), "mysql", str(root), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names"],
                                 input=text.encode("ascii"), capture_output=True, env=env, timeout=30)
         if result.returncode:
             (probe / "query-error.private.log").write_bytes(result.stdout + result.stderr)
@@ -113,7 +115,7 @@ def main():
             if name.startswith("game/"):
                 assert re.search(r"(?m)^system_monitoring_ip\s*=\s*0\.0\.0\.0\s*$", config), name
         checks["original_advertised_address_placeholders_are_local"] = True
-        assert not (instance / "hosts").exists(), "Hosts belong to the delivered runtime directory"
+        assert not (instance / "hosts").exists(), "Hosts belong to the delivered compatibility directory"
         assert "password=uu5!^%jg\n" in (instance / "client.private.cnf").read_text(encoding="utf-8")
         checks["fixed_default_root_password_and_external_hosts"] = True
         before_cfg = {path: path.read_bytes() for path in instance.rglob("*.cfg")}
@@ -196,7 +198,7 @@ def main():
         assert process.returncode == 0
         checks["second_instance_normal_close"] = True
         checks["delivery_resources_unchanged"] = tree_identity(delivery / "native") == copied_before
-        checks["source_resources_unchanged"] = tree_identity(source / "native") == source_before
+        checks["source_resources_unchanged"] = tree_identity(package_root / "native") == source_before
         assert all(value is not False for value in checks.values())
         record["first_instance"] = str(instance.relative_to(ROOT))
         record["second_instance"] = str(second.relative_to(ROOT))

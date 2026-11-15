@@ -1,0 +1,77 @@
+{
+  "recorded_utc": "2026-11-15T03:12:02.655522+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "scope": "Current directory delivery layout and GUI first-run verification.",
+  "package_root": "build/release-package",
+  "top_level_directories": [
+    "compatibility",
+    "gui",
+    "mysql",
+    "native"
+  ],
+  "root_files": [],
+  "archive_bytes": 198076222,
+  "archive_sha256": "374fb8bdbe851653829ea40714720504b98279c1ad7048e258d6584a7729d53b",
+  "gui_sha256": "7c2d4bd0184199c5af46f292d2bba209060a3de45c87e254e8c5dd5cdedab178",
+  "mysql_official_exes": {
+    "bin/mysqld.exe": "432693b766a4bc23a769f19993fa2bcb86f983db7e9f40d32a6380ead6f62d63",
+    "bin/mysql.exe": "3e5828f7eac9f63d1c31c9e243906d6b1ca55fe9abe69ffde6765c41712031e6",
+    "bin/mysqladmin.exe": "0db97929bdfa84efd49e75c072095d16231f44b1657e2157b8439ae7b4fdb98d",
+    "bin/mysqldump.exe": "67f5aa71bf46210da9e2cc74e17b73cadae930f8150ffe167f01783fa5178d09"
+  },
+  "compatibility_hosts": {
+    "hosts/i686/dnf-host.exe": "5fab754f7398278938c70d6dfb33eb3b8c175aa4ca66906275d4c5953325f692",
+    "hosts/x86_64/dnf-host.exe": "dc6d460d2538380b0de62c55e7e71473d2a493d5bee3991d5a6acde34857e7e5"
+  },
+  "setup_probe": "build/probes/20261115T030825981984Z/gui-setup/receipt.json",
+  "setup_checks": {
+    "opening_gui_does_not_start_work_or_disable_initialize": true,
+    "changed_resource_rejected_before_instance_writes": true,
+    "existing_nonempty_directory_unchanged": true,
+    "copy_and_initialize_window_response_ms": 0.12,
+    "busy_keeps_service_selection_and_log_controls_available": true,
+    "native_first_run_creates_nineteen_service_instance": true,
+    "import_reexport_matches_complete_original_seed_bytes": true,
+    "resource_format": "cabinet",
+    "original_advertised_address_placeholders_are_local": true,
+    "fixed_default_root_password_and_external_hosts": true,
+    "service_ip_updates_ini_and_positional_records_with_backups": true,
+    "service_ip_keeps_database_and_monitor_bypass_and_is_idempotent": true,
+    "original_eighteen_schemas_and_current_month_tables": true,
+    "original_stored_routine_runs_with_locked_schema_definer": true,
+    "original_credential_encoding_matches_connection_table": true,
+    "game_account_has_no_global_grants": true,
+    "ip_locked_while_database_running": true,
+    "native_initialized_fifteen_original_peers": true,
+    "channel_protocol": {
+      "challenge": true,
+      "positive_responses": 3,
+      "fragmented": true,
+      "coalesced": true
+    },
+    "relay_and_actual_monitor_protocol": {
+      "registered_peers": 2,
+      "bidirectional_messages": 8,
+      "unlogged_accounts_disconnected": [
+        701,
+        702
+      ],
+      "own_auth_response_sent": false
+    },
+    "stun_protocol": {
+      "responses": 5,
+      "address_and_source_ports": true
+    },
+    "original_frida_database_interface_with_generated_account": true,
+    "all_owned_peers_and_database_stopped_normally": true,
+    "default_root_matches_and_three_service_secrets_differ": true,
+    "second_instance_normal_close": true,
+    "delivery_resources_unchanged": true,
+    "source_resources_unchanged": true
+  },
+  "forced_cleanup": false,
+  "limits": [
+    "Developer Windows 10 only; no clean Win7/10/11 matrix.",
+    "Client login, jbz69 PVF business and full gameplay acceptance remain outside this probe."
+  ]
+}

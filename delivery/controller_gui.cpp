@@ -948,8 +948,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {}; limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         require(SetInformationJobObject(state.service_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)), "Configure ELF host ownership");
         wchar_t module[32768]; require(GetModuleFileNameW(nullptr, module, 32768) != 0, "Find native application directory");
-        std::wstring folder(module); folder.resize(folder.find_last_of(L'\\'));
-        state.runtime = folder + L"\\runtime";
+        std::wstring gui_folder(module); gui_folder.resize(gui_folder.find_last_of(L'\\'));
+        // The release layout keeps the controller in gui/ and the two
+        // runtime directories beside it. Development builds may still place
+        // the executable directly in their build directory.
+        std::wstring folder = gui_folder;
+        if (folder.size() >= 4 && _wcsicmp(folder.substr(folder.size() - 3).c_str(), L"gui") == 0 &&
+            present(folder.substr(0, folder.find_last_of(L'\\')) + L"\\compatibility"))
+            folder.resize(folder.find_last_of(L'\\'));
+        state.runtime = folder + L"\\compatibility";
+        if (!present(state.runtime)) state.runtime = gui_folder + L"\\runtime";
         state.exe = state.runtime + L"\\mysql-control.exe";
         state.resources = folder + L"\\native";
         state.initial = folder + L"\\instances\\default";

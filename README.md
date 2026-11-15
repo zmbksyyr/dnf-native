@@ -2,9 +2,9 @@
 
 DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项目。
 
-**当前状态：本轮实现已提交，等待审阅。** 原版 core 16 服务通过自研宿主、Win32 GUI 和单文件 MySQL 完成本机联合自然启动与停服。GUI 提供 19 项服务列表、单项/整体启停、日志、DP2/Lua/Frida 开关，以及从本地压缩资源创建实例。新建实例导入原始 18 个应用库、核对导出字节并生成独立账号；15 个 peer、channel/relay/monitor/STUN 对照和原版 Frida 数据库接口通过。数据库备份、还原与失败回滚的范围见[实施记录](docs/06-progress.md)。
+**当前状态：本轮实现已提交，等待审阅。** 原版 core 16 服务通过自研宿主、Win32 GUI 和目录式官方 MySQL 完成本机联合自然启动与停服。GUI 提供 19 项服务列表、单项/整体启停、日志、DP2/Lua/Frida 开关，以及从本地压缩资源创建实例。新建实例导入原始 18 个应用库、核对导出字节并生成独立账号；15 个 peer、channel/relay/monitor/STUN 对照和原版 Frida 数据库接口通过。数据库备份、还原与失败回滚的范围见[实施记录](docs/06-progress.md)。
 
-最新 GUI 已按用户参考图调整为浅色卡片、全局控制、真实服务网格、数据库单行及大面积原生日志；最终 GUI 的数据库、日志和插件专项通过。当前审阅程序为 `build/review/DNF-Native.exe`，本地资源 ZIP 为 `build/review/native-local-resources.zip`，190382482 字节，已包含本轮宿主、缓存优化和地址空间并发修复。界面截图见[GUI 阶段说明](docs/12-gui-reference.md)，最新包体身份和新增验证见[运行时并发阶段](docs/14-runtime-concurrency.md)。
+最新 GUI 已按用户参考图调整为浅色卡片、全局控制、真实服务网格、数据库单行及大面积原生日志；最终 GUI 的数据库、日志和插件专项通过。当前目录式审阅包为 `build/release-package/`，包含 `gui/`、`mysql/`、`compatibility/`、`native/`；压缩包为 `build/release-package.zip`，其结构和哈希见[目录式交付](docs/19-directory-delivery.md)。界面截图见[GUI 阶段说明](docs/12-gui-reference.md)，最新包体身份和新增验证见[运行时并发阶段](docs/14-runtime-concurrency.md)。
 
 此前已解决 TLS 异常处理热点和关闭 DP2 时的映射容量不足；相同配置的 ELF 文件视图历史对照减少约 69.4 MiB 私有提交。本轮原包 PVF 对照实际完成建角、洛兰通关、结算、回城和冷重启存档读回；教程含客户端功能，不能计为纯净评分验收。角色退出暴露的物品清零 JS 热点已改为等价原生操作，原版 1000 项缓存构造 94 毫秒，完整栈正常停服约 26.9 秒。新资源的首次创建回归通过两份实例和原协议检查。
 
@@ -17,7 +17,8 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 - [资源调研](docs/01-resource-research.md)：本地原包、公开规范、依赖与包体风险。
 - [静态证据](docs/evidence/resource-inventory.json)与[网络来源](docs/evidence/web-resources.json)：本轮重新生成的记录。
 - [原生运行方案](docs/02-technical-plan.md)：双架构、ELF、syscall/TLS、插件和服务管理。
-- [数据库、GUI 与交付](docs/03-database-and-delivery.md)：MySQL 单文件、预快照/回滚及离线包。
+- [数据库、GUI 与交付](docs/03-database-and-delivery.md)：官方 MySQL 目录、预快照/回滚及离线包。
+- [目录式交付](docs/19-directory-delivery.md)：当前 gui/mysql/compatibility/native 结构、构建和验证。
 - [实施阶段与验收](docs/04-milestones-and-acceptance.md)：P1 否决关卡、19 项服务矩阵、三系统矩阵及需求追踪。
 - [本地压缩资源样件](docs/07-local-package.md)：原生首次创建、体积与审阅产物。
 - [兼容缺口与运行开销](docs/08-compatibility-and-performance.md)：rednf 对照、优化依据及实际边界。
