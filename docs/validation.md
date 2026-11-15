@@ -2,6 +2,19 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## game/Frida 信号与文件映射（2026-11-16）
+
+P9 修复来自实际原版路径的三个缺口：Frida 注册 `0x44000004`（SIGINFO/RESTORER/NODEFER）被拒；验证码字体 `/home/neople/game/captcha_font/SeoulHangangL.ttf` 的 9093120 字节只读私有映射被送进 ELF 加载器；连续内存的 munmap 横跨多条匿名记录被拒。触发收据为 `probes/20261115T202233188700Z/startup-compat/receipt.json`，保留原始诊断。运行环境为 Windows 10 x64 10.0.19044，工具链为 LLVM-MinGW 20261104 MSVCRT。
+
+- 双架构信号夹具通过普通自动屏蔽、NODEFER 同信号嵌套、NODEFER 加显式 action mask 的延后投递和逐层掩码恢复；原版 glibc sigaction/raise/restorer 与四种跨进程架构组合继续通过。
+- 双架构 VM 夹具通过跨两条真实相邻 Windows allocation 的部分/完整解除、两端保留页、重复空洞、非对齐及溢出拒绝；八线程 VM 并发继续通过。
+- 双架构文件/maps 夹具通过只读 fd 的私有 COW、视图间写隔离、不回写文件、不移动 fd、4 KiB 偏移、EOF 页尾零填充、部分解除和关闭 fd 后的身份；普通文件执行映射、EOF 外整页及坏 fd 均明确拒绝。原有共享视图和跨进程可见性继续通过。
+- 原版 game/DP2/Frida hook 与双向 Lua/JS RPC 正常退出 42，无强制清理；收据为 `probes/20261115T202814737760Z/game-fixture/receipt.json`。只剩 inotify 291/332 的 ENOSYS，signal 和 munmap 缺口消失。
+- 独立副本的 GUI 整体启动、game 原生日志初始化和逆序自然停服通过，game 初始化 30.983 秒，保留 `main() exited OK`、Frida dispose、DP2 unload；所有服务无运行时异常或强制清理。收据为 `probes/20261115T202902393057Z/startup-compat/receipt.json`，仅剩 inotify 两项缺口，字体 mmap ENOSYS 消失。
+- 最终宿主的 GUI 完整回归通过两轮 channel/relay/monitor/STUN 协议、单服启停、哈希拒绝、19 项分组/筛选、逆序停服及协调备份，正常关闭且无运行时异常/缺口或强制清理；收据为 `probes/20261115T203202599925Z/gui-services/receipt.json`。Frida item reset 与既有共享 msync 另行通过；这轮 GUI 专项没有运行 game 或完整安全拓扑。
+
+阶段程序、源码哈希及验证副本位于仓库外 `P9-20261116-game-compat/`。开发中曾将数据文件的 EOF 长度检查误用于含 BSS 的 ELF 预留，造成 libstdc++ 加载失败；该中间失败保留在 `probes/20261115T202745817856Z/game-fixture/receipt.json`，最终实现将两条路径分开。没有修改原版 ELF 或资源 ZIP；同步异常信号转交、备用信号栈、通用 SIGBUS、inotify、完整客户端及跨系统矩阵仍未完成。
+
 ## DBMW/manager 停服修复（2026-11-16）
 
 在 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT 上，已从固定原版 ELF 确认 P7 停服访问异常的原因：原版 Free/析构没有 join 网络工作线程，TCP 的实际退出标志又与基础 stop 写入的字段不同。`service.c` 仅在两个已核验哈希的执行副本上补充停止、取消 DBMW 阻塞接收、等待自然退出和原版 guest join，再继续全部原有清理。身份、旧字节和恢复方法见[实现说明](architecture.md)，只读参考与独立实现边界见[来源记录](third-party.md)。

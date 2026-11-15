@@ -1,4 +1,4 @@
-"""Check anonymous PROT_NONE, partial unmap and fixed remap through both hosts."""
+"""Check anonymous PROT_NONE, cross-region unmap and fixed remap through both hosts."""
 
 import datetime
 import hashlib
@@ -43,7 +43,7 @@ def main():
                         "stdout": stdout, "stderr": stderr, "passed": passed})
         print(arch, "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "os": platform.platform(), "scope": "Own anonymous VM fixtures; not full mmap or service acceptance",
+              "os": platform.platform(), "scope": "Own anonymous VM fixtures: permissions, partial/fixed remap, cross-reservation unmap, retained outside pages and repeated holes; not full mmap or service acceptance",
               "results": records}
     (BUILD / "vm-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(record["passed"] for record in records):

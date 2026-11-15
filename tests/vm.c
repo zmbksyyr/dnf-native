@@ -120,6 +120,36 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         CHECK(UNMAP(regions[i], page) == 0);
     }
 
+    /* Separate Windows reservations can be adjacent. Unmap both sides of
+       their boundary in one syscall, retaining each outside page. */
+    word blocks[128], lower = 0, upper = 0;
+    const word block_bytes = 65536;
+    for (unsigned i = 0; i < 128; ++i) {
+        blocks[i] = (word)call6(MMAP, 0, block_bytes, 3, 0x22, (word)-1, 0);
+        CHECK(blocks[i] && blocks[i] < (word)-4095);
+        *(volatile unsigned char *)blocks[i] = 0x47;
+        *(volatile unsigned char *)(blocks[i] + block_bytes - 1) = 0x58;
+        for (unsigned j = 0; j < i; ++j) {
+            if (blocks[j] + block_bytes == blocks[i]) { lower = blocks[j]; upper = blocks[i]; }
+            if (blocks[i] + block_bytes == blocks[j]) { lower = blocks[i]; upper = blocks[j]; }
+        }
+    }
+    CHECK(lower && upper);
+    CHECK(UNMAP(upper - page, 2 * page) == 0);
+    CHECK(PROTECT(upper - page, page, 3) == -12);
+    CHECK(PROTECT(upper, page, 3) == -12);
+    CHECK(*(volatile unsigned char *)lower == 0x47);
+    CHECK(*(volatile unsigned char *)(upper + block_bytes - 1) == 0x58);
+    CHECK(UNMAP(upper - page, 2 * page) == 0); /* Already-unmapped holes. */
+    CHECK(UNMAP(lower, 2 * block_bytes) == 0);
+    CHECK(PROTECT(lower, page, 3) == -12);
+    CHECK(PROTECT(upper + block_bytes - page, page, 3) == -12);
+    CHECK(UNMAP(lower, 2 * block_bytes) == 0);
+    CHECK(UNMAP(lower + 1, page) == -22);
+    CHECK(UNMAP((word)-4096, 8192) == -22);
+    for (unsigned i = 0; i < 128; ++i)
+        CHECK(UNMAP(blocks[i], block_bytes) == 0);
+
 #ifndef __x86_64__
     word remap = (word)call6(MMAP, 0, page, 3, 0x22, (word)-1, 0);
     CHECK(remap && remap < (word)-4095);

@@ -37,7 +37,7 @@ flowchart TD
 | `ipc.c` | eventfd 64 位计数、阻塞/非阻塞、信号量及 poll/epoll/select 就绪联动 |
 | `net.c` | TCP/UDP、select/poll、LT epoll、已支持的 socket 选项 |
 | `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集及非 PI robust owner death |
-| `signal.c` | 当前服务所需处理器、掩码、SA_SIGINFO/SA_RESTORER、SIGTERM/SIGUSR2 及上下文恢复 |
+| `signal.c` | 当前服务所需处理器、掩码、SA_SIGINFO/SA_RESTORER/SA_NODEFER、嵌套帧及上下文恢复 |
 | `tls.c` | Linux FS/GS TLS 指令适配和返回路径 |
 | `service.c` | 固定 DBMW/manager ELF 的网络线程停服顺序修正，独立于 syscall 兼容语义 |
 
@@ -46,6 +46,12 @@ flowchart TD
 所有描述符创建路径在同一临界区内选择并预留空槽，再初始化资源并发布实际类型；创建失败释放预留槽，关闭时先清理元数据再释放槽。eventfd 的原有创建锁与此锁一致，防止 epoll、socket、文件、管道和 procfs 并发分配同一个 fd。epoll 销毁与关闭 fd 时移除监听的遍历也使用该锁，避免遍历已释放的监听表；阻塞 I/O 不持有该锁。
 
 `/proc/self/maps` 在同一内存锁内从现有 ELF/VM 表生成快照，结合 Windows 实际页权限和部分解除映射的位图，保留 PROT_NONE，排除空洞及已释放区域。共享文件显示共享标志、UTF-8 路径、文件偏移和与 stat 一致的 inode；关闭描述符后仍保留映射身份。它描述本宿主管理的 guest 区域，不枚举 Windows 自身模块。
+
+普通非执行文件的 `MAP_PRIVATE` 使用 Windows `PAGE_WRITECOPY` / `FILE_MAP_COPY` 视图；只读 fd 也可获得私有可写页，写入不会回写文件或其他私有视图，也不移动原 fd 的文件位置。4 KiB 文件偏移通过对齐 Windows 64 KiB 视图并保存实际 view 起点实现；最后一个文件页的 EOF 后部分为零。ELF 依赖仍使用原有 eager snapshot 和指令适配路径，包含 BSS 的预留长度不受普通数据文件的 EOF 限制。普通文件的执行映射和完整超出 EOF、需要 SIGBUS 的页明确返回 ENOSYS。
+
+`munmap` 遍历所有相交 VM 记录，允许跨相邻映射及已解除的空洞。局部释放保留页位图；匿名页 decommit，文件视图页设置为不可访问，直到该记录全部解除后释放实际 Windows view。guest 内存检查和 maps 均排除这些页。程序、解释器、初始栈和 brk 堆的解除仍明确拒绝；跨记录 MAP_FIXED、通用地址复用不由这项修正提供。
+
+`SA_NODEFER` 允许同一未屏蔽信号在 handler 内再次投递，但 action 中的显式 mask 仍然生效。每层 handler 保存独立中断上下文、掩码及 guest 帧，`sigreturn` 逐层恢复。投递仍发生在本项目已有的 syscall/运行时边界；接受 Frida 的处理器注册不代表已支持原生同步访问异常的 Linux 信号转交。
 
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
 
@@ -97,9 +103,9 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 - `/dev/shm` 的真实共享文件映射已有路径；System V shm/sem 不等于文件映射，尚无通用实现。
 - 网络以现有 TCP/UDP、select/poll、LT epoll 路径为主；AF_UNIX、完整 sendmsg/recvmsg 辅助数据、ET/ONESHOT 等未完成。
 - 非 PI robust list 注册及正常线程退出时的 owner death、pending 节点与进程内唤醒已有实现；PI 锁、跨进程 futex、强制终止后的恢复、线程退出槽复用、pthread cancel 和通用线程定向信号未完整覆盖。
-- SA_SIGINFO 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；浮点扩展状态、备用信号栈、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
+- SA_SIGINFO/SA_NODEFER 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、嵌套投递、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；浮点扩展状态、备用信号栈、同步异常转交、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
 - 匿名私有映射的 `madvise(MADV_DONTNEED)` 使用 Windows `MEM_RESET` 保留地址、权限和并发访问；Windows 不保证 Linux 下一次读一定立即得到零页，因此不能把它扩展为通用页面回收或跨进程共享语义。
-- 打开目标上的 POSIX rename、符号链接、任意私有文件 COW、跨多个预留区固定映射及部分 msync 行为存在边界。
+- 打开目标上的 POSIX rename、符号链接、普通文件执行映射、EOF 外整页的 SIGBUS、跨多个预留区固定映射及部分 msync 行为存在边界。
 - inotify_init/init1 仍可返回 ENOSYS，当前 Frida 路径可 fallback；不能宣称通用文件热加载支持。
 - 保留原地址不等于任意等级 ELF/PVF 都兼容；每个新组合都需要匹配资源和独立业务验证。
 

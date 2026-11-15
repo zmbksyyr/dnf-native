@@ -143,3 +143,5 @@ python -B tests/test_gui_services.py --instance <私有实例目录> --gui ../x/
 ```
 
 停服专项覆盖 manager、三个 DBMW 在网络线程刚创建时停止，以及 manager/DBMW 稳定运行后的停止，核对真实线程 join、原版退出日志、退出码及磁盘 ELF 不变。`service shutdown failed` 与未处理异常一样会使集成验收失败。
+
+当前 P9 已补齐真实 game/Frida 触发的 `SA_NODEFER`、跨映射 `munmap` 和验证码字体的普通私有文件映射。双架构原语、原版 Frida hook/RPC 与 game 自然启停均通过；该启动路径仍记录 inotify 未实现，完整客户端和安全链不据此视为通过。原始收据见[验证记录](validation.md)。

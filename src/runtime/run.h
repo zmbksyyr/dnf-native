@@ -8,6 +8,7 @@
 #define NR_EVENTFD 32
 #define NR_FD_RESERVED 255
 typedef struct NrEventFd NrEventFd;
+typedef struct NrSignalState NrSignalState;
 
 typedef struct {
     uint32_t events;
@@ -23,11 +24,9 @@ typedef struct {
 typedef struct {
     uintptr_t tls_base;
     unsigned char *tls_code;
-    uint64_t signal_mask, saved_mask;
-    CONTEXT saved_context, initial_context;
-    int in_signal;
-    int signal_uses_info;
-    uintptr_t signal_frame_address;
+    uint64_t signal_mask;
+    CONTEXT initial_context;
+    NrSignalState *signal_state;
     uint64_t signal_frame_data[64];
     uintptr_t clear_tid, robust_head;
     DWORD tid;
@@ -45,7 +44,9 @@ typedef struct {
     size_t size;
     unsigned char *mapped_pages; /* NULL means the entire guest range is mapped. */
     HANDLE source;
-    HANDLE section; /* Real shared file view; NULL for VirtualAlloc regions. */
+    HANDLE section; /* Real file view; NULL for VirtualAlloc regions. */
+    void *view_base; /* Windows view may begin before a 4 KiB guest offset. */
+    int private_view;
     char *path; /* Guest pathname for /proc/self/maps, when this is a file image. */
     uint64_t file_offset, file_inode;
     NrElf image;

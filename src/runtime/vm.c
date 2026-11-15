@@ -14,6 +14,10 @@ static DWORD protect(uintptr_t flags) {
     return flags & 1 ? PAGE_READONLY : PAGE_NOACCESS;
 }
 
+static DWORD view_protect(const NrVm *v, uintptr_t flags) {
+    return v && v->private_view && (flags & 2) ? PAGE_WRITECOPY : protect(flags);
+}
+
 static int contains(uintptr_t base, size_t size, uintptr_t address, size_t bytes) {
     return base && address >= base && address - base <= size && bytes <= size - (address - base);
 }
@@ -153,20 +157,65 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
                                          &v->source, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
             UnmapViewOfFile(base); CloseHandle(section); return -5;
         }
-        v->base = base; v->size = length; v->section = section;
+        v->base = base; v->view_base = base; v->size = length; v->section = section;
         v->path = guest_path_from_handle(run, run->files[fd]);
         v->file_offset = offset;
         v->file_inode = nr_file_inode(run->files[fd]);
         if (slot == run->vm_count) ++run->vm_count;
         return (intptr_t)base;
     }
-    /* Private file mappings remain limited to immutable ELF dependency snapshots. */
-    if (offset || fd >= 256 || !run->files[fd]) return -38;
+    if (fd >= 256 || !run->files[fd]) return -9;
+    if (!(run->file_access[fd] & 1)) return -13;
+    LARGE_INTEGER file_size;
+    if (!GetFileSizeEx(run->files[fd], &file_size)) return -5;
+    if (file_size.QuadPart <= 0 || offset >= (uint64_t)file_size.QuadPart) return -38;
+    uint64_t available = (uint64_t)file_size.QuadPart - offset;
+    size_t delta = (size_t)(offset & 65535);
+    size_t file_bytes = available < length ? (size_t)available : length;
+    if (file_bytes > SIZE_MAX - delta) return -12;
+    uint64_t view_offset = offset - delta;
+    HANDLE section = CreateFileMappingW(run->files[fd], NULL, PAGE_WRITECOPY, 0, 0, NULL);
+    if (!section) return -5;
+    void *view = MapViewOfFile(section, FILE_MAP_COPY, (DWORD)(view_offset >> 32),
+                               (DWORD)view_offset, file_bytes + delta);
+    if (!view) { CloseHandle(section); return -12; }
+    unsigned char *base = (unsigned char *)view + delta;
+    int elf = !offset && file_bytes >= 4 && !memcmp(base, "\177ELF", 4);
+    if (!elf) {
+        /* A page containing EOF has a zero tail. Whole pages beyond EOF need
+           SIGBUS support. ELF reservations separately include their BSS. */
+        if (length - 4096 >= available) { UnmapViewOfFile(view); CloseHandle(section); return -38; }
+        /* Data mappings use real Windows copy-on-write pages, even with a
+           readonly fd. Mapping neither advances the fd nor writes its file. */
+        if (args[2] & 4) { UnmapViewOfFile(view); CloseHandle(section); return -38; }
+        DWORD old;
+        DWORD permission = args[2] & 2 ? PAGE_WRITECOPY : protect(args[2]);
+        if (!VirtualProtect(base, length, permission, &old)) {
+            UnmapViewOfFile(view); CloseHandle(section); return -13;
+        }
+        v->base = base; v->size = length; v->section = section;
+        v->view_base = view; v->private_view = 1;
+        v->path = guest_path_from_handle(run, run->files[fd]);
+        v->file_offset = offset;
+        v->file_inode = nr_file_inode(run->files[fd]);
+        if (slot == run->vm_count) ++run->vm_count;
+        return (intptr_t)base;
+    }
+    UnmapViewOfFile(view); CloseHandle(section);
+    /* Keep the existing eager ELF snapshot/adaptation used by guest ld.so. */
+    if (offset) return -38;
     wchar_t path[32768];
     DWORD n = GetFinalPathNameByHandleW(run->files[fd], path, 32768, FILE_NAME_NORMALIZED);
     if (!n || n >= 32768) return -5;
     const char *error;
-    if (!nr_elf_open(&v->image, path, NULL, 0, &error)) return -38;
+    if (!nr_elf_open(&v->image, path, NULL, 0, &error)) {
+        char *guest = guest_path_from_handle(run, run->files[fd]);
+        fprintf(stderr, "private mmap rejected path=%s fd=%llu bytes=%zu offset=0x%llx reason=%s\n",
+                guest ? guest : "[unknown]", (unsigned long long)fd, length,
+                (unsigned long long)offset, error ? error : "not an ELF dependency");
+        if (guest) HeapFree(GetProcessHeap(), 0, guest);
+        return -38;
+    }
     if (v->image.header->type != 3 || v->image.low || length > v->image.allocation_size ||
         !nr_elf_map(&v->image, &error) || !nr_adapt(&v->image, &error)) {
         fprintf(stderr, "ELF dependency snapshot failed: %s\n", error ? error : "unsupported extent");
@@ -183,6 +232,62 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
             (unsigned long long)(uintptr_t)v->base, v->size);
     nr_log_image(&v->image, v->path ? v->path : "[dependency]");
     return (intptr_t)v->base;
+}
+
+static int overlaps(uintptr_t address, size_t length, uintptr_t base, size_t size) {
+    return base && size && base < address + length && address < base + size;
+}
+
+static intptr_t unmapping(NrRun *run, uintptr_t address, size_t length) {
+    const NrElf *images[] = {&run->program, &run->interpreter};
+    for (unsigned i = 0; i < 2; ++i)
+        if (overlaps(address, length, (uintptr_t)images[i]->allocation, images[i]->allocation_size)) return -38;
+    if (overlaps(address, length, run->stack_low, run->stack_high - run->stack_low) ||
+        overlaps(address, length, run->heap_base, run->heap_committed)) return -38;
+
+    /* Allocate all needed page masks before removing anything. Linux permits
+       one unmap to span neighboring mappings and unmapped holes. */
+    uintptr_t end = address + length;
+    for (unsigned i = 0; i < run->vm_count; ++i) {
+        NrVm *v = &run->vm[i];
+        uintptr_t first = (uintptr_t)v->base, last = first + v->size;
+        if (!overlaps(address, length, first, v->size) || (address <= first && end >= last) || v->mapped_pages) continue;
+        size_t pages = v->size / 4096, bytes = (pages + 7) / 8;
+        v->mapped_pages = HeapAlloc(GetProcessHeap(), 0, bytes);
+        if (!v->mapped_pages) return -12;
+        memset(v->mapped_pages, 255, bytes);
+        if (pages % 8) v->mapped_pages[bytes - 1] = (unsigned char)((1u << (pages % 8)) - 1);
+    }
+    for (unsigned i = 0; i < run->vm_count; ++i) {
+        NrVm *v = &run->vm[i];
+        uintptr_t first = (uintptr_t)v->base, last = first + v->size;
+        if (!overlaps(address, length, first, v->size)) continue;
+        if (address > first || end < last) {
+            uintptr_t start = address > first ? address : first;
+            size_t bytes = (end < last ? end : last) - start;
+            DWORD old;
+            /* Windows cannot decommit part of a file view. Inaccessible pages
+               plus the guest bitmap preserve unmap semantics until final release. */
+            if (v->section ? !VirtualProtect((void *)start, bytes, PAGE_NOACCESS, &old) :
+                             !VirtualFree((void *)start, bytes, MEM_DECOMMIT)) return -22;
+            mark_pages(v, start, bytes, 0);
+            size_t bitmap_bytes = (v->size / 4096 + 7) / 8;
+            size_t remaining = 0;
+            while (remaining < bitmap_bytes && !v->mapped_pages[remaining]) ++remaining;
+            if (remaining < bitmap_bytes) continue;
+        }
+        if (v->section) {
+            if (!UnmapViewOfFile(v->view_base)) return -22;
+            CloseHandle(v->section);
+        } else if (v->image.file) nr_elf_close(&v->image);
+        else if (!VirtualFree(v->base, 0, MEM_RELEASE)) return -22;
+        if (v->source) CloseHandle(v->source);
+        if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
+        if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
+        memset(v, 0, sizeof(*v));
+    }
+    while (run->vm_count && !run->vm[run->vm_count - 1].base) --run->vm_count;
+    return 0;
 }
 
 #ifndef _WIN64
@@ -238,6 +343,8 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
     }
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
     length = (length + 4095) & ~(size_t)4095;
+    if (address > UINTPTR_MAX - length) { *result = -22; return 1; }
+    if (number == MUNMAP) { *result = unmapping(run, address, length); return 1; }
     NrVm *v = NULL;
     for (unsigned i = 0; i < run->vm_count; ++i)
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
@@ -246,7 +353,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
         *result = 0;
         /* Private/anonymous pages have no writeback. Windows already tracks
            dirty shared pages for asynchronous writeback, as Linux MS_ASYNC does. */
-        if (v->section && (args[2] & 4)) {
+        if (v->section && !v->private_view && (args[2] & 4)) {
             if (!FlushViewOfFile((const void *)address, length) || (v->source && !FlushFileBuffers(v->source)))
                 *result = -5;
         }
@@ -279,38 +386,6 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
         }
         return 1;
     }
-    if (number == MUNMAP) {
-        if (!v) { *result = -38; return 1; }
-        if (address != (uintptr_t)v->base || length != v->size) {
-            if (v->section) { *result = -38; return 1; }
-            size_t pages = v->size / 4096, bytes = (pages + 7) / 8;
-            if (!v->mapped_pages) {
-                v->mapped_pages = HeapAlloc(GetProcessHeap(), 0, bytes);
-                if (!v->mapped_pages) { *result = -12; return 1; }
-                memset(v->mapped_pages, 255, bytes);
-                if (pages % 8) v->mapped_pages[bytes - 1] = (unsigned char)((1u << (pages % 8)) - 1);
-            }
-            *result = VirtualFree((void *)address, length, MEM_DECOMMIT) ? 0 : -22;
-            if (*result) return 1;
-            mark_pages(v, address, length, 0);
-            for (size_t i = 0; i < bytes; ++i)
-                if (v->mapped_pages[i]) return 1;
-            /* Alignment trims followed by freeing the middle can remove every
-               guest page without a single unmap covering the reservation. */
-        }
-        if (v->section) {
-            if (!UnmapViewOfFile(v->base)) { *result = -22; return 1; }
-            CloseHandle(v->section);
-        } else if (v->image.file) nr_elf_close(&v->image);
-        else if (!VirtualFree(v->base, 0, MEM_RELEASE)) { *result = -22; return 1; }
-        if (v->source) CloseHandle(v->source);
-        if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
-        if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
-        memset(v, 0, sizeof(*v));
-        while (run->vm_count && !run->vm[run->vm_count - 1].base) --run->vm_count;
-        *result = 0;
-        return 1;
-    }
     int owned = v != NULL;
     const NrElf *images[] = {&run->program, &run->interpreter};
     for (unsigned i = 0; i < 2; ++i)
@@ -318,6 +393,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
     if (!owned) { *result = -12; return 1; }
     if (args[2] & ~7u) { *result = -38; return 1; }
     if (v && !mapped(v, address, length)) { *result = -12; return 1; }
+    if (v && v->private_view && (args[2] & 4)) { *result = -38; return 1; }
     DWORD old;
     if (v && !v->image.file && !args[2]) {
         /* Reserved PROT_NONE pages are still guest mappings. Only committed
@@ -348,7 +424,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
             cursor += bytes;
         }
     }
-    *result = VirtualProtect((void *)address, length, protect(args[2]), &old) ? 0 : -12;
+    *result = VirtualProtect((void *)address, length, view_protect(v, args[2]), &old) ? 0 : -12;
     return 1;
 }
 

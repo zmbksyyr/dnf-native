@@ -366,7 +366,7 @@ static char *maps_text(NrRun *run, size_t *size) {
         if (v->image.allocation) {
             if (!map_add_image(&maps,&v->image,v->path,v)) goto done;
         } else if (v->base && !map_add_range(&maps,(uintptr_t)v->base,(uintptr_t)v->base+v->size,
-                    v->file_offset,v->file_inode,v->path,v->section != NULL,v)) goto done;
+                    v->file_offset,v->file_inode,v->path,v->section && !v->private_view,v)) goto done;
     }
     if (run->heap_committed && !map_add_range(&maps,run->heap_base,run->heap_base+run->heap_committed,0,0,"[heap]",0,NULL)) goto done;
     if (!map_add_range(&maps,run->stack_low,run->stack_high,0,0,"[stack]",0,NULL)) goto done;

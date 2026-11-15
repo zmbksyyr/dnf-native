@@ -21,6 +21,8 @@ Zydis/Zycore 由 `tools/bootstrap.py` 按固定提交获取；miniz 原样上游
 
 DBMW/manager 停服修正曾参考 `rednf/remake/source/DNFServer/GameServer/DBMW/` 中 `DNFThreadInterface.h`、`DNFTcpNetworkThread.cpp`、`DNFNetworkThread.cpp`、`DNFApplication.cpp` 和 `DNFUdpHandler.cpp` 的对象关系。实际地址、虚表槽、循环标志、I/O 等待及销毁顺序均从固定原版 ELF 独立核对，差异是本项目在原版 Free 之前补充真实的停止、取消阻塞和 guest join；没有编译、移植或复制参考线程实现。原始指令与虚表核验记录位于外部 `P8-20261116-service-stop/evidence/`，适配身份与恢复方法见[实现说明](architecture.md)。
 
+P9 的嵌套信号和普通私有文件映射独立实现依据为 Linux [sigaction(2)](https://man7.org/linux/man-pages/man2/sigaction.2.html)、[mmap/munmap(2)](https://man7.org/linux/man-pages/man2/mmap.2.html) 的 ABI 语义，以及 Microsoft [CreateFileMappingW](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingw)、[MapViewOfFile](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile) 和 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect) 的文件视图与保护约束。需求来自固定 game/Frida 的 syscall 日志；与现有 ELF snapshot 路径分开，未移植参考 compat 代码。Linux EOF 外整页的 SIGBUS、同步异常转交及地址复用限制均保留明确边界。
+
 ## 原始许可材料
 
 下列文本取自原 `LICENSES/` 和已验证交付包的 Linux 许可材料；合并时统一换行并清理行尾空白，每段路径与 SHA-256 标识原文件。原 miniz 源码目录的 `LICENSE` 与 `LICENSES/miniz.txt` 相同，合并保留一份。

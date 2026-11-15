@@ -21,6 +21,21 @@ static volatile word observed;
 static word expected_pid;
 #ifndef NR_GLIBC
 static int expected_origin;
+static unsigned nodefer_mode, nested_calls, depth, max_depth;
+static void nested_handler(int signal, void *info, void *context) {
+    CHECK(signal==12 && info && context);
+    unsigned long long mask=0;
+    CHECK(call(MASK,0,0,(word)&mask,8)==0);
+    CHECK(((mask>>11)&1)==(nodefer_mode!=1));
+    ++depth;
+    if (depth>max_depth) max_depth=depth;
+    ++nested_calls;
+    if (nested_calls==1) {
+        CHECK(call(KILL,expected_pid,12,0,0)==0);
+        CHECK(nested_calls==(nodefer_mode==1 ? 2u : 1u));
+    }
+    --depth;
+}
 static void handler(int signal, void *info, void *context) {
     CHECK(signal == 12 && info && context);
     const int *si=(const int *)info;
@@ -78,6 +93,20 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     expected_origin=-6;
     CHECK(call(TGKILL,expected_pid,(word)call(GETTID,0,0,0,0),12,0)==77);
     CHECK(observed==2);
+    /* Exact Frida flags: SIGINFO|RESTORER|NODEFER. Also verify that an explicit
+       action mask still defers the signal, and that each return restores it. */
+    mask=0;
+    CHECK(call(MASK,2,(word)&mask,0,8)==0);
+    action.handler=(word)nested_handler;
+    for (nodefer_mode=0; nodefer_mode<3; ++nodefer_mode) {
+        action.flags=0x04000004u | (nodefer_mode ? 0x40000000u : 0);
+        action.mask=nodefer_mode==2 ? 1ULL<<11 : 0;
+        depth=max_depth=nested_calls=0;
+        CHECK(call(ACTION,12,(word)&action,0,8)==0);
+        CHECK(call(KILL,expected_pid,12,0,0)==0);
+        CHECK(nested_calls==2 && depth==0 && max_depth==(nodefer_mode==1 ? 2u : 1u));
+        CHECK(call(MASK,0,0,(word)&current,8)==0 && current==0);
+    }
     const char message[]="native-siginfo-ok\n";
     CHECK(call(WRITE, 1, (word)message, sizeof(message)-1, 0) == sizeof(message)-1);
     call(EXIT, 42, 0, 0, 0);

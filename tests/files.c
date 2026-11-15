@@ -170,6 +170,52 @@ static void check_map_lifecycle(void) {
     CHECK(call(MUNMAP, memory, 4096, 0) == 0);
     read_maps();
     expect_map(memory, 0, 0, 0, "");
+
+    /* Readonly fds support writable MAP_PRIVATE without file writeback.
+       A 4 KiB offset must work despite Windows' 64 KiB view granularity. */
+    fd = call(OPEN, (word)"/private-data", 0, 0);
+    CHECK(fd >= 0 && call(FSTAT, fd, (word)stat, 0) == 0);
+    inode = u64(stat + INODE);
+    CHECK(call6(MMAP, 0, 4096, 5, 2, (word)fd, 0) == -38);
+    CHECK(call6(MMAP, 0, 5 * 4096, 1, 2, (word)fd, 0) == -38);
+    CHECK(call6(MMAP, 0, 4096, 1, 2, 256, 0) == -9);
+#ifdef __x86_64__
+    file_offset = 4096;
+#else
+    file_offset = 1;
+#endif
+    word copy = (word)call6(MMAP, 0, 3 * 4096, 1, 2, (word)fd, file_offset);
+    word alias = (word)call6(MMAP, 0, 3 * 4096, 3, 2, (word)fd, file_offset);
+    CHECK(copy && copy < (word)-4095 && alias && alias < (word)-4095);
+    unsigned char first;
+    CHECK(call(READ, fd, (word)&first, 1) == 1 && first == 0x61);
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
+    volatile unsigned char *private_bytes = (volatile unsigned char *)copy;
+    CHECK(private_bytes[0] == 0x62 && private_bytes[8191] == 0x63);
+    CHECK(private_bytes[8192] == 0x64 && private_bytes[8192 + 36] == 0x64);
+    CHECK(private_bytes[8192 + 37] == 0 && private_bytes[12287] == 0);
+    CHECK(call(MPROTECT, copy, 4096, 3) == 0);
+    private_bytes[0] = 0x78;
+    CHECK(*(volatile unsigned char *)alias == 0x62);
+    *(volatile unsigned char *)alias = 0x79;
+    CHECK(private_bytes[0] == 0x78);
+    CHECK(call(MPROTECT, copy, 4096, 1) == 0);
+    CHECK(call(MPROTECT, copy, 4096, 5) == -38);
+    read_maps();
+    expect_map(copy, "r--p", 4096, inode, "/private-data");
+    expect_map(alias, "rw-p", 4096, inode, "/private-data");
+    CHECK(call(MUNMAP, copy + 4096, 4096, 0) == 0);
+    CHECK(call(MPROTECT, copy + 4096, 4096, 3) == -12);
+    CHECK(private_bytes[0] == 0x78 && private_bytes[8192] == 0x64);
+    read_maps();
+    expect_map(copy + 4096, 0, 0, 0, "");
+    expect_map(copy + 8192, "r--p", 12288, inode, "/private-data");
+    CHECK(call(MUNMAP, copy, 3 * 4096, 0) == 0);
+    CHECK(call(MUNMAP, alias, 3 * 4096, 0) == 0);
+    fd = call(OPEN, (word)"/private-data", 0, 0);
+    CHECK(fd >= 0);
+    CHECK(call(READ, fd, (word)&first, 1) == 1 && first == 0x61);
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
 }
 #endif
 

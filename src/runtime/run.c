@@ -392,7 +392,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
         return EXCEPTION_CONTINUE_EXECUTION;
     }
 #endif
-    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION && nr_current()->in_signal &&
+    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION && nr_current()->signal_state &&
         pc == (uintptr_t)active->signal_code) {
         if (!nr_restore_signal(active, c)) ExitProcess(124);
         if (!nr_deliver_signal(active, c)) ExitProcess(124);
@@ -417,7 +417,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
             ExitProcess(126);
         }
 #ifdef _WIN64
-        if (c->Rax == 15 && nr_current()->in_signal) {
+        if (c->Rax == 15 && nr_current()->signal_state) {
             if (!nr_restore_signal(active, c)) ExitProcess(124);
             if (!nr_deliver_signal(active, c)) ExitProcess(124);
             return EXCEPTION_CONTINUE_EXECUTION;
@@ -436,7 +436,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     if ((code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_PRIV_INSTRUCTION || code == EXCEPTION_ILLEGAL_INSTRUCTION) &&
         executable(pc) &&
         nr_memory(pc, 2, 0) && !memcmp((const void *)pc, "\xcd\x80", 2)) {
-        if ((c->Eax == 119 || c->Eax == 173) && nr_current()->in_signal) {
+        if ((c->Eax == 119 || c->Eax == 173) && nr_current()->signal_state) {
             if (!nr_restore_signal(active, c)) ExitProcess(124);
             if (!nr_deliver_signal(active, c)) ExitProcess(124);
             return EXCEPTION_CONTINUE_EXECUTION;

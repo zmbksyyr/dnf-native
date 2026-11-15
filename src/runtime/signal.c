@@ -12,8 +12,19 @@ enum {ACTION = 174, MASK = 175, KILL = 37, TGKILL = 270};
 #define SP(c) ((c)->Esp)
 #endif
 
-enum { SA_SIGINFO = 4, SA_RESTORER = 0x04000000, SA_RESTART = 0x10000000, SA_RESETHAND = 0x80000000u };
+enum { SA_SIGINFO = 4, SA_RESTORER = 0x04000000, SA_RESTART = 0x10000000,
+       SA_NODEFER = 0x40000000, SA_RESETHAND = 0x80000000u };
 void nr_signal_enter(void);
+
+/* Every delivered handler owns its interrupted context. Unmasked signals can
+   nest; sigreturn must restore the innermost frame before the outer one. */
+struct NrSignalState {
+    NrSignalState *previous;
+    CONTEXT context;
+    uint64_t mask;
+    uintptr_t frame;
+    int info;
+};
 
 /* Linux UAPI sigcontext/ucontext layouts, independent of Windows CONTEXT.
    Floating-point state stays in the saved native context; fpstate=NULL
@@ -90,13 +101,15 @@ static void restore_machine(CONTEXT *c, const NrSigContext *s) {
 
 int nr_restore_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread=nr_current();
-    CONTEXT restored=thread->saved_context;
-    uint64_t mask=thread->saved_mask;
-    if (thread->signal_uses_info) {
+    NrSignalState *state=thread->signal_state;
+    if (!state) return 0;
+    CONTEXT restored=state->context;
+    uint64_t mask=state->mask;
+    if (state->info) {
         NrSignalFrame frame;
         EnterCriticalSection(&run->memory_lock);
-        int valid=nr_memory(thread->signal_frame_address, sizeof(frame), 0);
-        if (valid) memcpy(&frame, (void *)thread->signal_frame_address, sizeof(frame));
+        int valid=nr_memory(state->frame, sizeof(frame), 0);
+        if (valid) memcpy(&frame, (void *)state->frame, sizeof(frame));
         LeaveCriticalSection(&run->memory_lock);
         if (!valid || frame.context.machine.fpstate) return 0;
         restore_machine(&restored, &frame.context.machine);
@@ -105,7 +118,8 @@ int nr_restore_signal(NrRun *run, CONTEXT *c) {
     }
     *c=restored;
     thread->signal_mask=mask & ~((1ULL<<8) | (1ULL<<18));
-    thread->in_signal=0;
+    thread->signal_state=state->previous;
+    HeapFree(GetProcessHeap(), 0, state);
     return 1;
 }
 
@@ -129,7 +143,9 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         if (b) {
             memcpy(&action, (const void *)b, 3 * sizeof(uintptr_t));
             memcpy(&action.mask, (const void *)(b + 3 * sizeof(uintptr_t)), 8);
-            if (action.flags & ~(uintptr_t)(SA_SIGINFO | SA_RESTORER | SA_RESTART | SA_RESETHAND)) {
+            if (action.flags & ~(uintptr_t)(SA_SIGINFO | SA_RESTORER | SA_RESTART | SA_NODEFER | SA_RESETHAND)) {
+                fprintf(stderr, "sigaction unsupported signal=%llu flags=0x%llx handler=0x%llx\n",
+                        (unsigned long long)a, (unsigned long long)action.flags, (unsigned long long)action.handler);
                 *result = -38; return 1;
             }
         }
@@ -184,7 +200,6 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     if (WaitForSingleObject(run->usr2_event, 0) == WAIT_OBJECT_0) {
         run->signal_origin[12]=128; run->signal_sender[12]=0; run->signal_pending |= 1ULL << 11;
     }
-    if (thread->in_signal) return 1;
     uint64_t ready = run->signal_pending & ~thread->signal_mask;
     for (unsigned signal = 1; signal <= 64; ++signal) {
         uint64_t bit = 1ULL << (signal - 1);
@@ -224,14 +239,18 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
             save_machine(&frame->context.machine,c,thread);
             memcpy(frame->context.mask,&thread->signal_mask,8);
         }
-        thread->saved_context = *c;
-        thread->saved_mask = thread->signal_mask;
+        NrSignalState *state=HeapAlloc(GetProcessHeap(), 0, sizeof(*state));
+        if (!state) return 0;
+        state->context=*c;
+        state->mask=thread->signal_mask;
+        state->info=info;
+        state->frame=stack;
+        state->previous=thread->signal_state;
+        thread->signal_state=state;
         thread->signal_mask |= action.mask;
-        thread->signal_mask |= bit;
+        if (!(action.flags & SA_NODEFER)) thread->signal_mask |= bit;
         thread->signal_mask &= ~((1ULL<<8) | (1ULL<<18));
         if (action.flags & SA_RESETHAND) memset(&run->actions[signal], 0, sizeof(NrSignal));
-        thread->signal_uses_info=info;
-        thread->signal_frame_address=stack;
         SP(c) = stack;
         PC(c) = (uintptr_t)nr_signal_enter;
 #ifdef _WIN64
@@ -240,7 +259,6 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
 #else
         c->Eax=action.handler; c->Edi=stack; c->Esi=(uintptr_t)frame; c->Ecx=(DWORD)bytes;
 #endif
-        thread->in_signal = 1;
         return 1;
     }
     return 1;

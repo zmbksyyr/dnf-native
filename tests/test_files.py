@@ -73,6 +73,8 @@ def main():
         instance.mkdir(parents=True)
         (instance / "sample").write_bytes(b"abcdef")
         (instance / "maps-共享").write_bytes(bytes(128 * 1024))
+        private_data = b"a" * 4096 + b"b" * 4096 + b"c" * 4096 + b"d" * 37
+        (instance / "private-data").write_bytes(private_data)
         os.link(instance / "sample", instance / "sample-link")
         (instance / "directory/beta").mkdir(parents=True)
         (instance / "directory/alpha").write_bytes(b"directory entry")
@@ -94,6 +96,7 @@ def main():
         passed = (process.returncode == 42 and peer.returncode == 42 and peer.stdout == b"peer-ok\n" and
                   stdout[size:] == b"shared-ready\nfiles-ok\n" and inode == identity["expected_inode"] and
                   content == b"abcd\0\0\0\0\0" and shared[:3] == b"shp" and len(shared) == 280 and
+                  (instance / "private-data").read_bytes() == private_data and
                   not (instance / "dev/urandom").exists())
         records.append({"arch": arch, "build": build, "command": command, "fixture_sha256": sha,
                         "host_sha256": hashlib.sha256(host.read_bytes()).hexdigest(), **identity,
@@ -106,7 +109,7 @@ def main():
     if args.build_only:
         return
     result = {"recorded_utc": stamp, "os": platform.platform(),
-              "scope": "Own Linux fixtures: maps permissions/PROT_NONE/partial unmap/removal, shared offsets/UTF-8 paths/inodes after fd close, file identity, CNG reads, directory pagination/EOF/rewind, live shared aliases and cross-process visibility. Not service acceptance.",
+              "scope": "Own Linux fixtures: maps permissions/PROT_NONE/partial unmap/removal, shared offsets/UTF-8 paths/inodes after fd close, private COW aliases/4 KiB offsets/EOF tails/no writeback/error paths, file identity, CNG reads, directory pagination/EOF/rewind, live shared aliases and cross-process visibility. Not service acceptance.",
               "results": records}
     (BUILD / "files-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(r["passed"] for r in records):
