@@ -1,4 +1,4 @@
-// Independent Win32 console for original ELF hosts and the official MySQL tools.
+﻿// Independent Win32 console for original ELF hosts and the official MySQL tools.
 #include "service_processes.h"
 #include <ws2tcpip.h>
 #include <uxtheme.h>
@@ -185,7 +185,7 @@ struct App {
     int px(int value) const { return MulDiv(value, dpi, 96); }
     int grid_columns(int width) const { return std::max(1,(width-72)/(width < 1280 ? 140 : 126)); }
     int grid_rows = 2;
-    int database_top() const { return 300 + grid_rows * 54; }
+    int database_top() const { return 232 + grid_rows * 54; }
 
     void display_log(const std::wstring &text) {
         bool follow = SendMessageW(GetDlgItem(window, LOG_FOLLOW), BM_GETCHECK, 0, 0) == BST_CHECKED;
@@ -699,9 +699,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 }
                 return child;
             };
-            HWND heading = control(L"STATIC", L"DNF Native 控制台", SS_NOPREFIX, 211);
-            SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(app->title_font), TRUE);
-            control(L"STATIC", L"本地服务管理", SS_NOPREFIX, 212);
             control(L"STATIC", L"全局控制", SS_CENTERIMAGE, 214);
             control(L"STATIC", L"0 / 0 运行中", SS_CENTERIMAGE, 213);
             control(L"STATIC", L"实例目录", 0, 201);
@@ -758,19 +755,18 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->grid_rows = std::max(2, (static_cast<int>(app->services.size())+columns-1)/columns);
             int db = app->database_top(), logs = db + 94;
             auto place = [&](int id, int x, int y, int w, int h) { MoveWindow(GetDlgItem(window, id), app->px(x), app->px(y), app->px(w), app->px(h), TRUE); };
-            place(211,76,18,252,32); place(212,344,24,150,24);
-            place(214,42,107,78,24); place(201,128,107,64,24);
-            place(INSTANCE,202,106,width-710,26); place(BROWSE,width-500,101,64,36);
-            place(FOLDER,width-424,101,90,36); place(LOGS,width-324,101,90,36);
-            place(ALL_STOP,width-222,101,90,36); place(ALL_START,width-122,101,92,36);
-            place(207,40,194,80,24); place(213,126,190,130,28);
-            place(216,40,239,56,24); place(SERVICE_IP,108,235,142,26); place(IP_APPLY,266,230,66,36);
-            place(217,346,239,300,24);
-            place(DP2_ENABLE,width-630,190,96,26); place(FRIDA_ENABLE,width-520,190,80,26);
-            place(PLUGINS_SAVE,width-430,187,80,32);
-            place(ELF_START,width-336,187,96,32); place(ELF_STOP,width-230,187,96,32);
-            place(SERVICE_LOGS,width-126,187,110,32);
-            place(SERVICE_LIST,32,274,width-64,app->grid_rows*54);
+            place(214,39,78,78,24); place(201,125,64,64,24);
+            place(INSTANCE,202,124,width-710,26); place(BROWSE,width-500,119,64,36);
+            place(FOLDER,width-424,119,90,36); place(LOGS,width-324,119,90,36);
+            place(ALL_STOP,width-222,119,90,36); place(ALL_START,width-122,119,92,36);
+            place(207,40,126,80,24); place(213,126,122,130,28);
+            place(216,40,171,56,24); place(SERVICE_IP,108,167,142,26); place(IP_APPLY,266,162,66,36);
+            place(217,346,171,300,24);
+            place(DP2_ENABLE,width-630,122,96,26); place(FRIDA_ENABLE,width-520,122,80,26);
+            place(PLUGINS_SAVE,width-430,119,80,32);
+            place(ELF_START,width-336,119,96,32); place(ELF_STOP,width-230,119,96,32);
+            place(SERVICE_LOGS,width-126,119,110,32);
+            place(SERVICE_LIST,32,206,width-64,app->grid_rows*54);
             HWND services = GetDlgItem(window, SERVICE_LIST);
             SendMessageW(services, LB_SETCOLUMNWIDTH, (app->px(width-64))/columns, 0);
             LRESULT selected = SendMessageW(services, LB_GETCURSEL, 0, 0);
@@ -800,7 +796,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         case WM_PAINT: {
             PAINTSTRUCT paint; HDC dc = BeginPaint(window, &paint);
             RECT area; GetClientRect(window, &area); int width = area.right, db = app->px(app->database_top()), logs = db+app->px(94);
-            RECT header = {0,0,width,app->px(68)}; FillRect(dc,&header,app->surface);
             RECT footer = {0,area.bottom-app->px(38),width,area.bottom}; FillRect(dc,&footer,app->surface);
             auto card = [&](int top,int bottom) {
                 RECT shadow = {app->px(24),top+app->px(3),width-app->px(24),bottom+app->px(3)};
@@ -808,19 +803,15 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 RECT panel = {app->px(24),top,width-app->px(24),bottom};
                 rounded(dc,panel,RGB(255,255,255),RGB(228,234,243),app->px(24));
             };
-            card(app->px(88),app->px(152)); card(app->px(174),db-app->px(18)); card(db,db+app->px(76)); card(logs,area.bottom-app->px(54));
-            RECT path_border = {app->px(198),app->px(100),width-app->px(432),app->px(138)};
+            card(app->px(20),app->px(84)); card(app->px(106),db-app->px(18)); card(db,db+app->px(76)); card(logs,area.bottom-app->px(54));
+            RECT path_border = {app->px(198),app->px(118),width-app->px(432),app->px(156)};
             rounded(dc,path_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
             RECT port_border = {app->px(260),db+app->px(22),app->px(326),db+app->px(54)};
             rounded(dc,port_border,RGB(255,255,255),RGB(225,233,246),app->px(14));
-            RECT ip_border = {app->px(102),app->px(230),app->px(256),app->px(266)};
+            RECT ip_border = {app->px(102),app->px(162),app->px(256),app->px(198)};
             rounded(dc,ip_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
-            RECT icon = {app->px(26),app->px(14),app->px(62),app->px(50)};
-            rounded(dc,icon,RGB(43,108,246),RGB(43,108,246),app->px(10));
-            SelectObject(dc,app->strong_font); SetTextColor(dc,RGB(255,255,255)); SetBkMode(dc,TRANSPARENT);
-            DrawTextW(dc,L"DN",-1,&icon,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
             HPEN line = CreatePen(PS_SOLID,1,RGB(239,243,249)); HGDIOBJ old=SelectObject(dc,line);
-            for (int y : {app->px(68),app->px(225),logs+app->px(53),logs+app->px(88),static_cast<int>(area.bottom)-app->px(38)}) {
+            for (int y : {app->px(84),app->px(157),logs+app->px(53),logs+app->px(88),static_cast<int>(area.bottom)-app->px(38)}) {
                 MoveToEx(dc,app->px(24),y,nullptr);LineTo(dc,width-app->px(24),y);
             }
             SelectObject(dc,old);DeleteObject(line);EndPaint(window, &paint); return 0;
