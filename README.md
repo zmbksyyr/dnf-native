@@ -23,6 +23,7 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 - [兼容缺口与运行开销](docs/08-compatibility-and-performance.md)：rednf 对照、优化依据及实际边界。
 - [客户端与原数据库兼容](docs/11-client-auth-and-database.md)：密钥、简繁体、账号夹具及原数据库行为。
 - [GUI 参考图落地](docs/12-gui-reference.md)：最新界面、回归、截图与审阅包。
+- [GUI 维护停服协调](docs/18-gui-maintenance-coordination.md)：备份/还原自动逆序停服并记录真实维护结果。
 - [真实游戏与缓存开销](docs/13-gameplay-and-cache-performance.md)：实际通关与存档、退出热点、更新资源与保留边界。
 - [运行时并发回归](docs/14-runtime-concurrency.md)：地址空间竞态修复、双架构并发夹具、relay 复测和当前资源包。
 

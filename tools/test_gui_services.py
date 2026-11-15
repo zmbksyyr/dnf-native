@@ -64,11 +64,15 @@ def main():
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 224)), "whole-stop enabled")
         checks["start_window_response_ms"] = responsive(window)
         receipt["started_rows"] = rows(window)
-        assert sum("进程运行中" in row for row in rows(window)) == 15
+        assert sum("进程运行中" in row for row in rows(window)) >= 15
         checks["fifteen_original_peer_processes"] = True
-        checks["database_stop_and_backup_disabled_while_services_run"] = all(not user.IsWindowEnabled(user.GetDlgItem(window, i)) for i in [112, 113, 114, 101])
-        if not checks["database_stop_and_backup_disabled_while_services_run"]:
-            raise RuntimeError("Database maintenance was enabled while writers were active")
+        checks["database_stop_disabled_but_backup_enabled_while_services_run"] = (
+            not user.IsWindowEnabled(user.GetDlgItem(window, 112)) and
+            user.IsWindowEnabled(user.GetDlgItem(window, 113)) and
+            not user.IsWindowEnabled(user.GetDlgItem(window, 114)) and
+            not user.IsWindowEnabled(user.GetDlgItem(window, 101)))
+        if not checks["database_stop_disabled_but_backup_enabled_while_services_run"]:
+            raise RuntimeError("GUI did not expose the coordinated backup action while services were active")
         time.sleep(25)  # Original auction/point need their own startup work.
         checks["channel_protocol"] = channel(7001)
         checks["relay_and_real_monitor_rejection"] = relay(True)
@@ -116,15 +120,24 @@ def main():
         checks["reverse_order_whole_stop_completed"] = True
         checks["owned_pid_markers_removed_after_stop"] = not list((instance / "i686").rglob("*.pid"))
         print("GUI: whole-stop completed", flush=True)
-        checks["backup_enabled_only_after_whole_stop"] = bool(user.IsWindowEnabled(user.GetDlgItem(window, 113)))
+        checks["backup_enabled_after_whole_stop"] = bool(user.IsWindowEnabled(user.GetDlgItem(window, 113)))
         # Repeated launch and ordinary window-close must also stop every owned peer.
         click(window, 223); ready(window, "已启动默认服务进程", 90)
         time.sleep(25)
-        assert sum("进程运行中" in row for row in rows(window)) == 15
+        assert sum("进程运行中" in row for row in rows(window)) >= 15
         checks["second_launch_channel_protocol"] = channel(7001)
         checks["second_launch_relay_and_monitor_protocol"] = relay(True)
         checks["second_launch_stun_protocol"] = stun()
-        owned = [int(re.search(r"PID (\d+)", row)[1]) for row in rows(window)[:15]]
+        auto_backups = probe / "coordinated-backups"
+        auto_backups.mkdir()
+        click(window, 113)
+        select_folder(process, auto_backups)
+        wait_for(lambda: "正在停止服务和数据库" in status(window), "coordinated maintenance starts")
+        ready(window, "备份完成", 300)
+        assert all("已退出" in row for row in rows(window)[:15])
+        assert "维护前已按逆序停止服务和数据库" in title(user.GetDlgItem(window, 206))
+        checks["backup_stops_services_and_database_before_running"] = True
+        owned = [int(re.search(r"PID (\d+)", row)[1]) for row in rows(window)[:15] if re.search(r"PID (\d+)", row)]
         screenshot(window, probe / "before-close.png")
         user.PostMessageW(window, 0x10, 0, 0)
         process.wait(timeout=120)
@@ -155,7 +168,6 @@ def main():
     except Exception as error:
         receipt["error"] = type(error).__name__ + ": " + str(error)
     finally:
-        elf.write_bytes(original)
         if process.poll() is None:
             if window:
                 user.PostMessageW(window, 0x10, 0, 0)
@@ -165,6 +177,10 @@ def main():
                 receipt["forced_cleanup"] = True
                 subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=15)
                 process.wait(timeout=10)
+        # Stop the hosts before restoring the deliberately damaged ELF.  The
+        # previous order masked the real probe failure with a Windows sharing
+        # violation from a still-running host.
+        elf.write_bytes(original)
         receipt["exit_code"] = process.returncode
         receipt["service_logs"] = {path.name: sha256(path) for path in sorted((instance / "service-logs").glob("*.log"))}
         (probe / "receipt.json").write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")

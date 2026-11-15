@@ -356,7 +356,11 @@ struct App {
         EnableWindow(GetDlgItem(window, INITIALIZE), !busy && !session.process && !current.empty() && !initialized && !pending);
         EnableWindow(GetDlgItem(window, START), !busy && !session.process && initialized && !pending);
         EnableWindow(GetDlgItem(window, STOP), session.process && !active);
-        for (int id : {BACKUP, RESTORE}) EnableWindow(GetDlgItem(window, id), !active && !session.process && initialized && !pending);
+        // Maintenance owns the same stop path as the window close action.  It
+        // is safe to offer it while the instance is running because the worker
+        // first stops the original services in reverse order and then the
+        // database before invoking the offline operation.
+        for (int id : {BACKUP, RESTORE}) EnableWindow(GetDlgItem(window, id), initialized && !pending);
         EnableWindow(GetDlgItem(window, RECOVER), !busy && !active && !session.process && restore_pending);
         for (int id : {FOLDER, LOGS}) EnableWindow(GetDlgItem(window, id), !busy && !current.empty());
         LRESULT index = SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_GETCURSEL, 0, 0);
@@ -434,6 +438,22 @@ struct App {
                     result->status = L"数据库已正常停止";
                     result->details = result->status + L"\r\n" + decode(read_file(owned.log));
                 } else {
+                    std::wstring preparation;
+                    if (id == BACKUP || id == RESTORE) {
+                        bool active = services_running();
+                        if (active && !owned.process)
+                            throw std::runtime_error("Services are running without an owned database; maintenance was not started");
+                        if (active) {
+                            preparation = L"维护前已按逆序停止服务和数据库\r\n";
+                            PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在停止服务和数据库以进行维护…"));
+                            for (auto item = services.rbegin(); item != services.rend(); ++item) stop_service(*item);
+                        }
+                        if (owned.process) {
+                            stop_database(window, tool, instance, owned);
+                            result->stopped = true;
+                            if (preparation.empty()) preparation = L"维护前已停止数据库\r\n";
+                        }
+                    }
                     const wchar_t *operation = id == INITIALIZE ? L"initialize" : id == BACKUP ? L"backup" : id == RESTORE ? L"restore" : L"recover";
                     if (id == INITIALIZE) {
                         size_t used; unsigned long value = std::stoul(port_text, &used);
@@ -444,10 +464,10 @@ struct App {
                     if (id == INITIALIZE) arguments.push_back(port_text);
                     if (id == BACKUP || id == RESTORE) arguments.push_back(target);
                     ToolResult command = run_tool(tool, instance, arguments);
-                    result->details = decode(command.output) + L"\r\n操作日志：" + command.log;
+                    result->details = preparation + decode(command.output) + L"\r\n操作日志：" + command.log;
                     if (!target.empty()) result->details = L"备份目录：" + target + L"\r\n" + result->details;
                     if (command.code) throw std::runtime_error("Native database operation failed; inspect the operation log");
-                    result->status = id == INITIALIZE ? L"安全初始化完成，数据库已停止" : id == BACKUP ? L"备份完成，数据库已停止" : id == RESTORE ? L"还原已验证并提交，数据库已停止" : L"恢复完成，数据库已停止";
+                    result->status = id == INITIALIZE ? L"安全初始化完成，数据库已停止" : id == BACKUP ? L"备份完成，服务与数据库已停止" : id == RESTORE ? L"还原已验证并提交，服务与数据库已停止" : L"恢复完成，数据库已停止";
                 }
                 result->success = true;
             } catch (const std::exception &error) {
@@ -598,7 +618,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->status = control(L"STATIC", L"选择实例目录以开始", SS_LEFT, 204);
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{INITIALIZE,L"初始化"},{START,L"启动"},{STOP,L"停止"},{BACKUP,L"备份…"},{RESTORE,L"还原…"},{RECOVER,L"恢复操作"},{FOLDER,L"实例目录"},{LOGS,L"日志目录"}})
                 control(L"BUTTON", button.second, WS_TABSTOP, button.first);
-            control(L"STATIC", L"备份与还原前请停止数据库", SS_ENDELLIPSIS, 205);
+            control(L"STATIC", L"备份与还原会先按逆序停止服务和数据库", SS_ENDELLIPSIS, 205);
             control(L"BUTTON", L"DP2/Lua", BS_AUTOCHECKBOX | WS_TABSTOP, DP2_ENABLE);
             control(L"BUTTON", L"Frida", BS_AUTOCHECKBOX | WS_TABSTOP, FRIDA_ENABLE);
             control(L"BUTTON", L"保存设置", WS_TABSTOP, PLUGINS_SAVE);
