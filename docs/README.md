@@ -124,6 +124,7 @@ python -B tests/test_vm.py
 python -B tests/test_vm_concurrent.py
 python -B tests/test_tls.py
 python -B tests/test_futex.py
+python -B tests/test_futex.py --robust
 python -B tests/test_ld.py
 python -B tests/test_luv.py
 python -B tests/test_frida.py --item-reset

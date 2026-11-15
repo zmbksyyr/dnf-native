@@ -36,7 +36,7 @@ flowchart TD
 | `files.c` | 实例根目录映射、文件/目录/锁、部分 procfs 和共享文件 |
 | `ipc.c` | eventfd 64 位计数、阻塞/非阻塞、信号量及 poll/epoll/select 就绪联动 |
 | `net.c` | TCP/UDP、select/poll、LT epoll、已支持的 socket 选项 |
-| `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集 |
+| `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集及非 PI robust owner death |
 | `signal.c` | 当前服务所需处理器、掩码、SIGTERM/SIGUSR2 及上下文恢复 |
 | `tls.c` | Linux FS/GS TLS 指令适配和返回路径 |
 
@@ -80,7 +80,7 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 - 当前采用原服务的前台 `run/nofork/test` 入口；通用 fork/exec/wait、setsid 和后台父子语义未提供完整支持。
 - `/dev/shm` 的真实共享文件映射已有路径；System V shm/sem 不等于文件映射，尚无通用实现。
 - 网络以现有 TCP/UDP、select/poll、LT epoll 路径为主；AF_UNIX、完整 sendmsg/recvmsg 辅助数据、ET/ONESHOT 等未完成。
-- 线程退出槽复用、robust owner death、pthread cancel 和通用线程定向信号未完整覆盖。
+- 非 PI robust list 注册及正常线程退出时的 owner death、pending 节点与进程内唤醒已有实现；PI 锁、跨进程 futex、强制终止后的恢复、线程退出槽复用、pthread cancel 和通用线程定向信号未完整覆盖。
 - SA_SIGINFO、备用信号栈、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
 - 打开目标上的 POSIX rename、符号链接、任意私有文件 COW、跨多个预留区固定映射及部分 msync 行为存在边界。
 - inotify_init/init1 仍可返回 ENOSYS，当前 Frida 路径可 fallback；不能宣称通用文件热加载支持。

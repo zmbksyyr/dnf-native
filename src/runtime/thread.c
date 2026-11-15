@@ -46,6 +46,68 @@ static intptr_t wake(uintptr_t address, uintptr_t count) {
     return woken;
 }
 
+static int robust_read(NrRun *run, uintptr_t address, void *data, size_t bytes) {
+    EnterCriticalSection(&run->memory_lock);
+    int valid = nr_memory(address, bytes, 0);
+    if (valid) memcpy(data, (const void *)address, bytes);
+    LeaveCriticalSection(&run->memory_lock);
+    return valid;
+}
+
+static int robust_owner(NrRun *run, NrThread *thread, uintptr_t entry, uintptr_t offset, int pending) {
+    if (entry & 1) {
+        nr_log_robust_failure(thread, entry, "PI unsupported");
+        return 0;
+    }
+    uintptr_t address = entry + offset;
+    EnterCriticalSection(&run->memory_lock);
+    if ((address & 3) || !nr_memory(address, 4, 1)) {
+        LeaveCriticalSection(&run->memory_lock);
+        nr_log_robust_failure(thread, address, "unreadable futex");
+        return 0;
+    }
+    volatile LONG *word = (volatile LONG *)address;
+    uint32_t old = (uint32_t)InterlockedCompareExchange(word, 0, 0);
+    int notify = 0;
+    for (;;) {
+        /* list_op_pending can point at an unlocked word during unlock.
+           Its waiter still needs a wake, without inventing owner death. */
+        if (pending && !(old & 0x3fffffff)) { notify = 1; break; }
+        if ((old & 0x3fffffff) != thread->tid) break;
+        uint32_t value = (old & 0x80000000u) | 0x40000000u;
+        uint32_t actual = (uint32_t)InterlockedCompareExchange(word, (LONG)value, (LONG)old);
+        if (actual == old) { notify = (old & 0x80000000u) != 0; break; }
+        old = actual;
+    }
+    LeaveCriticalSection(&run->memory_lock);
+    /* Do not nest wait_lock with memory_lock. A waiter atomically checks
+       the word under wait_lock before enqueueing, so this cannot lose a wake. */
+    if (notify) wake(address, 1);
+    return 1;
+}
+
+static void robust_exit(NrRun *run, NrThread *thread) {
+    uintptr_t head = thread->robust_head, fields[3];
+    if (!head) return;
+    if (!robust_read(run, head, fields, sizeof(fields))) {
+        nr_log_robust_failure(thread, head, "unreadable head");
+        return;
+    }
+    uintptr_t entry = fields[0], offset = fields[1], pending = fields[2];
+    unsigned remaining = 2048; /* Linux ROBUST_LIST_LIMIT, including malformed cycles. */
+    while ((entry & ~(uintptr_t)1) != head && remaining--) {
+        uintptr_t node = entry & ~(uintptr_t)1, next;
+        if (!robust_read(run, node, &next, sizeof(next))) {
+            nr_log_robust_failure(thread, node, "unreadable link");
+            return;
+        }
+        if (node != (pending & ~(uintptr_t)1) && !robust_owner(run, thread, entry, offset, 0)) return;
+        entry = next;
+    }
+    if ((entry & ~(uintptr_t)1) != head) nr_log_robust_failure(thread, entry, "list limit");
+    if (pending) robust_owner(run, thread, pending, offset, 1);
+}
+
 static intptr_t requeue(const uintptr_t args[6]) {
     if ((args[4] & 3) || (int32_t)args[2] < 0 || (int32_t)args[3] < 0) return -22;
     if (!nr_memory(args[4], 4, 0)) return -14;
@@ -120,11 +182,13 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
     NrThread *thread = nr_current();
     if (number == SETTID) { thread->clear_tid = args[0]; *result = thread->tid; return 1; }
     if (number == ROBUST) {
-        /* Robust owner-death handling is not implemented. */
-        *result = -38; return 1;
+        if (args[1] != 3 * sizeof(uintptr_t)) *result = -22;
+        else { thread->robust_head = args[0]; *result = 0; }
+        return 1;
     }
     if (number == EXIT) {
         nr_log_thread_exit(thread, args[0]);
+        robust_exit(run, thread);
         if (thread->clear_tid && nr_memory(thread->clear_tid, 4, 1)) {
             InterlockedExchange((volatile LONG *)thread->clear_tid, 0);
             wake(thread->clear_tid, UINT32_MAX);

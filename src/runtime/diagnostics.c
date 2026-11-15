@@ -127,12 +127,10 @@ static int read_bytes(uintptr_t address, void *output, size_t bytes) {
     return ReadProcessMemory(GetCurrentProcess(), (const void *)address, output, bytes, &read) && read == bytes;
 }
 
-void nr_log_thread_exit(const NrThread *thread, uintptr_t status) {
+static void thread_record(const char *const labels[3], const uintptr_t values[3], const char *reason) {
     /* Exit runs on a guest stack. Avoid CRT per-thread teardown/stdio locks
        racing exit_group on another thread; emit one bounded kernel write. */
-    char line[128], *out = line;
-    const char *labels[] = {"guest thread exit tid=0x", " tls=0x", " status=0x"};
-    uintptr_t values[] = {thread->tid, thread->tls_base, status};
+    char line[256], *out = line;
     for (unsigned i = 0; i < 3; ++i) {
         for (const char *p = labels[i]; *p; ++p) *out++ = *p;
         int started = 0;
@@ -141,9 +139,25 @@ void nr_log_thread_exit(const NrThread *thread, uintptr_t status) {
             if (digit || started || n == 1) { *out++ = "0123456789abcdef"[digit]; started = 1; }
         }
     }
+    if (reason) {
+        *out++ = ' ';
+        for (unsigned i = 0; reason[i] && i < 48; ++i) *out++ = reason[i];
+    }
     *out++ = '\r'; *out++ = '\n';
     DWORD written;
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), line, (DWORD)(out - line), &written, NULL);
+}
+
+void nr_log_thread_exit(const NrThread *thread, uintptr_t status) {
+    const char *labels[] = {"guest thread exit tid=0x", " tls=0x", " status=0x"};
+    uintptr_t values[] = {thread->tid, thread->tls_base, status};
+    thread_record(labels, values, NULL);
+}
+
+void nr_log_robust_failure(const NrThread *thread, uintptr_t address, const char *reason) {
+    const char *labels[] = {"robust cleanup stopped tid=0x", " head=0x", " address=0x"};
+    uintptr_t values[] = {thread->tid, thread->robust_head, address};
+    thread_record(labels, values, reason);
 }
 
 static void dump(const char *label, uintptr_t address, size_t bytes) {

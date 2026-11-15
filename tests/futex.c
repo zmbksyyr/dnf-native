@@ -3,9 +3,9 @@ typedef __UINTPTR_TYPE__ word;
 typedef __INTPTR_TYPE__ result;
 
 #ifdef __x86_64__
-enum {FUTEX=202, EXIT=60, GROUP_EXIT=231, WRITE=1, SLEEP=35};
+enum {FUTEX=202, EXIT=60, GROUP_EXIT=231, WRITE=1, SLEEP=35, ROBUST=273};
 #else
-enum {FUTEX=240, EXIT=1, GROUP_EXIT=252, WRITE=4, SLEEP=162};
+enum {FUTEX=240, EXIT=1, GROUP_EXIT=252, WRITE=4, SLEEP=162, ROBUST=311};
 #endif
 
 static result call(word n, word a, word b, word c, word d, word e, word f) {
@@ -32,16 +32,51 @@ static void delay(void) {
     CHECK(call(SLEEP, (word)duration, 0, 0, 0, 0, 0) == 0);
 }
 
+#ifndef ROBUST_FIXTURE
 static unsigned first, second;
+#endif
 struct Worker {
-    unsigned char stack[65536] __attribute__((aligned(16)));
+    unsigned char stack[1024 * 1024] __attribute__((aligned(16)));
     word tls[8];
     unsigned descriptor[4], tid, done;
+#ifdef ROBUST_FIXTURE
+    word head[3];
+    struct { unsigned owner; word next; } locks[3];
+    unsigned ready, go;
+#endif
 };
 static struct Worker workers[9];
 extern result spawn(word stack, word parent_tid, word tls, word child_tid);
 
 __attribute__((noreturn)) void child_main(struct Worker *worker) {
+#ifdef ROBUST_FIXTURE
+    unsigned index = (unsigned)(worker - workers);
+    word head = (word)worker->head;
+    word node = (word)&worker->locks[0].next;
+    worker->head[0] = node;
+    worker->head[1] = (word)&worker->locks[0].owner - node; /* glibc uses a negative futex_offset. */
+    worker->locks[0].next = head;
+    worker->locks[0].owner = worker->tid | 0x80000000u;
+    if (index == 0) {
+        worker->locks[0].next = (word)&worker->locks[1].next;
+        worker->locks[1].next = (word)&worker->locks[2].next;
+        worker->locks[2].next = head;
+        worker->locks[2].owner = worker->tid ^ 0x100000;
+    }
+    if (index == 1 || index == 8) { worker->head[0] = head; worker->head[2] = node; }
+    if (index == 2) worker->head[2] = node; /* Pending item already linked: process once. */
+    if (index == 3) head = 1;
+    if (index == 4) worker->head[0] = 2;
+    if (index == 5) worker->locks[0].next = node; /* Malformed cycle is bounded. */
+    if (index == 6) worker->head[0] |= 1; /* PI cannot pretend to be a normal mutex. */
+    if (index == 7) worker->locks[0].owner ^= 0x100000;
+    if (index == 8) worker->locks[0].owner = 0x80000000u;
+    CHECK(call(ROBUST, head, 3 * sizeof(word) - 1, 0, 0, 0, 0) == -22);
+    CHECK(call(ROBUST, head, 3 * sizeof(word), 0, 0, 0, 0) == 0);
+    __atomic_store_n(&worker->ready, 1, __ATOMIC_SEQ_CST);
+    while (!__atomic_load_n(&worker->go, __ATOMIC_SEQ_CST)) delay();
+    delay();
+#else
     for (unsigned i = 0; i < 2000; ++i) {
         word self;
 #ifdef __x86_64__
@@ -52,6 +87,7 @@ __attribute__((noreturn)) void child_main(struct Worker *worker) {
         CHECK(self == (word)worker->tls);
     }
     CHECK(futex(&first, 128, 0, 0, 0, 0) == 0);
+#endif
     __atomic_store_n(&worker->done, 1, __ATOMIC_SEQ_CST);
     call(EXIT, 0, 0, 0, 0, 0, 0);
     __builtin_unreachable();
@@ -72,6 +108,7 @@ static void start(unsigned index) {
     CHECK(spawn(top, (word)&w->tid, tls, (word)&w->tid) > 0);
 }
 
+#ifndef ROBUST_FIXTURE
 static void move_all(unsigned count) {
     unsigned moved = 0;
     for (unsigned tries = 0; moved < count && tries < 3000; ++tries) {
@@ -82,6 +119,7 @@ static void move_all(unsigned count) {
     }
     CHECK(moved == count);
 }
+#endif
 
 static void join(unsigned begin, unsigned count) {
     for (unsigned i = begin; i < begin + count; ++i) {
@@ -92,6 +130,29 @@ static void join(unsigned begin, unsigned count) {
 }
 
 __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
+#ifdef ROBUST_FIXTURE
+    CHECK(call(ROBUST, 0, 3 * sizeof(word), 0, 0, 0, 0) == 0);
+    unsigned real_wakes = 0;
+    for (unsigned index = 0; index < 9; ++index) {
+        start(index);
+        struct Worker *w = &workers[index];
+        while (!__atomic_load_n(&w->ready, __ATOMIC_SEQ_CST)) delay();
+        unsigned old = w->locks[0].owner;
+        __atomic_store_n(&w->go, 1, __ATOMIC_SEQ_CST);
+        if (index < 3 || index == 8) {
+            result timeout[2] = {2, 0};
+            result waited = futex(&w->locks[0].owner, 128, old, (word)timeout, 0, 0);
+            CHECK(waited == 0 || waited == -11);
+            if (!waited) ++real_wakes;
+        }
+        join(index, 1);
+        unsigned expected = index < 3 || index == 5 ? 0xc0000000u : old;
+        CHECK(w->locks[0].owner == expected);
+        if (!index) CHECK(w->locks[1].owner == 0 && w->locks[2].owner != 0xc0000000u);
+    }
+    CHECK(real_wakes > 0);
+    const char message[] = "native-robust-owner-death-ok\n";
+#else
     for (unsigned i = 0; i < 3; ++i) start(i);
     move_all(3);
     CHECK(futex(&second, 132, 1, 2, &first, 1) == -11); /* Compare failure leaves every waiter asleep. */
@@ -120,6 +181,7 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(futex(&first, 133, 0, 0, &second, 0x000ff000) == 0 && second == 255);
     CHECK(futex(&first, 133, 0, 0, &second, 0x00fff000) == 0 && second == (unsigned)-1);
     const char message[] = "native-futex-requeue-wake-op-ok\n";
+#endif
     CHECK(call(WRITE, 1, (word)message, sizeof(message)-1, 0, 0, 0) == sizeof(message)-1);
     call(GROUP_EXIT, 42, 0, 0, 0, 0, 0);
     __builtin_unreachable();

@@ -2,6 +2,10 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## robust mutex 退出恢复（2026-11-16）
+
+双架构独立夹具通过 owner death 原子更新、真实等待者唤醒、负 futex_offset、链内/链外/已解锁 pending 节点，以及错误长度、坏指针、环形链表和 PI 拒绝诊断。进一步使用固定资源内原版 glibc 2.17/libpthread，真实 pthread 持有 robust mutex 后退出，另一线程得到 EOWNERDEAD，修复后可重新持锁；放弃修复后得到 ENOTRECOVERABLE。双架构 futex/TLS/VM 并发和诊断回归通过，原版 game/Frida hook 与双向 RPC 正常退出，无强制清理，robust list ENOSYS 消失。收据在外部 `P4-20261116/robust-receipt.json`。未将结果扩展到 PI 或跨进程 futex。
+
 ## proc maps 生命周期（2026-11-16）
 
 双架构文件夹具验证了 PROT_NONE、逐页 r/w/x 变化、部分 munmap 的空洞、全部释放后消失，以及共享文件的偏移、中文路径和关闭描述符后的 inode。八个 guest 线程进行映射/权限/释放操作时，主线程反复读取 maps 快照；双架构 VM 与并发检查通过。原版 game/DP2/Frida hook 和双向 RPC 正常退出 42，无强制清理。环境仍为 Windows 10 x64 10.0.19044；收据及哈希保存于外部 `P4-20261116/maps-receipt.json`。这些结果不代表任意 ELF 或客户端业务通过。
