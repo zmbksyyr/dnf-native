@@ -755,10 +755,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->grid_rows = std::max(2, (static_cast<int>(app->services.size())+columns-1)/columns);
             int db = app->database_top(), logs = db + 94;
             auto place = [&](int id, int x, int y, int w, int h) { MoveWindow(GetDlgItem(window, id), app->px(x), app->px(y), app->px(w), app->px(h), TRUE); };
-            place(214,39,78,78,24); place(201,125,64,64,24);
-            place(INSTANCE,202,124,width-710,26); place(BROWSE,width-500,119,64,36);
-            place(FOLDER,width-424,119,90,36); place(LOGS,width-324,119,90,36);
-            place(ALL_STOP,width-222,119,90,36); place(ALL_START,width-122,119,92,36);
+            place(214,42,39,78,24); place(201,128,39,64,24);
+            place(INSTANCE,202,38,width-710,26); place(BROWSE,width-500,33,64,36);
+            place(FOLDER,width-424,33,90,36); place(LOGS,width-324,33,90,36);
+            place(ALL_STOP,width-222,33,90,36); place(ALL_START,width-122,33,92,36);
             place(207,40,126,80,24); place(213,126,122,130,28);
             place(216,40,171,56,24); place(SERVICE_IP,108,167,142,26); place(IP_APPLY,266,162,66,36);
             place(217,346,171,300,24);
@@ -804,7 +804,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 rounded(dc,panel,RGB(255,255,255),RGB(228,234,243),app->px(24));
             };
             card(app->px(20),app->px(84)); card(app->px(106),db-app->px(18)); card(db,db+app->px(76)); card(logs,area.bottom-app->px(54));
-            RECT path_border = {app->px(198),app->px(118),width-app->px(432),app->px(156)};
+            RECT path_border = {app->px(198),app->px(32),width-app->px(432),app->px(70)};
             rounded(dc,path_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
             RECT port_border = {app->px(260),db+app->px(22),app->px(326),db+app->px(54)};
             rounded(dc,port_border,RGB(255,255,255),RGB(225,233,246),app->px(14));

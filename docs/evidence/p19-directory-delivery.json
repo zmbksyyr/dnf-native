@@ -1,7 +1,7 @@
 {
-  "recorded_utc": "2026-11-15T03:12:02.655522+00:00",
+  "recorded_utc": "2026-11-15T03:23:21.140675+00:00",
   "os": "Windows-10-10.0.19044-SP0",
-  "scope": "Current directory delivery layout and GUI first-run verification.",
+  "scope": "Current directory delivery layout and final GUI first-run verification.",
   "package_root": "build/release-package",
   "top_level_directories": [
     "compatibility",
@@ -10,9 +10,9 @@
     "native"
   ],
   "root_files": [],
-  "archive_bytes": 198076222,
-  "archive_sha256": "374fb8bdbe851653829ea40714720504b98279c1ad7048e258d6584a7729d53b",
-  "gui_sha256": "7c2d4bd0184199c5af46f292d2bba209060a3de45c87e254e8c5dd5cdedab178",
+  "archive_bytes": 198076224,
+  "archive_sha256": "b61e534bfc5f28f490aa797e3881bfde66d810ed9a1670ebfe2e80dc023eb34b",
+  "gui_sha256": "dac4878794fd82655b727d30c530abc6c79445d62cf14f4bb19e0c7a2b269c49",
   "mysql_official_exes": {
     "bin/mysqld.exe": "432693b766a4bc23a769f19993fa2bcb86f983db7e9f40d32a6380ead6f62d63",
     "bin/mysql.exe": "3e5828f7eac9f63d1c31c9e243906d6b1ca55fe9abe69ffde6765c41712031e6",
@@ -23,12 +23,12 @@
     "hosts/i686/dnf-host.exe": "5fab754f7398278938c70d6dfb33eb3b8c175aa4ca66906275d4c5953325f692",
     "hosts/x86_64/dnf-host.exe": "dc6d460d2538380b0de62c55e7e71473d2a493d5bee3991d5a6acde34857e7e5"
   },
-  "setup_probe": "build/probes/20261115T030825981984Z/gui-setup/receipt.json",
+  "setup_probe": "build/probes/20261115T032057172739Z/gui-setup/receipt.json",
   "setup_checks": {
     "opening_gui_does_not_start_work_or_disable_initialize": true,
     "changed_resource_rejected_before_instance_writes": true,
     "existing_nonempty_directory_unchanged": true,
-    "copy_and_initialize_window_response_ms": 0.12,
+    "copy_and_initialize_window_response_ms": 0.051,
     "busy_keeps_service_selection_and_log_controls_available": true,
     "native_first_run_creates_nineteen_service_instance": true,
     "import_reexport_matches_complete_original_seed_bytes": true,
@@ -70,24 +70,10 @@
     "source_resources_unchanged": true
   },
   "forced_cleanup": false,
+  "database_gui_probe": "build/probes/20261115T031324902680Z/gui/receipt.json",
+  "original_log_probe": "build/probes/20261115T031408253573Z/gui-logs/receipt.json",
   "limits": [
     "Developer Windows 10 only; no clean Win7/10/11 matrix.",
     "Client login, jbz69 PVF business and full gameplay acceptance remain outside this probe."
-  ],
-  "database_gui_probe": "build/probes/20261115T031324902680Z/gui/receipt.json",
-  "original_log_probe": "build/probes/20261115T031408253573Z/gui-logs/receipt.json",
-  "database_gui_scope": "Direct build without native game resources; verifies helper lookup fallback, TLS, backup/restore and normal shutdown.",
-  "original_log_checks": [
-    "original_text_without_controller_prefix",
-    "automatic_append",
-    "explicit_gbk_encoding_and_truncation",
-    "rotated_file_reopened",
-    "large_log_tail_bounded",
-    "unfollowed_scroll_preserved",
-    "actual_application_init_log_visible",
-    "actual_stdout_visible",
-    "actual_stderr_visible",
-    "actual_mysql_log_visible",
-    "game_normal_exit"
   ]
 }
