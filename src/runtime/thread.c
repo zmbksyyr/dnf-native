@@ -104,6 +104,7 @@ static intptr_t wake_op(const uintptr_t args[6]) {
 static DWORD WINAPI child_entry(void *argument) {
     NrThread *thread = argument;
     nr_thread_attach(thread);
+    fprintf(stderr, "guest thread enter tid=%lu tls=0x%llx\n", GetCurrentThreadId(), (unsigned long long)thread->tls_base);
     /* New Windows thread keeps its own TEB and host TLS. Guest registers,
        Linux stack and logical TLS are restored independently. */
     RaiseException(0xe0444e46u, 0, 0, NULL);
@@ -123,6 +124,7 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
         *result = -38; return 1;
     }
     if (number == EXIT) {
+        nr_log_thread_exit(thread, args[0]);
         if (thread->clear_tid && nr_memory(thread->clear_tid, 4, 1)) {
             InterlockedExchange((volatile LONG *)thread->clear_tid, 0);
             wake(thread->clear_tid, UINT32_MAX);

@@ -96,7 +96,7 @@ static intptr_t write_copy(HANDLE file, const void *bytes, DWORD count) {
     return error == ERROR_INVALID_HANDLE ? -9 : error == ERROR_BROKEN_PIPE ? -32 : -5;
 }
 
-static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
+static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
     uintptr_t a = args[0], b = args[1], c = args[2];
     if (GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
         fprintf(stderr, "trace pc=0x%llx nr=%llu args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
@@ -350,11 +350,20 @@ static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc
         HeapFree(GetProcessHeap(), 0, copy);
         return result;
     }
-    fprintf(stderr, "syscall gap nr=%llu pc=0x%llx args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
-            (unsigned long long)number, (unsigned long long)pc,
-            (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
-            (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     return -38;
+}
+
+static intptr_t dispatch(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
+    intptr_t result = dispatch_inner(number, args, pc);
+    if (result == -38) nr_log_gap(active, number, args, pc);
+    return result;
+}
+
+static intptr_t syscall_result(uintptr_t number, const uintptr_t args[6], CONTEXT *c, uintptr_t pc) {
+    intptr_t result;
+    if (!nr_threads(active, number, args, c, &result)) return dispatch(number, args, pc);
+    if (result == -38) nr_log_gap(active, number, args, pc);
+    return result;
 }
 
 static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
@@ -411,8 +420,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
             return EXCEPTION_CONTINUE_EXECUTION;
         }
         uintptr_t args[] = {c->Rdi, c->Rsi, c->Rdx, c->R10, c->R8, c->R9};
-        intptr_t result;
-        c->Rax = (DWORD64)(nr_threads(active, c->Rax, args, c, &result) ? result : dispatch(c->Rax, args, pc));
+        c->Rax = (DWORD64)syscall_result(c->Rax, args, c, pc);
         c->Rcx = pc + 2;
         c->R11 = c->EFlags & ~0x10000u;
         c->Rip = pc + 2;
@@ -431,24 +439,27 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
             return EXCEPTION_CONTINUE_EXECUTION;
         }
         uintptr_t args[] = {c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi, c->Ebp};
-        intptr_t result;
-        c->Eax = (DWORD)(nr_threads(active, c->Eax, args, c, &result) ? result : dispatch(c->Eax, args, pc));
+        c->Eax = (DWORD)syscall_result(c->Eax, args, c, pc);
         c->Eip = pc + 2;
         if (!nr_deliver_signal(active, c)) ExitProcess(124);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
 #endif
+    /* Windows cannot reliably unwind through ELF code without PE unwind
+       metadata. Record unsupported guest faults at the VEH boundary, while
+       the original register context still exists. */
+    DWORD fatal = exception->ExceptionRecord->ExceptionCode;
+    if ((fatal == EXCEPTION_ACCESS_VIOLATION || fatal == EXCEPTION_ILLEGAL_INSTRUCTION ||
+         fatal == EXCEPTION_PRIV_INSTRUCTION) && executable(pc)) {
+        nr_log_crash(active, exception);
+        fflush(NULL);
+        ExitProcess(125);
+    }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
 static LONG WINAPI unhandled(EXCEPTION_POINTERS *exception) {
-#ifdef _WIN64
-    uintptr_t pc = exception->ContextRecord->Rip;
-#else
-    uintptr_t pc = exception->ContextRecord->Eip;
-#endif
-    fprintf(stderr, "unhandled exception code=0x%08lx pc=0x%llx\n",
-            exception->ExceptionRecord->ExceptionCode, (unsigned long long)pc);
+    nr_log_crash(active, exception);
     fflush(NULL);
     ExitProcess(125);
     return EXCEPTION_EXECUTE_HANDLER;

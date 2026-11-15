@@ -13,6 +13,11 @@ typedef struct {
 } NrWatch;
 
 typedef struct {
+    uintptr_t number, pc;
+    unsigned count;
+} NrGap;
+
+typedef struct {
     uintptr_t tls_base;
     unsigned char *tls_code;
     uint64_t signal_mask, saved_mask;
@@ -21,6 +26,7 @@ typedef struct {
     uintptr_t clear_tid, robust_head;
     DWORD tid;
     HANDLE handle;
+    NrGap gaps[32];
 } NrThread;
 
 typedef struct {
@@ -90,5 +96,9 @@ DWORD nr_thread_tls_slot(void);
 int nr_thread_init(NrRun *run);
 void nr_thread_attach(NrThread *thread);
 int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *context, intptr_t *result);
+void nr_log_image(const NrElf *elf, const char *path);
+void nr_log_gap(NrRun *run, uintptr_t number, const uintptr_t args[6], uintptr_t pc);
+void nr_log_crash(NrRun *run, EXCEPTION_POINTERS *exception);
+void nr_log_thread_exit(const NrThread *thread, uintptr_t status);
 
 #endif

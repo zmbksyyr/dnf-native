@@ -72,6 +72,7 @@ int wmain(int argc, wchar_t **argv) {
                     fprintf(stderr, "interpreter load failed: %s\n", error ? error : "Windows memory operation failed");
                     nr_elf_close(&run.interpreter); nr_elf_close(elf); return 1;
                 }
+                nr_log_image(&run.interpreter, (const char *)elf->file + elf->programs[i].offset);
                 break;
             }
         }
@@ -86,6 +87,7 @@ int wmain(int argc, wchar_t **argv) {
         for (int i = 0; i < run.argc; ++i) {
             if (!(run.argv[i] = utf8(argv[i + 4]))) return 1;
         }
+        nr_log_image(elf, run.argv[0]);
         int status = nr_run(&run);
         for (int i = 0; i < run.argc; ++i) free(run.argv[i]);
         free(run.argv);

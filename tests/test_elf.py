@@ -68,6 +68,18 @@ def main():
         path.write_bytes(content)
         cases.append((name, hosts[32], path, hashlib.sha256(content).hexdigest(),
                       "cannot read ELF" if name == "truncated" else "architecture or header"))
+    for name, message in [("invalid-load-extent", "PT_LOAD bounds"), ("entry-outside-executable", "executable entry")]:
+        content = bytearray(raw)
+        if name == "invalid-load-extent":
+            phoff = struct.unpack_from("<I", content, 28)[0]
+            stride, count = struct.unpack_from("<HH", content, 42)
+            index = next(i for i in range(count) if struct.unpack_from("<I", content, phoff + i * stride)[0] == 1)
+            struct.pack_into("<I", content, phoff + index * stride + 16, 0xFFFFFFFF)
+        else:
+            struct.pack_into("<I", content, 24, 1)
+        path = bad / name
+        path.write_bytes(content)
+        cases.append((name, hosts[32], path, hashlib.sha256(content).hexdigest(), message))
     for name, host, path, sha, message in cases:
         row = invoke(host, path, sha)
         assert row["exit_code"] == 1 and message in row["stderr"], row

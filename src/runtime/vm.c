@@ -178,6 +178,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     if (slot == run->vm_count) ++run->vm_count;
     fprintf(stderr, "ELF dependency private snapshot sha256=%s base=0x%llx bytes=%zu\n", v->image.sha256,
             (unsigned long long)(uintptr_t)v->base, v->size);
+    nr_log_image(&v->image, v->path ? v->path : "[dependency]");
     return (intptr_t)v->base;
 }
 
