@@ -1,7 +1,6 @@
-// Independent bootstrap for the pinned official MySQL tools.
+// Instance maintenance for the separately delivered official MySQL tools.
 #include <windows.h>
 #include <bcrypt.h>
-#include <fdi.h>
 #include <shlobj.h>
 #include <sddl.h>
 #include <algorithm>
@@ -14,13 +13,8 @@
 #include <vector>
 #include "win32_files.h"
 
-struct Entry { const char *name; ULONG bytes; const char *sha256; };
-#include "payload_manifest.h"
-
-static std::wstring wide(const char *ascii) {
-    std::wstring result(ascii, ascii + std::strlen(ascii));
-    std::replace(result.begin(), result.end(), L'/', L'\\');
-    return result;
+static std::wstring wide(const char *text) {
+    return std::wstring(text, text + std::strlen(text));
 }
 
 class Digest {
@@ -50,142 +44,18 @@ public:
     ~Digest() { if (hash) BCryptDestroyHash(hash); if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0); }
 };
 
-static void verify(const std::wstring &root) {
-    for (const Entry &entry : payload_files) {
-        std::wstring path = root + L"\\" + wide(entry.name);
-        HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                                  FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-        require(file != INVALID_HANDLE_VALUE, "Open payload file");
-        try {
-            LARGE_INTEGER size;
-            require(GetFileSizeEx(file, &size) && size.QuadPart == entry.bytes, "Payload file size differs");
-            Digest digest;
-            std::vector<BYTE> buffer(1024 * 1024);
-            for (;;) {
-                DWORD bytes = 0;
-                require(ReadFile(file, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes, nullptr), "Read payload file");
-                if (!bytes) break;
-                digest.add(buffer.data(), bytes);
-            }
-            if (digest.finish() != entry.sha256) throw std::runtime_error(std::string("Payload hash differs: ") + entry.name);
-        } catch (...) { CloseHandle(file); throw; }
-        CloseHandle(file);
-    }
-}
-
-static const BYTE *cabinet_data;
-static ULONG cabinet_bytes;
-struct CabFile { HANDLE disk; LONG position; };
-struct Extraction { std::wstring root; std::vector<bool> seen; std::string error; };
-
-static FNALLOC(cab_alloc) { return std::malloc(cb); }
-static FNFREE(cab_free) { std::free(pv); }
-static FNOPEN(cab_open) {
-    (void)oflag; (void)pmode;
-    if (std::strcmp(pszFile, "payload.cab")) return -1;
-    auto file = static_cast<CabFile *>(std::malloc(sizeof(CabFile)));
-    if (!file) return -1;
-    *file = {INVALID_HANDLE_VALUE, 0};
-    return reinterpret_cast<INT_PTR>(file);
-}
-static FNREAD(cab_read) {
-    auto file = reinterpret_cast<CabFile *>(hf);
-    if (file->disk != INVALID_HANDLE_VALUE) return UINT(-1);
-    cb = std::min(cb, static_cast<UINT>(cabinet_bytes - static_cast<ULONG>(file->position)));
-    std::memcpy(pv, cabinet_data + file->position, cb);
-    file->position += static_cast<LONG>(cb);
-    return cb;
-}
-static FNWRITE(cab_write) {
-    auto file = reinterpret_cast<CabFile *>(hf);
-    DWORD written = 0;
-    return WriteFile(file->disk, pv, cb, &written, nullptr) ? written : UINT(-1);
-}
-static FNCLOSE(cab_close) {
-    auto file = reinterpret_cast<CabFile *>(hf);
-    bool ok = file->disk == INVALID_HANDLE_VALUE || CloseHandle(file->disk);
-    std::free(file);
-    return ok ? 0 : -1;
-}
-static FNSEEK(cab_seek) {
-    auto file = reinterpret_cast<CabFile *>(hf);
-    if (file->disk != INVALID_HANDLE_VALUE) return -1;
-    LONGLONG position = (seektype == SEEK_SET ? 0 : seektype == SEEK_CUR ? file->position : cabinet_bytes);
-    position += dist;
-    if (position < 0 || position > cabinet_bytes) return -1;
-    return file->position = static_cast<LONG>(position);
-}
-static FNFDINOTIFY(cab_notify) {
-    auto &context = *static_cast<Extraction *>(pfdin->pv);
-    try {
-        if (fdint == fdintCOPY_FILE) {
-            std::string name = pfdin->psz1;
-            std::replace(name.begin(), name.end(), '\\', '/');
-            size_t index = 0;
-            while (index < context.seen.size() && name != payload_files[index].name) ++index;
-            if (index == context.seen.size() || context.seen[index] || pfdin->cb != static_cast<LONG>(payload_files[index].bytes))
-                throw std::runtime_error("Unexpected cabinet file");
-            std::wstring path = context.root + L"\\" + wide(name.c_str());
-            directory(path.substr(0, path.find_last_of(L"/\\")));
-            auto file = static_cast<CabFile *>(std::malloc(sizeof(CabFile)));
-            if (!file) throw std::runtime_error("Allocate cabinet handle failed");
-            file->disk = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-            if (file->disk == INVALID_HANDLE_VALUE) { std::free(file); throw std::runtime_error("Create extracted file failed"); }
-            file->position = 0;
-            context.seen[index] = true;
-            return reinterpret_cast<INT_PTR>(file);
-        }
-        if (fdint == fdintCLOSE_FILE_INFO) return cab_close(pfdin->hf) == 0;
-        if (fdint == fdintNEXT_CABINET) throw std::runtime_error("Multiple cabinets are not supported");
-        return 0;
-    } catch (const std::exception &error) { context.error = error.what(); return -1; }
-}
-
-static void extract(const std::wstring &destination) {
-    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(101), RT_RCDATA);
-    require(resource != nullptr, "Find embedded payload");
-    cabinet_bytes = SizeofResource(nullptr, resource);
-    cabinet_data = static_cast<const BYTE *>(LockResource(LoadResource(nullptr, resource)));
-    require(cabinet_data && cabinet_bytes, "Read embedded payload");
-    Digest digest;
-    digest.add(cabinet_data, cabinet_bytes);
-    if (digest.finish() != payload_cab_sha256) throw std::runtime_error("Embedded payload hash differs");
-    ERF error = {};
-    HFDI fdi = FDICreate(cab_alloc, cab_free, cab_open, cab_read, cab_write, cab_close, cab_seek, cpu80386, &error);
-    require(fdi != nullptr, "Create cabinet decoder");
-    Extraction context{destination, std::vector<bool>(sizeof(payload_files) / sizeof(payload_files[0])), {}};
-    char name[] = "payload.cab", path[] = "";
-    bool ok = FDICopy(fdi, name, path, 0, cab_notify, nullptr, &context);
-    FDIDestroy(fdi);
-    if (!ok || !std::all_of(context.seen.begin(), context.seen.end(), [](bool seen) { return seen; }))
-        throw std::runtime_error("Extract payload failed: " + context.error + " (FDI " + std::to_string(error.erfOper) + ")");
-    verify(destination);
-}
-
-static std::wstring prepare(const std::wstring &instance) {
-    std::wstring parent = instance + L"\\.mysql";
-    directory(parent);
-    std::wstring lock_path = parent + L"\\prepare.lock";
-    HANDLE lock = INVALID_HANDLE_VALUE;
-    ULONGLONG deadline = GetTickCount64() + 60000;
-    do {
-        lock = CreateFileW(lock_path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (lock != INVALID_HANDLE_VALUE || GetLastError() != ERROR_SHARING_VIOLATION) break;
-        Sleep(50);
-    } while (GetTickCount64() < deadline);
-    require(lock != INVALID_HANDLE_VALUE, "Acquire payload preparation lock");
-    std::wstring target = parent + L"\\payload-" + wide(payload_id);
-    try {
-        if (GetFileAttributesW(target.c_str()) != INVALID_FILE_ATTRIBUTES) verify(target);
-        else {
-            std::wstring temporary = target + L".partial-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64());
-            require(CreateDirectoryW(temporary.c_str(), nullptr), "Create extraction directory");
-            extract(temporary);
-            require(MoveFileExW(temporary.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH), "Commit verified payload");
-        }
-    } catch (...) { CloseHandle(lock); throw; }
-    CloseHandle(lock);
-    return target;
+static std::wstring prepare(const std::wstring &) {
+    wchar_t module[32768];
+    DWORD length = GetModuleFileNameW(nullptr, module, 32768);
+    require(length && length < 32768, "Locate MySQL controller");
+    std::wstring folder(module, length);
+    folder.resize(folder.find_last_of(L"/\\"));
+    folder.resize(folder.find_last_of(L"/\\"));
+    std::wstring root = folder + L"\\mysql";
+    for (const wchar_t *tool : {L"mysqld", L"mysql", L"mysqladmin", L"mysqldump"})
+        require(GetFileAttributesW((root + L"\\bin\\" + tool + L".exe").c_str()) != INVALID_FILE_ATTRIBUTES,
+                "Official MySQL directory is missing");
+    return root;
 }
 
 class Child {
@@ -224,7 +94,7 @@ public:
     ~Child() {
         if (!process) return;
         if (running()) {
-            std::fputs("mysql-standalone: terminating unfinished owned child after failure\n", stderr);
+            std::fputs("mysql-control: terminating unfinished owned child after failure\n", stderr);
             TerminateProcess(process, 1);
             WaitForSingleObject(process, 5000);
         }
@@ -283,7 +153,7 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     bool created = CreateDirectoryW((instance + L"\\data").c_str(), &security);
     LocalFree(descriptor);
     require(created, "Create private data directory");
-    std::string password = random_secret();
+    std::string password = "uu5!^%jg";
     std::string server_config = "[mysqld]\nbind-address=127.0.0.1\nport=" + std::to_string(port) +
                                 "\nlower_case_table_names=1\ncharacter_set_server=latin1\n"
                                 "sql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n";
@@ -349,9 +219,9 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     if (!complete || (stop_code && !lost_ack))
         throw std::runtime_error("Initialized database shutdown failed (client " + std::to_string(stop_code) +
                                  ", server " + std::to_string(server_code) + ")");
-    if (lost_ack) std::fputs("mysql-standalone: shutdown client reported ERROR 2013; owned server exited 0 with Shutdown complete.\n", stderr);
+    if (lost_ack) std::fputs("mysql-control: shutdown client reported ERROR 2013; owned server exited 0 with Shutdown complete.\n", stderr);
     require(DeleteFileW((instance + L"\\bootstrap.private.cnf").c_str()), "Remove temporary bootstrap credential");
-    std::puts("Initialized official MySQL 5.7.44; generated credential saved in client.private.cnf; server stopped.");
+    std::puts("Initialized official MySQL 5.7.44; instance credential saved in client.private.cnf; server stopped.");
     return 0;
 }
 
@@ -371,10 +241,10 @@ static void print_path(const std::wstring &path) {
 int wmain(int argc, wchar_t **argv) {
     try {
         if (argc == 2 && std::wstring(argv[1]) == L"--version") {
-            std::printf("dnf-native MySQL bootstrap: official MySQL 5.7.44, payload %s\n", payload_id);
+            std::puts("dnf-native MySQL instance controller; external official MySQL 5.7.44");
             return 0;
         }
-        if (argc < 3) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT] | backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
+        if (argc < 3) throw std::runtime_error("Usage: mysql-control.exe initialize INSTANCE [PORT] | backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE | prepare|mysqld|mysql|mysqladmin|mysqldump INSTANCE [official tool arguments]");
         std::wstring tool = argv[1];
         bool maintenance = tool == L"backup" || tool == L"restore" || tool == L"recover";
         if (!maintenance && tool != L"initialize" && tool != L"prepare" && tool != L"mysqld" && tool != L"mysql" && tool != L"mysqladmin" && tool != L"mysqldump")
@@ -383,7 +253,7 @@ int wmain(int argc, wchar_t **argv) {
             throw std::runtime_error("Usage: backup|restore INSTANCE BACKUP_DIRECTORY | recover INSTANCE");
         unsigned port = 3306;
         if (tool == L"initialize") {
-            if (argc > 4) throw std::runtime_error("Usage: mysql-standalone.exe initialize INSTANCE [PORT]");
+            if (argc > 4) throw std::runtime_error("Usage: mysql-control.exe initialize INSTANCE [PORT]");
             if (argc == 4) {
                 size_t used = 0;
                 unsigned long value = std::stoul(argv[3], &used);
@@ -400,8 +270,8 @@ int wmain(int argc, wchar_t **argv) {
             directory(instance + L"\\.mysql");
             File lock(CreateFileW((instance + L"\\.mysql\\operation.lock").c_str(), GENERIC_READ | GENERIC_WRITE,
                                  0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-            // Recover the cold directory layout even when payload extraction or
-            // verification is unavailable. No official process is needed here.
+            // Recover the cold directory layout even when external tools are
+            // unavailable. No official process is needed here.
             if (tool == L"recover") return recover_restore(instance);
             if (exists(instance + L"\\restore.pending"))
                 throw std::runtime_error("Interrupted restore requires recover INSTANCE before starting or maintaining this database");
@@ -413,7 +283,7 @@ int wmain(int argc, wchar_t **argv) {
         }
         return run(prepare(instance), instance, tool, argc - 3, argv + 3);
     } catch (const std::exception &error) {
-        std::fprintf(stderr, "mysql-standalone: %s\n", error.what());
+        std::fprintf(stderr, "mysql-control: %s\n", error.what());
         return 1;
     }
 }

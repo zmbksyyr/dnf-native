@@ -142,7 +142,7 @@ def main():
     parser.add_argument("--database-source", type=Path, required=True,
                         help="Stopped private restored instance containing data/ and game-db.json")
     parser.add_argument("--mysql-standalone", type=Path,
-                        default=ROOT / "build/mysql-standalone/mysql-standalone.exe",
+                        default=ROOT / "build/mysql-tools/runtime/mysql-control.exe",
                         help="Independent single EXE used for every official MySQL tool invocation")
     parser.add_argument("--timeout", type=float, default=2100)
     parser.add_argument("--dp2-cleanup", action="store_true",

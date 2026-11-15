@@ -1,0 +1,95 @@
+{
+  "recorded_utc": "20261115T024643654669Z",
+  "os": "Windows-10-10.0.19044-SP0",
+  "probe": "build\\probes\\20261115T024643654669Z\\mysql-tools",
+  "exe_sha256": "bb7b742d940e6915266b731aac0448aece06d27ebaecbceee0cbaac8bdbcd6be",
+  "exe_bytes": 835584,
+  "scope": "Secure native initialization, TLS query, backup and restore from the helper and external official EXEs; developer Windows 10 only.",
+  "checks": {
+    "concurrent_prepare": 4,
+    "secure_initialize_without_tcp": true,
+    "initialize_fresh_private_data": true,
+    "private_windows_permissions": true,
+    "passwordless_root_refused": true,
+    "query_write_read_over_tls": true,
+    "original_sql_mode_accepts_legacy_game_inserts": true,
+    "logical_backup_restore_rows": 2,
+    "loaded_vc_runtime_app_local": true,
+    "server_shutdown_complete": true,
+    "existing_data_reinitialization_refused": true,
+    "official_exes_run_directly_without_unpacking": true,
+    "fixed_default_root_credential": true
+  },
+  "forced_cleanup": false,
+  "versions": {
+    "mysqld": "5.7.44",
+    "mysql": "5.7.44",
+    "mysqladmin": "5.7.44",
+    "mysqldump": "5.7.44"
+  },
+  "private_permissions": [
+    {
+      "name": "data",
+      "protected": true,
+      "current_user_only": true
+    },
+    {
+      "name": "server.cnf",
+      "protected": true,
+      "current_user_only": true
+    },
+    {
+      "name": "client.private.cnf",
+      "protected": true,
+      "current_user_only": true
+    },
+    {
+      "name": "mysql-initialize.private.log",
+      "protected": true,
+      "current_user_only": true
+    },
+    {
+      "name": "mysql-bootstrap.private.log",
+      "protected": true,
+      "current_user_only": true
+    },
+    {
+      "name": "mysql-shutdown.private.log",
+      "protected": true,
+      "current_user_only": true
+    }
+  ],
+  "tls_cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+  "logical_backup_sha256": "1da8bebbcf20f1bbde5db9fee6b3521d0c0951d83db23c4e6357172fe1bf41c1",
+  "runtime_modules": [
+    {
+      "name": "ucrtbase.dll",
+      "app_local": false,
+      "sha256": "de8d08d01291df93821314176381f3d1ae863e6c5584a7f8ea42f0b94b15ef65"
+    },
+    {
+      "name": "msvcp140.dll",
+      "app_local": true,
+      "sha256": "75872c426555ac8af55b5a7f6d4aea8831af74353b22612850a2bfc40e3b67e1"
+    },
+    {
+      "name": "vcruntime140.dll",
+      "app_local": true,
+      "sha256": "270ba17bf89cc2eb6e6ce536eb78e4614ab5499f653ab7e07fe9e3d33bf3b6e3"
+    },
+    {
+      "name": "vcruntime140_1.dll",
+      "app_local": true,
+      "sha256": "f3754fc6ec87bcf84e05f3287b5de7bd305a30a0e1db7d478cb6353600682784"
+    }
+  ],
+  "mysqladmin_shutdown_exit_code": 0,
+  "server_exit_code": 0,
+  "mysqladmin_shutdown_lost_ack": false,
+  "limits": [
+    "Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
+    "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
+    "Default root credential is the requested product default; existing databases are not reconfigured. Cross-machine migration remains untested.",
+    "No GUI backup/rollback workflow or final complete offline package acceptance."
+  ]
+}

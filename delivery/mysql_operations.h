@@ -148,12 +148,12 @@ public:
         bool lost_ack = client_code == 1 && result().find("ERROR 2013 (HY000)") != std::string::npos;
         if (!complete || (client_code && !lost_ack)) throw std::runtime_error("Maintenance database did not shut down normally");
         stopped = true;
-        if (lost_ack) std::fputs("mysql-standalone: maintenance shutdown acknowledgment lost; owned server exited normally.\n", stderr);
+        if (lost_ack) std::fputs("mysql-control: maintenance shutdown acknowledgment lost; owned server exited normally.\n", stderr);
     }
     ~Maintenance() {
         if (!stopped && server.running()) {
             try { stop(); }
-            catch (const std::exception &error) { std::fprintf(stderr, "mysql-standalone: %s\n", error.what()); }
+            catch (const std::exception &error) { std::fprintf(stderr, "mysql-control: %s\n", error.what()); }
         }
     }
 };

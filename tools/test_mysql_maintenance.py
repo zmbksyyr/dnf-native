@@ -40,7 +40,7 @@ def main():
                "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery. No GUI or DNF client acceptance.",
                "exe_sha256": sha256(exe), "script_sha256": sha256(Path(__file__)),
                "sources": {name: sha256(ROOT / name) for name in
-                           ["delivery/mysql_standalone.cpp", "delivery/mysql_operations.h", "tools/build_mysql_standalone.py"]},
+                           ["delivery/mysql_control.cpp", "delivery/mysql_operations.h", "tools/build_mysql.py"]},
                "checks": {}, "commands": [], "forced_cleanup": False}
     checks = receipt["checks"]
     index = 0

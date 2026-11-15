@@ -1,4 +1,4 @@
-"""Exercise the single EXE in a fresh Unicode instance with real official MySQL tools."""
+"""Exercise directory-deployed official MySQL tools and native instance maintenance."""
 
 import argparse
 import datetime
@@ -18,14 +18,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--exe", type=Path, default=ROOT / "build/mysql-standalone/mysql-standalone.exe")
+    parser.add_argument("--exe", type=Path, default=ROOT / "build/mysql-tools/runtime/mysql-control.exe")
     args = parser.parse_args()
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    probe = ROOT / "build/probes" / stamp / "mysql-sfx"
-    isolated = probe / "单文件 (独立目录)"
+    probe = ROOT / "build/probes" / stamp / "mysql-tools"
+    isolated = probe / "官方工具 (独立目录)"
     isolated.mkdir(parents=True)
-    exe = isolated / "mysql-standalone.exe"
-    shutil.copyfile(args.exe, exe)
+    for name in ["mysql", "runtime"]:
+        shutil.copytree(args.exe.resolve().parent.parent / name, isolated / name)
+    exe = isolated / "runtime/mysql-control.exe"
     instance = probe / "中文 (数据库实例)"
     env = dict(os.environ)
     env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
@@ -33,7 +34,7 @@ def main():
         env.pop(name, None)
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(probe.relative_to(ROOT)),
                "exe_sha256": sha256(exe), "exe_bytes": exe.stat().st_size,
-               "scope": "Secure native initialization, TLS query, backup and restore from only the standalone EXE; developer Windows 10 only.",
+               "scope": "Secure native initialization, TLS query, backup and restore from the helper and external official EXEs; developer Windows 10 only.",
                "checks": {}, "forced_cleanup": False}
     checks = receipt["checks"]
     server = None
@@ -56,7 +57,7 @@ def main():
                                          stderr=subprocess.PIPE, env=env, cwd=isolated) for _ in range(4)]
         outputs = [process.communicate(timeout=60) for process in preparations]
         if any(process.returncode for process in preparations) or len({output[0] for output in outputs}) != 1:
-            raise RuntimeError("Concurrent preparation did not produce one verified payload")
+            raise RuntimeError("Concurrent lookup did not resolve the same MySQL directory")
         payload = Path(outputs[0][0].decode("utf-8").strip())
         checks["concurrent_prepare"] = len(preparations)
         versions = {}
@@ -74,8 +75,8 @@ def main():
         config = instance / "client.private.cnf"
         password = next(line.split("=", 1)[1] for line in config.read_text(encoding="ascii").splitlines()
                         if line.startswith("password="))
-        if len(password) != 48 or password.encode("ascii") in initialized.stdout + initialized.stderr:
-            raise RuntimeError("Generated credential is missing or was exposed")
+        if password != "uu5!^%jg" or password.encode("ascii") in initialized.stdout + initialized.stderr:
+            raise RuntimeError("Default credential differs or was exposed")
         if (instance / "bootstrap.private.cnf").exists():
             raise RuntimeError("Temporary bootstrap credential was retained after success")
         if b"Shutdown complete" not in (instance / "mysql-bootstrap.private.log").read_bytes():
@@ -178,7 +179,7 @@ ConvertTo-Json -InputObject @($result) -Compress
             receipt["runtime_modules"].append({"name": name, "app_local": local, "sha256": sha256(path)})
             if name in vc_names:
                 if not local:
-                    raise RuntimeError("VC runtime loaded outside the standalone payload")
+                    raise RuntimeError("VC runtime loaded outside the delivered mysql directory")
                 seen.add(name)
         if seen != vc_names:
             raise RuntimeError("Cannot verify all three loaded VC runtime modules")
@@ -204,16 +205,12 @@ ConvertTo-Json -InputObject @($result) -Compress
         if repeat.returncode == 0 or identity != after:
             raise RuntimeError("Reinitialization did not preserve existing data")
         checks["existing_data_reinitialization_refused"] = True
-        readme = payload / "README"
-        content = readme.read_bytes()
-        try:
-            readme.write_bytes(b"!" + content[1:])
-            rejected = subprocess.run([str(exe), "prepare", str(instance)], capture_output=True, env=env, timeout=30)
-            if rejected.returncode == 0 or b"Payload hash differs" not in rejected.stderr:
-                raise RuntimeError("Modified cache was accepted")
-            checks["modified_cache_refused"] = True
-        finally:
-            readme.write_bytes(content)
+        assert not list((instance / ".mysql").glob("payload-*"))
+        for tool in ["mysqld", "mysql", "mysqladmin", "mysqldump"]:
+            result = subprocess.run([str(payload / "bin" / (tool + ".exe")),"--no-defaults","--version"],env=env,capture_output=True,timeout=15)
+            assert result.returncode==0 and b"5.7.44" in result.stdout
+        checks["official_exes_run_directly_without_unpacking"] = True
+        checks["fixed_default_root_credential"] = True
     except Exception as failure:
         receipt["error"] = str(failure)
     finally:
@@ -227,7 +224,7 @@ ConvertTo-Json -InputObject @($result) -Compress
                 server.wait(timeout=10)
         receipt["limits"] = ["Tests use Windows 10 10.0.19044 on the developer host, not a clean Win7/10/11 matrix.",
                              "Windows 10 loads its system UCRT; app-local UCRT execution on Win7 remains unverified.",
-                             "Native initialization generates a local credential; GUI password configuration and cross-machine migration remain untested.",
+                             "Default root credential is the requested product default; existing databases are not reconfigured. Cross-machine migration remains untested.",
                              "No GUI backup/rollback workflow or final complete offline package acceptance."]
         (probe / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(receipt, ensure_ascii=True))

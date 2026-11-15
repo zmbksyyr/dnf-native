@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=Path, required=True, help="Private verified application-only logical seed")
     parser.add_argument("--seed-sha256", required=True)
-    parser.add_argument("--exe", type=Path, default=ROOT / "build/mysql-standalone/mysql-standalone.exe")
+    parser.add_argument("--exe", type=Path, default=ROOT / "build/mysql-tools/runtime/mysql-control.exe")
     args = parser.parse_args()
     seed, exe = args.seed.resolve(strict=True), args.exe.resolve(strict=True)
     if sha256(seed) != args.seed_sha256:

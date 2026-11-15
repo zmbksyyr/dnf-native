@@ -1,7 +1,6 @@
-"""Build an independent Win32 SFX containing official MySQL and app-local runtimes."""
+"""Stage official MySQL tools unchanged and build the instance maintenance helper."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -17,14 +16,14 @@ TOOLS = ["mysqld.exe", "mysql.exe", "mysqladmin.exe", "mysqldump.exe"]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", type=Path, default=ROOT / "build/mysql-standalone")
+    parser.add_argument("--build-dir", type=Path, default=ROOT / "build/mysql-tools")
     args = parser.parse_args()
     official = json.loads((ROOT / ".local/mysql-import.json").read_text(encoding="utf-8"))
     runtime = json.loads((ROOT / ".local/mysql-runtime-import.json").read_text(encoding="utf-8"))
     if not official["passed"] or official["archive_sha256"] != MYSQL_ZIP_SHA256 or not runtime["passed"]:
         raise ValueError("Run the official MySQL and Microsoft runtime imports first")
     work = args.build_dir.resolve()
-    payload = work / "payload"
+    payload = work / "mysql"
     payload.mkdir(parents=True, exist_ok=True)
     files = {}
 
@@ -43,49 +42,23 @@ def main():
         add(ROOT / ".local/mysql-runtime-x64" / name,
             ("bin/" if name.endswith(".dll") else "licenses/") + name, metadata["sha256"])
     files = dict(sorted(files.items()))
-    manifest = json.dumps(files, sort_keys=True, separators=(",", ":")).encode("ascii")
-    payload_id = hashlib.sha256(manifest).hexdigest()
     (work / "manifest.json").write_text(json.dumps(files, indent=2) + "\n", encoding="utf-8")
-
-    ddf = [".OPTION EXPLICIT", ".Set Cabinet=on", ".Set Compress=on", ".Set CompressionType=LZX",
-           ".Set CompressionMemory=21", ".Set MaxDiskSize=0", ".Set MaxCabinetSize=0",
-           ".Set CabinetNameTemplate=payload.cab", ".Set DiskDirectoryTemplate=.",
-           ".Set RptFileName=NUL", ".Set InfFileName=NUL"]
-    ddf += ['"' + str(payload / name) + '" "' + name.replace("/", "\\") + '"' for name in files]
-    (work / "payload.ddf").write_text("\n".join(ddf) + "\n", encoding="utf-8")
-    result = subprocess.run(["makecab.exe", "/F", str(work / "payload.ddf")], cwd=work, capture_output=True, timeout=180)
-    (work / "makecab.log").write_bytes(result.stdout + result.stderr)
-    if result.returncode:
-        raise RuntimeError("makecab failed; see build/mysql-standalone/makecab.log")
-    cabinet = work / "payload.cab"
-    header = ['static const char payload_id[] = "' + payload_id + '";',
-              'static const char payload_cab_sha256[] = "' + sha256(cabinet) + '";',
-              "static const Entry payload_files[] = {"]
-    header += ['    {"' + name + '", ' + str(info["bytes"]) + ', "' + info["sha256"] + '"},'
-               for name, info in files.items()]
-    header += ["};"]
-    (work / "payload_manifest.h").write_text("\n".join(header) + "\n", encoding="ascii")
-    resource = work / "payload.rc"
-    resource.write_text('101 RCDATA "' + cabinet.as_posix() + '"\n', encoding="ascii")
-    resource_object = work / "payload-resource.o"
-    subprocess.run([str(BIN / "x86_64-w64-mingw32-windres.exe"), "-i", str(resource), "-o", str(resource_object)],
-                   check=True, cwd=ROOT)
-    output = work / "mysql-standalone.exe"
-    source = ROOT / "delivery/mysql_standalone.cpp"
+    (work / "runtime").mkdir(exist_ok=True)
+    output = work / "runtime/mysql-control.exe"
+    source = ROOT / "delivery/mysql_control.cpp"
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               "-I", str(work), str(source), str(resource_object), "-lcabinet", "-lbcrypt", "-lshell32", "-ladvapi32", "-o", str(output)]
+               str(source), "-lbcrypt", "-lshell32", "-ladvapi32", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
-    receipt = {"payload_id": payload_id, "files": files, "cabinet_bytes": cabinet.stat().st_size,
-               "cabinet_sha256": sha256(cabinet), "output_bytes": output.stat().st_size,
+    receipt = {"files": files, "output_bytes": output.stat().st_size,
                "output_sha256": sha256(output), "source_sha256": sha256(source),
                "source_files": {str(path.relative_to(ROOT)).replace("\\", "/"): sha256(path)
                                 for path in [source, ROOT / "delivery/mysql_operations.h", ROOT / "delivery/win32_files.h"]}, "command": command,
                "official_mysql_source": {key: official[key] for key in ["url", "archive_sha256"]},
                "microsoft_runtime_sources": runtime["sources"],
-               "scope": "Build of independent SFX and official tool delegation; not final minimized payload or three-OS acceptance."}
+               "scope": "Official EXEs and app-local Microsoft runtimes in a directory; helper only manages instance operations. No clean three-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    print("MySQL SFX:", output, output.stat().st_size, "bytes;", len(files), "verified files", flush=True)
+    print("MySQL tools:", output, output.stat().st_size, "bytes;", len(files), "verified files", flush=True)
 
 
 if __name__ == "__main__":

@@ -1,39 +1,20 @@
 # 数据库、GUI 与离线交付方案
 
-本文件是[运行方案](02-technical-plan.md)的配套设计。数据库固定为官方 Windows x64 MySQL 5.7.44；GUI 在本项目内用 Win32/C++ 从零实现。官方文件导入和原始数据逻辑往返已有本机可复现实验；独立单文件引导首版已完成本机实测，GUI 和最终交付仍未完成。
+数据库固定为官方 Windows x64 MySQL 5.7.44，GUI 在本项目内使用 Win32/C++ 实现。2026-11-15 用户明确改用目录式交付，覆盖原始需求中的 MySQL 单文件条款。原始需求归档保持原文，旧阶段证据仅代表当时版本。
 
-## 1. MySQL 单文件发布
+## 1. 官方 MySQL 目录发布
 
-`mysql-standalone.exe` 是本项目独立编写的引导程序，内部封装官方 5.7.44 payload，最终最小依赖闭包仍待裁剪和验证。解压后执行真实官方 `mysqld/mysql/mysqladmin/mysqldump`。源码、四个 PE、DLL、字符集、必要 share/plugin 文件和分发材料分别锁定来源与哈希。
+交付根目录为 `DNF-Native.exe`、`mysql/`、`runtime/`、`native/`。`mysql/bin/` 保留官方的 `mysqld.exe`、`mysql.exe`、`mysqladmin.exe`、`mysqldump.exe`，字节哈希与已锁定的官方下载包一致；VC/UCRT DLL 就近部署，字符集、share、LICENSE 和再分发材料随目录提供。
 
-当前单文件约 16 MB，精确大小与哈希记录在构建和阶段证据中。使用系统 Cabinet FDI 解压内嵌 LZX CAB，CNG 校验文件哈希，以 Win32 CreateProcessW 调用四个官方工具。`prepare INSTANCE` 解压到实例内 `.mysql/payload-<manifest hash>`；`mysqld|mysql|mysqladmin|mysqldump INSTANCE [官方参数]` 执行工具并转交标准输入输出与退出码，mysqld 的 basedir/datadir 固定在该实例内。并发准备使用文件锁，展开后校验再提交目录；已有缓存逐文件校验，失败明确返回错误，不覆盖数据库。
+`runtime/mysql-control.exe` 是本项目的实例维护工具，只负责初始化、子进程管理、备份和还原。它直接调用同级发布包中的官方工具，不嵌入、解压或向实例复制 MySQL。两个架构的自研 ELF 宿主位于 `runtime/hosts/`；`native/resources.cab` 只保存原生文件、用户态依赖和实例种子，宿主不再重复封入 CAB。
 
-官方 5.7 客户端的 defaults loader 在本机不能读取中文绝对配置路径。子进程工作目录固定为实例目录，控制器使用 `--defaults-file=client.private.cnf` 这类固定相对文件名；该方式已在中文/空格/括号实例目录中完成 TLS 读写和备份还原。8.3 路径仍可能含中文，不能依赖它解决此问题。首版保留整个官方 share 目录，尚未做最终按访问记录裁剪。
+新建数据库的 root 默认密码固定为用户指定的 `uu5!^%jg`。继续使用官方 `mysqld --initialize`，通过临时命名管道设置默认凭据并正常关闭，不重建既有数据库。实例配置保存在 `client.private.cnf`，GUI 不提供密码轮换提示；官方 `mysqladmin.exe` 等可直接调用。游戏、bridge 和 Frida 继续使用各自的实例账号，原版编码密码仍按已核实格式生成。
 
-复现命令为 `python tools/import_mysql_runtime.py`、`python tools/build_mysql_standalone.py`、`python tools/test_mysql_standalone.py`。首版测试只在开发机 Windows 10 完成，包含四工具版本、四进程并发准备、私有新库初始化、TLS、两行二进制数据备份/还原、已有库拒绝重新初始化、修改缓存拒绝运行与正常停服。VC++ 三个 DLL 的实际加载位置为实例缓存；Windows 10 的 UCRT 仍由系统提供，Win7 本地 UCRT 尚未实测。首版证据见 [单文件引导](evidence/p4-mysql-standalone.json)。
+维护工具保留 `initialize INSTANCE [PORT]`、`backup|restore INSTANCE DIRECTORY`、`recover INSTANCE` 及四种官方工具转发命令。`prepare INSTANCE` 仅返回外部 MySQL 目录。数据库操作锁、受控子进程 Job、目标实例 UUID/TLS 校验，以及备份/还原的影子导入、逐字节复核、切换和中断恢复语义继续复用。
 
-`initialize INSTANCE [PORT]` 已实现原生安全首次初始化：只接受没有 data 和数据库配置的新实例，使用官方 `--initialize`；经 `--skip-networking` 的随机命名管道，以官方临时密码设置 CNG 生成的 48 位十六进制密码，验证新凭据，再正常停库。写出的 `server.cnf` 固定本机地址、所选端口、lower_case_table_names=1 和 latin1；`client.private.cnf` 强制 TCP/TLS。data、配置与私有日志使用受保护 DACL，只允许当前 Windows 用户，data 的规则可继承到子文件。密码通过标准输入传 SQL，不进入命令行或普通输出。失败保留私有数据与诊断，不重新初始化既有实例。
+官方 5.7 的 defaults loader 在本机不能读取中文绝对配置路径。GUI 固定子进程工作目录为实例目录，传入 `--defaults-file=client.private.cnf` 等相对配置名；不依赖 8.3 路径。普通用户运行、Win7 本地 UCRT 和干净多系统矩阵仍按实际证据区分。
 
-安全版本在中文实例中实际完成初始化、重启、TLS、备份还原及正常关闭；预定 TCP 端口被独占时初始化仍成功，空密码 root 被认证拒绝，敏感目录/文件的实际 DACL 通过检查。已有实例重试不改变 data 中任何文件。证据见 [安全初始化](evidence/p4-mysql-secure-initialize.json)。GUI 密码设置、跨 Windows 用户迁移、备份/回滚控制流程仍待实现。
-
-后续复测发现命名管道停服时，mysqladmin 和 SQL SHUTDOWN 都可能丢失关闭确认。引导使用 SQL SHUTDOWN，并独立等待自有服务器；仅在服务器返回 0、日志出现 Shutdown complete、客户端错误明确为 ERROR 2013 时，将其记录为确认丢失并提示。其他客户端错误、服务器错误和超时仍失败。客户端非零结果保持原值，未改写为 0。证据见 [原始数据实测](evidence/p4-mysql-original-seed.json)及[服务链接入](evidence/p4-mysql-core-integration.json)。
-
-原版服务配置及 d_taiwan.db_connect.db_passwd 保存 24 字节 XTEA/ECB 密文的十六进制形式，不能填管理员配置里的明文密码。已根据原版 DBMW 的构造、解码和分组函数核实格式，独立实现 tools/legacy_db_password.py；固定材料只从哈希锁定的原版 ELF 读取，材料和真实口令不进 Git。隔离测试账号采用 16 个 ASCII 字符，经该格式编码后，三路 DBMW 和 auction/point 均完成真实连接；管理员配置继续使用独立的强随机凭据。GUI 密码配置仍待接入这一约束。
-
-不得把“只携带四个 EXE”视为完整闭包。静态普通/延迟导入、运行期 DLL/插件/数据文件访问、中文路径、初始化、查询、备份、还原及 TLS 连接都参与闭包判定。VC++ 2019/UCRT 采用可分发且经 Win7/10/11 验证的本地部署组合，不能要求另装 VC Redist，也不能直接从开发机 System32 抄取 DLL。开发工具使用何种 CRT 不改变这一产品要求。
-
-建议支持内部操作：查询版本、准备 payload、初始化空实例、启动/停止、mysql 客户端、备份与还原。具体命令行协议在实施阶段定义；GUI 和控制器使用受控操作接口，密码不出现在命令行或普通日志中。
-
-首次运行流程：
-
-1. 校验自身 payload 目录、清单和哈希，获取实例准备锁。
-2. 解压到实例下的新临时目录；拒绝路径穿越、越界链接和重复路径，限制展开大小。
-3. 校验全部展开文件和版本，成功后原子提交到按 payload 哈希命名的缓存；并发首启只产生一份有效缓存。
-4. 仅对全新空数据目录执行 `mysqld --initialize`，在临时受控凭据流程中设置实例密码；初始化失败保留诊断，不触碰既有目录。
-5. 启动前检查实例身份、数据目录、配置和端口占用；使用显式绝对路径与安全的 Windows 参数编码创建进程。默认绑定本机。
-6. 验证 `SELECT VERSION()`、server UUID、目标库/表和基本读写，才报告数据库就绪；不以进程存在或端口可连代替。
-
-已有数据目录禁止重新初始化。可写状态全部放在实例目录，不能写入只读安装目录；解压目录必须可由当前普通用户写入。没有管理员权限、Windows 服务注册、系统 PATH 修改、联网安装或隐藏自动升级。
+构建：`python tools/build_mysql.py`。专项：`python tools/test_mysql_tools.py`。本机 Windows 10 已验证中文目录、四工具直接运行、固定默认凭据、TLS、应用本地 VC 运行库、写入和备份恢复、拒绝重新初始化已有库及正常停库。单文件历史记录见既有 evidence，不能作为当前目录包的新测试结果。
 
 ## 2. 原始数据恢复与逻辑种子
 
