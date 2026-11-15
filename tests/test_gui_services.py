@@ -132,7 +132,8 @@ def main():
         # Original foreground CApplication mains return 1 after their normal
         # cleanup too. Require the observed baseline plus actual stop markers.
         code_one = {"manager", "dbmw_guild", "dbmw_mnt", "dbmw_stat", "monitor", "guild", "statics", "coserver"}
-        assert all("代码 " + str(1 if name in code_one else 0) in service_row(window, name) for name in peers)
+        assert all(int(re.search(r"代码 (\d+)$", service_row(window, name))[1]) ==
+                   (1 if name in code_one else 0) for name in peers)
         for name in ["manager", "dbmw_guild", "dbmw_mnt", "dbmw_stat", "monitor", "guild", "statics", "coserver"]:
             log = max((instance / "service-logs").glob(name + "-*.stdout.private.log"), key=lambda path: path.stat().st_mtime)
             assert b"Application Stop!" in log.read_bytes(), name + " original stop marker missing"

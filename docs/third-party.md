@@ -19,6 +19,8 @@ Zydis/Zycore 由 `tools/bootstrap.py` 按固定提交获取；miniz 原样上游
 
 `dnf-winport/rednf` 只作为只读行为线索；口令格式、relay/monitor 行为及 NTFS inode 处理由原版 ELF、独立实验和 Microsoft 规范复核。项目没有将参考工程代码、字节表、生成器或其构建产物接入运行链。原版资源基底继承此前已记录的来源与变更，整理目录不使它们变为项目独创内容。
 
+DBMW/manager 停服修正曾参考 `rednf/remake/source/DNFServer/GameServer/DBMW/` 中 `DNFThreadInterface.h`、`DNFTcpNetworkThread.cpp`、`DNFNetworkThread.cpp`、`DNFApplication.cpp` 和 `DNFUdpHandler.cpp` 的对象关系。实际地址、虚表槽、循环标志、I/O 等待及销毁顺序均从固定原版 ELF 独立核对，差异是本项目在原版 Free 之前补充真实的停止、取消阻塞和 guest join；没有编译、移植或复制参考线程实现。原始指令与虚表核验记录位于外部 `P8-20261116-service-stop/evidence/`，适配身份与恢复方法见[实现说明](architecture.md)。
+
 ## 原始许可材料
 
 下列文本取自原 `LICENSES/` 和已验证交付包的 Linux 许可材料；合并时统一换行并清理行尾空白，每段路径与 SHA-256 标识原文件。原 miniz 源码目录的 `LICENSE` 与 `LICENSES/miniz.txt` 相同，合并保留一份。

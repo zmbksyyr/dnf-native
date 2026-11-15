@@ -2,6 +2,18 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## DBMW/manager 停服修复（2026-11-16）
+
+在 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT 上，已从固定原版 ELF 确认 P7 停服访问异常的原因：原版 Free/析构没有 join 网络工作线程，TCP 的实际退出标志又与基础 stop 写入的字段不同。`service.c` 仅在两个已核验哈希的执行副本上补充停止、取消 DBMW 阻塞接收、等待自然退出和原版 guest join，再继续全部原有清理。身份、旧字节和恢复方法见[实现说明](architecture.md)，只读参考与独立实现边界见[来源记录](third-party.md)。
+
+- 双架构宿主构建和固定资源打包通过。原始指令/虚表、构建收据及本轮结果保存在外部 `P8-20261116-service-stop/`。
+- `test_service_shutdown.py` 的六轮通过：manager 和三个 DBMW 在三类网络线程刚创建时立即停止，另两轮等待稳定运行后停止；每轮均完成 accept/TCP/UDP 三个真实 join，保留原版 `Application Stop!` 和退出码 1。无运行时异常/缺口、无强制清理，磁盘 ELF 不变。收据：`probes/20261115T200717827812Z/service-shutdown/receipt.json`。
+- `test_gui_services.py` 完整通过 19 项分组/筛选、两轮 channel/relay/monitor/STUN 协议、单服停止/重启、日志与 ELF 哈希拒绝、逆序整体停服、数据库协调备份和正常关闭；26 项检查完成，`runtime_faults/runtime_gaps` 为空，无强制清理。收据：`probes/20261115T200853543048Z/gui-services/receipt.json`。
+- `test_instance_workflow.py` 完成新建双实例、数据库保存/恢复、资源拒绝和删除保护、15 个辅助服务协议，以及 game/DP2/Frida 自然启停；game 启动 30.264 秒，所有服务无访问异常和强制清理。game/Frida 仍有 `rt_sigaction`、文件 mmap、部分 munmap 与 inotify 的 ENOSYS，不能称为零兼容缺口。收据：`probes/20261115T201137905036Z/instance-workflow/receipt.json`。
+- 回归现在精确读取退出码，避免将 126 误匹配为 1；停服适配明确失败也计入集成异常。首轮 UDP 关闭入口错误及随后诊断行交错造成的专项失败均保留原始现场，未写成通过。
+
+这些结果证明上述原版服务的网络线程退出与对应 GUI 路径；完整客户端、安全链、生产负载和 Win7/11 仍不在本轮验收范围。
+
 ## robust mutex 退出恢复（2026-11-16）
 
 双架构独立夹具通过 owner death 原子更新、真实等待者唤醒、负 futex_offset、链内/链外/已解锁 pending 节点，以及错误长度、坏指针、环形链表和 PI 拒绝诊断。进一步使用固定资源内原版 glibc 2.17/libpthread，真实 pthread 持有 robust mutex 后退出，另一线程得到 EOWNERDEAD，修复后可重新持锁；放弃修复后得到 ENOTRECOVERABLE。双架构 futex/TLS/VM 并发和诊断回归通过，原版 game/Frida hook 与双向 RPC 正常退出，无强制清理，robust list ENOSYS 消失。收据在外部 `P4-20261116/robust-receipt.json`。未将结果扩展到 PI 或跨进程 futex。
@@ -127,7 +139,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 ## 未完成事项
 
-- **relay 偶发异常**：历史 `0x0805b91a` / `TManager<RelayService>::getManager()` 访问异常，在 ZIP 实例回归中也出现过。后续两轮完整通过及并发修复后 30 次未复现均不能证明根治。
+- **长期运行与容量**：历史 relay `0x0805b91a` 异常已在 P7 定位为并发描述符重复分配并修复，见本文后部的前后证据；本轮 GUI 两轮协议通过仍不替代生产负载和长期运行验收。
 - **STUN TLS**：曾有历史 guest TLS 站点失败现场，不能由普通 UDP 回归扩展为所有 x64 ELF 支持。
 - **Frida 文件监视接口**：本轮插件夹具仍记录 i386 `inotify_init` / `inotify_init1`（syscall 291/332）未实现。hook、双向 RPC、reset 边界和恢复专项通过不代表这些接口已支持，诊断保留在外部收据中。
 - **jbz69 定制 PVF**：原服务 PVF 为 48984，客户端定制 PVF 为 66282；未找到匹配的原版 Linux ELF。缺失模板、BIG5/UTF-8 编码及资源字段差异仍阻塞 Loading Items。模板别名、临时 iconv 映射和 `.str` 重编码实验均未形成可交付兼容结果；认证公钥加载成功不能解释成定制 PVF 可用。
@@ -171,6 +183,6 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 新包的实例收据 `probes/20261115T193853281896Z/instance-workflow/receipt.json` 记录了实例/数据库生命周期、channel/relay/STUN 协议和 game/DP2/Frida 自然启停通过（game 启动约 30.525 秒），脚本退出 0、无强制清理。但事后读取全部 stderr，发现 dbmw_guild、dbmw_mnt 和 manager 在停服时仍有未处理访问异常；同时 game/Frida 路径留有明确 ENOSYS。该轮只能认定上述局部路径通过，不能认定完整实例工作流通过或零兼容缺口。原始收据不改写，补充证据见 `P7-20261116-descriptor-fix/integration-postcheck.json`。
 
-GUI 专项收据 `probes/20261115T194156105324Z/gui-services/receipt.json` 再次记录 `dbmw_guild` 停止标记缺失，全部 stderr 同样记录上述三个服务的停服异常。DBMW 固定 ELF 的 SHA-256 为 `0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967`，PC `0x8057daf` 位于 `CTcpHandler::GetEventPtr()+0x9`；manager 的 PC 为 `0x805494f`。固定 ELF 的 dispatch 指令读取到空 handler，销毁路径与工作线程退出顺序仍待定位；目前不能断言是原程序问题或某项兼容语义导致。
+GUI 专项收据 `probes/20261115T194156105324Z/gui-services/receipt.json` 再次记录 `dbmw_guild` 停止标记缺失，全部 stderr 同样记录上述三个服务的停服异常。DBMW 固定 ELF 的 SHA-256 为 `0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967`，PC `0x8057daf` 位于 `CTcpHandler::GetEventPtr()+0x9`；manager 的 PC 为 `0x805494f`。固定 ELF 的 dispatch 指令读取到空 handler；P7 提交时尚未定位销毁与线程退出顺序，后续结论和修复见本文顶部 P8 记录。
 
-两项集成脚本现均在最终清理后汇总所有服务的异常与缺口：实例脚本遇未处理异常必须失败，GUI 脚本提前失败时也保留 `runtime_faults/runtime_gaps`。汇总逻辑已用上述保留现场复验，两轮均检出三个服务异常；修改后未重复执行完整 GUI 流程，不将现场复验写成整轮通过。后续应先闭合停服现场，再推进完整业务和目标系统验收。
+两项集成脚本在最终清理后汇总所有服务的异常与缺口：实例脚本遇未处理异常必须失败，GUI 脚本提前失败时也保留 `runtime_faults/runtime_gaps`。P7 以保留现场复验汇总逻辑，两轮均检出三个服务异常，当时没有将现场复验写成整轮通过。P8 已修正停服并重新完成完整 GUI 流程；完整业务和目标系统验收继续独立记录。

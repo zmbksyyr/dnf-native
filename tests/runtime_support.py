@@ -47,9 +47,9 @@ def runtime_diagnostics(instance):
     for path in sorted((Path(instance) / "service-logs").glob("*.stderr.private.log")):
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             entry = path.name + ": " + line
-            if "unhandled exception" in line:
+            if "unhandled exception" in line or "service shutdown failed" in line:
                 faults.append(entry)
-            if any(text in line for text in ["syscall gap", "unhandled exception", "unsupported", "exhausted"]):
+            if any(text in line for text in ["syscall gap", "unhandled exception", "service shutdown failed", "unsupported", "exhausted"]):
                 gaps.append(entry)
     return {"faults": sorted(set(faults)), "gaps": sorted(set(gaps))}
 

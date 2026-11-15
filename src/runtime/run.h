@@ -92,6 +92,7 @@ typedef struct {
 } NrRun;
 
 int nr_run(NrRun *run);
+int nr_service_stop(NrRun *run, CONTEXT *context);
 int nr_memory(uintptr_t address, uintptr_t bytes, int write);
 int nr_path(NrRun *run, const char *guest, wchar_t *path);
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);

@@ -39,6 +39,7 @@ flowchart TD
 | `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集及非 PI robust owner death |
 | `signal.c` | 当前服务所需处理器、掩码、SA_SIGINFO/SA_RESTORER、SIGTERM/SIGUSR2 及上下文恢复 |
 | `tls.c` | Linux FS/GS TLS 指令适配和返回路径 |
+| `service.c` | 固定 DBMW/manager ELF 的网络线程停服顺序修正，独立于 syscall 兼容语义 |
 
 映射表最多 4096 项，记录已使用前缀并复用空槽。VM 修改、内存检查和异常读取使用同一进程内临界区，防止 guest 线程争用映射槽。文件与 socket 共用 256 项描述符，线程表为 64 项；这些是当前容量边界。
 
@@ -47,6 +48,17 @@ flowchart TD
 `/proc/self/maps` 在同一内存锁内从现有 ELF/VM 表生成快照，结合 Windows 实际页权限和部分解除映射的位图，保留 PROT_NONE，排除空洞及已释放区域。共享文件显示共享标志、UTF-8 路径、文件偏移和与 stat 一致的 inode；关闭描述符后仍保留映射身份。它描述本宿主管理的 guest 区域，不枚举 Windows 自身模块。
 
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
+
+`service.c` 对固定原版 DBMW 和 manager 的 `CApplication::Free()` 增加局部停服适配。原版 `stop()` 仅清除对象 `+8`，TCP dispatch 实际循环标志在 `+0x2c`；原版清理还在工作线程退出前删除 handler，且没有调用已有的 `pthread_join`。这属于应用生命周期缺陷，不能通过改变通用线程或网络 syscall 语义修复。
+
+适配先核验完整 ELF SHA-256、原地址、完整待改写 MOV 的旧字节及 join 函数入口，再仅在执行内存中将 MOV 的前两个字节改为 UD2。异常分发等待已创建线程完成初始标志设置，清除 accept/TCP/UDP 的实际循环标志；DBMW 通过正常关闭其 UDP 描述符取消阻塞接收，manager 使用其原有一秒 select 返回路径。保留所有对象至工作线程自然退出，随后逐一调用原版 guest join，最后执行被替代 MOV 的原始效果并继续全部原版 Free/析构。超时、布局不符或 join 失败均记录 `service shutdown failed` 并以 126 退出，不继续释放仍在使用的对象。
+
+| ELF | SHA-256 | 适配 PC / 原始 MOV |
+| --- | --- | --- |
+| DBMW（guild/mnt/stat 同一 ELF） | `0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967` | `0x806c0c2` / `c70424cdaa1a08` |
+| manager | `74b3adba3c2d376547ee65c53940129bd20af9e48926be3f4facc7d729dd65e3` | `0x805e3b4` / `c704241d6e1508` |
+
+适配记录写明哈希、PC、旧字节、替换字节及 `scope=execution-memory`，停服记录各 worker 的 stop/join 结果。磁盘 ELF 和 ZIP 基底保持原字节；回退宿主到此修正之前的构建即可恢复原版执行行为。具体范围不推广到其他服务或任意版本 ELF。只读参考源码提供对象关系线索，地址、布局与指令均重新从上述原版 ELF 核对；未使用参考实现、补丁或生成器。
 
 ## 控制台与实例
 

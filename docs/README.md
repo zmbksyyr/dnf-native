@@ -134,3 +134,12 @@ python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/D
 ```
 
 后两项分别验证实际字符编码转换，以及真实 Win32 双实例生命周期、辅助服务协议和 game/DP2/Frida 启停。Lua/Frida 专项以自写夹具的退出码 42 验证接口，不计为游戏自然启动或业务通过。GUI 测试需要可交互 Windows 桌面和空闲的服务端口，会在 `../x/dnf-native-output/probes/` 创建独立实例。其他测试所需输入及本轮实际执行结果见[验证记录](validation.md)。
+
+已有已停止的私有实例可作为 GUI 与原版停服专项的复制来源；以下命令只运行外部独立副本：
+
+```powershell
+python -B tests/test_service_shutdown.py --instance <私有实例目录> --gui ../x/dnf-native-output/package/DNF-Native.exe
+python -B tests/test_gui_services.py --instance <私有实例目录> --gui ../x/dnf-native-output/package/DNF-Native.exe
+```
+
+停服专项覆盖 manager、三个 DBMW 在网络线程刚创建时停止，以及 manager/DBMW 稳定运行后的停止，核对真实线程 join、原版退出日志、退出码及磁盘 ELF 不变。`service shutdown failed` 与未处理异常一样会使集成验收失败。
