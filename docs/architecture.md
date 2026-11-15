@@ -26,6 +26,8 @@ flowchart TD
 
 `adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取可经每线程 Windows TLS 槽和同义 CPU 指令直接执行，保留寄存器与标志。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
 
+固定 x64 STUN 的历史失败站点已定位为原版 glibc 2.17 `start_thread+0x1b` 的 FS 写入。P15 以当前宿主完成三个原版 pthread worker 的协议与自然停服，结合原版控制流确认该站点路径已覆盖，沿用现有 TLS 实现；通用 ELF 的其他 FS/GS 指令仍以实际支持和验证范围为准，详见[验证记录](validation.md)。
+
 原始 manager 的 GCC PIC 跳转表、特定 Frida 数据/指令和 packed image 处理都有局部识别条件；不能把这些有限适配外推到任意 ELF。所有分发路径的 ENOSYS 记录服务、位数、线程、PC、参数、模块哈希和首次/重复计数；按 1/2/4/8 次采样，返回值保持 ENOSYS。`diagnostics.c` 在 guest 异常边界记录寄存器、原始指令字节、可读局部栈及最多 16 层 frame-pointer 帧；没有帧指针或符号时明确保留未解析地址，不声称完整展开。`tools/elf_manifest.py` 可离线生成资源 ELF 的段、TLS、依赖、重定位类型和未定义动态符号清单，输出必须在 x 下。
 
 | 模块 | 职责 |

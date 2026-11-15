@@ -113,11 +113,8 @@ def parse_elf(name: str, data: bytes, expected_hash: str | None) -> dict:
     string_table = next((value for tag, value in dynamic_entries if tag == 5), None)
     string_size = next((value for tag, value in dynamic_entries if tag == 10), None)
 
-    def dynamic_string(tag: int) -> str | None:
+    def dynamic_string(value: int) -> str | None:
         if string_table is None:
-            return None
-        value = next((v for t, v in dynamic_entries if t == tag), None)
-        if value is None:
             return None
         address = file_offset(string_table) + value
         return read_c_string(data, address, string_size - value if string_size is not None else None)
@@ -148,7 +145,7 @@ def parse_elf(name: str, data: bytes, expected_hash: str | None) -> dict:
             continue
         record = {"tag": dynamic_tag_names.get(tag, f"0x{tag:x}"), "value": f"0x{value:x}"}
         if tag in (1, 14, 15, 29):
-            string_value = dynamic_string(tag)
+            string_value = dynamic_string(value)
             if string_value is not None:
                 record["string"] = string_value
         tags.append(record)
