@@ -4,11 +4,11 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 
 **当前状态：本轮实现已提交，等待审阅。** 原版 core 16 服务通过自研宿主、Win32 GUI 和单文件 MySQL 完成本机联合自然启动与停服。GUI 提供 19 项服务列表、单项/整体启停、日志、DP2/Lua/Frida 开关，以及从本地压缩资源创建实例。新建实例导入原始 18 个应用库、核对导出字节并生成独立账号；15 个 peer、channel/relay/monitor/STUN 对照和原版 Frida 数据库接口通过。数据库备份、还原与失败回滚的范围见[实施记录](docs/06-progress.md)。
 
-最新 GUI 已按用户参考图调整为浅色卡片、全局控制、真实服务网格、数据库单行及大面积原生日志；最终 GUI 的数据库、日志和插件专项通过。当前审阅程序为 `build/review/DNF-Native.exe`，本地资源 ZIP 为 `build/review/native-local-resources.zip`，190315866 字节，已包含本轮宿主和缓存优化。界面截图见[GUI 阶段说明](docs/12-gui-reference.md)，最新包体身份和新增验证见[真实游戏与缓存记录](docs/13-gameplay-and-cache-performance.md)。
+最新 GUI 已按用户参考图调整为浅色卡片、全局控制、真实服务网格、数据库单行及大面积原生日志；最终 GUI 的数据库、日志和插件专项通过。当前审阅程序为 `build/review/DNF-Native.exe`，本地资源 ZIP 为 `build/review/native-local-resources.zip`，190382482 字节，已包含本轮宿主、缓存优化和地址空间并发修复。界面截图见[GUI 阶段说明](docs/12-gui-reference.md)，最新包体身份和新增验证见[运行时并发阶段](docs/14-runtime-concurrency.md)。
 
 此前已解决 TLS 异常处理热点和关闭 DP2 时的映射容量不足；相同配置的 ELF 文件视图历史对照减少约 69.4 MiB 私有提交。本轮原包 PVF 对照实际完成建角、洛兰通关、结算、回城和冷重启存档读回；教程含客户端功能，不能计为纯净评分验收。角色退出暴露的物品清零 JS 热点已改为等价原生操作，原版 1000 项缓存构造 94 毫秒，完整栈正常停服约 26.9 秒。新资源的首次创建回归通过两份实例和原协议检查。
 
-修复后客户端登录前的图形初始化错误阻止了真实玩家退出复验；一次 relay 启动访问异常和此前一次 STUN TLS 失败仍未定位。安全三件套完整拓扑、大连接数、密码编辑、定制 jbz69 PVF、最终 core/full 分包及干净 Win7/10/11 验收仍未完成；上述数据不代表玩家负载表现。
+修复后客户端登录前的图形初始化错误阻止了真实玩家退出复验；地址空间并发竞态已修复并通过双架构夹具，relay 启动访问异常连续复测未复现，此前一次 STUN TLS 失败仍未定位。安全三件套完整拓扑、大连接数、密码编辑、定制 jbz69 PVF、最终 core/full 分包及干净 Win7/10/11 验收仍未完成；上述数据不代表玩家负载表现。
 
 设计与初始审阅事项见[审阅记录](docs/05-review.md)。用户已授权开始实施，持续按阶段提交可复核结果。
 
@@ -24,6 +24,7 @@ DNF 台服原版 Linux ELF 在 Windows 7/10/11 x64 上原生运行的独立项�
 - [客户端与原数据库兼容](docs/11-client-auth-and-database.md)：密钥、简繁体、账号夹具及原数据库行为。
 - [GUI 参考图落地](docs/12-gui-reference.md)：最新界面、回归、截图与审阅包。
 - [真实游戏与缓存开销](docs/13-gameplay-and-cache-performance.md)：实际通关与存档、退出热点、更新资源与保留边界。
+- [运行时并发回归](docs/14-runtime-concurrency.md)：地址空间竞态修复、双架构并发夹具、relay 复测和当前资源包。
 
 仓库与上级目录中的输入包、`dnf-winport/`、`opendnf-win-jbz69/`、`x/` 独立。原始资产和构建产物不进入 Git。
 
@@ -47,6 +48,7 @@ python tools/test_ld.py
 python tools/test_stun.py
 python tools/probe_manager.py
 python tools/test_vm.py
+python tools/test_vm_concurrent.py
 python tools/test_files.py
 python tools/test_poll.py
 python tools/test_net.py

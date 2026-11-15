@@ -23,12 +23,14 @@ static int in_image(const NrElf *elf, uintptr_t pc) {
 }
 
 static int executable(uintptr_t pc) {
-    if (in_image(&active->program, pc) || in_image(&active->interpreter, pc)) return 1;
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (in_image(&active->vm[i].image, pc)) return 1;
-    return 0;
+    EnterCriticalSection(&active->memory_lock);
+    int found = in_image(&active->program, pc) || in_image(&active->interpreter, pc);
+    for (unsigned i = 0; !found && i < NR_VM_SLOTS; ++i) found = in_image(&active->vm[i].image, pc);
+    LeaveCriticalSection(&active->memory_lock);
+    return found;
 }
 
-int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
+static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
     if (!bytes) return 1;
     if (address > UINTPTR_MAX - bytes) return 0;
     uintptr_t end = address + bytes;
@@ -69,6 +71,13 @@ int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
         address = covered;
     }
     return 1;
+}
+
+int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
+    EnterCriticalSection(&active->memory_lock);
+    int valid = memory_check(address, bytes, write);
+    LeaveCriticalSection(&active->memory_lock);
+    return valid;
 }
 
 static HANDLE output_handle(uintptr_t fd) {
@@ -377,12 +386,16 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
         if (!nr_deliver_signal(active, c)) ExitProcess(124);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
+    NrTrap site;
     const NrTrap *record = NULL;
     if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
+        EnterCriticalSection(&active->memory_lock);
         record = nr_syscall_site(&active->program, pc);
         if (!record) record = nr_syscall_site(&active->interpreter, pc);
         for (unsigned i = 0; !record && i < NR_VM_SLOTS; ++i)
             record = nr_syscall_site(&active->vm[i].image, pc);
+        if (record) { site = *record; record = &site; }
+        LeaveCriticalSection(&active->memory_lock);
     }
     if (record && executable(pc)) {
         if (record->tls) {
@@ -512,6 +525,7 @@ int nr_run(NrRun *run) {
         bytes += n;
     }
     active = run;
+    InitializeCriticalSection(&run->memory_lock);
     wchar_t event_name[80];
     swprintf(event_name, 80, L"Local\\dnf-native-terminate-%lu", GetCurrentProcessId());
     run->terminate_event = CreateEventW(NULL, FALSE, FALSE, event_name);

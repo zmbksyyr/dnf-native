@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef _WIN64
+enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, MSYNC = 26};
+#else
+enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, MSYNC = 144};
+#endif
+
 static DWORD protect(uintptr_t flags) {
     if (flags & 4) return flags & 2 ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ;
     if (flags & 2) return PAGE_READWRITE;
@@ -207,12 +213,7 @@ static intptr_t remapping(NrRun *run, const uintptr_t args[6]) {
 }
 #endif
 
-int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
-#ifdef _WIN64
-    enum {MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, MSYNC = 26};
-#else
-    enum {MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, MSYNC = 144};
-#endif
+static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
     if (number == MMAP) { *result = mapping(run, args); return 1; }
 #ifndef _WIN64
     if (number == MREMAP) { *result = remapping(run, args); return 1; }
@@ -321,4 +322,18 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     }
     *result = VirtualProtect((void *)address, length, protect(args[2]), &old) ? 0 : -12;
     return 1;
+}
+
+int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
+    if (number != MMAP && number != MPROTECT && number != MUNMAP && number != MADVISE && number != MSYNC
+#ifndef _WIN64
+        && number != MREMAP
+#endif
+    ) return 0;
+    /* Threads share one Linux address space. Reserve, publish and release its
+       records together so concurrent mmap/munmap cannot claim the same slot. */
+    EnterCriticalSection(&run->memory_lock);
+    int handled = vm_operation(run, number, args, result);
+    LeaveCriticalSection(&run->memory_lock);
+    return handled;
 }

@@ -38,7 +38,7 @@ runtime 内存校验另在请求已完整覆盖时结束映射槽扫描，保留
 
 GUI 的布局、数据库与原生日志专项仍对应[参考图阶段](12-gui-reference.md)的程序身份；程序 SHA-256 为 `aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9`。截图位于 `build/probes/20261114T161532969697Z/gui-reference-preview/`，审阅入口为 `build/review/DNF-Native.exe` 和相邻 `native-local-resources.zip`。
 
-最新 ZIP 为 190315866 字节，SHA-256 `e7a2967cfd98816e291a85169707a1734cdc02f47b8f0d646d97a237656486f0`，包含 GUI、MySQL、资源清单及 CAB；CRC、全部成员哈希及 ≤210000000 字节检查通过。CAB 为 175446663 字节，包含普通宿主与优化后的派生脚本。现有实例不会自动替换脚本；本轮主验证实例在停止后备份并更新，新建实例直接使用新资源。
+本阶段之后，地址空间并发修复已进入新资源。当前审阅包身份和首次创建回归见[运行时并发阶段](14-runtime-concurrency.md)；本阶段历史 ZIP 为 190315866 字节，不能代表当前包体。
 
 完成检查后，验证删除目标均为 build 内绝对路径、无 reparse point 且没有 build 内程序运行；归档日志、配置、脚本等诊断，核对 CRC 与每个成员 SHA-256 后移除可重建副本，恢复 JSON 与截图。释放 6.836 GiB，build 现约 16.804 GiB，其中唯一私有客户端约 13.208 GiB；保留主游戏验证实例、一个最终新建实例、审阅包和故障栈。归档与收据为 `build/cleanup-cache-stage-diagnostics.zip`、`build/cleanup-cache-stage-receipt.json`，摘要在阶段证据中。
 

@@ -62,6 +62,7 @@ typedef struct {
     uint64_t send_timeout[256];
     NrWatch *epolls[256];
     NrVm vm[NR_VM_SLOTS];
+    CRITICAL_SECTION memory_lock;
     NrSignal actions[65];
     uint64_t signal_pending;
     HANDLE terminate_event, usr2_event;
