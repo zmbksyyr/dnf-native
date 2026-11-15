@@ -78,7 +78,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
         if (!(flags & 2)) return -38;
         if (address & 4095) return -22;
         NrVm *v = NULL;
-        for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+        for (unsigned i = 0; i < run->vm_count; ++i)
             if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
         if (!v) return -38;
         if (v->section) return -38;
@@ -103,11 +103,11 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
         mark_pages(v, address, length, 1);
         return (intptr_t)address;
     }
-    NrVm *v = NULL;
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) if (!run->vm[i].base) { v = &run->vm[i]; break; }
-    if (!v) {
+    unsigned slot = run->vm_count;
+    for (unsigned i = 0; i < run->vm_count; ++i) if (!run->vm[i].base) { slot = i; break; }
+    if (slot == NR_VM_SLOTS) {
         size_t reserved = 0, live_pages = 0, partial = 0;
-        for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
+        for (unsigned i = 0; i < run->vm_count; ++i) {
             NrVm *region = &run->vm[i]; reserved += region->size;
             if (region->mapped_pages) {
                 ++partial;
@@ -119,11 +119,13 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
                 NR_VM_SLOTS, partial, reserved, live_pages * 4096);
         return -12;
     }
+    NrVm *v = &run->vm[slot];
     if (flags & 0x20) {
         if (flags & 1) return -38;
         v->base = VirtualAlloc(NULL, length, MEM_RESERVE | (args[2] ? MEM_COMMIT : 0), protect(args[2]));
         if (!v->base) return -12;
         v->size = length;
+        if (slot == run->vm_count) ++run->vm_count;
         return (intptr_t)v->base;
     }
     if (flags & 1) {
@@ -152,6 +154,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
             UnmapViewOfFile(base); CloseHandle(section); return -5;
         }
         v->base = base; v->size = length; v->section = section;
+        if (slot == run->vm_count) ++run->vm_count;
         return (intptr_t)base;
     }
     /* Private file mappings remain limited to immutable ELF dependency snapshots. */
@@ -172,6 +175,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
     v->path = guest_path_from_handle(run, run->files[fd]);
     v->base = v->image.allocation;
     v->size = v->image.allocation_size;
+    if (slot == run->vm_count) ++run->vm_count;
     fprintf(stderr, "ELF dependency private snapshot sha256=%s base=0x%llx bytes=%zu\n", v->image.sha256,
             (unsigned long long)(uintptr_t)v->base, v->size);
     return (intptr_t)v->base;
@@ -187,7 +191,7 @@ static intptr_t remapping(NrRun *run, const uintptr_t args[6]) {
     old_size = (old_size + 4095) & ~(size_t)4095;
     new_size = (new_size + 4095) & ~(size_t)4095;
     NrVm *v = NULL;
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+    for (unsigned i = 0; i < run->vm_count; ++i)
         if ((uintptr_t)run->vm[i].base == address) { v = &run->vm[i]; break; }
     if (!v || v->size != old_size || v->section || v->image.file) return -22;
     if (new_size <= old_size) {
@@ -231,7 +235,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
     length = (length + 4095) & ~(size_t)4095;
     NrVm *v = NULL;
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+    for (unsigned i = 0; i < run->vm_count; ++i)
         if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
     if (number == MSYNC) {
         if (!v || !mapped(v, address, length)) { *result = -12; return 1; }
@@ -280,6 +284,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
         if (v->path) HeapFree(GetProcessHeap(), 0, v->path);
         if (v->mapped_pages) HeapFree(GetProcessHeap(), 0, v->mapped_pages);
         memset(v, 0, sizeof(*v));
+        while (run->vm_count && !run->vm[run->vm_count - 1].base) --run->vm_count;
         *result = 0;
         return 1;
     }

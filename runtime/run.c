@@ -25,7 +25,7 @@ static int in_image(const NrElf *elf, uintptr_t pc) {
 static int executable(uintptr_t pc) {
     EnterCriticalSection(&active->memory_lock);
     int found = in_image(&active->program, pc) || in_image(&active->interpreter, pc);
-    for (unsigned i = 0; !found && i < NR_VM_SLOTS; ++i) found = in_image(&active->vm[i].image, pc);
+    for (unsigned i = 0; !found && i < active->vm_count; ++i) found = in_image(&active->vm[i].image, pc);
     LeaveCriticalSection(&active->memory_lock);
     return found;
 }
@@ -55,7 +55,7 @@ static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
         }
         /* Once this request is covered, later mappings cannot improve its
            validity. Frida's small memory operations hit this path repeatedly. */
-        for (unsigned i = 0; i < NR_VM_SLOTS && covered < end; ++i) {
+        for (unsigned i = 0; i < active->vm_count && covered < end; ++i) {
             NrVm *v = &active->vm[i];
             uintptr_t first = (uintptr_t)v->base;
             if (first && address >= first && address - first < v->size && first + v->size > covered)
@@ -392,7 +392,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
         EnterCriticalSection(&active->memory_lock);
         record = nr_syscall_site(&active->program, pc);
         if (!record) record = nr_syscall_site(&active->interpreter, pc);
-        for (unsigned i = 0; !record && i < NR_VM_SLOTS; ++i)
+        for (unsigned i = 0; !record && i < active->vm_count; ++i)
             record = nr_syscall_site(&active->vm[i].image, pc);
         if (record) { site = *record; record = &site; }
         LeaveCriticalSection(&active->memory_lock);

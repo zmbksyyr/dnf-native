@@ -23,3 +23,9 @@
 验证结束后归档并移除了三组可重建的完整 core/首次创建副本，归档 CRC 和每个成员 SHA-256 均通过；保留首次创建 receipt、截图和阶段摘要。释放约 2.035 GiB，build 现约 17.365 GiB；归档和收据为 `build/cleanup-concurrency-stage-diagnostics.zip` 与 `build/cleanup-concurrency-stage-receipt.json`。
 
 客户端登录前的图表系统初始化错误、定制 jbz69 PVF 缺失模板、一次历史 STUN guest TLS 现场仍保留，尚未声称修复。安全三件套、负载测试、Win7/Win11 和客户端业务的完整矩阵仍未完成。本阶段提交后等待审阅。
+
+## 映射表扫描优化
+
+在保留 4096 个映射容量和原有分配语义的前提下，`NrRun` 记录当前使用过的最高槽位。内存校验、异常地址查找、`/proc/self/maps` 生成和映射操作只扫描有效前缀，并复用前缀内的空洞。双架构基础回归、20 次并发映射夹具、独立 bridge/relay 协议和目录包首次创建回归通过；首次创建最终收据为 `build/probes/20261115T041952451590Z/gui-setup/receipt.json`。
+
+现有八线程映射夹具 20 次中位数从 33.402 ms 降至 33.217 ms（约 0.55%）。这只代表该夹具的局部收益，不外推为完整服务 CPU 降幅；长期大连接数和跨 Windows 版本仍未验收。

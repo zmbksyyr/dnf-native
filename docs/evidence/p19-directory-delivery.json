@@ -1,5 +1,5 @@
 {
-  "recorded_utc": "20261115T033128887383Z",
+  "recorded_utc": "20261115T041952451590Z",
   "os": "Windows-10-10.0.19044-SP0",
   "scope": "Current directory delivery layout and final GUI first-run verification.",
   "package_root": "build/release-package",
@@ -10,9 +10,9 @@
     "native"
   ],
   "root_files": [],
-  "archive_bytes": 198076270,
-  "archive_sha256": "c6cf0c9234fda0cfaab4ad328ed90ef6b11f6d1ad5413ec45a85f2efd08cced6",
-  "gui_sha256": "77193f7192d4bbb3f1a2c59ec323d8a07a4f036aa58518e07fc16a9d3c884939",
+  "archive_bytes": 198075763,
+  "archive_sha256": "e0421cc83dfa6dd59660653108a69aa3f8664146c2b9e202948df41a3fea242c",
+  "gui_sha256": "c50b0f40d9b3f89609018913b7caa830bc69f83498bf25345af4f5822028238c",
   "mysql_official_exes": {
     "bin/mysqld.exe": "432693b766a4bc23a769f19993fa2bcb86f983db7e9f40d32a6380ead6f62d63",
     "bin/mysql.exe": "3e5828f7eac9f63d1c31c9e243906d6b1ca55fe9abe69ffde6765c41712031e6",
@@ -20,15 +20,15 @@
     "bin/mysqldump.exe": "67f5aa71bf46210da9e2cc74e17b73cadae930f8150ffe167f01783fa5178d09"
   },
   "compatibility_hosts": {
-    "hosts/i686/dnf-host.exe": "5fab754f7398278938c70d6dfb33eb3b8c175aa4ca66906275d4c5953325f692",
-    "hosts/x86_64/dnf-host.exe": "dc6d460d2538380b0de62c55e7e71473d2a493d5bee3991d5a6acde34857e7e5"
+    "hosts/i686/dnf-host.exe": "47f03c570a537fd0c06a7a159b776cac784e11d8fe70c5a7a9bffcbba3311c28",
+    "hosts/x86_64/dnf-host.exe": "3475891fa119fb0415c8f092d321261915611b240e3b428d429265811c09fd8a"
   },
-  "setup_probe": "build/probes/20261115T033128887383Z/gui-setup/receipt.json",
+  "setup_probe": "build/probes/20261115T041952451590Z/gui-setup/receipt.json",
   "setup_checks": {
     "opening_gui_does_not_start_work_or_disable_initialize": true,
     "changed_resource_rejected_before_instance_writes": true,
     "existing_nonempty_directory_unchanged": true,
-    "copy_and_initialize_window_response_ms": 0.123,
+    "copy_and_initialize_window_response_ms": 0.162,
     "busy_keeps_service_selection_and_log_controls_available": true,
     "native_first_run_creates_nineteen_service_instance": true,
     "import_reexport_matches_complete_original_seed_bytes": true,

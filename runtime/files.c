@@ -295,7 +295,7 @@ static char *maps_text(NrRun *run, size_t *size) {
         }
     }
     size_t capacity = map_image_count(&run->program) + map_image_count(&run->interpreter) + 2;
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i)
+    for (unsigned i = 0; i < run->vm_count; ++i)
         capacity += run->vm[i].image.allocation ? map_image_count(&run->vm[i].image) : run->vm[i].base ? 1 : 0;
     if (!capacity) return NULL;
     NrMapRange *ranges = HeapAlloc(GetProcessHeap(), 0, capacity * sizeof(*ranges));
@@ -303,7 +303,7 @@ static char *maps_text(NrRun *run, size_t *size) {
     size_t count = 0;
     map_add_image(ranges, &count, &run->program, run->argc ? run->argv[0] : NULL);
     map_add_image(ranges, &count, &run->interpreter, interpreter[0] ? interpreter : NULL);
-    for (unsigned i = 0; i < NR_VM_SLOTS; ++i) {
+    for (unsigned i = 0; i < run->vm_count; ++i) {
         NrVm *v = &run->vm[i];
         if (v->image.allocation) map_add_image(ranges, &count, &v->image, v->path);
         else if (v->base) map_add_anonymous(ranges, &count, (uintptr_t)v->base, v->size, 6, NULL);
