@@ -10,11 +10,17 @@
 
 双架构文件夹具验证了 PROT_NONE、逐页 r/w/x 变化、部分 munmap 的空洞、全部释放后消失，以及共享文件的偏移、中文路径和关闭描述符后的 inode。八个 guest 线程进行映射/权限/释放操作时，主线程反复读取 maps 快照；双架构 VM 与并发检查通过。原版 game/DP2/Frida hook 和双向 RPC 正常退出 42，无强制清理。环境仍为 Windows 10 x64 10.0.19044；收据及哈希保存于外部 `P4-20261116/maps-receipt.json`。这些结果不代表任意 ELF 或客户端业务通过。
 
+## P5/P6 交付链回归（2026-11-16）
+
+最终源码宿主、GUI、数据库维护程序和统一资源包已在外部 `P6-20261116/package/` 生成。新实例回归通过中文/空格路径双实例、资源缺失和损坏拒绝、存档保持、实例锁、取消删除与 reparse point 保护，15 个辅助服务的 channel/relay/STUN 协议，以及 game/DP2/Frida 自然启动约 29.906 秒和正常关闭。资源编码往返、19 项固定映射、eventfd、文件/maps、信号、TLS、VM 并发、诊断、robust mutex、Frida item reset 和 Lua/luv timer 均通过；未发生强制清理。
+
+固定停库副本的 MySQL 维护回归通过完整逻辑备份、损坏备份拒绝、失败导入现场保留、影子还原字节核对、账号/例程/事件/触发器、冷快照和 rename 窗口恢复；源数据未改变。GUI 服务专项完成 19 项分组/筛选、15 个 peer 协议、单服停止/重启、真实日志、ELF 哈希拒绝、逆序停服、数据库身份和备份流程，全部正常关闭；最终收据的 `runtime_gaps` 明确保留 i386 `rt_sigaction`（174/flags）和 x64 STUN `rt_sigaction`（13）缺口，因此该专项不能标成零 ABI 缺口通过。原始收据分别为外部 `probes/20261115T161134156596Z/instance-workflow/receipt.json`、`probes/20261115T161409615934Z/mysql-maintenance/receipt.json` 和 `probes/20261115T161440174143Z/gui-services/receipt.json`。
+
 ## eventfd 与插件路径（2026-11-15）
 
 固定 game/Frida 实际调用的 eventfd/eventfd2 已独立实现。双架构计数读写、溢出拒绝、信号量、阻塞跨线程通知及 poll/epoll/select 回归通过；原文件、网络及并发关闭回归保持通过。最终宿主运行原版 game、DP2 和 Frida hook/双向 RPC 夹具正常退出 42，无强制清理，未再出现 eventfd ENOSYS。
 
-GUI 插件专项 `20261115T155020067625Z` 使用前一版 eventfd 宿主完成 Lua-only/Frida 开关、真实模块观测、双向 RPC、关闭插件后 game 自然启动（30.890 秒）、原版辅助协议、正常关闭及源数据库不变；最终 select/中断细节由原语与最终 game 夹具验证。12 次 relay 独立启动重连未复现旧崩溃，不能声明根治。inotify、robust list 和部分 signal/VM 语义仍有明确缺口。完整收据见外部 `P4-20261115/eventfd-receipt.json`。
+GUI 插件专项 `20261115T155020067625Z` 使用前一版 eventfd 宿主完成 Lua-only/Frida 开关、真实模块观测、双向 RPC、关闭插件后 game 自然启动（30.890 秒）、原版辅助协议、正常关闭及源数据库不变；最终 select/中断细节由原语与最终 game 夹具验证。12 次 relay 独立启动重连未复现旧崩溃，不能声明根治。inotify 和部分 signal/VM 语义仍有明确缺口；非 PI robust list 已由后续专项补齐。完整收据见外部 `P4-20261115/eventfd-receipt.json`。
 
 ## 完整资源目录（2026-11-15）
 
