@@ -82,8 +82,9 @@ def main():
         assert not title(user.GetDlgItem(window, 101))
         checks["cold_start_idle_and_create_available"] = True
         for name in ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "resources.ini"]:
-            p = resources / name; renamed = p.with_suffix(p.suffix + ".test-missing")
-            p.rename(renamed)
+            p = resources / name
+            missing = p.with_suffix(p.suffix + ".test-missing")
+            p.rename(missing); renamed = missing
             click(window, 262)
             assert name in title(user.GetDlgItem(window, 218))
             assert not user.IsWindowEnabled(user.GetDlgItem(window, 260))

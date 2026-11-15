@@ -26,6 +26,8 @@ def retained_files(files, objects):
             continue
         if name.endswith(("/test1.lua", "/test2.lua", "/test.lua", "/README.md")):
             removed[name] = "Plugin example/test or documentation"
+        elif name.endswith(("/auction_restart", "/guild_restart", "/gunnersvs")):
+            removed[name] = "Linux shell launcher superseded by the native controller"
         else:
             kept.add(name)
 
@@ -34,7 +36,7 @@ def retained_files(files, objects):
     for arch in ("i686", "x86_64"):
         library_paths = [p for p in files if p.startswith(arch + "/") and
                          (p.startswith(arch + "/lib") or p.startswith(arch + "/usr/lib")) and
-                         ".so" in Path(p).name and "/gconv/" not in p and "/audit/" not in p]
+                         ".so" in Path(p).name and "/audit/" not in p]
         by_name = {}
         for name in library_paths:
             by_name.setdefault(Path(name).name, []).append(name)
@@ -103,10 +105,25 @@ def main():
         if sha256(objects / digest) != digest:
             raise SystemExit("Source object hash differs")
     kept, removed = retained_files(files, objects)
+    closure = {}
+    for arch in ("i686", "x86_64"):
+        paths = [p for p in kept if p.startswith(arch + "/")]
+        available = {Path(p).name for p in paths}
+        dependencies = {}
+        for path in paths:
+            data = (objects / files[path]).read_bytes()
+            if data.startswith(b"\x7fELF"):
+                dependencies[path] = elf_metadata(data)["needed"]
+        missing = {p: [n for n in needs if n not in available] for p, needs in dependencies.items()
+                   if any(n not in available for n in needs)}
+        if missing:
+            raise SystemExit("Native ELF dependency is missing: " + json.dumps(missing))
+        closure[arch] = {"elf_count": len(dependencies), "needed": dependencies, "missing": missing}
     output.mkdir(parents=True, exist_ok=False)
     resources = output / "resources"
     resources.mkdir()
     shutil.copy2(gui / "DNF-Native.exe", output / "DNF-Native.exe")
+    shutil.copy2(ROOT / "delivery/README.txt", resources / "README.txt")
     shutil.copy2(gui / "runtime/mysql-control.exe", resources / "mysql-control.exe")
     for arch, label in [("i686", "x86"), ("x86_64", "x64")]:
         shutil.copy2(hosts / "hosts" / arch / "dnf-host.exe", resources / ("dnf-host-" + label + ".exe"))
@@ -132,13 +149,19 @@ def main():
                       ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
         ini.write(stream)
-    third_party = output / "licenses"
+    third_party = resources / "licenses"
     third_party.mkdir()
     for path in (ROOT / "LICENSES").glob("*.txt"):
         shutil.copy2(path, third_party / path.name)
     shutil.copy2(ROOT / "THIRD_PARTY.md", third_party / "THIRD_PARTY.md")
+    # Preserve the imported license materials without carrying debugger/deployment docs.
+    for group in ("glibc-2.17", "libgcc-4.8.5", "zlib-1.2.7"):
+        for path in (ROOT / ".local/sysroot/i686/usr/share/doc" / group).iterdir():
+            if path.is_file() and (path.name.startswith("COPYING") or path.name in ("LICENSES", "README")):
+                target = third_party / "linux" / group / path.name
+                target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(path, target)
     record = {"original_files": len(files), "retained_files": len(kept), "removed_files": removed,
-              "source_sha256": sha256(source / "resources.cab"),
+              "source_sha256": sha256(source / "resources.cab"), "elf_dependency_closure": closure,
               "package_files": {p.relative_to(output).as_posix(): sha256(p) for p in output.rglob("*") if p.is_file()},
               "builder_sha256": sha256(Path(__file__)), "scope": "Resource selection and ZIP construction; runtime validation recorded separately."}
     (work / "receipt.json").write_text(json.dumps(record, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
