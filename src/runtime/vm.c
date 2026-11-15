@@ -29,16 +29,16 @@ static char *guest_path_from_handle(NrRun *run, HANDLE file) {
         (host[root_length] && host[root_length] != L'\\')) return NULL;
     const wchar_t *relative = host + root_length;
     while (*relative == L'\\') ++relative;
-    size_t length = wcslen(relative);
-    char *guest = HeapAlloc(GetProcessHeap(), 0, length + 2);
+    int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, relative, -1, NULL, 0, NULL, NULL);
+    if (!length) return NULL;
+    char *guest = HeapAlloc(GetProcessHeap(), 0, (size_t)length + 1);
     if (!guest) return NULL;
     guest[0] = '/';
-    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, relative, (int)length,
-                             guest + 1, (int)length + 1, NULL, NULL)) {
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, relative, -1,
+                             guest + 1, length, NULL, NULL)) {
         HeapFree(GetProcessHeap(), 0, guest);
         return NULL;
     }
-    guest[length + 1] = 0;
     for (char *p = guest; *p; ++p) if (*p == '\\') *p = '/';
     return guest;
 }
@@ -154,6 +154,9 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
             UnmapViewOfFile(base); CloseHandle(section); return -5;
         }
         v->base = base; v->size = length; v->section = section;
+        v->path = guest_path_from_handle(run, run->files[fd]);
+        v->file_offset = offset;
+        v->file_inode = nr_file_inode(run->files[fd]);
         if (slot == run->vm_count) ++run->vm_count;
         return (intptr_t)base;
     }

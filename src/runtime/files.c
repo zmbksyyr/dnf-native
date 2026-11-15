@@ -248,89 +248,137 @@ typedef struct {
     uint32_t flags;
     uint64_t offset, inode;
     const char *path;
+    int shared;
 } NrMapRange;
+
+typedef struct {
+    NrMapRange *ranges;
+    size_t count, capacity;
+} NrMaps;
 
 static int map_compare(const void *left, const void *right) {
     const NrMapRange *a = left, *b = right;
     return a->start > b->start ? 1 : a->start < b->start ? -1 : 0;
 }
 
-static size_t map_image_count(const NrElf *image) {
-    size_t count = 0;
-    if (!image->allocation) return 0;
-    for (unsigned i = 0; i < image->header->phnum; ++i)
-        if (image->programs[i].type == 1 && image->programs[i].memsz) ++count;
-    return count;
+static int map_append(NrMaps *maps, NrMapRange range) {
+    if (maps->count == maps->capacity) {
+        size_t capacity = maps->capacity ? maps->capacity * 2 : 32;
+        NrMapRange *grown = maps->ranges ? HeapReAlloc(GetProcessHeap(), 0, maps->ranges, capacity * sizeof(*grown)) :
+                                          HeapAlloc(GetProcessHeap(), 0, capacity * sizeof(*grown));
+        if (!grown) return 0;
+        maps->ranges = grown; maps->capacity = capacity;
+    }
+    maps->ranges[maps->count++] = range;
+    return 1;
 }
 
-static void map_add_image(NrMapRange *ranges, size_t *count, const NrElf *image, const char *path) {
-    if (!image->allocation) return;
+uint64_t nr_file_inode(HANDLE file) {
+    BY_HANDLE_FILE_INFORMATION info;
+    uint64_t inode;
+    return file && !file_identity(file, &info, &inode) ? inode : 0;
+}
+
+static uint32_t map_protection(DWORD protection) {
+    switch (protection & 255) {
+        case PAGE_READONLY: return 4;
+        case PAGE_READWRITE: case PAGE_WRITECOPY: return 6;
+        case PAGE_EXECUTE: return 1;
+        case PAGE_EXECUTE_READ: return 5;
+        case PAGE_EXECUTE_READWRITE: case PAGE_EXECUTE_WRITECOPY: return 7;
+        default: return 0;
+    }
+}
+
+static int map_add_range(NrMaps *maps, uintptr_t start, uintptr_t end, uint64_t offset,
+                         uint64_t inode, const char *path, int shared, const NrVm *vm) {
+    uintptr_t original = start;
+    while (start < end) {
+        MEMORY_BASIC_INFORMATION info;
+        if (!VirtualQuery((const void *)start, &info, sizeof(info))) return 0;
+        uintptr_t next = (uintptr_t)info.BaseAddress + info.RegionSize;
+        if (next > end) next = end;
+        if (next <= start) return 0;
+        if (vm && vm->mapped_pages) {
+            size_t page = (start - (uintptr_t)vm->base) / 4096;
+            int present = (vm->mapped_pages[page / 8] >> (page % 8)) & 1;
+            uintptr_t boundary = start + 4096;
+            while (boundary < next) {
+                ++page;
+                if (((vm->mapped_pages[page / 8] >> (page % 8)) & 1) != present) break;
+                boundary += 4096;
+            }
+            if (boundary < next) next = boundary;
+            if (!present) { start = next; continue; }
+        }
+        if (info.State == MEM_COMMIT || info.State == MEM_RESERVE) {
+            uint32_t flags = info.State == MEM_COMMIT ? map_protection(info.Protect) : 0;
+            if (!map_append(maps, (NrMapRange){start,next,flags,inode ? offset + start-original : 0,inode,path,shared})) return 0;
+        }
+        start = next;
+    }
+    return 1;
+}
+
+static int map_add_image(NrMaps *maps, const NrElf *image, const char *path, const NrVm *vm) {
+    if (!image->allocation) return 1;
+    uintptr_t previous = 0;
     for (unsigned i = 0; i < image->header->phnum; ++i) {
         const NrElfProgram *p = &image->programs[i];
         if (p->type != 1 || !p->memsz) continue;
-        uintptr_t start = (image->bias + (uintptr_t)p->vaddr) & ~(uintptr_t)4095;
+        uintptr_t first = (image->bias + (uintptr_t)p->vaddr) & ~(uintptr_t)4095;
+        uintptr_t start = first;
         uintptr_t end = (image->bias + (uintptr_t)p->vaddr + (uintptr_t)p->memsz + 4095) & ~(uintptr_t)4095;
+        /* Adjacent PT_LOAD segments can share a page; report it once with
+           the effective Windows protection, never overlapping entries. */
+        if (start < previous) start = previous;
         if (end <= start) continue;
-        ranges[*count] = (NrMapRange){start, end, p->flags & 7, p->offset & ~(uint64_t)4095, 1, path};
-        ++*count;
+        if (!map_add_range(maps,start,end,(p->offset & ~(uint64_t)4095) + start-first,
+                           nr_file_inode(image->file_handle),path,0,vm)) return 0;
+        previous = end;
     }
-}
-
-static void map_add_anonymous(NrMapRange *ranges, size_t *count, uintptr_t start, size_t size,
-                              uint32_t flags, const char *path) {
-    if (!start || !size) return;
-    start &= ~(uintptr_t)4095;
-    uintptr_t end = (start + size + 4095) & ~(uintptr_t)4095;
-    if (end > start) ranges[*count] = (NrMapRange){start, end, flags, 0, 0, path}, ++*count;
+    return 1;
 }
 
 static char *maps_text(NrRun *run, size_t *size) {
-    char interpreter[4096] = {0};
+    const char *interpreter = NULL;
     for (unsigned i = 0; i < run->program.header->phnum; ++i) {
         const NrElfProgram *p = &run->program.programs[i];
-        if (p->type == 3 && p->filesz && p->filesz < sizeof(interpreter) && p->offset <= run->program.file_size &&
-            p->filesz <= run->program.file_size - p->offset) {
-            memcpy(interpreter, run->program.file + p->offset, (size_t)p->filesz);
-            break;
-        }
+        if (p->type == 3) { interpreter = (const char *)run->program.file + p->offset; break; }
     }
-    size_t capacity = map_image_count(&run->program) + map_image_count(&run->interpreter) + 2;
-    for (unsigned i = 0; i < run->vm_count; ++i)
-        capacity += run->vm[i].image.allocation ? map_image_count(&run->vm[i].image) : run->vm[i].base ? 1 : 0;
-    if (!capacity) return NULL;
-    NrMapRange *ranges = HeapAlloc(GetProcessHeap(), 0, capacity * sizeof(*ranges));
-    if (!ranges) return NULL;
-    size_t count = 0;
-    map_add_image(ranges, &count, &run->program, run->argc ? run->argv[0] : NULL);
-    map_add_image(ranges, &count, &run->interpreter, interpreter[0] ? interpreter : NULL);
+    NrMaps maps = {0};
+    char *output = NULL;
+    if (!map_add_image(&maps,&run->program,run->argc ? run->argv[0] : NULL,NULL) ||
+        !map_add_image(&maps,&run->interpreter,interpreter,NULL)) goto done;
     for (unsigned i = 0; i < run->vm_count; ++i) {
-        NrVm *v = &run->vm[i];
-        if (v->image.allocation) map_add_image(ranges, &count, &v->image, v->path);
-        else if (v->base) map_add_anonymous(ranges, &count, (uintptr_t)v->base, v->size, 6, NULL);
+        const NrVm *v = &run->vm[i];
+        if (v->image.allocation) {
+            if (!map_add_image(&maps,&v->image,v->path,v)) goto done;
+        } else if (v->base && !map_add_range(&maps,(uintptr_t)v->base,(uintptr_t)v->base+v->size,
+                    v->file_offset,v->file_inode,v->path,v->section != NULL,v)) goto done;
     }
-    map_add_anonymous(ranges, &count, run->heap_base, run->heap_committed, 6, "[heap]");
-    map_add_anonymous(ranges, &count, run->stack_low, run->stack_high - run->stack_low, 6, "[stack]");
-    qsort(ranges, count, sizeof(*ranges), map_compare);
-    size_t output_capacity = count * 512 + 1, used = 0;
-    char *output = HeapAlloc(GetProcessHeap(), 0, output_capacity);
-    if (!output) { HeapFree(GetProcessHeap(), 0, ranges); return NULL; }
-    for (size_t i = 0; i < count; ++i) {
-        char permissions[5] = {
-            ranges[i].flags & 4 ? 'r' : '-', ranges[i].flags & 2 ? 'w' : '-',
-            ranges[i].flags & 1 ? 'x' : '-', 'p', 0
-        };
-        int written = _snprintf(output + used, output_capacity - used, "%llx-%llx %s %08llx 00:00 %llu%s%s\n",
-                                (unsigned long long)ranges[i].start, (unsigned long long)ranges[i].end,
-                                permissions, (unsigned long long)ranges[i].offset,
-                                (unsigned long long)ranges[i].inode,
-                                ranges[i].path ? " " : "", ranges[i].path ? ranges[i].path : "");
-        if (written < 0 || (size_t)written >= output_capacity - used) {
-            HeapFree(GetProcessHeap(), 0, output); HeapFree(GetProcessHeap(), 0, ranges); return NULL;
-        }
+    if (run->heap_committed && !map_add_range(&maps,run->heap_base,run->heap_base+run->heap_committed,0,0,"[heap]",0,NULL)) goto done;
+    if (!map_add_range(&maps,run->stack_low,run->stack_high,0,0,"[stack]",0,NULL)) goto done;
+    qsort(maps.ranges,maps.count,sizeof(*maps.ranges),map_compare);
+    size_t capacity = 1, used = 0;
+    for (size_t i = 0; i < maps.count; ++i) capacity += 160 + (maps.ranges[i].path ? strlen(maps.ranges[i].path) : 0);
+    output = HeapAlloc(GetProcessHeap(),0,capacity);
+    if (!output) goto done;
+    for (size_t i = 0; i < maps.count; ++i) {
+        const NrMapRange *r = &maps.ranges[i];
+        char permissions[5] = {r->flags & 4 ? 'r' : '-',r->flags & 2 ? 'w' : '-',
+                               r->flags & 1 ? 'x' : '-',r->shared ? 's' : 'p',0};
+        int written = _snprintf(output+used,capacity-used,"%llx-%llx %s %08llx 00:00 %llu%s%s\n",
+                               (unsigned long long)r->start,(unsigned long long)r->end,permissions,
+                               (unsigned long long)r->offset,(unsigned long long)r->inode,
+                               r->path ? " " : "",r->path ? r->path : "");
+        if (written < 0 || (size_t)written >= capacity-used) { HeapFree(GetProcessHeap(),0,output); output=NULL; goto done; }
         used += (size_t)written;
     }
-    HeapFree(GetProcessHeap(), 0, ranges);
-    *size = used;
+    output[used]=0;
+    *size=used;
+done:
+    if (maps.ranges) HeapFree(GetProcessHeap(),0,maps.ranges);
     return output;
 }
 
@@ -524,7 +572,9 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
             if (fd == 256) { *result = -24; return 1; }
             size_t bytes = 0;
+            EnterCriticalSection(&run->memory_lock);
             char *text = maps_text(run, &bytes);
+            LeaveCriticalSection(&run->memory_lock);
             if (!text) { *result = -12; return 1; }
             run->synthetic_files[fd] = text;
             run->synthetic_sizes[fd] = bytes;

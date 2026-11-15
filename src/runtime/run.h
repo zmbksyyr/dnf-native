@@ -43,6 +43,7 @@ typedef struct {
     HANDLE source;
     HANDLE section; /* Real shared file view; NULL for VirtualAlloc regions. */
     char *path; /* Guest pathname for /proc/self/maps, when this is a file image. */
+    uint64_t file_offset, file_inode;
     NrElf image;
 } NrVm;
 
@@ -89,6 +90,7 @@ int nr_run(NrRun *run);
 int nr_memory(uintptr_t address, uintptr_t bytes, int write);
 int nr_path(NrRun *run, const char *guest, wchar_t *path);
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+uint64_t nr_file_inode(HANDLE file);
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);

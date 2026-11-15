@@ -30,10 +30,10 @@ static result call6(word n, word a, word b, word c, word d, word e, word f) {
 
 #ifdef __x86_64__
 enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, LSTAT=6, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
-      FLOCK=73, IOCTL=16, MMAP=9, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
+      FLOCK=73, IOCTL=16, MMAP=9, MPROTECT=10, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
 enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, LSTAT=196, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
-      FLOCK=143, IOCTL=54, MMAP=192, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
+      FLOCK=143, IOCTL=54, MMAP=192, MPROTECT=125, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
 static void check(int condition, word line) {
@@ -52,6 +52,125 @@ static int equal(const unsigned char *a, const char *b) {
     while (*a && *a == (unsigned char)*b) { ++a; ++b; }
     return *a == (unsigned char)*b;
 }
+
+static char maps_snapshot[65536];
+static void read_maps(void) {
+    result fd = call(OPEN, (word)"/proc/self/maps", 0, 0);
+    CHECK(fd >= 0);
+    word used = 0;
+    for (;;) {
+        CHECK(used < sizeof(maps_snapshot) - 1);
+        result count = call(READ, fd, (word)(maps_snapshot + used), sizeof(maps_snapshot) - used - 1);
+        CHECK(count >= 0);
+        if (!count) break;
+        used += (word)count;
+    }
+    maps_snapshot[used] = 0;
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
+}
+
+static unsigned long long number(const char **text, unsigned radix) {
+    unsigned long long value = 0;
+    for (;;) {
+        unsigned digit = (unsigned char)**text;
+        if (digit >= '0' && digit <= '9') digit -= '0';
+        else if (radix == 16 && digit >= 'a' && digit <= 'f') digit -= 'a' - 10;
+        else break;
+        value = value * radix + digit;
+        ++*text;
+    }
+    return value;
+}
+
+/* Check the guest-visible ABI, including sorted/nonoverlapping ranges. */
+static void expect_map(word address, const char *permissions, word offset,
+                       unsigned long long inode, const char *path) {
+    const char *p = maps_snapshot;
+    word previous = 0;
+    unsigned matches = 0;
+    while (*p) {
+        word first = (word)number(&p, 16);
+        CHECK(*p++ == '-');
+        word last = (word)number(&p, 16);
+        CHECK(first >= previous && last > first && *p++ == ' ');
+        previous = last;
+        const char *flags = p;
+        while (*p != ' ') ++p;
+        ++p;
+        word actual_offset = (word)number(&p, 16);
+        CHECK(*p++ == ' ');
+        while (*p != ' ') ++p;
+        ++p;
+        unsigned long long actual_inode = number(&p, 10);
+        if (*p == ' ') ++p;
+        const char *name = p;
+        while (*p && *p != '\n') ++p;
+        if (address >= first && address < last) {
+            CHECK(permissions != 0);
+            for (unsigned i = 0; i < 4; ++i) CHECK(flags[i] == permissions[i]);
+            CHECK(actual_offset == offset && actual_inode == inode);
+            const char *q = name;
+            while (*path) CHECK(q < p && *q++ == *path++);
+            CHECK(q == p);
+            ++matches;
+        }
+        if (*p) ++p;
+    }
+    CHECK(matches == (permissions != 0));
+}
+
+static void check_map_lifecycle(void) {
+    word memory = (word)call6(MMAP, 0, 5 * 4096, 0, 0x22, (word)-1, 0);
+    CHECK(memory && memory < (word)-4095);
+    read_maps();
+    expect_map(memory, "---p", 0, 0, "");
+    CHECK(call(MPROTECT, memory, 4096, 1) == 0);
+    CHECK(call(MPROTECT, memory + 4096, 4096, 3) == 0);
+    CHECK(call(MPROTECT, memory + 8192, 4096, 5) == 0);
+    CHECK(call(MPROTECT, memory + 16384, 4096, 3) == 0);
+    read_maps();
+    expect_map(memory, "r--p", 0, 0, "");
+    expect_map(memory + 4096, "rw-p", 0, 0, "");
+    expect_map(memory + 8192, "r-xp", 0, 0, "");
+    expect_map(memory + 12288, "---p", 0, 0, "");
+    expect_map(memory + 16384, "rw-p", 0, 0, "");
+    CHECK(call(MUNMAP, memory + 4096, 4096, 0) == 0);
+    read_maps();
+    expect_map(memory + 4096, 0, 0, 0, "");
+    expect_map(memory + 12288, "---p", 0, 0, "");
+    CHECK(call(MUNMAP, memory, 5 * 4096, 0) == 0);
+    read_maps();
+    expect_map(memory, 0, 0, 0, "");
+    expect_map(memory + 16384, 0, 0, 0, "");
+
+    const char *path = "/maps-\xe5\x85\xb1\xe4\xba\xab";
+    result fd = call(OPEN, (word)path, 2, 0);
+    unsigned char stat[STAT_BYTES];
+    CHECK(fd >= 0 && call(FSTAT, fd, (word)stat, 0) == 0);
+    unsigned long long inode = u64(stat + INODE);
+#ifdef __x86_64__
+    word file_offset = 65536;
+#else
+    word file_offset = 16;
+#endif
+    memory = (word)call6(MMAP, 0, 3 * 4096, 3, 1, (word)fd, file_offset);
+    CHECK(memory && memory < (word)-4095);
+    CHECK(call(CLOSE, fd, 0, 0) == 0);
+    CHECK(call(MPROTECT, memory + 8192, 4096, 1) == 0);
+    read_maps();
+    expect_map(memory, "rw-s", 65536, inode, path);
+    expect_map(memory + 8192, "r--s", 65536 + 8192, inode, path);
+    CHECK(call(MUNMAP, memory, 3 * 4096, 0) == 0);
+    fd = call(OPEN, (word)path, 0, 0);
+    CHECK(fd >= 0);
+    memory = (word)call6(MMAP, 0, 4096, 1, 1, (word)fd, 0);
+    CHECK(memory && memory < (word)-4095 && call(CLOSE, fd, 0, 0) == 0);
+    read_maps();
+    expect_map(memory, "r--s", 0, inode, path);
+    CHECK(call(MUNMAP, memory, 4096, 0) == 0);
+    read_maps();
+    expect_map(memory, 0, 0, 0, "");
+}
 #endif
 
 __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
@@ -67,6 +186,7 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call6(MUNMAP, shared, 280, 0, 0, 0, 0) == 0);
     CHECK(call(WRITE, 1, (word)"peer-ok\n", 8) == 8);
 #else
+    check_map_lifecycle();
     unsigned char stat[STAT_BYTES], other[STAT_BYTES], random[128], data[9];
     unsigned char executable[16];
     for (unsigned i = 0; i < sizeof(executable); ++i) executable[i] = 0x7f;

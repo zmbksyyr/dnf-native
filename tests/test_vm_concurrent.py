@@ -25,6 +25,7 @@ def main():
     env = dict(os.environ)
     env["PATH"] = str(BIN) + os.pathsep + env.get("PATH", "")
     records = []
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     for arch, target, base in [("i686", "i386-linux-gnu", "0x8048000"), ("x86_64", "x86_64-linux-gnu", "0x400000")]:
         fixture = BUILD / "fixtures" / arch / "concurrent-mappings"
         build = [str(BIN / "clang.exe"), "--target=" + target, "-fuse-ld=lld", "-nostdlib", "-static",
@@ -34,7 +35,10 @@ def main():
         subprocess.run(build, env=env, check=True)
         digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
         host = args.hosts.resolve() / arch / "dnf-host.exe"
-        process = subprocess.run([str(host), "--run", str(fixture), digest, "concurrent-mappings"],
+        instance = BUILD / "probes" / stamp / ("concurrent-mappings-" + arch)
+        instance.mkdir(parents=True)
+        process = subprocess.run([str(host), "--root", str(instance), "0" * 64,
+                                  "--run", str(fixture), digest, "concurrent-mappings"],
                                  capture_output=True, timeout=30)
         stdout, stderr = process.stdout.decode(errors="replace"), process.stderr.decode(errors="replace")
         passed = process.returncode == 42 and stdout == "native-concurrent-mappings-ok\n"
@@ -44,7 +48,7 @@ def main():
         print(arch, "concurrent mappings", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "os": platform.platform(),
-              "scope": "Eight native guest threads perform 200 rounds of mmap/mprotect/read/write/munmap; no service or load acceptance.",
+              "scope": "Eight native guest threads perform 200 rounds of mmap/mprotect/read/write/munmap while the parent reads proc maps snapshots; no service or load acceptance.",
               "results": records}
     (BUILD / "vm-concurrent-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(record["passed"] for record in records):

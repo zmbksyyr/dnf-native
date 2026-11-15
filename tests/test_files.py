@@ -72,6 +72,7 @@ def main():
         instance = BUILD / "probes" / stamp / ("files-" + arch)
         instance.mkdir(parents=True)
         (instance / "sample").write_bytes(b"abcdef")
+        (instance / "maps-共享").write_bytes(bytes(128 * 1024))
         os.link(instance / "sample", instance / "sample-link")
         (instance / "directory/beta").mkdir(parents=True)
         (instance / "directory/alpha").write_bytes(b"directory entry")
@@ -101,11 +102,11 @@ def main():
                         "peer_build": peer_build, "peer_command": peer_command, "peer_fixture_sha256": peer_sha,
                         "peer_exit_code": peer.returncode, "peer_stderr": peer.stderr.decode("utf-8", "replace"),
                         "passed": passed})
-        print(arch, "files, directory pagination and live shared mappings", "PASS" if passed else "FAIL", flush=True)
+        print(arch, "files, maps lifecycle, directory pagination and live shared mappings", "PASS" if passed else "FAIL", flush=True)
     if args.build_only:
         return
     result = {"recorded_utc": stamp, "os": platform.platform(),
-              "scope": "Own Linux fixtures: file identity, CNG reads, directory pagination/EOF/rewind, live shared aliases and cross-process visibility. Not service acceptance.",
+              "scope": "Own Linux fixtures: maps permissions/PROT_NONE/partial unmap/removal, shared offsets/UTF-8 paths/inodes after fd close, file identity, CNG reads, directory pagination/EOF/rewind, live shared aliases and cross-process visibility. Not service acceptance.",
               "results": records}
     (BUILD / "files-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(r["passed"] for r in records):

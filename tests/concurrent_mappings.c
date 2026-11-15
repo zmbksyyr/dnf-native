@@ -3,9 +3,9 @@ typedef __UINTPTR_TYPE__ word;
 typedef __INTPTR_TYPE__ result;
 
 #ifdef __x86_64__
-enum {FUTEX=202, EXIT=60, GROUP_EXIT=231, WRITE=1, SLEEP=35, MMAP=9, MPROTECT=10, MUNMAP=11};
+enum {FUTEX=202, EXIT=60, GROUP_EXIT=231, WRITE=1, SLEEP=35, MMAP=9, MPROTECT=10, MUNMAP=11, OPEN=2, READ=0, CLOSE=3};
 #else
-enum {FUTEX=240, EXIT=1, GROUP_EXIT=252, WRITE=4, SLEEP=162, MMAP=192, MPROTECT=125, MUNMAP=91};
+enum {FUTEX=240, EXIT=1, GROUP_EXIT=252, WRITE=4, SLEEP=162, MMAP=192, MPROTECT=125, MUNMAP=91, OPEN=5, READ=3, CLOSE=6};
 #endif
 
 static result call(word n, word a, word b, word c, word d, word e, word f) {
@@ -74,6 +74,12 @@ __attribute__((noreturn,force_align_arg_pointer)) void _start(void) {
     for(unsigned round=0;round<200;++round) {
         while(__atomic_load_n(&arrived,__ATOMIC_SEQ_CST)<8*(round+1)) __asm__ volatile("pause");
         __atomic_store_n(&phase,round+1,__ATOMIC_SEQ_CST);
+        result fd=call(OPEN,(word)"/proc/self/maps",0,0,0,0,0);
+        CHECK(fd>=0);
+        char snapshot[1024];
+        result count;
+        do { count=call(READ,(word)fd,(word)snapshot,sizeof(snapshot),0,0,0); CHECK(count>=0); } while(count);
+        CHECK(call(CLOSE,(word)fd,0,0,0,0,0)==0);
         for(unsigned i=0;i<8;++i)while(__atomic_load_n(&workers[i].done,__ATOMIC_SEQ_CST)<round+1) __asm__ volatile("pause");
     }
     const char message[]="native-concurrent-mappings-ok\n";
