@@ -73,5 +73,21 @@
   "limits": [
     "Developer Windows 10 only; no clean Win7/10/11 matrix.",
     "Client login, jbz69 PVF business and full gameplay acceptance remain outside this probe."
+  ],
+  "database_gui_probe": "build/probes/20261115T031324902680Z/gui/receipt.json",
+  "original_log_probe": "build/probes/20261115T031408253573Z/gui-logs/receipt.json",
+  "database_gui_scope": "Direct build without native game resources; verifies helper lookup fallback, TLS, backup/restore and normal shutdown.",
+  "original_log_checks": [
+    "original_text_without_controller_prefix",
+    "automatic_append",
+    "explicit_gbk_encoding_and_truncation",
+    "rotated_file_reopened",
+    "large_log_tail_bounded",
+    "unfollowed_scroll_preserved",
+    "actual_application_init_log_visible",
+    "actual_stdout_visible",
+    "actual_stderr_visible",
+    "actual_mysql_log_visible",
+    "game_normal_exit"
   ]
 }
