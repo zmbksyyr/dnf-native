@@ -69,7 +69,8 @@ int nr_eventfd(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
     if (!event) { LeaveCriticalSection(&run->memory_lock); return 0; }
     if (number == CLOSE) {
         run->eventfds[fd] = NULL;
-        run->file_access[fd] = run->nonblock[fd] = run->descriptor_flags[fd] = 0;
+        run->nonblock[fd] = run->descriptor_flags[fd] = 0;
+        run->file_access[fd] = 0;
         release(event); *result = 0;
     } else if (number == FCNTL) {
         if (args[1] == 1) *result = run->descriptor_flags[fd];

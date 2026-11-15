@@ -22,6 +22,7 @@ from gui_support import (user, windows, wait_for, click, ready, status, title,
 from gui_support import rows, select_service
 
 from gui_support import guest_root
+from runtime_support import runtime_diagnostics
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -224,6 +225,12 @@ def main():
                 record["forced_cleanup"] = True
                 subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=15)
                 process.wait(timeout=10)
+        if record.get("first_instance"):
+            diagnostics = runtime_diagnostics(Path(record["first_instance"]))
+            checks["runtime_faults"] = diagnostics["faults"]
+            checks["runtime_gaps"] = diagnostics["gaps"]
+            if diagnostics["faults"] and not record.get("error"):
+                record["error"] = "Original service exception: " + diagnostics["faults"][0]
         record["exit_code"] = process.returncode
         (probe / "receipt.json").write_text(json.dumps(record, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
         print("Instance workflow receipt:", probe / "receipt.json", flush=True)

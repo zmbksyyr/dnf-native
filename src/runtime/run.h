@@ -6,6 +6,7 @@
 /* The original game without DP2's allocator needs over 1024 live mappings. */
 #define NR_VM_SLOTS 4096
 #define NR_EVENTFD 32
+#define NR_FD_RESERVED 255
 typedef struct NrEventFd NrEventFd;
 
 typedef struct {
@@ -94,6 +95,7 @@ int nr_run(NrRun *run);
 int nr_memory(uintptr_t address, uintptr_t bytes, int write);
 int nr_path(NrRun *run, const char *guest, wchar_t *path);
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+unsigned nr_fd_reserve(NrRun *run);
 uint64_t nr_file_inode(HANDLE file);
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);

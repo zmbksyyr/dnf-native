@@ -42,6 +42,18 @@ def tree_identity(directory):
     return {"files": count, "bytes": size, "tree_sha256": digest.hexdigest()}
 
 
+def runtime_diagnostics(instance):
+    faults, gaps = [], []
+    for path in sorted((Path(instance) / "service-logs").glob("*.stderr.private.log")):
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            entry = path.name + ": " + line
+            if "unhandled exception" in line:
+                faults.append(entry)
+            if any(text in line for text in ["syscall gap", "unhandled exception", "unsupported", "exhausted"]):
+                gaps.append(entry)
+    return {"faults": sorted(set(faults)), "gaps": sorted(set(gaps))}
+
+
 def request_stop(pid, signal=15):
     # Same runtime events used by cross-process guest kill(). This run mode
     # does not write a PID file, so its original stop helper cannot target it.

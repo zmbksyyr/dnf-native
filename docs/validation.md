@@ -10,7 +10,7 @@
 
 双架构文件夹具验证了 PROT_NONE、逐页 r/w/x 变化、部分 munmap 的空洞、全部释放后消失，以及共享文件的偏移、中文路径和关闭描述符后的 inode。八个 guest 线程进行映射/权限/释放操作时，主线程反复读取 maps 快照；双架构 VM 与并发检查通过。原版 game/DP2/Frida hook 和双向 RPC 正常退出 42，无强制清理。环境仍为 Windows 10 x64 10.0.19044；收据及哈希保存于外部 `P4-20261116/maps-receipt.json`。这些结果不代表任意 ELF 或客户端业务通过。
 
-## P5/P6 交付链回归（2026-11-16）
+## P5/P6 交付链历史脚本结果（2026-11-16）
 
 最终源码宿主、GUI、数据库维护程序和统一资源包已在外部 `P6-20261116-madvise3/package/` 生成。新实例回归通过中文/空格路径双实例、资源缺失和损坏拒绝、存档保持、实例锁、取消删除与 reparse point 保护，15 个辅助服务的 channel/relay/STUN 协议，以及 game/DP2/Frida 自然启动和正常关闭。资源编码往返、19 项固定映射、eventfd、文件/maps、双架构 `SA_SIGINFO`/`rt_sigreturn`、TLS、VM 并发、匿名 `MADV_DONTNEED` 保留映射、诊断、robust mutex、Frida item reset 和 Lua/luv timer 均通过；未发生强制清理。
 
@@ -150,3 +150,27 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | 根 README、THIRD_PARTY、LICENSES、阶段 Markdown | 本目录四份文档；必要原始声明见 `third-party.md` |
 
 资源来源和参考边界仍以原始输入身份、ELF 观察和独立实验为准。参考工程未接入本次构建和验收链，本次整理不改变历史失败或降低验收标准。
+
+
+## relay 并发描述符故障定位（2026-11-16）
+
+针对固定原版 `df_relay_r` 的偶发访问冲突，增加了默认关闭的 `DNF_NATIVE_EPOLL_TRACE=1` 定向日志，记录 epoll 创建、注册/修改/删除、等待结果和返回事件的 fd/data 关联。
+
+目标环境为 Windows 10 x64 10.0.19044，guest 为 i686 relay ELF；SHA-256 为 `39c87b68408a82f840808c09c520b911c01176349af9eaa3bf071cce2295c3eb`。
+
+- `python -B tests/test_relay.py --reconnect-rounds 3` 通过：TCP 双向转发、分片/合并请求、UDP 断开、无关连接保留和三轮重连均通过。
+- 初期实例工作流脚本退出 0；收据为 `../x/dnf-native-output/probes/20261115T191758019436Z/instance-workflow/receipt.json`。当时脚本尚未汇总所有服务的未处理异常，不能据此证明全部服务正常退出。
+- GUI 服务回归中的 channel、relay/monitor、STUN、ELF 哈希拒绝和 relay 重启通过；`dbmw_guild` 缺少 `Application Stop!`，其 stderr 实际保留了 `CTcpHandler::GetEventPtr()` 访问异常，因此该次完整 GUI 回归失败。收据为 `../x/dnf-native-output/probes/20261115T192119233108Z/gui-services/receipt.json`。
+- 上述早期轮次未复现崩溃，不能单独证明故障修复。
+
+随后使用诊断包 `P7-20261116-epoll-trace-final/package` 的实例回归再次失败，收据为 `probes/20261115T192913835376Z/instance-workflow/receipt.json`。失败发生在辅助协议和 game 启动前，GUI 正常退出、无强制清理。relay 原始诊断显示两个线程的 epoll 创建都返回 `epfd=3`，随后同一 epoll 内同时出现 listener data `0x4` 和 `0x5`；TCP 线程在 `TManager<RelayService>::getManager()+0x6`（PC `0x805b91a`）把 `0x5` 当作对象指针读取而崩溃。共享描述符分配未同步，使独立 reactor 的事件集混合，已具备具体根因证据。
+
+修复统一了 epoll、socket、文件、管道和 procfs 的描述符预留；eventfd 保持在同一临界区分配。并发夹具还复现了 epoll 销毁与其他 fd 关闭时遍历监听表的竞争，已同步这两项操作。未修改原版 ELF、manager 逻辑或增加空指针兜底。
+
+`test_descriptors.py` 使用双架构自建 ELF、8 个 guest 线程和每线程 200 轮混合分配，检查所有存活 fd 唯一、每组 epoll 只返回自己的 eventfd/data、关闭复用，以及文件打开失败和管道分配不足后的预留释放。修复前失败收据为 `probes/20261115T193434126279Z/descriptors/receipt.json`；修复后双架构通过收据为 `probes/20261115T193708425319Z/descriptors/receipt.json`。既有双架构 files、net、ipc、epoll、poll、select/concurrent-close 回归及原版 relay 三轮重连均通过。新包位于 `P7-20261116-descriptor-fix/package`。
+
+新包的实例收据 `probes/20261115T193853281896Z/instance-workflow/receipt.json` 记录了实例/数据库生命周期、channel/relay/STUN 协议和 game/DP2/Frida 自然启停通过（game 启动约 30.525 秒），脚本退出 0、无强制清理。但事后读取全部 stderr，发现 dbmw_guild、dbmw_mnt 和 manager 在停服时仍有未处理访问异常；同时 game/Frida 路径留有明确 ENOSYS。该轮只能认定上述局部路径通过，不能认定完整实例工作流通过或零兼容缺口。原始收据不改写，补充证据见 `P7-20261116-descriptor-fix/integration-postcheck.json`。
+
+GUI 专项收据 `probes/20261115T194156105324Z/gui-services/receipt.json` 再次记录 `dbmw_guild` 停止标记缺失，全部 stderr 同样记录上述三个服务的停服异常。DBMW 固定 ELF 的 SHA-256 为 `0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967`，PC `0x8057daf` 位于 `CTcpHandler::GetEventPtr()+0x9`；manager 的 PC 为 `0x805494f`。固定 ELF 的 dispatch 指令读取到空 handler，销毁路径与工作线程退出顺序仍待定位；目前不能断言是原程序问题或某项兼容语义导致。
+
+两项集成脚本现均在最终清理后汇总所有服务的异常与缺口：实例脚本遇未处理异常必须失败，GUI 脚本提前失败时也保留 `runtime_faults/runtime_gaps`。汇总逻辑已用上述保留现场复验，两轮均检出三个服务异常；修改后未重复执行完整 GUI 流程，不将现场复验写成整轮通过。后续应先闭合停服现场，再推进完整业务和目标系统验收。

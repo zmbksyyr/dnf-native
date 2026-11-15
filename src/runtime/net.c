@@ -40,6 +40,11 @@ static intptr_t socket_io_error(void) {
     return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
 }
 
+static int epoll_trace_enabled(void) {
+    wchar_t value[2];
+    return GetEnvironmentVariableW(L"DNF_NATIVE_EPOLL_TRACE", value, 2) == 1 && value[0] == L'1';
+}
+
 static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout) {
     if (!timeout) return 0;
     if (timeout / 1000000 > LONG_MAX) return -22;
@@ -71,17 +76,16 @@ static int interface_mac(unsigned char mac[6]) {
 }
 
 static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
-    unsigned fd;
-    for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
-    if (fd == 256) { closesocket(s); return -24; }
     if (nonblock) {
         u_long mode = 1;
         if (ioctlsocket(s, FIONBIO, &mode)) { intptr_t error = socket_error(); closesocket(s); return error; }
     }
+    unsigned fd = nr_fd_reserve(run);
+    if (fd == 256) { closesocket(s); return -24; }
     run->sockets[fd] = (uintptr_t)s;
-    run->file_access[fd] = 4;
     run->nonblock[fd] = nonblock != 0;
     run->connect_state[fd] = 0;
+    run->file_access[fd] = 4;
     return fd;
 }
 
@@ -305,7 +309,8 @@ static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]) {
     return result;
 }
 
-static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uintptr_t maximum, intptr_t milliseconds) {
+static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uintptr_t address,
+                           uintptr_t maximum, intptr_t milliseconds) {
     if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
     size_t capacity = maximum > 256 ? 256 : maximum;
     if (!nr_memory(address, capacity * 12, 1)) return -14;
@@ -326,6 +331,21 @@ static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uint
         unsigned char *out = (unsigned char *)address + written * 12;
         memcpy(out, &events, 4); memcpy(out + 4, &watches[polls[i].fd].data, 8); ++written;
     }
+    if (epoll_trace_enabled()) {
+        fprintf(stderr, "epoll wait epfd=%u max=%llu timeout=%lld watches=%u ready=%lld returned=%lld\n",
+                epoll_fd, (unsigned long long)maximum, (long long)milliseconds, count,
+                (long long)ready, (long long)written);
+        intptr_t traced = 0;
+        for (unsigned i = 0; i < count && traced < written; ++i) {
+            if (!(polls[i].revents & 61)) continue;
+            uint64_t data;
+            memcpy(&data, (const unsigned char *)address + traced * 12 + 4, 8);
+            ++traced;
+            fprintf(stderr, "epoll event epfd=%u fd=%d revents=0x%x data=0x%llx\n",
+                    epoll_fd, polls[i].fd, (unsigned)(unsigned short)polls[i].revents,
+                    (unsigned long long)data);
+        }
+    }
     return written;
 }
 
@@ -342,33 +362,47 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     if (number == POLL) { *result = poll_sockets(run, input); return 1; }
     if (number == EP_CREATE || number == EP_CREATE1) {
         if ((number == EP_CREATE && (intptr_t)input[0] <= 0) || (number == EP_CREATE1 && (input[0] & ~0x80000u))) { *result = -22; return 1; }
-        unsigned fd;
-        for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
+        unsigned fd = nr_fd_reserve(run);
         if (fd == 256) { *result = -24; return 1; }
         run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 256 * sizeof(NrWatch));
-        if (!run->epolls[fd]) { *result = -12; return 1; }
+        if (!run->epolls[fd]) { run->file_access[fd] = 0; *result = -12; return 1; }
         run->file_access[fd] = 8;
+        if (epoll_trace_enabled()) fprintf(stderr, "epoll create epfd=%u\n", fd);
         *result = fd; return 1;
     }
     if (number == CLOSE && input[0] < 256) {
         unsigned fd = (unsigned)input[0];
+        /* Another close walks these sets to remove its descriptor. Keep that
+           walk and epoll destruction together so it cannot touch a freed set. */
+        EnterCriticalSection(&run->memory_lock);
         if (run->file_access[fd] == 8) {
             HeapFree(GetProcessHeap(), 0, run->epolls[fd]); run->epolls[fd] = NULL; run->file_access[fd] = 0;
+            LeaveCriticalSection(&run->memory_lock);
             *result = 0; return 1;
         }
         for (unsigned i = 0; i < 256; ++i) if (run->epolls[i]) run->epolls[i][fd].used = 0;
+        LeaveCriticalSection(&run->memory_lock);
     }
     if (number == EP_CTL || number == EP_WAIT) {
         if (input[0] >= 256 || run->file_access[input[0]] != 8) { *result = -9; return 1; }
         NrWatch *watches = run->epolls[input[0]];
-        if (number == EP_WAIT) { *result = epoll_wait(run, watches, input[1], input[2], (intptr_t)input[3]); return 1; }
+        if (number == EP_WAIT) {
+            *result = epoll_wait(run, (unsigned)input[0], watches, input[1], input[2], (intptr_t)input[3]);
+            return 1;
+        }
         if (input[2] >= 256 || !run->file_access[input[2]]) { *result = -9; return 1; }
         if (run->file_access[input[2]] != 4 && run->file_access[input[2]] != NR_EVENTFD &&
             (!run->files[input[2]] || GetFileType(run->files[input[2]]) != FILE_TYPE_PIPE)) {
             *result = -1; return 1;
         }
         NrWatch *watch = &watches[input[2]];
-        if (input[1] == 2) { *result = watch->used ? 0 : -2; watch->used = 0; return 1; }
+        if (input[1] == 2) {
+            if (epoll_trace_enabled()) fprintf(stderr,
+                "epoll ctl epfd=%u op=%llu fd=%u used=%u data=0x%llx\n",
+                (unsigned)input[0], (unsigned long long)input[1], (unsigned)input[2],
+                watch->used, (unsigned long long)watch->data);
+            *result = watch->used ? 0 : -2; watch->used = 0; return 1;
+        }
         if (input[1] != 1 && input[1] != 3) { *result = -22; return 1; }
         if (!nr_memory(input[3], 12, 0)) { *result = -14; return 1; }
         uint32_t events; memcpy(&events, (const void *)input[3], 4);
@@ -377,6 +411,10 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         if ((input[1] == 1 && watch->used) || (input[1] == 3 && !watch->used)) { *result = watch->used ? -17 : -2; return 1; }
         watch->used = 1; watch->events = events; memcpy(&watch->data, (const void *)(input[3] + 4), 8);
+        if (epoll_trace_enabled()) fprintf(stderr,
+            "epoll ctl epfd=%u op=%llu fd=%u events=0x%x data=0x%llx\n",
+            (unsigned)input[0], (unsigned long long)input[1], (unsigned)input[2], events,
+            (unsigned long long)watch->data);
         *result = 0; return 1;
     }
     uintptr_t args[6]; memcpy(args, input, sizeof(args));

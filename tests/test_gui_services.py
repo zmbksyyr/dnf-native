@@ -22,6 +22,7 @@ from gui_support import (user, kernel, windows, wait_for, click, ready, status, 
                          responsive, screenshot, select_folder, rows, list_rows, select_service, service_row, hidden_startup, choose_log_source)
 
 from gui_support import guest_root
+from runtime_support import runtime_diagnostics
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -181,13 +182,10 @@ def main():
         checks["close_normally_stops_all_owned_elf_hosts"] = True
         server_logs = set((instance / ".mysql").glob("gui-*-server.private.log")) - previous_server_logs
         checks["database_normal_shutdown_after_peers"] = len(server_logs) == 2 and all(b"Shutdown complete" in path.read_bytes() for path in server_logs)
-        gaps = []
-        for path in (instance / "service-logs").glob("*.stderr.private.log"):
-            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-                if any(text in line for text in ["syscall gap", "unhandled exception", "unsupported", "exhausted"]):
-                    gaps.append(line)
-        checks["runtime_gaps"] = sorted(set(gaps))
-        assert not gaps
+        diagnostics = runtime_diagnostics(instance)
+        checks["runtime_faults"] = diagnostics["faults"]
+        checks["runtime_gaps"] = diagnostics["gaps"]
+        assert not diagnostics["gaps"]
         for key, value in checks.items():
             if value is False:
                 raise RuntimeError("Failed check: " + key)
@@ -212,6 +210,11 @@ def main():
         # previous order masked the real probe failure with a Windows sharing
         # violation from a still-running host.
         elf.write_bytes(original)
+        diagnostics = runtime_diagnostics(instance)
+        checks["runtime_faults"] = diagnostics["faults"]
+        checks["runtime_gaps"] = diagnostics["gaps"]
+        if diagnostics["faults"] and not receipt.get("error"):
+            receipt["error"] = "Original service exception: " + diagnostics["faults"][0]
         receipt["exit_code"] = process.returncode
         receipt["service_logs"] = {path.name: sha256(path) for path in sorted((instance / "service-logs").glob("*.log"))}
         (probe / "receipt.json").write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
