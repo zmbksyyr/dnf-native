@@ -5,6 +5,8 @@
 
 /* The original game without DP2's allocator needs over 1024 live mappings. */
 #define NR_VM_SLOTS 4096
+#define NR_EVENTFD 32
+typedef struct NrEventFd NrEventFd;
 
 typedef struct {
     uint32_t events;
@@ -67,6 +69,7 @@ typedef struct {
     uint64_t receive_timeout[256];
     uint64_t send_timeout[256];
     NrWatch *epolls[256];
+    NrEventFd *eventfds[256];
     NrVm vm[NR_VM_SLOTS];
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;
@@ -100,5 +103,7 @@ void nr_log_image(const NrElf *elf, const char *path);
 void nr_log_gap(NrRun *run, uintptr_t number, const uintptr_t args[6], uintptr_t pc);
 void nr_log_crash(NrRun *run, EXCEPTION_POINTERS *exception);
 void nr_log_thread_exit(const NrThread *thread, uintptr_t status);
+int nr_eventfd(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+intptr_t nr_eventfd_events(NrRun *run, unsigned fd, short requested);
 
 #endif

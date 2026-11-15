@@ -14,6 +14,7 @@ import socket
 import struct
 import subprocess
 import time
+import traceback
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
@@ -91,8 +92,19 @@ def main():
         game_logs.rename(probe / "prior-game-logs")
     (game_logs / "siroco11").mkdir(parents=True)
     if args.hosts:
-        for arch in ["i686", "x86_64"]:
-            shutil.copy2(args.hosts.resolve(strict=True) / arch / "dnf-host.exe", instance / "hosts" / arch / "dnf-host.exe")
+        program = probe / "program"
+        shutil.copytree(gui.parent, program)
+        gui = program / gui.name
+        resource_ini = program / "resources/resources.ini"
+        resources = configparser.ConfigParser(interpolation=None)
+        resources.read(resource_ini, encoding="utf-16")
+        for arch, label in [("i686", "x86"), ("x86_64", "x64")]:
+            name = "dnf-host-" + label + ".exe"
+            target = program / "resources" / name
+            shutil.copy2(args.hosts.resolve(strict=True) / arch / "dnf-host.exe", target)
+            resources["package"][name] = sha256(target)
+        with resource_ini.open("w", encoding="utf-16") as stream:
+            resources.write(stream)
     assert tree_identity(instance / "data") == source_before
     manifest = instance / "services.ini"
     ini = configparser.ConfigParser(interpolation=None)
@@ -111,7 +123,8 @@ def main():
     env = dict(os.environ)
     env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
     record = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
-              "host_sha256": {arch: sha256(instance / "hosts" / arch / "dnf-host.exe") for arch in ["i686", "x86_64"]},
+              "host_sha256": {arch: sha256(gui.parent / "resources" / ("dnf-host-" + label + ".exe"))
+                              for arch, label in [("i686", "x86"), ("x86_64", "x64")]},
               "nosegneg": any(value.startswith("LD_LIBRARY_PATH=") and "/lib/i686/nosegneg" in value
                               for value in ini["game"].values()),
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False,
@@ -217,6 +230,10 @@ def main():
         assert not any(value is False for value in checks.values())
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
+        record["traceback"] = traceback.format_exc()
+        if window and process is not None and process.poll() is None:
+            record["failure_rows"] = rows(window)
+            screenshot(window, probe / "failure.png")
     finally:
         if process is not None and process.poll() is None:
             if window:

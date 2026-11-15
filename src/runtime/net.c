@@ -85,6 +85,8 @@ static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
     return fd;
 }
 
+static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]);
+
 static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     if (args[0] > 256) return -22;
     size_t bytes = ((args[0] + sizeof(uintptr_t) * 8 - 1) / (sizeof(uintptr_t) * 8)) * sizeof(uintptr_t);
@@ -98,6 +100,7 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
         memcpy(bits[i], (const void *)args[i + 1], bytes);
         for (unsigned fd = 0; fd < args[0]; ++fd) {
             if (!(bits[i][fd / 8] & (1u << (fd % 8)))) continue;
+            if (run->file_access[fd] == NR_EVENTFD) return select_mixed(run, args);
             if (run->file_access[fd] != 4) return -9;
             sockets[fd] = (SOCKET)run->sockets[fd];
             if (sockets[fd] == INVALID_SOCKET) return -9;
@@ -188,6 +191,12 @@ static intptr_t poll_descriptors(NrRun *run, NrPoll *entries, unsigned length, i
             int fd = entries[i].fd;
             if (fd < 0) continue;
             if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
+            if (run->file_access[fd] == NR_EVENTFD) {
+                entries[i].revents = (short)nr_eventfd_events(run, (unsigned)fd, entries[i].events);
+                if (entries[i].revents) ++ready;
+                has_pipes = 1;
+                continue;
+            }
             if (entries[i].events & ~(1 | 2 | 4 | 64 | 256)) return -38;
             if (run->file_access[fd] != 4) {
                 short events = 0;
@@ -248,6 +257,54 @@ static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
     return ready;
 }
 
+static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]) {
+    size_t bytes = ((args[0] + sizeof(uintptr_t) * 8 - 1) / (sizeof(uintptr_t) * 8)) * sizeof(uintptr_t);
+    unsigned char bits[3][32] = {{0}}, output[3][32] = {{0}};
+    for (unsigned i = 0; i < 3; ++i) if (args[i + 1]) {
+        if (!nr_memory(args[i + 1], bytes, 1)) return -14;
+        memcpy(bits[i], (const void *)args[i + 1], bytes);
+    }
+    int timeout = -1;
+    uint64_t microseconds = 0;
+    if (args[4]) {
+        if (!nr_memory(args[4], 2 * sizeof(uintptr_t), 1)) return -14;
+        intptr_t input[2]; memcpy(input, (const void *)args[4], sizeof(input));
+        if (input[0] < 0 || input[1] < 0 || (uint64_t)input[0] > (UINT64_MAX - (uint64_t)input[1]) / 1000000) return -22;
+        microseconds = (uint64_t)input[0] * 1000000 + (uint64_t)input[1];
+        if (microseconds / 1000 > INT_MAX - 1) return -38;
+        timeout = (int)((microseconds + 999) / 1000);
+    }
+    NrPoll entries[256]; unsigned count = 0;
+    for (unsigned fd = 0; fd < args[0]; ++fd) {
+        unsigned bit = 1u << (fd % 8);
+        short events = (bits[0][fd / 8] & bit ? 1 : 0) | (bits[1][fd / 8] & bit ? 4 : 0) | (bits[2][fd / 8] & bit ? 2 : 0);
+        if (!events) continue;
+        if (run->file_access[fd] != 4 && run->file_access[fd] != NR_EVENTFD) return -9;
+        entries[count++] = (NrPoll){(int32_t)fd, events, 0};
+    }
+    ULONGLONG start = GetTickCount64();
+    intptr_t result = poll_descriptors(run, entries, count, timeout);
+    if (result < 0) return result;
+    result = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        unsigned fd = (unsigned)entries[i].fd, bit = 1u << (fd % 8);
+        if (entries[i].revents & 32) return -9;
+        short ready[] = {(short)(entries[i].revents & (1 | 16 | 8)),
+                         (short)(entries[i].revents & (4 | 8)), (short)(entries[i].revents & 2)};
+        for (unsigned set = 0; set < 3; ++set) if ((bits[set][fd / 8] & bit) && ready[set]) {
+            output[set][fd / 8] |= (unsigned char)bit; ++result;
+        }
+    }
+    for (unsigned i = 0; i < 3; ++i) if (args[i + 1]) memcpy((void *)args[i + 1], output[i], bytes);
+    if (args[4]) {
+        uint64_t used = (GetTickCount64() - start) * 1000;
+        microseconds = used >= microseconds ? 0 : microseconds - used;
+        uintptr_t remaining[] = {(uintptr_t)(microseconds / 1000000), (uintptr_t)(microseconds % 1000000)};
+        memcpy((void *)args[4], remaining, sizeof(remaining));
+    }
+    return result;
+}
+
 static intptr_t epoll_wait(NrRun *run, NrWatch *watches, uintptr_t address, uintptr_t maximum, intptr_t milliseconds) {
     if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
     size_t capacity = maximum > 256 ? 256 : maximum;
@@ -306,7 +363,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         NrWatch *watches = run->epolls[input[0]];
         if (number == EP_WAIT) { *result = epoll_wait(run, watches, input[1], input[2], (intptr_t)input[3]); return 1; }
         if (input[2] >= 256 || !run->file_access[input[2]]) { *result = -9; return 1; }
-        if (run->file_access[input[2]] != 4 &&
+        if (run->file_access[input[2]] != 4 && run->file_access[input[2]] != NR_EVENTFD &&
             (!run->files[input[2]] || GetFileType(run->files[input[2]]) != FILE_TYPE_PIPE)) {
             *result = -1; return 1;
         }

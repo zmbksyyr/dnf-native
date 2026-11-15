@@ -350,6 +350,7 @@ static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, 
 }
 
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result) {
+    if (nr_eventfd(run, number, args, result)) return 1;
 #ifdef _WIN64
     enum {READ = 0, OPEN = 2, OPENAT = 257, CLOSE = 3, STAT = 4, LSTAT = 6, FSTAT = 5, LSEEK = 8, READLINK = 89, ACCESS = 21, CHDIR = 80, GETCWD = 79, MKDIR = 83, UNLINK = 87, RENAME = 82, FCNTL = 72, FTRUNCATE = 77, IOCTL = 16, FLOCK = 73, STATFS = 137, FSTATFS = 138, GETDENTS = 217};
 #else
@@ -364,9 +365,9 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
 #ifdef _WIN64
-    enum {PIPE = 22, PIPE2 = 293, EVENTFD = 284, EVENTFD2 = 290};
+    enum {PIPE = 22, PIPE2 = 293};
 #else
-    enum {PIPE = 42, PIPE2 = 331, EVENTFD = 323, EVENTFD2 = 328};
+    enum {PIPE = 42, PIPE2 = 331};
 #endif
     if (number == PIPE || number == PIPE2) {
         if (!nr_memory(a, 2 * sizeof(int32_t), 1)) { *result = -14; return 1; }
@@ -386,7 +387,6 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         memcpy((void *)a, fds, sizeof(fds));
         *result = 0; return 1;
     }
-    if (number == EVENTFD || number == EVENTFD2) { *result = -38; return 1; }
     int legacy = 0;
 #ifndef _WIN64
     if (number == 221) number = FCNTL;

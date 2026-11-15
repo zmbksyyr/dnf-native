@@ -34,6 +34,7 @@ flowchart TD
 | `run.c` | Linux 初始上下文、异常分发、基础 syscall、内存有效性检查 |
 | `vm.c` | mmap/mprotect/munmap/madvise/msync 和有限 x86 mremap |
 | `files.c` | 实例根目录映射、文件/目录/锁、部分 procfs 和共享文件 |
+| `ipc.c` | eventfd 64 位计数、阻塞/非阻塞、信号量及 poll/epoll/select 就绪联动 |
 | `net.c` | TCP/UDP、select/poll、LT epoll、已支持的 socket 选项 |
 | `thread.c` | 已观察 pthread clone、TLS 接入、futex/wake/requeue 子集 |
 | `signal.c` | 当前服务所需处理器、掩码、SIGTERM/SIGUSR2 及上下文恢复 |
