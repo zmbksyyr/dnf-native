@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 import struct
 
+from bootstrap import ORIGINALS
+
 ROOT = Path(__file__).resolve().parents[1]
 ORIGINAL_SHA256 = "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967"
 
@@ -12,7 +14,7 @@ def encode_password(password):
     plain = password.encode("ascii")
     if not 1 <= len(plain) < 20 or b"\0" in plain:
         raise ValueError("Original database password must contain 1-19 ASCII bytes")
-    original = (ROOT / "originals/dp123/home/neople/dbmw_guild/df_dbmw_r").read_bytes()
+    original = (ORIGINALS / "dp123/home/neople/dbmw_guild/df_dbmw_r").read_bytes()
     if hashlib.sha256(original).hexdigest() != ORIGINAL_SHA256:
         raise ValueError("Original credential format requires the recorded DBMW ELF")
     # Original CAppConfig constructor initializes mode 0 from this ELF data.

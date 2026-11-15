@@ -8,6 +8,7 @@
 *.h text eol=lf
 *.S text eol=lf
 *.ps1 text eol=crlf
-docs/requirements.md -text whitespace=-blank-at-eof
+resources/*.zip -text
+resources/baseline.ini -text
 resources/native.zip filter=lfs diff=lfs merge=lfs -text
 resources/mysql.zip filter=lfs diff=lfs merge=lfs -text

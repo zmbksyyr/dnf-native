@@ -51,7 +51,7 @@ def main():
               "scope": "Lexical call candidates, including declarations/comments/duplicates; not original ELF reachability or ABI acceptance. No reference source content copied.",
               "apis": dict(sorted(hits.items())), "reference_material_in_delivery": False,
               "runtime_sources": {path.relative_to(ROOT).as_posix(): sha(path)
-                                  for path in sorted((ROOT / "runtime").iterdir()) if path.is_file()},
+                                  for path in sorted((ROOT / "src/runtime").iterdir()) if path.is_file()},
               "auditor_sha256": sha(Path(__file__))}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

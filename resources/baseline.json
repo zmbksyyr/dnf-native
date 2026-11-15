@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "origin": "Verified DNF-Native-1.0/resources snapshot, imported read-only from x on 2026-11-15",
+  "evidence": "docs/evidence/p20-instance-delivery.json",
+  "files": {
+    "native.zip": {
+      "bytes": 257681089,
+      "sha256": "8b14ce63fa667d6e9116324b97bfd05111bf2e180837e352281536a5e590e7a5"
+    },
+    "mysql.zip": {
+      "bytes": 20527300,
+      "sha256": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc"
+    },
+    "baseline.ini": {
+      "bytes": 199050,
+      "sha256": "23b4a0bc47295ac5269f97505f15ccb1a3cce9804f77807fa278783bf4e83d08"
+    }
+  },
+  "native_files": 657,
+  "mysql_files": 114,
+  "official_mysql": {
+    "version": "5.7.44",
+    "url": "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-winx64.zip",
+    "archive_sha256": "aed661fe8120254a1dc30f5a4d5de346681922f4847cf025e2d4084eca78e70e"
+  },
+  "scope": "Pinned service/library/plugin/PVF/seed templates and official database programs. Generated instances, user data, build tools and project host executables are excluded."
+}

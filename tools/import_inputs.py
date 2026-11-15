@@ -6,6 +6,8 @@ import json
 from pathlib import Path, PurePosixPath
 import tarfile
 
+from bootstrap import ORIGINALS
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -24,7 +26,7 @@ def main():
         source = args.workspace / row["path"]
         if digest(source) != row["sha256"]:
             raise ValueError(f"Input archive changed: {name}")
-        destination = ROOT / "originals" / subdir
+        destination = ORIGINALS / subdir
         destination.mkdir(parents=True, exist_ok=True)
         count = 0
         with tarfile.open(source, "r|gz") as package:

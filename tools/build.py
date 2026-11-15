@@ -6,15 +6,17 @@ import os
 from pathlib import Path
 import subprocess
 
+from bootstrap import LOCAL, TOOLCHAIN, BUILD
+
 ROOT = Path(__file__).resolve().parents[1]
-TOOLCHAIN = ROOT / ".local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin"
+
 
 
 def main():
     env = dict(os.environ)
     env["PATH"] = str(TOOLCHAIN) + os.pathsep + env.get("PATH", "")
-    sources = sorted((ROOT / "runtime").glob("*.c")) + sorted((ROOT / "runtime").glob("*.S"))
-    decoder = ROOT / ".local/sources/zydis-4.1.1"
+    sources = sorted((ROOT / "src/runtime").glob("*.c")) + sorted((ROOT / "src/runtime").glob("*.S"))
+    decoder = LOCAL / "sources/zydis-4.1.1"
     decoder_names = ["Decoder", "DecoderData", "Encoder", "EncoderData", "MetaInfo", "Mnemonic", "Register", "SharedData", "Utils", "Zydis"]
     dependency_sources = [decoder / "src" / (name + ".c") for name in decoder_names]
     records = []
@@ -22,7 +24,7 @@ def main():
         compiler = TOOLCHAIN / (target + "-clang.exe")
         if not compiler.is_file():
             raise SystemExit("Run python tools/bootstrap.py first")
-        output = ROOT / "build" / arch / "dnf-host.exe"
+        output = BUILD / arch / "dnf-host.exe"
         output.parent.mkdir(parents=True, exist_ok=True)
         command = [str(compiler), "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2", "-g",
                    "-D_WIN32_WINNT=0x0601", "-DUNICODE", "-D_UNICODE", "-municode", "-static",
@@ -36,12 +38,12 @@ def main():
         record = {"arch": arch, "command": command,
                   "compiler_version": subprocess.check_output([str(compiler), "--version"], env=env, text=True),
                   "sources": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-                              for p in sorted((ROOT / "runtime").iterdir()) if p.is_file()},
+                              for p in sorted((ROOT / "src/runtime").iterdir()) if p.is_file()},
                   "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
                   "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
         records.append(record)
         print(output, flush=True)
-    (ROOT / "build/build-receipt.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    (BUILD / "build-receipt.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

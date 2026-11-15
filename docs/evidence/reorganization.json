@@ -1,0 +1,429 @@
+{
+  "recorded_utc": "2026-11-15T11:49:58.378080+00:00",
+  "os": "Windows-10-10.0.19044-SP0",
+  "python": "3.14.6",
+  "compiler": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+  "scope": "Source/test/document reorganization, repository resource baseline and external-only development output; no new client, load, security-topology or multi-OS acceptance.",
+  "output_root": "../x/dnf-native-output",
+  "repository_build_directory_absent": true,
+  "current_build_clis_reject_repository_output": true,
+  "source_layout": [
+    "src/runtime",
+    "src/controller",
+    "src/database",
+    "src/third_party",
+    "src/win32_files.h"
+  ],
+  "resource_baseline": {
+    "native.zip": {
+      "bytes": 257681089,
+      "sha256": "8b14ce63fa667d6e9116324b97bfd05111bf2e180837e352281536a5e590e7a5"
+    },
+    "mysql.zip": {
+      "bytes": 20527300,
+      "sha256": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc"
+    },
+    "baseline.ini": {
+      "bytes": 199050,
+      "sha256": "23b4a0bc47295ac5269f97505f15ccb1a3cce9804f77807fa278783bf4e83d08"
+    }
+  },
+  "static_checks": {
+    "python_syntax_and_imports": 59,
+    "original_notices_preserved": 13,
+    "active_document_links_valid": true
+  },
+  "primitive_regression": {
+    "receipt": "../x/dnf-native-output/reorganization-external-primitives/receipt.json",
+    "receipt_sha256": "3eb7e6231f8f75b5e2d2ce0d0cca8464ad2988a17b06abee2636b6f2a2148fdb",
+    "results": [
+      {
+        "test": "tests/test_elf.py",
+        "sha256": "d20fa98000d4c08e7cfc67596b1920fd19898a119a51aed3960391c63516f6a2",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_entry.py",
+        "sha256": "f91ccda4b42e4f2d3b1c5b9b6e8fcc1f7f0fe5dc879a51c2cab8080bdb4e5268",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_vm.py",
+        "sha256": "a6d031850ac4233ee2a66cd7982925e9f46c899fee239af822bf34f90afca49a",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_vm_concurrent.py",
+        "sha256": "788ce1fb15a1951ad5e65ad96d2a36533054a0dd3e7b24735567047a5a003f4a",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_tls.py",
+        "sha256": "916aba30103a8d3f194cee77b9b9fb42494653211436013e5edf31b9d41df360",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_futex.py",
+        "sha256": "89e1fc40a756048799c87a6e2c8d9528175580a13d136b0956b0f21949721495",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_files.py",
+        "sha256": "866a4e197710972419be83ad7ff6bf87276b67b2597350b7fe7aafa24d8e73bc",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_file_sync.py",
+        "sha256": "0c682663badb7f524ce3488469fb609967bed6e77fc86cc4e78846d6459bacef",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_net.py",
+        "sha256": "b333b35fe90b4acb4f5fa8340a381c54efc7b432533c4c97e0a54db7693a2244",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_poll.py",
+        "sha256": "14549e555148dd1de1e4aa10e777e3f8281e23d32c8fc3e8722a4f66eb7953f1",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_epoll.py",
+        "sha256": "11bc4abf07bf92a3ad4f00076d18ad38c0c2e545093897b42bb98e3a93639735",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_select_close.py",
+        "sha256": "684757ce2b6a83edc1a611b37bb7b272114e7eadd631e62dd0b4ab351990ff7a",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_process_signal.py",
+        "sha256": "9e9b2b039f47a8dbc72f1e2139d64656494804c99619acd7f6e6aa71af5fdf64",
+        "exit_code": 0
+      }
+    ]
+  },
+  "runtime_regressions": {
+    "instance-workflow": {
+      "receipt": "../x/dnf-native-output/probes/20261115T113933872674Z/instance-workflow/receipt.json",
+      "receipt_sha256": "9185b38307700b2657f3a6ea3d7a7d8e273f9550131fb283e59b3956b1c59fa0",
+      "passed": true,
+      "forced_cleanup": false,
+      "check_names": [
+        "cold_start_idle_and_create_available",
+        "each_missing_resource_named_and_creation_disabled",
+        "native_zip_has_browsable_paths_and_trimmed_files",
+        "changed_zip_rejected_before_instance_writes",
+        "nonempty_creation_target_unchanged",
+        "creation_response_ms",
+        "first_created_selected_and_official_tools_released",
+        "database_runs_from_instance_and_delete_disabled_while_running",
+        "second_created_and_automatically_selected",
+        "second_controller_cannot_start_or_delete_owned_instance",
+        "switch_to_existing_preserves_saved_database",
+        "delete_cancel_preserves_entire_instance",
+        "delete_removes_whole_tree_and_clears_selection",
+        "shared_resources_unchanged",
+        "trimmed_peer_protocols",
+        "trimmed_game_natural_startup_seconds",
+        "game_dp2_frida_startup_and_normal_shutdown"
+      ],
+      "checks": {
+        "cold_start_idle_and_create_available": true,
+        "each_missing_resource_named_and_creation_disabled": true,
+        "native_zip_has_browsable_paths_and_trimmed_files": true,
+        "changed_zip_rejected_before_instance_writes": true,
+        "nonempty_creation_target_unchanged": true,
+        "creation_response_ms": 0.124,
+        "first_created_selected_and_official_tools_released": true,
+        "database_runs_from_instance_and_delete_disabled_while_running": true,
+        "second_created_and_automatically_selected": true,
+        "second_controller_cannot_start_or_delete_owned_instance": true,
+        "switch_to_existing_preserves_saved_database": true,
+        "delete_cancel_preserves_entire_instance": true,
+        "delete_removes_whole_tree_and_clears_selection": true,
+        "shared_resources_unchanged": true,
+        "trimmed_peer_protocols": {
+          "channel": {
+            "challenge": true,
+            "positive_responses": 3,
+            "fragmented": true,
+            "coalesced": true
+          },
+          "relay": {
+            "registered_peers": 2,
+            "bidirectional_messages": 8,
+            "unlogged_accounts_disconnected": [
+              701,
+              702
+            ],
+            "own_auth_response_sent": false
+          },
+          "stun": {
+            "responses": 5,
+            "address_and_source_ports": true
+          }
+        },
+        "trimmed_game_natural_startup_seconds": 29.652,
+        "game_dp2_frida_startup_and_normal_shutdown": true
+      },
+      "gui_sha256": "9570307f02e0b79e494295da6eea90710a3859cba990644e0019805eb6ce8014",
+      "script_sha256": "01b4d07886545e0cc13887479f4a822d8c4fdf1cd482dc1b078fc24252bf3b62"
+    },
+    "resource-encodings": {
+      "receipt": "../x/dnf-native-output/probes/20261115T113956105425Z/resource-encodings/receipt.json",
+      "receipt_sha256": "07d2bd25609bc0e02a3a1453edba677363196136324d5a6414666d4fd3d55237",
+      "passed": true,
+      "forced_cleanup": false,
+      "check_names": []
+    },
+    "mysql-tools": {
+      "receipt": "../x/dnf-native-output/probes/20261115T114230119943Z/mysql-tools/receipt.json",
+      "receipt_sha256": "bf94feb525144a75c70036ad18c2aee0a8aa142a65b24256d69cf797f8ae01a5",
+      "passed": true,
+      "forced_cleanup": false,
+      "check_names": [
+        "concurrent_prepare",
+        "secure_initialize_without_tcp",
+        "initialize_fresh_private_data",
+        "private_windows_permissions",
+        "passwordless_root_refused",
+        "query_write_read_over_tls",
+        "original_sql_mode_accepts_legacy_game_inserts",
+        "logical_backup_restore_rows",
+        "loaded_vc_runtime_app_local",
+        "server_shutdown_complete",
+        "existing_data_reinitialization_refused",
+        "official_exes_run_directly_without_unpacking",
+        "fixed_default_root_credential"
+      ]
+    },
+    "mysql-maintenance": {
+      "receipt": "../x/dnf-native-output/probes/20261115T114343308437Z/mysql-maintenance/receipt.json",
+      "receipt_sha256": "c38a5e5bb4fe8be5782d3feaef3800200d01485d5f881a87940e3f88499cfc4a",
+      "passed": true,
+      "forced_cleanup": false,
+      "check_names": [
+        "running_instance_refused",
+        "native_full_logical_backup",
+        "corrupt_backup_refused_without_data_writes",
+        "failed_sql_import_preserved_active_database",
+        "native_shadow_restore_byte_exact",
+        "innodb_myisam_binary_rows_and_extra_schema_removal",
+        "accounts_routines_events_and_triggers_restored",
+        "cold_snapshot_and_logical_prebackup_retained",
+        "automatic_rollback_after_original_datadir_rename",
+        "rename_window_recovery",
+        "owned_server_exits_when_wrapper_is_terminated"
+      ]
+    },
+    "gui-maintenance": {
+      "receipt": "../x/dnf-native-output/probes/20261115T114518356154Z/gui-maintenance/receipt.json",
+      "receipt_sha256": "442d8caad2b62d14a523b0ee3da94cde2ef52ce07a9e3b791137d2d0f6329636",
+      "passed": true,
+      "forced_cleanup": false,
+      "check_names": [
+        "backup_enabled_while_owned_services_run",
+        "backup_stops_services_before_offline_operation"
+      ]
+    }
+  },
+  "review_package": {
+    "path": "../x/dnf-native-output/package-review",
+    "runtime_files_identical_to_tested_package": true,
+    "files": {
+      "DNF-Native.exe": "9570307f02e0b79e494295da6eea90710a3859cba990644e0019805eb6ce8014",
+      "resources/dnf-host-x64.exe": "8771f7c68bb73c391a0e02667987b1b8937aefd19b4ec94680bb6d46f2347882",
+      "resources/dnf-host-x86.exe": "292c1554b948f2d19ff8b3a2bfde2103958a2ec985bbfdba87f5dce008c56751",
+      "resources/mysql-control.exe": "12108ed9b0125d1f3e31697744778ed850298bd629eb2eed4b33e48d496f0add",
+      "resources/mysql.zip": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc",
+      "resources/native.zip": "8b14ce63fa667d6e9116324b97bfd05111bf2e180837e352281536a5e590e7a5",
+      "resources/README.md": "fa788073dbb7608cbeb490aca5303175d8f70f39a50e72a2640733f28e1c80fa",
+      "resources/resources.ini": "d9222f746719dc1cfd31768edec4f273871cd2f5c152b72b30ef3180c353e2bf",
+      "resources/third-party.md": "1faaf3658ebcb576beb8303d3bee985315d828b38ac3af48424db67d907b52f1"
+    }
+  },
+  "source_sha256": {
+    "src/controller/controller_gui.cpp": "24a04e321f5655e3daf18779df6b44f599e065deb695076d89aa3e77c38f1fe4",
+    "src/controller/controller_gui.manifest": "05ecfb2fbab448566cfbb8d6224a29690b11555d3b73601a3ec007b91c192e89",
+    "src/controller/instance_files.h": "c154336ca29d8e68d903072cad5008ff14318457ce48ac9e4fdece424fe4518e",
+    "src/controller/instance_setup.h": "561deee3cf1f81967f662b18c985daad6c7dfd04dd8c32ac377658300c7d7b80",
+    "src/controller/log_view.h": "8c5475943a8de1ae5a4f62132e02c5eba875361ff41232075f8d082b8704f942",
+    "src/controller/resource_check.h": "d2d6cb686047497c583d288466a3a9565aa09707169855362b8e563db6ecaea5",
+    "src/controller/resource_zip.h": "e0b6e250d2539e48fbf3bdd0d3b8253aaf1d4086805796d8ae14880ef8cc2e7a",
+    "src/controller/service_ip.h": "e7a5b4d427f55d26674c5d3bf3191f62a4fb0a20d27bb631ac1aeb17a389d165",
+    "src/controller/service_processes.h": "2c3f840a5a91eaee628183ec5f1e212b0bc556f38ef5c9fb11b58a9073fe507a",
+    "src/database/mysql_control.cpp": "67656998eda4e4be14ec179b29493ae2928ccb98345edc9fb4a1afa9994d8f32",
+    "src/database/mysql_operations.h": "05fbcef3bd5d8d46bc67cfd19f5550488e53399ab2783adb00567e5b8708e621",
+    "src/runtime/adapt.c": "e45d1dfba615fa080e19d9401519782b44579aad569389c770ca6ea553eaa374",
+    "src/runtime/dp2_cleanup.lua": "9330a4bdf5b2726a3cbae287208bd1774aaa480567c279fe9994e698b29dbd42",
+    "src/runtime/elf.c": "77bf37803209ee1a530cdbc2995f560e58073526983fa82757a8d3a51384576d",
+    "src/runtime/elf.h": "3a88313cf5ee1a395a5170d870b662caf1250ce9efdd524d7d3c75f5f6e01c69",
+    "src/runtime/entry.S": "6d27ae4b23d15d6d471f4fba7229ab5dee0bc08b6967e2838490463f046c4336",
+    "src/runtime/files.c": "e08ddb88f108a5d59816680a4be98c8fe1adc720228b926b023cdd931a1631f1",
+    "src/runtime/frida_item_reset.js": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
+    "src/runtime/main.c": "d24340c71cf4df1281bbe4432dd9f08f0f5306ddf2dcd862fe90fb83b801d3e9",
+    "src/runtime/net.c": "892bc6b8143068c79d113b2dde84cc0e6f2bf2623006c9b9196bc622f38779b9",
+    "src/runtime/run.c": "6b9f92dc143ab779f3252ddf89ddee74979b1feb217285589fbb8d2717f7669a",
+    "src/runtime/run.h": "002b1d888811151d3a80a75db72bf8bccb228f2ba1c9967851794a8591ab52be",
+    "src/runtime/signal.c": "f92bddf3617fd79d6c1e54413e7fb98276d362e60404e5765f9873f3417487be",
+    "src/runtime/thread.c": "bf32dbd1e71fa3671e342463b3f8df8cd513469c2ab441fb2f5217ca9f06ce18",
+    "src/runtime/tls.c": "e31fdf7b9e086c9d0b9ca7ecc1cec35cf6a6b3676c93b252052f3860933ea7ab",
+    "src/runtime/vm.c": "328ac796b9584566c18d7965ba58e7b514c180566e6ec220a127fa972d6ec8e0",
+    "src/third_party/miniz/miniz.c": "6a0314b68c9b804f33e27d89aa3144ef7724fd787043ba8c95d1b19be2d64afd",
+    "src/third_party/miniz/miniz.h": "525d5a537fc6d4e69263cb5087ef2cbd787e7ef7195abe96f0efb93a41ab026f",
+    "src/third_party/miniz/miniz_common.h": "b60cf1b07faa68762411abaf231d15be7970be4eda5f67b9f572548a038a8c0b",
+    "src/third_party/miniz/miniz_export.h": "36bc4b8f74820c36f6705d082206a4b934aaf62217db0621545afb238179f680",
+    "src/third_party/miniz/miniz_tdef.h": "13574142e909c529c3c08bbd76be8ac23939370e08fdc9837e635b2e00b4883d",
+    "src/third_party/miniz/miniz_tinfl.c": "ced7aa650454250544a02f107fad4790c76924cce68d19e9496dcd25588e89b5",
+    "src/third_party/miniz/miniz_tinfl.h": "ef18f995b0151095a0e9ed718114bd03437c607b302ee979a9d371f157bacf8a",
+    "src/third_party/miniz/miniz_zip.c": "1ab94b269cd6021b006dac0fa78a42c73e1559676d086a16059fb98e21830606",
+    "src/third_party/miniz/miniz_zip.h": "eff19da6bcd7e127bb4447bf67a6093a6e589ee496fd251a444ec3b58c1d86f4",
+    "src/win32_files.h": "1c4571207d85e6b67d3881078eb6f129d146e63a81d206fab1f2a6ec078e7c0e",
+    "tools/__pycache__/audit_compatibility.cpython-314.pyc": "c462277f6fe270ce655a28b5ed528ea0037b04e76ad63773920571bfde580d8e",
+    "tools/__pycache__/audit_resources.cpython-314.pyc": "510a48481d168716e1ec573f8b6e354cf600d30b7058c4d4041113a831949785",
+    "tools/__pycache__/bootstrap.cpython-314.pyc": "d2139eafcf64bf49f82d54707309a7bcb97a26d62176d46ccff2f5aba28fb7ad",
+    "tools/__pycache__/build.cpython-314.pyc": "8f257fd9754432efd2d4acf4669120dc58d6418de41b4f365d048b3b7c0f5de4",
+    "tools/__pycache__/build_gui.cpython-314.pyc": "d0765ab316c14791b4405d539008e70d9b389fa10ca5d9492fc3db0e346f130d",
+    "tools/__pycache__/build_mysql.cpython-314.pyc": "03992113d2fd514968010db59b6c2539c59e18e548aa063e4c41fd5ba77b2606",
+    "tools/__pycache__/build_mysql_standalone.cpython-314.pyc": "e086aba8d194a5182320183fdf42b9bd8aef79a07214788477492807181c2fc6",
+    "tools/__pycache__/build_review_package.cpython-314.pyc": "552b6d0cd6e9c74f43571a9a228a5b45a808eeb559f8582badb89658ea57c09f",
+    "tools/__pycache__/build_service_cabinet.cpython-314.pyc": "3f3398287da0f347e996811612ac4d42e0607a68d73263d356802bf77e6683a0",
+    "tools/__pycache__/build_service_resources.cpython-314.pyc": "dbc9bb80e75663f77c37d1c56dabcf491d4b7308ea5454ef30a8969526f9e4a7",
+    "tools/__pycache__/import_inputs.cpython-314.pyc": "3bec90fdc490034bfbab37bbee0290f7fc03d7fc19ac1aca0f7f378612bae250",
+    "tools/__pycache__/import_linux.cpython-314.pyc": "ed37c10ca111fe01a477946205d038c3b2e93c4d95fd7ceb08f24aaceaf2bc30",
+    "tools/__pycache__/import_mysql.cpython-314.pyc": "98daaddbf312ad81b5097b7a0dc1edd3e08d06e5065544357974a024a52c4ff5",
+    "tools/__pycache__/import_mysql_runtime.cpython-314.pyc": "968b3f0a4343a10e1cfde0651f6688e5d0535021de5e3d3c154c6c83707f86e4",
+    "tools/__pycache__/legacy_db_password.cpython-314.pyc": "bd35c1bd09d1792ae99f0eb684433e9f08b56eecc01a2913c1f561ca47f8c9fe",
+    "tools/__pycache__/prepare_service_instance.cpython-314.pyc": "fe014a7e6a97aa960a83406d88c29631a8a1919494f592f5de1a4d3aacc58a91",
+    "tools/__pycache__/probe_core_protocols.cpython-314.pyc": "9b8f4dea6dfd0f83c14568fe54a48bfc5536c2053453ff8b2f602e58f82ccd56",
+    "tools/__pycache__/probe_dbmw.cpython-314.pyc": "7319ae9cdcbf4ec501f9f09f0024bce5345bbc5fd80bfd9b01f9b309d6247706",
+    "tools/__pycache__/probe_game.cpython-314.pyc": "1ce25857652241857fc9ce3c12f19807d9f2c008e56e0d77276ef49fc1f23e3f",
+    "tools/__pycache__/probe_game_chain.cpython-314.pyc": "234097149d88085eff4d888708d70a16ec9c273be63c527484663c2b23304800",
+    "tools/__pycache__/probe_game_chain_custom.cpython-314.pyc": "0f21d7601b98e5185576daa0b5bca50ab44b9e89d2dde1ffa8d7612709624fef",
+    "tools/__pycache__/probe_game_custom.cpython-314.pyc": "c6c3c8e1d7e14639d20233e7d40a8fb96cc722e04d32f564571e99db25bf884f",
+    "tools/__pycache__/probe_gui_core.cpython-314.pyc": "36fb83fb160323c69fabdbc4673f93c8dcbe7ac8ba7396c091f582c96fb95f6e",
+    "tools/__pycache__/probe_manager.cpython-314.pyc": "51f01153d529665439ed0f4d1323af82b1ee479c25461083323ecead2466f359",
+    "tools/__pycache__/probe_monitor.cpython-314.pyc": "6c74b1b3ef6903ba4423ff4ea098f80ceb915ccdcec26bbf62c89f3cb2ed047a",
+    "tools/__pycache__/probe_mysql.cpython-314.pyc": "e83b66ddfe673d78f679f4da6ef2263f655c6ba26e4c89bc482fad978c04f561",
+    "tools/__pycache__/probe_mysql_seed.cpython-314.pyc": "5cf995f285bfcf8ec8e67a9b750204b5881ca82036067abcfaeea5778190d22d",
+    "tools/__pycache__/probe_security.cpython-314.pyc": "ae38e10409e4b6950ad690051abbbed566087e737a15fded80b0094ec3d3dbe0",
+    "tools/__pycache__/test.cpython-314.pyc": "0c12de6c52e779c9e984dd4ff58722dc0b29acd3f3800aa5bdcf65ffc35a92ff",
+    "tools/__pycache__/test_bridge.cpython-314.pyc": "50191f2c019245c872c340166b7e1d3376f742bae62ead5573617ad3afc9c6a9",
+    "tools/__pycache__/test_channel.cpython-314.pyc": "8d08a8beca92373bc1973ca5602e0d5dc182b74dacfda796ee3c4be52f94ebbf",
+    "tools/__pycache__/test_entry.cpython-314.pyc": "e4f2292bda14460ec4a45090e7c0c52e633bd857c4c1f468d9dca2fb27bed3fe",
+    "tools/__pycache__/test_epoll.cpython-314.pyc": "727462e8ac5f0661c007fcaca7e0fc4ca1b33a695dd4137e0536f18152b67354",
+    "tools/__pycache__/test_file_sync.cpython-314.pyc": "de796ff46a53ef9f28783baa2d17aafc273316b24edafb6c67fa2af785d361de",
+    "tools/__pycache__/test_files.cpython-314.pyc": "c846a3679c299ce4f57fed9b86abb28a2aff199acfae6c3a3954319d758bea6d",
+    "tools/__pycache__/test_frida.cpython-314.pyc": "8ffbb666728794ed3934123b60ca4a1589d3a1f2c5d451fb388cb6924b270c60",
+    "tools/__pycache__/test_futex.cpython-314.pyc": "ecc814dad8c3d0f5be2f23a6e129344eaeac66a3b24ed78581992604a38f70c0",
+    "tools/__pycache__/test_gui.cpython-314.pyc": "b8f6bff20cb6361d887eff98d34b25f85128a67f2d9338b6aacf4e6f8931b6b1",
+    "tools/__pycache__/test_gui_logs.cpython-314.pyc": "c3b7d6bab70d59def0bf2d12663199abb93c41ec350fafcf5fbe21d5adfee525",
+    "tools/__pycache__/test_gui_maintenance.cpython-314.pyc": "4afbe24116525f8495667841e2b90d8e7bd731e02c5beec379094c6a6d1439e6",
+    "tools/__pycache__/test_gui_plugins.cpython-314.pyc": "d3252bc827e097d589709dbc73f6f7a1451a1388037aceeba65a282a0e2c73aa",
+    "tools/__pycache__/test_gui_services.cpython-314.pyc": "450b51de504e42f15aa1b726e420f0efdf0fd8a6af4b4f885653333a61350130",
+    "tools/__pycache__/test_gui_setup.cpython-314.pyc": "4394779a6183545112383f31590f66134e6c65874896a60e0902a626438d3d7c",
+    "tools/__pycache__/test_ld.cpython-314.pyc": "814794b20904210b5ca391dc1352a16df5677b421d4f447306c4e4280c3629de",
+    "tools/__pycache__/test_luv.cpython-314.pyc": "47572339d6852b979d135840707a5361d8dc1f3044d853808fd01be2cffb2750",
+    "tools/__pycache__/test_mysql_maintenance.cpython-314.pyc": "a3ce375633811a142987d6f3cbef747e8a95f53e8ec4ba017d53d40de3fd0b3f",
+    "tools/__pycache__/test_mysql_standalone.cpython-314.pyc": "567d8c4406e1e8928be0e9a9f746b9dbe237ca24b435e26314b05e61335e68f9",
+    "tools/__pycache__/test_mysql_tools.cpython-314.pyc": "4a9e296c62d2502cfdce4ec0894420120ddd7d6e173d84120206673b9411fda1",
+    "tools/__pycache__/test_net.cpython-314.pyc": "ff141cf380203e0b8829bc4c6e76eab85e1d7133d7e184599a2802a6cc76e89b",
+    "tools/__pycache__/test_poll.cpython-314.pyc": "3ae4a361f5c1c4239914fb56faa61216c84df66922cad2a4faced477f2153636",
+    "tools/__pycache__/test_process_signal.cpython-314.pyc": "8f3af9315a37fe479560227812acd82b71a379ee130b7c9827f5e0ccadb742e6",
+    "tools/__pycache__/test_relay.cpython-314.pyc": "a1f758babcbb465a69bbe8a692016336718f6c701dbc79e38f7621c5c06954d6",
+    "tools/__pycache__/test_select_close.cpython-314.pyc": "3535676415e97e36f4ac6eea157fefbf27f4f97aaf5bd366af823df8a62144f3",
+    "tools/__pycache__/test_shared_entry.cpython-314.pyc": "302e280c64384b21cc110aeecf220bfcbad5c53b9618ae5a4db208508f7ec25a",
+    "tools/__pycache__/test_stun.cpython-314.pyc": "cfb9adb48569b249e719388039c3cc6557eb728c56ae5bc5478bac68e241cc29",
+    "tools/__pycache__/test_tls.cpython-314.pyc": "4d12e0c5cbdfe9b06339d836b8bcbd8cfd9a5dc3330183086bd7be082e0be06e",
+    "tools/__pycache__/test_vm.cpython-314.pyc": "1eec7455e2209c4bd6a0fc010bd11236d5f0f44d7d240b01589ab70d14d2a442",
+    "tools/__pycache__/test_vm_concurrent.cpython-314.pyc": "0fab4248a18f17d41e8f971416d0d6e8f9947e93630a04c0942d50a20cffa6f6",
+    "tools/audit_compatibility.py": "375d0677a6bf70964954d364103c59f6c656027fce1aa5c912d69de17b1fbed5",
+    "tools/audit_resources.py": "1e46c1173e103ad3ca7bd4fea6b995fb5a4e6519ac858af118a7fdd65cf15102",
+    "tools/bootstrap.py": "07a625beaeef6d129e8b7ae2081f420780b8ac8e9f829eef08b80185deabf6d8",
+    "tools/build.py": "91c5f25026354b7c68d81fc5ab83e62313e07439dd4e1b61b66f35bbadd29f13",
+    "tools/build_all.py": "be85b917087d19dc3f69797319bb6d857f26e013d4ea3b5d5a0a9c8f7aa16576",
+    "tools/build_gui.py": "8f5ffda9d87966c0efa808b3cde9906ac7bb913e4bd0a4238d3139ebb34b7f9f",
+    "tools/build_instance_package.py": "698e9da83d7bf416e8353bdda1321b68987aaee83d16eec4babe05fa9049629b",
+    "tools/build_mysql.py": "c14464d595c15d500d3a17ec0a9ec296b935e480473db9d6258670f73697a471",
+    "tools/import_inputs.py": "cb63dd6288718c08b74d421c05372622609d9345dfd25021c64aa368a36e6e27",
+    "tools/import_linux.py": "b19b6e3d790d864625be06ba35ed9f857077f535981288bf5f75fbc9a2149842",
+    "tools/import_mysql.py": "5a2874e2449720c9586b3425ee32be4d7f773519230f46e2a35ff64de8495560",
+    "tools/import_mysql_runtime.py": "71c81d8ed760ff5788362b5589c5be1ff71c6d806f25c39d471d402daf3ad11b",
+    "tools/legacy/build_review_package.py": "98c79e02aab242bb76e6fb0fc1138e2d772b74e22efd2c239b1b2ca795c9f9fc",
+    "tools/legacy/build_service_cabinet.py": "c11bfb90bf64e5ae02458fb2153fc83fb7d817eae67074bea1047043a2898f05",
+    "tools/legacy/build_service_resources.py": "be2bfd104c65a496f524bd79afc05f2ddb5453122d8e2c0f142e025abc3fe434",
+    "tools/legacy/prepare_service_instance.py": "7757193bf02c4dd8f9c682dcc2ff7a187c4922e31f3c1bcf76b6784d5d4113f5",
+    "tools/legacy_db_password.py": "3ffef93cd95d283e41a6a2e4745340e9774993c1396332628e173184843fb968",
+    "tools/resource_baseline.py": "4c463859fcd0baccc98b4e5dd3328469fc3ff78bca643d8474a3b012c293e585",
+    "tests/channel_proxy.js": "42ad7e5c6d8c46536257dacbcd5e986906f91b222a84dbe0e71109acaa31f6af",
+    "tests/channel_proxy.lua": "31c1342308265b73c24bb2abfb68030826ab66de6883ef5259765c349ac48525",
+    "tests/concurrent_mappings.c": "cff5e82ff682195cfb091d58eaca13bbbb6f17be5c85cce9f05ad5f7e52204eb",
+    "tests/entry.S": "e7689185a24dab0bf88744a8dce13e7acb409ea5d2027fc199e2abc0816c2fcd",
+    "tests/epoll.c": "c699b0de732e2130215374e100e2c577be9f7e5d1223e945d27f0dbd6dc9321c",
+    "tests/file_sync.c": "8555475da2072a33912fef98e09e38aa7ffc045c2ae19005f63a09263ce15861",
+    "tests/files.c": "30636ebbbb22b64a5a2e262bd8159d80484c98f0d31925691635bfaef6aa950e",
+    "tests/frida_bridge.js": "429980d35b9ed58864cfaaf9414c071607d9062b476e133a5fa37f4bd761f183",
+    "tests/frida_bridge.lua": "000e6bad3118d44aa85c330bae99e56f8b2221978c78979c42591d99971f7c65",
+    "tests/frida_item_reset.js": "325bcb08bd2d1f83ef54c1cd243a64f6c979fca13a376eb5e9a0d63a90ef3cd2",
+    "tests/futex.c": "0c5c9c21b4169536c0c77dbbac7c59c55eb96992ba5534dfc8274b081cca411b",
+    "tests/futex_clone.S": "4ba72debe24ab6c818311f6cbbbd41715ef46ca0a768ea3ab0a8bc79f8022218",
+    "tests/luv_timer.lua": "a0a119a1333aca8e98a344c32b4fefcabcd66f97fcdc70ebc05040b1a340a7b6",
+    "tests/net.c": "9baa3d7da334e8665ddd2d49cfacb72b399796e71fffc8ab6ab3baf577bb3dd1",
+    "tests/poll.c": "b53ef23b275e5bf3381f330ce161540050d608d8ca782e60b310b347df18ef7a",
+    "tests/probe_core_protocols.py": "c19f2b111afecfe248378a958aff945bd6e42c193a88dacf118173f0a97c162f",
+    "tests/probe_dbmw.py": "c9a195def34c115a720900d44707113fbe3e387149fcb104813281c7305c2f18",
+    "tests/probe_game.py": "1d3191d0d9e724cfc9ae6fe7841a1af33a81892468c4aacb20f0510818a7554e",
+    "tests/probe_game_chain.py": "7c805eb29ee94d9880ff52e5b0874f462b4b9782ca468016fa8ea3bd7b71b21c",
+    "tests/probe_gui_core.py": "eb58eafd2893524a531595e8c5966c3eaf4fa5989e9279820b6ea38e57720c50",
+    "tests/probe_manager.py": "78170fb1e3cb72858d8638eb3fbbaabf7fa0ea3f5387e04015ffce8637cb20de",
+    "tests/probe_monitor.py": "82cc58330a0402762caeed81ed7b701ade471a09d606e9d4fed8893b8975bd01",
+    "tests/probe_mysql.py": "7ab73f8d6de228c5533ab50dfa4899212ec42cf268c61796fadd121dfa0e0e9d",
+    "tests/probe_mysql_seed.py": "205af7daf7c62777a47641d9790d7b076720fc5b8af3b2f15465139aba6d6fb8",
+    "tests/probe_security.py": "224d335e1bed56bbbb0bfd0ebc133402c570aeeeaaf5891439685341989d6ebc",
+    "tests/process_signal.c": "1e854e9b9b192f5620d4dcfe3c8974a0b689222404fe60b7a6200416540f9dd3",
+    "tests/resource_encodings.c": "ea83aa3783475999e360410ca021a49c418d9692fbdb0ce3d54bce0202d9faba",
+    "tests/select_close.c": "6ccd45b460b5a0571803103850573e1d8b5ca42bf71a5449c7bed656378cd953",
+    "tests/shared_entry.c": "8427b553c7d1745ed60498e9caa280a52ff7c4d073caec68017e33bb5f048f10",
+    "tests/syscalls.c": "74cd702e44ba2187c1613dac1f7d8ceee9cc93ba1fb7e916169312236e3986ef",
+    "tests/test_bridge.py": "a773ae4d90c31c9398c0abd7d8909abd7ebf985f9dc44f301f238bad8fee5cb7",
+    "tests/test_channel.py": "ce5df9862bd3b02c901f53dce1589f2ff98b21200238ea474e37965874edd91d",
+    "tests/test_elf.py": "d20fa98000d4c08e7cfc67596b1920fd19898a119a51aed3960391c63516f6a2",
+    "tests/test_entry.py": "f91ccda4b42e4f2d3b1c5b9b6e8fcc1f7f0fe5dc879a51c2cab8080bdb4e5268",
+    "tests/test_epoll.py": "11bc4abf07bf92a3ad4f00076d18ad38c0c2e545093897b42bb98e3a93639735",
+    "tests/test_file_sync.py": "0c682663badb7f524ce3488469fb609967bed6e77fc86cc4e78846d6459bacef",
+    "tests/test_files.py": "866a4e197710972419be83ad7ff6bf87276b67b2597350b7fe7aafa24d8e73bc",
+    "tests/test_frida.py": "fbe78f3609c8137cac3310acdb64aabd33bce92688c82d16b6afb4b63dc86494",
+    "tests/test_futex.py": "89e1fc40a756048799c87a6e2c8d9528175580a13d136b0956b0f21949721495",
+    "tests/test_gui.py": "a5ab20c30d6e59ccdaebb1d0bb2184465da412a0f62a2335395660eb2d7b3b82",
+    "tests/test_gui_logs.py": "4db95cebe669afab7e5f594559cb146de0d4615836d9288fe3b9707a2bbc68c5",
+    "tests/test_gui_maintenance.py": "b6427916547f2bbcc8874813f1034f12ba0e52424c1070d5ce89d9a834a705c4",
+    "tests/test_gui_plugins.py": "499ebf40ec13b51ab85e68010cdf3633f11394376cd0879bf79afb98ef327f15",
+    "tests/test_gui_services.py": "98b4eed738796cf676f74b4b40b705660e985f43148675886e7a6e64826469a2",
+    "tests/test_gui_setup.py": "ba2f0a54dec6333a6bb26f10b6c36a110f90fc5046bd6e6c78e2cf2cc8823454",
+    "tests/test_instance_workflow.py": "01b4d07886545e0cc13887479f4a822d8c4fdf1cd482dc1b078fc24252bf3b62",
+    "tests/test_ld.py": "9c113dc7123ed2c4182abfcf37c44aa1ed06eef61bacf316c0bdfff9c8019ba4",
+    "tests/test_luv.py": "f7300df3e0368f58f528e56bfaee5c2a6e822308a8c2745beb53afc382ebf807",
+    "tests/test_mysql_maintenance.py": "cff591fd38ff45d1c4abd4167e63e8102fb4d9447de077da8c407843b9fdd309",
+    "tests/test_mysql_tools.py": "576a1a111718c4f624502fac729f9d3b783c0600ebe8dbe7aa6a43ca8b9b02e7",
+    "tests/test_net.py": "b333b35fe90b4acb4f5fa8340a381c54efc7b432533c4c97e0a54db7693a2244",
+    "tests/test_poll.py": "14549e555148dd1de1e4aa10e777e3f8281e23d32c8fc3e8722a4f66eb7953f1",
+    "tests/test_process_signal.py": "9e9b2b039f47a8dbc72f1e2139d64656494804c99619acd7f6e6aa71af5fdf64",
+    "tests/test_relay.py": "17395d56348d7a12452ff24bee6b3932afbd244545aae13985fa7197771d5a39",
+    "tests/test_resource_encodings.py": "1bd03c376199655ceab7cc476642a1a9308a78f2c61af16497b002a799e7d0a2",
+    "tests/test_select_close.py": "684757ce2b6a83edc1a611b37bb7b272114e7eadd631e62dd0b4ab351990ff7a",
+    "tests/test_shared_entry.py": "54cbc9cf9b0b5dc34081eaeab37562d2f0e74bf87d473244d2c7854bff3423ae",
+    "tests/test_stun.py": "e51521c5957d2f8031ea0ed77e38da0739a707f45b6c42dbba9a8f20ae2d5c11",
+    "tests/test_tls.py": "916aba30103a8d3f194cee77b9b9fb42494653211436013e5edf31b9d41df360",
+    "tests/test_vm.py": "a6d031850ac4233ee2a66cd7982925e9f46c899fee239af822bf34f90afca49a",
+    "tests/test_vm_concurrent.py": "788ce1fb15a1951ad5e65ad96d2a36533054a0dd3e7b24735567047a5a003f4a",
+    "tests/tls.c": "59f14abb22596a3ca92c9340664ceea7ace94043c28d0ee4f9ba7fa1ccb7b72c",
+    "tests/vm.c": "510e052c87d2750944a352acd8006184024f8ef23c2f896a896a7dfa4ac57f05"
+  },
+  "limits": [
+    "Windows 10 x64 10.0.19044 only.",
+    "Historical relay intermittent access violation and STUN TLS failure are not claimed fixed.",
+    "Custom jbz69 PVF, full security topology, production load, complete client acceptance and clean Win7/Win11 matrix remain outside this stage."
+  ]
+}

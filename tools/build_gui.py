@@ -6,39 +6,41 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from bootstrap import sha256
+from bootstrap import external_output, sha256, BUILD
+
+from bootstrap import TOOLCHAIN
 
 ROOT = Path(__file__).resolve().parents[1]
-BIN = ROOT / ".local/toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin"
+BIN = TOOLCHAIN
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mysql-dir", type=Path, default=ROOT / "build/mysql-tools")
-    parser.add_argument("--build-dir", type=Path, default=ROOT / "build/gui")
+    parser.add_argument("--mysql-dir", type=Path, default=BUILD / "mysql-tools")
+    parser.add_argument("--build-dir", type=Path, default=BUILD / "gui")
     args = parser.parse_args()
     mysql_dir = args.mysql_dir.resolve(strict=True)
     mysql = mysql_dir / "runtime/mysql-control.exe"
     receipt = json.loads((mysql_dir / "build-receipt.json").read_text(encoding="utf-8"))
-    sources = ["delivery/mysql_control.cpp", "delivery/mysql_operations.h", "delivery/win32_files.h"]
+    sources = ["src/database/mysql_control.cpp", "src/database/mysql_operations.h", "src/win32_files.h"]
     if (sha256(mysql) != receipt["output_sha256"] or
             receipt.get("source_files") != {name: sha256(ROOT / name) for name in sources}):
         raise SystemExit("Rebuild the MySQL tools from current sources before building the GUI")
-    work = args.build_dir.resolve()
+    work = external_output(args.build_dir)
     work.mkdir(parents=True, exist_ok=True)
-    manifest = ROOT / "delivery/controller_gui.manifest"
+    manifest = ROOT / "src/controller/controller_gui.manifest"
     resource = work / "gui.rc"
     resource.write_text('1 24 "' + manifest.as_posix() + '"\n', encoding="ascii")
     obj = work / "gui-resource.o"
     subprocess.run([str(BIN / "x86_64-w64-mingw32-windres.exe"), "-i", str(resource), "-o", str(obj)], check=True)
     output = work / "DNF-Native.exe"
-    source = ROOT / "delivery/controller_gui.cpp"
+    source = ROOT / "src/controller/controller_gui.cpp"
     zip_objects = []
     zip_defines = ["-DMINIZ_NO_STDIO", "-DMINIZ_NO_TIME", "-DMINIZ_NO_ZLIB_APIS", "-DMINIZ_NO_DEFLATE_APIS"]
     for name in ["miniz", "miniz_tinfl", "miniz_zip"]:
         target = work / (name + ".o")
         subprocess.run([str(BIN / "x86_64-w64-mingw32-clang.exe"), "-O2", *zip_defines,
-                        "-c", str(ROOT / "third_party/miniz" / (name + ".c")), "-o", str(target)], check=True)
+                        "-c", str(ROOT / "src/third_party/miniz" / (name + ".c")), "-o", str(target)], check=True)
         zip_objects.append(str(target))
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-mwindows", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
@@ -50,7 +52,7 @@ def main():
     target = work / "runtime/mysql-control.exe"
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "delivery/win32_files.h", ROOT / "delivery/service_processes.h", ROOT / "delivery/log_view.h", ROOT / "delivery/service_ip.h", ROOT / "delivery/instance_setup.h", ROOT / "delivery/resource_zip.h", ROOT / "delivery/resource_check.h", ROOT / "delivery/instance_files.h", Path(__file__)]},
+                          for p in [source, manifest, ROOT / "src/win32_files.h", ROOT / "src/controller/service_processes.h", ROOT / "src/controller/log_view.h", ROOT / "src/controller/service_ip.h", ROOT / "src/controller/instance_setup.h", ROOT / "src/controller/resource_zip.h", ROOT / "src/controller/resource_check.h", ROOT / "src/controller/instance_files.h", Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

@@ -12,6 +12,8 @@ import zipfile
 
 from bootstrap import sha256
 
+from bootstrap import LOCAL
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = [
     ("7zr-26.06.exe", "https://github.com/ip7z/7zip/releases/download/26.06/7zr.exe",
@@ -28,7 +30,7 @@ SOURCES = [
 
 
 def download(name, url, digest):
-    target = ROOT / ".local/downloads" / name
+    target = LOCAL / "downloads" / name
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
         partial = target.with_suffix(".part")
@@ -52,9 +54,9 @@ def extract(program, archive, destination):
 
 def main():
     paths = [download(*source) for source in SOURCES]
-    seven = ROOT / ".local/toolchains/7zip-26.06/7z.exe"
+    seven = LOCAL / "toolchains/7zip-26.06/7z.exe"
     extract(paths[0], paths[1], seven.parent)
-    work = ROOT / ".local/sources/vc-redist-2019"
+    work = LOCAL / "sources/vc-redist-2019"
     extract(seven, paths[2], work)
     # These offsets belong to the hash-pinned 14.29.30157.0 Burn bundle.
     bundle = paths[2].read_bytes()
@@ -67,7 +69,7 @@ def main():
     extract(seven, container, work / "packages")
     extract(seven, work / "packages/a12", work / "x64")
 
-    destination = ROOT / ".local/mysql-runtime-x64"
+    destination = LOCAL / "mysql-runtime-x64"
     destination.mkdir(parents=True, exist_ok=True)
     origins = {}
     for name in ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"]:
@@ -109,7 +111,7 @@ ConvertTo-Json -InputObject @($result) -Compress
                          for p in sorted(destination.iterdir()) if p.is_file()},
                "limits": ["Authenticode and pinned source verification only; clean Windows 7/11 execution not tested.",
                           "Windows 10 selects its system UCRT even when app-local UCRT files are present."]}
-    (ROOT / ".local/mysql-runtime-import.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    (LOCAL / "mysql-runtime-import.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print("Microsoft app-local runtime:", len(origins), "DLLs; signatures", "PASS" if passed else "FAIL")
     if not passed:
         raise SystemExit("See .local/mysql-runtime-import.json")

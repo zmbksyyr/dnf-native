@@ -10,6 +10,8 @@ import subprocess
 import urllib.request
 import zipfile
 
+from bootstrap import LOCAL
+
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "5.7.44"
 NAME = "mysql-5.7.44-winx64"
@@ -47,7 +49,7 @@ ConvertTo-Json -InputObject @($records) -Depth 3 -Compress
 
 
 def main():
-    archive = ROOT / ".local/downloads" / (NAME + ".zip")
+    archive = LOCAL / "downloads" / (NAME + ".zip")
     archive.parent.mkdir(parents=True, exist_ok=True)
     if not archive.exists():
         partial = archive.with_suffix(".zip.part")
@@ -62,7 +64,7 @@ def main():
     if sha256(archive) != SHA256:
         raise ValueError("Cached MySQL archive SHA-256 mismatch; existing file retained")
 
-    destination = ROOT / ".local/mysql-5.7.44"
+    destination = LOCAL / "mysql-5.7.44"
     destination.mkdir(parents=True, exist_ok=True)
     selected = {"bin/" + name for name in TOOLS} | {"LICENSE", "README"}
     payload = {}
@@ -112,7 +114,7 @@ def main():
                "limitations": ["Version checks use this developer machine's available Windows runtimes; local CRT dependency closure is not verified.",
                                "Clean Windows 7/10/11, offline operation and standalone packaging are not verified.",
                                "mysql_upgrade and mysqlcheck are development recovery tools; their inclusion in the final payload is not decided."]}
-    (ROOT / ".local/mysql-import.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    (LOCAL / "mysql-import.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(f"MySQL {VERSION}: {len(payload)} official files verified, {added} missing files added", flush=True)
     print("Version and Oracle Authenticode checks:", "PASS" if passed else "FAIL", flush=True)
     if not passed:

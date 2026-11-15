@@ -10,6 +10,8 @@ import struct
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from bootstrap import LOCAL
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "https://vault.centos.org/7.9.2009/os/x86_64/"
 PRIMARY = "repodata/2b479c0f3efa73f75b7fb76c82687744275fff78e4a138b5b3efba95f91e099e-primary.xml.gz"
@@ -17,7 +19,7 @@ PRIMARY_SHA256 = "2b479c0f3efa73f75b7fb76c82687744275fff78e4a138b5b3efba95f91e09
 
 
 def fetch(relative, expected):
-    target = ROOT / ".local/downloads" / PurePosixPath(relative).name
+    target = LOCAL / "downloads" / PurePosixPath(relative).name
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists() or hashlib.sha256(target.read_bytes()).hexdigest() != expected:
         print(f"Downloading {relative}", flush=True)
@@ -107,10 +109,10 @@ def main():
     links_by_arch = {"i686": {}, "x86_64": {}}
     for package in packages:
         arch = package["arch"]
-        destination = ROOT / ".local/sysroot" / arch
+        destination = LOCAL / "sysroot" / arch
         links_by_arch[arch].update(unpack_rpm(fetch(package["url"][len(BASE):], package["sha256"]), destination))
     for arch, links in links_by_arch.items():
-        destination = ROOT / ".local/sysroot" / arch
+        destination = LOCAL / "sysroot" / arch
         pending = dict(links)
         for _ in range(len(links) + 1):
             progress = False
@@ -131,7 +133,7 @@ def main():
         print(f"{arch}: imported five packages; {len(pending)} aliases target optional packages", flush=True)
     receipt = {"source": BASE, "metadata_sha256": PRIMARY_SHA256, "packages": packages,
                "note": "RPM scripts not executed. File aliases are development copies; full guest symlink semantics not implemented."}
-    (ROOT / ".local/linux-libraries.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    (LOCAL / "linux-libraries.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,8 @@ __pycache__/
 *.so.*
 *.pvf
 *.zip
+!/resources/native.zip
+!/resources/mysql.zip
 *.7z
 *.tar
 *.gz

@@ -1,171 +1,104 @@
-"""Build a visible ZIP resource package from the verified original resource snapshot."""
+"""Package current builds with the repository's verified ZIP resource baseline."""
 
 import argparse
 import configparser
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
-import subprocess
 import zipfile
 
 from audit_resources import elf_metadata
-from bootstrap import sha256
+from bootstrap import external_output, sha256, BUILD
+from resource_baseline import RESOURCES, verify_baseline
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def retained_files(files, objects):
-    """Keep original services/plugins and their Linux dependencies; omit deployment/debug data."""
-    kept = set()
-    removed = {}
-    for name in files:
-        if name.startswith("hosts/"):
-            continue
-        if name.startswith(("i686/lib/", "i686/usr/", "x86_64/lib64/", "x86_64/usr/")):
-            continue
-        if name.endswith(("/test1.lua", "/test2.lua", "/test.lua", "/README.md")):
-            removed[name] = "Plugin example/test or documentation"
-        elif name.endswith(("/auction_restart", "/guild_restart", "/gunnersvs")):
-            removed[name] = "Linux shell launcher superseded by the native controller"
-        else:
-            kept.add(name)
-
-    gconv = {"BIG5", "BIG5HKSCS", "GBBIG5", "GBGBK", "GBK", "GB18030", "EUC-KR", "UHC",
-             "CP1252", "ISO8859-1", "UTF-16", "UTF-32", "UNICODE", "UNICODE2", "ISO2022KR", "HZ"}
-    for arch in ("i686", "x86_64"):
-        library_paths = [p for p in files if p.startswith(arch + "/") and
-                         (p.startswith(arch + "/lib") or p.startswith(arch + "/usr/lib")) and
-                         ".so" in Path(p).name and "/audit/" not in p]
-        by_name = {}
-        for name in library_paths:
-            by_name.setdefault(Path(name).name, []).append(name)
-        needed = {"ld-2.17.so", "ld-linux.so.2" if arch == "i686" else "ld-linux-x86-64.so.2",
-                  "libnss_files.so.2", "libnss_dns.so.2", "libresolv.so.2"}
-        # dlopen users are outside DT_NEEDED: NSS/crypt and original plugin modules.
-        roots = [p for p in kept if p.startswith(arch + "/")]
-        if arch == "i686":
-            for p in files:
-                if p.startswith("i686/usr/lib/gconv/") and (Path(p).stem in gconv or Path(p).name.startswith("gconv-modules")):
-                    kept.add(p); roots.append(p)
-        scanned = set()
-        pending = list(roots)
-        while pending or needed:
-            while needed:
-                name = needed.pop()
-                for p in by_name.get(name, []):
-                    if p not in kept:
-                        kept.add(p); pending.append(p)
-            if not pending:
-                break
-            p = pending.pop()
-            if p in scanned:
-                continue
-            scanned.add(p)
-            data = (objects / files[p]).read_bytes()
-            if not data.startswith(b"\x7fELF"):
-                continue
-            metadata = elf_metadata(data)
-            needed.update(n for n in metadata["needed"] if not all(x in scanned for x in by_name.get(n, [])))
-        # SONAME aliases and their real filenames are both retained at original paths.
-        digests = {files[p] for p in kept if p in library_paths}
-        kept.update(p for p in library_paths if files[p] in digests)
-
-    for name in files:
-        if name in kept or name.startswith("hosts/"):
-            continue
-        if name.startswith("i686/usr/local/share/GeoIP/"):
-            kept.add(name)
-        else:
-            removed.setdefault(name, "Unused Linux library, encoding module, debugger or system-deployment support")
-    return sorted(kept), removed
+def check_sources(sources):
+    for name, expected in sources.items():
+        if sha256(ROOT / name) != expected:
+            raise ValueError("Build sources changed; rebuild before packaging: " + name)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, required=True, help="Verified v2 CAB resource directory (read only)")
-    parser.add_argument("--gui-dir", type=Path, required=True)
-    parser.add_argument("--hosts", type=Path, required=True, help="Previous compatibility directory with both host architectures")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source", type=Path, default=RESOURCES, help="Pinned ZIP baseline directory")
+    parser.add_argument("--gui-dir", type=Path, default=BUILD / "gui")
+    parser.add_argument("--hosts", type=Path, default=BUILD, help="Current host build directory")
+    parser.add_argument("--output", type=Path, default=BUILD / "package")
     args = parser.parse_args()
     source, gui, hosts, output = (p.resolve() for p in (args.source, args.gui_dir, args.hosts, args.output))
-    old = configparser.ConfigParser(interpolation=None)
-    old.read(source / "resources.ini", encoding="utf-16")
-    if sha256(source / "resources.cab") != old["resources"]["cabinet_sha256"]:
-        raise SystemExit("Source cabinet hash differs")
-    work = output.parent / (output.name + "-work")
-    objects = work / "objects"
-    objects.mkdir(parents=True, exist_ok=True)
-    if not any(objects.iterdir()):
-        subprocess.run(["expand.exe", "-F:*", str(source / "resources.cab"), str(objects)],
-                       check=True, stdout=subprocess.DEVNULL, timeout=180)
-    files = {old["file" + str(n)]["path"]: old["file" + str(n)]["sha256"]
-             for n in range(old.getint("resources", "count"))}
-    for digest in set(files.values()):
-        if sha256(objects / digest) != digest:
-            raise SystemExit("Source object hash differs")
-    kept, removed = retained_files(files, objects)
-    closure = {}
-    for arch in ("i686", "x86_64"):
-        paths = [p for p in kept if p.startswith(arch + "/")]
-        available = {Path(p).name for p in paths}
-        dependencies = {}
-        for path in paths:
-            data = (objects / files[path]).read_bytes()
+    output = external_output(output)
+    baseline = verify_baseline(source)
+    ini = configparser.ConfigParser(interpolation=None)
+    ini.read(source / "baseline.ini", encoding="utf-16")
+    files = {ini["file" + str(n)]["path"]: ini["file" + str(n)]["sha256"]
+             for n in range(ini.getint("resources", "count"))}
+    dependencies = {"i686": {}, "x86_64": {}}
+    with zipfile.ZipFile(source / "native.zip") as archive:
+        if set(archive.namelist()) != set(files):
+            raise ValueError("Native ZIP members differ from the baseline manifest")
+        for name, expected in files.items():
+            data = archive.read(name)
+            if hashlib.sha256(data).hexdigest() != expected:
+                raise ValueError("Native member hash differs: " + name)
             if data.startswith(b"\x7fELF"):
-                dependencies[path] = elf_metadata(data)["needed"]
-        missing = {p: [n for n in needs if n not in available] for p, needs in dependencies.items()
-                   if any(n not in available for n in needs)}
+                dependencies[name.split("/")[0]][name] = elf_metadata(data)["needed"]
+        for helper, entry in [("frida_item_reset.js", "i686/dp2/df_game_r.js"),
+                              ("dp2_cleanup.lua", "i686/dp2/df_game_r.lua")]:
+            code = (ROOT / "src/runtime" / helper).read_bytes().replace(b"\r\n", b"\n")
+            if code not in archive.read(entry).replace(b"\r\n", b"\n"):
+                raise ValueError("Resource baseline embeds a different helper: " + helper)
+    closure = {}
+    for arch, entries in dependencies.items():
+        available = {Path(name).name for name in files if name.startswith(arch + "/")}
+        missing = {name: [n for n in needed if n not in available] for name, needed in entries.items()
+                   if any(n not in available for n in needed)}
         if missing:
-            raise SystemExit("Native ELF dependency is missing: " + json.dumps(missing))
-        closure[arch] = {"elf_count": len(dependencies), "needed": dependencies, "missing": missing}
+            raise ValueError("Native ELF dependency is missing: " + json.dumps(missing))
+        closure[arch] = {"elf_count": len(entries), "missing": missing}
+    gui_receipt = json.loads((gui / "build-receipt.json").read_text(encoding="utf-8"))
+    check_sources(gui_receipt["sources"])
+    if sha256(gui / "DNF-Native.exe") != gui_receipt["output_sha256"]:
+        raise ValueError("GUI differs from its build receipt")
+    if sha256(gui / "runtime/mysql-control.exe") != gui_receipt["mysql_sha256"]:
+        raise ValueError("Database helper differs from the GUI build receipt")
+    host_receipts = json.loads((hosts / "build-receipt.json").read_text(encoding="utf-8"))
+    for arch in ("i686", "x86_64"):
+        receipt = next(r for r in host_receipts if r["arch"] == arch)
+        check_sources(receipt["sources"])
+        if sha256(hosts / arch / "dnf-host.exe") != receipt["output_sha256"]:
+            raise ValueError("Host differs from its build receipt: " + arch)
     output.mkdir(parents=True, exist_ok=False)
     resources = output / "resources"
     resources.mkdir()
     shutil.copy2(gui / "DNF-Native.exe", output / "DNF-Native.exe")
-    shutil.copy2(ROOT / "delivery/README.txt", resources / "README.txt")
     shutil.copy2(gui / "runtime/mysql-control.exe", resources / "mysql-control.exe")
     for arch, label in [("i686", "x86"), ("x86_64", "x64")]:
-        shutil.copy2(hosts / "hosts" / arch / "dnf-host.exe", resources / ("dnf-host-" + label + ".exe"))
-    with zipfile.ZipFile(resources / "mysql.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-        for path in sorted((gui / "mysql").rglob("*")):
-            if path.is_file(): z.write(path, path.relative_to(gui / "mysql").as_posix())
-    ini = configparser.ConfigParser(interpolation=None)
-    ini["resources"] = {"version": "3", "count": str(len(kept)), "seed_sha256": old["resources"]["seed_sha256"]}
-    with zipfile.ZipFile(resources / "native.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-        for n, name in enumerate(kept):
-            data = (objects / files[name]).read_bytes()
-            if name == "services.template.ini":
-                template = configparser.ConfigParser(interpolation=None)
-                template.read_string(data.decode("utf-16"))
-                for section in template.sections():
-                    if "host" in template[section]:
-                        template[section]["host"] = "dnf-host-x64.exe" if template[section]["root"] == "x86_64" else "dnf-host-x86.exe"
-                import io
-                text = io.StringIO(); template.write(text); data = text.getvalue().encode("utf-16")
-            z.writestr(name, data)
-            ini["file" + str(n)] = {"path": name, "sha256": hashlib.sha256(data).hexdigest()}
+        shutil.copy2(hosts / arch / "dnf-host.exe", resources / ("dnf-host-" + label + ".exe"))
+    for name in ("native.zip", "mysql.zip"):
+        shutil.copy2(source / name, resources / name)
     ini["package"] = {name: sha256(resources / name) for name in
                       ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
         ini.write(stream)
-    third_party = resources / "licenses"
-    third_party.mkdir()
-    for path in (ROOT / "LICENSES").glob("*.txt"):
-        shutil.copy2(path, third_party / path.name)
-    shutil.copy2(ROOT / "THIRD_PARTY.md", third_party / "THIRD_PARTY.md")
-    # Preserve the imported license materials without carrying debugger/deployment docs.
-    for group in ("glibc-2.17", "libgcc-4.8.5", "zlib-1.2.7"):
-        for path in (ROOT / ".local/sysroot/i686/usr/share/doc" / group).iterdir():
-            if path.is_file() and (path.name.startswith("COPYING") or path.name in ("LICENSES", "README")):
-                target = third_party / "linux" / group / path.name
-                target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(path, target)
-    record = {"original_files": len(files), "retained_files": len(kept), "removed_files": removed,
-              "source_sha256": sha256(source / "resources.cab"), "elf_dependency_closure": closure,
+    for name in ("README.md", "third-party.md"):
+        text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+        if name == "README.md":
+            introduction = text.split("## 仓库目录", 1)[0]
+            usage = text.split("## 产品使用", 1)[1].split("## 验证入口", 1)[0]
+            text = introduction + "## 产品使用" + usage
+        # Local source/evidence links belong to the repository, not the product directory.
+        text = re.sub(r"\[([^\]]+)\]\((?!https?://)[^)]+\)", r"\1", text)
+        (resources / name).write_text(text, encoding="utf-8", newline="\n")
+    record = {"baseline": baseline["files"], "elf_dependency_closure": closure,
               "package_files": {p.relative_to(output).as_posix(): sha256(p) for p in output.rglob("*") if p.is_file()},
-              "builder_sha256": sha256(Path(__file__)), "scope": "Resource selection and ZIP construction; runtime validation recorded separately."}
-    (work / "receipt.json").write_text(json.dumps(record, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
-    print("Instance package:", output, "native files", len(files), "->", len(kept), "removed", len(removed), flush=True)
+              "builder_sha256": sha256(Path(__file__)),
+              "scope": "Current source builds and pinned resource identity/dependencies; runtime checks recorded separately."}
+    (output.parent / (output.name + "-receipt.json")).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    print("Instance package:", output, "native files", len(files), flush=True)
 
 
 if __name__ == "__main__":
