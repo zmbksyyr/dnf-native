@@ -36,11 +36,11 @@ def main():
         for index in range(source.getint("services", "count")):
             name = source["services"]["service" + str(index)]
             entry = source[name]
-            member = entry["root"] + entry["elf"]
+            member = entry["elf"].lstrip("/")
             target = work / member
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(archive.read(member))
-            bits = 64 if entry["root"] == "x86_64" else 32
+            bits = 64 if "x64" in entry["host"] else 32
             address = struct.unpack_from("<Q" if bits == 64 else "<I", target.read_bytes(), 24)[0]
             assets.append((name, target, entry["elf_sha256"], bits, address))
     hosts = {32: BUILD / "i686/dnf-host.exe", 64: BUILD / "x86_64/dnf-host.exe"}
@@ -54,7 +54,7 @@ def main():
         row["case"] = name
         row["expected"] = "original fixed-address PT_LOAD mapping; not executed"
         results.append(row)
-    relay = work / "i686/home/neople/relay/df_relay_r"
+    relay = work / "home/neople/relay/df_relay_r"
     raw = relay.read_bytes()
     expected = hashlib.sha256(raw).hexdigest()
     bad = BUILD / "invalid-inputs"

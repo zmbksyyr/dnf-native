@@ -14,7 +14,7 @@
 | `src/win32_files.h` | 控制台和维护程序共用的 Win32 文件接口 |
 | `src/third_party/miniz/` | 内置 ZIP 解压所需的上游代码 |
 | `resources/` | 随仓库管理的固定 ZIP 基底及校验清单 |
-| `tools/` | 当前构建所需的 7 个开发准备、资源核验、编译与打包脚本 |
+| `tools/` | 当前开发准备、资源/ELF 核验、编译与打包脚本 |
 | `tests/` | 当前回归、C/汇编/Lua/JS 夹具，以及共用的窗口、协议和资源辅助函数 |
 | `docs/` | 本文、[实现说明](architecture.md)、[验证记录](validation.md)、[第三方声明](third-party.md)与历史 JSON 证据 |
 
@@ -28,10 +28,10 @@
 | --- | --- |
 | `resources/native.zip` | 657 个原生服务、Linux 用户库、PVF、DP2/Lua/Frida、配置模板及应用建库种子 |
 | `resources/mysql.zip` | 114 个官方 MySQL 5.7.44 程序、本地依赖及上游许可文件 |
-| `resources/baseline.ini` | 原已验证交付的 v3 清单，含原生逐文件哈希和种子哈希 |
+| `resources/baseline.ini` | 统一目录的 v4 清单，含原生逐文件哈希和种子哈希 |
 | `resources/baseline.json` | 上述三个文件的大小、SHA-256、来源和验证边界 |
 
-两个 ZIP 原样纳入仓库，不纳入自研宿主或 GUI 的历史 EXE。打包时校验基底身份、原生全部成员与 ELF 直接依赖，并用本轮构建的程序重新生成产品 `resources.ini`。基底内嵌的两份自研插件辅助脚本还会与当前源码核对，避免源码变化后静默发布旧实现。
+两个 ZIP 纳入仓库；native.zip 已按完整 Linux 目录树规整，不纳入自研宿主或 GUI 的历史 EXE。打包时校验基底身份、原生全部成员与 ELF 直接依赖，并用本轮构建的程序重新生成产品 `resources.ini`。本次目录迁移保留所有 ELF、库、资产和种子原字节，仅修改服务模板中的根路径；原 ZIP 和清单可从父提交恢复。基底内嵌的两份自研插件辅助脚本还会与当前源码核对，避免源码变化后静默发布旧实现。
 
 ## 开发构建
 
@@ -75,6 +75,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 | 文件 | 用途 |
 | --- | --- |
 | `bootstrap.py` | 固定工具链与 Zydis 开发依赖、共享路径与哈希函数 |
+| `elf_manifest.py` | 离线读取全部 ELF 的段、TLS、依赖、重定位类型与未定义动态符号 |
 | `resource_baseline.py` | 基底文件身份核验及 ELF 直接依赖读取 |
 | `build.py` | 双架构 ELF 宿主 |
 | `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
@@ -100,7 +101,9 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 将整个目录复制到目标机器后打开 `DNF-Native.exe`。点击“创建实例”，选择新建或空目录；GUI 校验资源、解压程序、安全初始化数据库、导入并逐字节核对应用种子，完成后自动选中该实例。损坏资源和非空目标目录会拒绝；失败现场带 `instance.pending` 保留供诊断。
 
-每个实例有自己的 `mysql/bin/`、`data/`、`i686/`、`x86_64/`、`services.ini`、`server.cnf`、`client.private.cnf`、`service-logs/` 和 `.mysql/`。游戏实例当前要求数据库端口 3306，原版 bridge 使用该固定端口。切换既有实例保留配置和存档，同一实例由 `.instance.lock` 防止多个窗口同时持有。
+每个实例有自己的 `mysql/bin/`、`data/`、`home/neople/`、`dp2/`、`lib/`、`lib64/`、`services.ini`、`server.cnf`、`client.private.cnf`、`service-logs/` 和 `.mysql/`。游戏实例当前要求数据库端口 3306，原版 bridge 使用该固定端口。切换既有实例保留配置和存档，同一实例由 `.instance.lock` 防止多个窗口同时持有。
+
+游戏 ELF、密钥与 PVF 位于完整的 `home/neople/game/` 路径，不再被分散到架构目录。宿主 EXE 仍区分 x86/x64；32 位与 64 位 Linux 库分别放在 `lib/` 与 `lib64/`。旧实例继续按自己的 `services.ini` 读取，本次不会自动移动或覆盖既有实例。更换 ELF 时仍须同步核对清单哈希。
 
 “整体启动”启动数据库和默认 16 个服务；三个安全组件保留独立入口，其完整业务尚未验收。单个服务的“进程运行中（业务未验证）”只表示宿主已安装停服通道；应用就绪和业务通过需要原生日志及协议/客户端验证。
 

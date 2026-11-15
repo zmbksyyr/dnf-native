@@ -16,15 +16,13 @@ def unpack_runtime(destination, arch, prefixes=("lib/", "lib64/", "usr/")):
     """Copy selected verified native ZIP members into a private external root."""
     destination = external_output(destination)
     verify_baseline()
-    start = arch + "/"
     with zipfile.ZipFile(RESOURCES / "native.zip") as archive:
         for name in archive.namelist():
-            if not name.startswith(start):
+            if not name.startswith(prefixes):
                 continue
-            relative = name[len(start):]
-            if not relative.startswith(prefixes):
-                continue
-            target = destination / relative
+            # Shared tree keeps /lib and /lib64 side by side. Fixtures copy
+            # requested paths; actual loader/host architecture remains explicit.
+            target = destination / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(archive.read(name))
     for name in ("tmp", "dev/shm/sec"):

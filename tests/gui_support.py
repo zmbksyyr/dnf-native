@@ -242,3 +242,12 @@ def choose_log_source(window, label):
     combo = user.GetDlgItem(window, 240)
     user.SendMessageW(combo, 0x14E, index, 0)
     user.SendMessageW(window, 0x111, 240 | (1 << 16), combo)
+
+
+def guest_root(instance, service="game"):
+    import configparser
+    from pathlib import Path
+    instance = Path(instance)
+    manifest = configparser.ConfigParser(interpolation=None)
+    manifest.read(instance / "services.ini", encoding="utf-16")
+    return instance / manifest[service]["root"]

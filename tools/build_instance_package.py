@@ -44,15 +44,15 @@ def main():
             if hashlib.sha256(data).hexdigest() != expected:
                 raise ValueError("Native member hash differs: " + name)
             if data.startswith(b"\x7fELF"):
-                dependencies[name.split("/")[0]][name] = elf_dependencies(data)
-        for helper, entry in [("frida_item_reset.js", "i686/dp2/df_game_r.js"),
-                              ("dp2_cleanup.lua", "i686/dp2/df_game_r.lua")]:
+                dependencies["x86_64" if data[4] == 2 else "i686"][name] = elf_dependencies(data)
+        for helper, entry in [("frida_item_reset.js", "dp2/df_game_r.js"),
+                              ("dp2_cleanup.lua", "dp2/df_game_r.lua")]:
             code = (ROOT / "src/runtime" / helper).read_bytes().replace(b"\r\n", b"\n")
             if code not in archive.read(entry).replace(b"\r\n", b"\n"):
                 raise ValueError("Resource baseline embeds a different helper: " + helper)
     closure = {}
     for arch, entries in dependencies.items():
-        available = {Path(name).name for name in files if name.startswith(arch + "/")}
+        available = {Path(name).name for name in entries}
         missing = {name: [n for n in needed if n not in available] for name, needed in entries.items()
                    if any(n not in available for n in needed)}
         if missing:

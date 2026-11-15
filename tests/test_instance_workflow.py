@@ -21,6 +21,8 @@ from gui_support import (user, windows, wait_for, click, ready, status, title,
                       select_folder, screenshot, hidden_startup, responsive)
 from gui_support import rows, select_service
 
+from gui_support import guest_root
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -95,9 +97,9 @@ def main():
         checks["each_missing_resource_named_and_creation_disabled"] = True
         with zipfile.ZipFile(resources / "native.zip") as z:
             names = z.namelist()
-            assert "i686/home/neople/game/df_game_r" in names
-            assert "i686/home/neople/game/Script.pvf" in names
-            assert "i686/dp2/frida/frida.so" in names
+            assert "home/neople/game/df_game_r" in names
+            assert "home/neople/game/Script.pvf" in names
+            assert "dp2/frida/frida.so" in names
             assert not any("/dracut/" in n or "/gdb/" in n or n.endswith((".pyc", ".pyo")) for n in names)
             assert z.testzip() is None
             record["native_file_count"] = len(names)
@@ -121,6 +123,13 @@ def main():
         assert (occupied / "keep.txt").read_bytes() == b"user contents\x00\xff"
         checks["nonempty_creation_target_unchanged"] = True
         first = create(probe / "实例 A (native)")
+        assert not (first / "i686").exists() and not (first / "x86_64").exists()
+        assert (first / "home/neople/game/df_game_r").is_file()
+        assert (first / "home/neople/game/Script.pvf").is_file()
+        assert (first / "home/neople/stun").is_dir()
+        assert (first / "lib/ld-2.17.so").is_file()
+        assert (first / "lib64").is_dir()
+        checks["unified_game_assets_stun_and_both_library_architectures"] = True
         checks["first_created_selected_and_official_tools_released"] = True
         screenshot(window, probe / "created.png")
         click(window, 111); ready(window, "数据库 SQL 检查通过")
@@ -185,7 +194,7 @@ def main():
         checks["trimmed_peer_protocols"] = {"channel": channel(7001), "relay": relay(True), "stun": stun()}
         # Use the real game with the retained DP2/Lua/Frida resources.
         select_service(window, "game"); click(window, 221); ready(window, "game：进程运行中", 30)
-        log_dir = first / "i686/home/neople/game/log"
+        log_dir = guest_root(first) / "home/neople/game/log"
         start = time.monotonic()
         wait_for(lambda: any(b"server has been started successfully" in p.read_bytes() for p in log_dir.rglob("*.init")), "trimmed game natural startup", 180)
         checks["trimmed_game_natural_startup_seconds"] = round(time.monotonic() - start, 3)

@@ -24,6 +24,8 @@ from probe_core_protocols import channel, relay, stun
 from gui_support import user, kernel, windows, wait_for, click, ready, screenshot
 from gui_support import rows, select_service, service_row
 
+from gui_support import guest_root
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -31,7 +33,7 @@ def loaded_plugins(pid, instance):
     """Observe real Linux ELF headers in the live 32-bit host's memory."""
     expected = {}
     for name, path in [("dp2", "dp2/libdp2.so"), ("frida", "dp2/frida/frida.so")]:
-        data = (instance / "i686" / path).read_bytes()
+        data = (guest_root(instance) / path).read_bytes()
         phoff = struct.unpack_from("<I", data, 28)[0]
         stride, count = struct.unpack_from("<HH", data, 42)
         expected[name] = data[:phoff + stride * count]
@@ -84,7 +86,7 @@ def main():
     shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
     # A copied init log may already contain the ready marker. Keep it outside
     # this run's log directory so startup is observed from fresh output.
-    game_logs = instance / "i686/home/neople/game/log"
+    game_logs = guest_root(instance) / "home/neople/game/log"
     if game_logs.exists():
         game_logs.rename(probe / "prior-game-logs")
     (game_logs / "siroco11").mkdir(parents=True)
@@ -102,9 +104,9 @@ def main():
                 ini["game"][key] = value.replace("LD_LIBRARY_PATH=", "LD_LIBRARY_PATH=/lib/i686/nosegneg:", 1)
     with manifest.open("w", encoding="utf-16") as stream:
         ini.write(stream)
-    lua, js = instance / "i686/dp2/df_game_r.lua", instance / "i686/dp2/df_game_r.js"
+    lua, js = guest_root(instance) / "dp2/df_game_r.lua", guest_root(instance) / "dp2/df_game_r.js"
     lua_before, js_before = lua.read_bytes(), js.read_bytes()
-    module = instance / "i686/dp2/lua/df/frida.lua"
+    module = guest_root(instance) / "dp2/lua/df/frida.lua"
     module_before = module.read_bytes()
     env = dict(os.environ)
     env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
@@ -173,7 +175,7 @@ def main():
         assert sum("进程运行中" in row for row in rows(window)) == 15
         hold = "\nprint('dnf-native-plugin-probe-hold')\nlocal uv=require('luv'); local t=uv.new_timer(); t:start(5000,0,function() t:close() end); uv.run(); os.exit(42)\n"
         bridge = (ROOT / "tests/frida_bridge.lua").read_text(encoding="utf-8").replace("os.exit(42)", hold)
-        (instance / "i686/dp2/plugin-bridge.lua").write_text(bridge, encoding="utf-8")
+        (guest_root(instance) / "dp2/plugin-bridge.lua").write_text(bridge, encoding="utf-8")
         lua.write_text("local frida=require('df.frida')\nif os.getenv('DNF_NATIVE_FRIDA')=='0' then\nassert(frida.load()==-1000)\nprint('dnf-native-plugin-disabled-load-return=-1000')\n" + hold + "\nelse dofile('/dp2/plugin-bridge.lua') end\n", encoding="ascii")
         js.write_bytes((ROOT / "tests/frida_bridge.js").read_bytes())
         checks["lua_running_without_frida_mapped"] = fixture(False)
@@ -187,7 +189,7 @@ def main():
         lua.write_bytes(lua_before); js.write_bytes(js_before)
         select_service(window, "game"); click(window, 221); ready(window, "game：进程运行中", 30)
         started = time.monotonic()
-        log_dir = instance / "i686/home/neople/game/log"
+        log_dir = guest_root(instance) / "home/neople/game/log"
         wait_for(lambda: any(b"All DB Open Success" in path.read_bytes() for path in log_dir.rglob("*.init")), "original game database initialization", 90)
         pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         checks["dp2_off_live_modules"] = loaded_plugins(pid, instance)

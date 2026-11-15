@@ -19,7 +19,7 @@ static std::wstring missing_resources(const std::wstring &folder) {
 static void verify_package(const std::wstring &folder) {
     if (!missing_resources(folder).empty()) throw std::runtime_error("Required package resources are missing");
     std::wstring manifest = folder + L"\\resources.ini";
-    if (setting(manifest, L"resources", L"version") != L"3")
+    if (setting(manifest, L"resources", L"version") != L"4")
         throw std::runtime_error("Unsupported resource manifest version");
     for (const wchar_t *name : package_files) {
         std::wstring expected = setting(manifest, L"package", name);

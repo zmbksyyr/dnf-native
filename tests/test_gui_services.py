@@ -21,6 +21,8 @@ from probe_core_protocols import channel, relay, stun
 from gui_support import (user, kernel, windows, wait_for, click, ready, status, title,
                          responsive, screenshot, select_folder, rows, list_rows, select_service, service_row, hidden_startup, choose_log_source)
 
+from gui_support import guest_root
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -45,7 +47,7 @@ def main():
                "checks": {}, "forced_cleanup": False}
     process = subprocess.Popen([str(gui), "--instance", str(instance)], startupinfo=hidden_startup())
     window = None
-    elf = instance / "i686/home/neople/channel/df_channel_r"
+    elf = guest_root(instance) / "home/neople/channel/df_channel_r"
     original = elf.read_bytes()
     checks = receipt["checks"]
     previous_server_logs = set((instance / ".mysql").glob("gui-*-server.private.log"))
@@ -134,7 +136,7 @@ def main():
             log = max((instance / "service-logs").glob(name + "-*.stdout.private.log"), key=lambda path: path.stat().st_mtime)
             assert b"Application Stop!" in log.read_bytes(), name + " original stop marker missing"
         checks["reverse_order_whole_stop_completed"] = True
-        checks["owned_pid_markers_removed_after_stop"] = not list((instance / "i686").rglob("*.pid"))
+        checks["owned_pid_markers_removed_after_stop"] = not list(guest_root(instance).rglob("*.pid"))
         print("GUI: whole-stop completed", flush=True)
         checks["backup_enabled_after_whole_stop"] = bool(user.IsWindowEnabled(user.GetDlgItem(window, 113)))
         # Repeated launch and ordinary window-close must also stop every owned peer.

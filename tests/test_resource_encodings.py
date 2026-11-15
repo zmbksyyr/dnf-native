@@ -28,9 +28,9 @@ def main():
     work.mkdir(parents=True)
     with zipfile.ZipFile(package / "resources/native.zip") as z:
         for entry in z.infolist():
-            if entry.filename.startswith(("i686/lib/", "i686/usr/lib/")):
+            if entry.filename.startswith(("lib/", "usr/lib/")):
                 z.extract(entry, work)
-    root = work / "i686"
+    root = work
     fixture = root / "encoding-check"
     source = ROOT / "tests/resource_encodings.c"
     command = [str(BIN / "clang.exe"), "--target=i386-linux-gnu", "-fuse-ld=lld", "-nostdlib",

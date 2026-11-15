@@ -18,6 +18,8 @@ from probe_core_protocols import channel, relay, stun
 from gui_support import user, windows, wait_for, click, ready, title, screenshot, responsive, hidden_startup
 from gui_support import rows, select, choose_log_source
 
+from gui_support import guest_root
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,7 +40,7 @@ def main():
                'script_sha256': sha256(Path(__file__)), 'instance': str(instance.relative_to(BUILD)),
                'scope': 'Private viewer fixtures and actual original game/peer/MySQL logs; no client gameplay acceptance.',
                'checks': {}, 'forced_cleanup': False}
-    log_dir = instance / 'i686/home/neople/game/log'
+    log_dir = guest_root(instance) / 'home/neople/game/log'
     if log_dir.exists():
         shutil.move(str(log_dir), str(probe / 'prior-game-logs'))
     (log_dir / 'siroco11').mkdir(parents=True)

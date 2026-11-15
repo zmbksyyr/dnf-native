@@ -94,7 +94,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
                                  const std::wstring &instance, Session &live, HANDLE &instance_lock) {
     std::wstring manifest = resources + L"\\resources.ini";
     std::wstring version = setting(manifest, L"resources", L"version");
-    if (version != L"3") throw std::runtime_error("Local ZIP resources are missing or incompatible");
+    if (version != L"4") throw std::runtime_error("Local ZIP resources are missing or incompatible");
     PostMessageW(window, STATUS_MESSAGE, 0, reinterpret_cast<LPARAM>(L"正在核对本地游戏与数据库资源…"));
     verify_package(resources);
     unsigned count = GetPrivateProfileIntW(L"resources", L"count", 0, manifest.c_str());
@@ -155,19 +155,19 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         }
         // Without this setting the original game treats local clients as
         // monitoring probes and closes their sockets before authentication.
-        if (path.rfind(L"i686\\home\\neople\\game\\cfg\\", 0) == 0 && text.find("system_monitoring_ip") == std::string::npos) {
+        if (path.rfind(L"home\\neople\\game\\cfg\\", 0) == 0 && text.find("system_monitoring_ip") == std::string::npos) {
             text += "\nsystem_monitoring_ip = 0.0.0.0\n"; changed = true;
         }
         if (changed) write_private(target, text, CREATE_ALWAYS);
     }
-    for (const wchar_t *path : {L"i686\\tmp",L"i686\\dev\\shm\\sec",L"service-logs"}) directory(instance + L"\\" + path);
+    for (const wchar_t *path : {L"tmp",L"dev\\shm\\sec",L"service-logs"}) directory(instance + L"\\" + path);
     // Directory-only runtime paths are absent from a file manifest.
     const wchar_t *names[] = {L"bridge",L"manager",L"dbmw_guild",L"dbmw_mnt",L"dbmw_stat",L"monitor",L"guild",L"statics",L"coserver",L"community",L"auction",L"point",L"channel",L"relay",L"game"};
     for (const wchar_t *name : names) for (const wchar_t *dir : {L"log",L"pid",L"history"})
-        directory(instance + L"\\i686\\home\\neople\\" + name + L"\\" + dir);
+        directory(instance + L"\\home\\neople\\" + name + L"\\" + dir);
     for (const wchar_t *name : {L"gunnersvr",L"zergsvr"}) for (const wchar_t *dir : {L"log",L"pid",L"history"})
-        directory(instance + L"\\i686\\home\\neople\\secsvr\\" + name + L"\\" + dir);
-    for (const wchar_t *dir : {L"log",L"pid"}) directory(instance + L"\\x86_64\\home\\neople\\stun\\" + dir);
+        directory(instance + L"\\home\\neople\\secsvr\\" + name + L"\\" + dir);
+    for (const wchar_t *dir : {L"log",L"pid"}) directory(instance + L"\\home\\neople\\stun\\" + dir);
     ToolResult init = run_tool(exe, instance, {L"initialize",instance,L"3306"});
     if (init.code) throw std::runtime_error("Secure game database initialization failed; private log retained");
     live = start_database(window, exe, instance);
@@ -180,7 +180,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     if (exported.code || file_sha256(exported.log) != seed_hash)
         throw std::runtime_error("Imported application database does not re-export byte for byte; incomplete instance retained");
     std::string game = instance_secret(8), bridge = instance_secret(16), frida = instance_secret(16);
-    std::string encoded = legacy_password(instance + L"\\i686\\home\\neople\\dbmw_guild\\df_dbmw_r", game);
+    std::string encoded = legacy_password(instance + L"\\home\\neople\\dbmw_guild\\df_dbmw_r", game);
     std::string query = "CREATE USER 'dnf_game'@'127.0.0.1' IDENTIFIED BY '" + game + "';";
     // Keep permissions at the application's existing schema boundary. This is
     // independent from the root maintenance credential.
@@ -208,12 +208,12 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     if (sql(exe, instance, monthly.c_str()).code) throw std::runtime_error("Prepare monthly application tables failed");
     for (const wchar_t *name : {L"dbmw_guild\\cfg\\dbmw_gld_siroco.cfg",L"dbmw_mnt\\cfg\\dbmw_mnt_siroco.cfg",L"dbmw_stat\\cfg\\dbmw_stat_siroco.cfg",
                                L"game\\cfg\\siroco11.cfg",L"auction\\cfg\\auction_siroco.cfg",L"point\\cfg\\point_siroco.cfg"}) {
-        std::wstring path = instance + L"\\i686\\home\\neople\\" + name;
+        std::wstring path = instance + L"\\home\\neople\\" + name;
         std::string text = read_file(path); replace_all(text, "@DNF_GAME_PASSWORD@", encoded); write_private(path, text, CREATE_ALWAYS);
     }
     for (const auto &entry : std::vector<std::pair<std::wstring,std::pair<std::string,std::string>>>{
-            {L"i686\\home\\neople\\bridge\\cfg\\bridge.cfg", {"@DNF_BRIDGE_PASSWORD@",bridge}},
-            {L"i686\\dp2\\df_game_r.js", {"@DNF_FRIDA_PASSWORD@",frida}}}) {
+            {L"home\\neople\\bridge\\cfg\\bridge.cfg", {"@DNF_BRIDGE_PASSWORD@",bridge}},
+            {L"dp2\\df_game_r.js", {"@DNF_FRIDA_PASSWORD@",frida}}}) {
         std::wstring path = instance + L"\\" + entry.first;
         std::string text = read_file(path); replace_all(text,entry.second.first,entry.second.second); write_private(path,text,CREATE_ALWAYS);
     }
