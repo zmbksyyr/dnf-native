@@ -31,11 +31,11 @@ build/release-package/gui/DNF-Native.exe --instance PRIVATE_INSTANCE
 
 ```powershell
 python tools/build_mysql.py
-python tools/build_gui.py --build-dir build/gui-rounded
-python tools/build_review_package.py --gui-dir build/gui-rounded --resources build/review/resources --output build/release-package
+python tools/build_gui.py --build-dir build/gui-compact-v3
+python tools/build_review_package.py --gui-dir build/gui-compact-v3 --resources build/review/resources --output build/release-package
 python tools/test_gui_setup.py --gui build/release-package/gui/DNF-Native.exe
 ```
 
-在 Windows 10 x64 10.0.19044 上，目录包首次创建验证通过：资源校验、18 个应用库、固定 root 默认密码、三份服务账号、15 个原版 peer、channel/relay/STUN、Frida 数据库接口、服务 IP 修改和两份实例正常关闭均通过。验证收据位于 `build/probes/20261115T032057172739Z/gui-setup/receipt.json`；目录包原生日志验证位于 `build/probes/20261115T031408253573Z/gui-logs/receipt.json`，通过 UTF-8/GBK、追加、轮转、尾部限制、滚动保持和原生日志显示。数据库维护控件的独立回归位于 `build/probes/20261115T031324902680Z/gui/receipt.json`。
+在 Windows 10 x64 10.0.19044 上，目录包首次创建验证通过：资源校验、18 个应用库、固定 root 默认密码、三份服务账号、15 个原版 peer、channel/relay/STUN、Frida 数据库接口、服务 IP 修改和两份实例正常关闭均通过。验证收据位于 `build/probes/20261115T033128887383Z/gui-setup/receipt.json`；目录包原生日志验证位于 `build/probes/20261115T031408253573Z/gui-logs/receipt.json`，通过 UTF-8/GBK、追加、轮转、尾部限制、滚动保持和原生日志显示。数据库维护控件的独立回归位于 `build/probes/20261115T031324902680Z/gui/receipt.json`。
 
 压缩包为 `build/release-package.zip`，生成记录为 `build/release-package.receipt.json`。该阶段仍不宣称干净 Windows 7/10/11 矩阵、定制 jbz69 PVF 业务通过或完整客户端登录验收。
