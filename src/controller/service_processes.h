@@ -3,6 +3,7 @@
 #include <winsock2.h>
 #include "../win32_files.h"
 #include <algorithm>
+#include <cstdint>
 
 static const wchar_t *dp2_preload = L"LD_PRELOAD=/dp2/libdp2pre.so";
 
@@ -18,6 +19,9 @@ struct Service {
     // Keep the distinction explicit so the controller cannot present a live
     // process as a protocol or gameplay success.
     std::wstring readiness = L"未启动";
+    bool application_initialized = false;
+    uint64_t readiness_offset = 0;
+    std::string readiness_tail;
 };
 
 static std::wstring setting(const std::wstring &file, const std::wstring &section, const std::wstring &key) {
@@ -81,6 +85,38 @@ static bool running(const Service &service) {
     return service.process && WaitForSingleObject(service.process, 0) == WAIT_TIMEOUT;
 }
 
+static bool refresh_service_readiness(Service &service) {
+    // Only game has an original, verified initialization marker. Read the
+    // fresh stdout belonging to this launch, never the application's old
+    // .init files or a previous host's output.
+    if (service.name != L"game" || service.application_initialized || !running(service) || service.out.empty()) return false;
+    HANDLE file = CreateFileW(service.out.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    LARGE_INTEGER offset; offset.QuadPart = static_cast<LONGLONG>(service.readiness_offset);
+    bool changed = false;
+    if (SetFilePointerEx(file, offset, nullptr, FILE_BEGIN)) {
+        char bytes[16384];
+        DWORD count = 0;
+        if (ReadFile(file, bytes, sizeof(bytes), &count, nullptr) && count) {
+            service.readiness_offset += count;
+            service.readiness_tail.append(bytes, count);
+            const std::string marker = " server has been started successfully.";
+            if (service.readiness_tail.find(marker) != std::string::npos) {
+                service.application_initialized = true;
+                service.state = L"进程运行中（应用已初始化）";
+                service.readiness = L"应用已初始化（接口/业务未验证）";
+                changed = true;
+            }
+            // Retain only the overlap needed if a read splits the marker.
+            if (service.readiness_tail.size() >= marker.size())
+                service.readiness_tail.erase(0, service.readiness_tail.size() - marker.size() + 1);
+        }
+    }
+    CloseHandle(file);
+    return changed;
+}
+
 static bool refresh_service(Service &service) {
     if (!service.process || running(service)) return false;
     DWORD code = 0;
@@ -103,6 +139,9 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     if (service.process) return;
     service.state = L"正在启动";
     service.readiness = L"宿主启动中";
+    service.application_initialized = false;
+    service.readiness_offset = 0;
+    service.readiness_tail.clear();
     directory(instance + L"\\service-logs");
     std::wstring tag = service.name + L"-" + std::to_wstring(GetTickCount64());
     service.out = instance + L"\\service-logs\\" + tag + L".stdout.private.log";
@@ -135,7 +174,8 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
         if (event) {
             CloseHandle(event);
             service.state = L"进程运行中（业务未验证）";
-            service.readiness = L"运行时通道已接入（接口/业务未验证）";
+            service.readiness = service.name == L"game" ? L"运行时通道已接入，等待应用初始化" :
+                                                        L"运行时通道已接入（接口/业务未验证）";
             return;
         }
         if (GetTickCount64() >= deadline) throw std::runtime_error("ELF host signal channel timed out; process retained for diagnosis");

@@ -107,7 +107,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 游戏 ELF、密钥与 PVF 位于完整的 `home/neople/game/` 路径，不再被分散到架构目录。宿主 EXE 仍区分 x86/x64；32 位与 64 位 Linux 库分别放在 `lib/` 与 `lib64/`。旧实例继续按自己的 `services.ini` 读取，本次不会自动移动或覆盖既有实例。更换 ELF 时仍须同步核对清单哈希。
 
-“整体启动”启动数据库和默认 16 个服务；三个安全组件保留独立入口，其完整业务尚未验收。单个服务的“进程运行中（业务未验证）”只表示宿主已安装停服通道；应用就绪和业务通过需要原生日志及协议/客户端验证。
+“整体启动”启动数据库和默认 16 个服务；三个安全组件保留独立入口，其完整业务尚未验收。单个服务的“进程运行中（业务未验证）”只表示宿主已安装停服通道。game 起初显示“等待应用初始化”，读取本次启动的原版完成日志后显示“应用已初始化”；重启会重新等待，不使用旧日志判断。协议和业务仍须单独验证。
 
 修改服务 IP 要在全部停止后应用；修改 DP2/Lua 和 Frida 开关要先停止 game。日志查看直接读取 stdout、stderr、服务应用日志和 MySQL 日志，可选自动、UTF-8、936、950、949 编码，并支持刷新和跟随滚动。
 
@@ -158,8 +158,11 @@ python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/D
 ```powershell
 python -B tests/test_service_shutdown.py --instance <私有实例目录> --gui ../x/dnf-native-output/package/DNF-Native.exe
 python -B tests/test_gui_services.py --instance <私有实例目录> --gui ../x/dnf-native-output/package/DNF-Native.exe
+python -B tests/test_gui_readiness.py --instance <曾完成 game 初始化的停服实例目录> --gui ../x/dnf-native-output/package/DNF-Native.exe
 ```
 
 停服专项覆盖 manager、三个 DBMW 在网络线程刚创建时停止，以及 manager/DBMW 稳定运行后的停止，核对真实线程 join、原版退出日志、退出码及磁盘 ELF 不变。`service shutdown failed` 与未处理异常一样会使集成验收失败。
+
+就绪状态专项保留来源实例的旧初始化日志，验证两次真实 game 启动均先等待本次初始化，再更新 GUI；重启、切换服务和正常停服后状态正确，协议/业务标签保留未验证。
 
 当前已补齐真实 game/Frida 触发的 `SA_NODEFER`、跨映射 `munmap` 和验证码字体的普通私有文件映射。双架构原语、原版 Frida hook/RPC、两种保存方式的轮询热加载与 game 自然启停均通过；inotify 本身仍未实现。安全组件加载已通过，现有配置与服务拓扑阻塞完整安全链，完整客户端和跨系统验证也未完成。原始收据见[验证记录](validation.md)。

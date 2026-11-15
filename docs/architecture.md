@@ -70,6 +70,8 @@ flowchart TD
 
 ## 控制台与实例
 
+game 的应用初始化状态取自当前宿主本次创建的 stdout，逐段读取原版 `server has been started successfully.` 完成标记，并保留跨段匹配所需的尾部；不会读取旧 `.init` 或上次启动的 stdout 来更新状态。每次启动清零读取位置和初始化标记，退出后显示宿主已退出。此层级确认原程序报告初始化完成，接口、协议和业务验证仍独立；其他服务没有经确认的原版完成标记，继续显示运行时通道层级。
+
 `src/controller/controller_gui.cpp` 使用原生 Win32 控件和一个后台操作线程，操作进行时限制冲突按钮。共享文件接口在 `src/win32_files.h`，支持 Unicode 路径和私有文件权限；ZIP 通过 miniz 和 Win32 HANDLE 解压。
 
 实例路径由共享 `instance_directory()` 规范化，GUI 与 `mysql-control` 使用相同入口。原版 MySQL 5.7.44 无法使用本次实测的扩展长工作目录或长 `datadir`；根路径达到 `MAX_PATH` 时查询已有的文件系统短名，只有结果短于该限制才用于运行。长短名仍指向同一物理目录，实例锁、UUID、数据和冷副本均保留原位；没有创建目录链接、调整系统设置或更换数据库。文件夹选择器通过 `SHGetNameFromIDList` 取得路径，并恢复完整长名供显示。根路径未达限制时仍按普通绝对路径处理；任意子路径长度、无短名卷和 UNC 支持不在该修复的保证范围内。

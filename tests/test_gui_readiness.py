@@ -1,0 +1,136 @@
+"""Verify original game initialization updates the GUI for each fresh launch."""
+import argparse
+import datetime
+import json
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from bootstrap import BUILD, sha256
+from gui_support import (user, windows, wait_for, click, ready, title, status,
+                         hidden_startup, select_service, service_row, screenshot, responsive)
+from runtime_support import runtime_diagnostics, tree_identity
+
+MARKER = b" server has been started successfully."
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--instance", type=Path, required=True)
+    parser.add_argument("--gui", type=Path, required=True)
+    args = parser.parse_args()
+    source, gui = args.instance.resolve(strict=True), args.gui.resolve(strict=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    probe = BUILD / "probes" / stamp / "gui-readiness"
+    instance = probe / "instance"
+    source_data = tree_identity(source / "data")
+    shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
+    import configparser
+    manifest = configparser.ConfigParser(interpolation=None)
+    manifest.read(instance / "services.ini", encoding="utf-16")
+    manifest["game"]["automatic"] = "0"
+    with (instance / "services.ini").open("w", encoding="utf-16") as stream:
+        manifest.write(stream)
+    root = instance / manifest["game"]["root"]
+    old_logs = [p for p in (root / "home/neople/game/log").rglob("*.init") if MARKER in p.read_bytes()]
+    assert old_logs, "Use a stopped instance with a previous successful initialization log"
+    record = {"recorded_utc": stamp, "os": platform.platform(), "source_instance": str(source),
+              "gui_sha256": sha256(gui), "script_sha256": sha256(Path(__file__)),
+              "scope": "GUI application initialization from original game stdout; no client or business acceptance",
+              "checks": {}, "launches": [], "forced_cleanup": False}
+    checks = record["checks"]
+    checks["old_successful_application_logs_retained"] = len(old_logs)
+    resources = {p.name: sha256(p) for p in (gui.parent / "resources").iterdir() if p.is_file()}
+    process = subprocess.Popen([str(gui), "--instance", str(instance)], startupinfo=hidden_startup())
+    window = None
+    try:
+        window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
+        select_service(window, "game")
+        assert "应用已初始化" not in title(user.GetDlgItem(window, 273))
+        click(window, 223)
+        ready(window, "已启动默认服务进程", 90)
+        for launch in [1, 2]:
+            select_service(window, "game")
+            previous_outputs = set((instance / "service-logs").glob("game-*.stdout.private.log"))
+            started = time.monotonic()
+            click(window, 221)
+            ready(window, "game：进程运行中", 30)
+            wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 222)), "game start operation complete")
+            pending = title(user.GetDlgItem(window, 273))
+            assert "等待应用初始化" in pending and "应用已初始化" not in pending, pending
+            assert "应用已初始化" not in service_row(window, "game")
+            item = {"launch": launch, "pending_readiness": pending, "window_response_ms": responsive(window)}
+            screenshot(window, probe / ("launch-" + str(launch) + "-pending.png"))
+            wait_for(lambda: "应用已初始化" in title(user.GetDlgItem(window, 273)), "original game initialization in GUI", 180)
+            item["application_initialized_seconds"] = round(time.monotonic() - started, 3)
+            outputs = set((instance / "service-logs").glob("game-*.stdout.private.log")) - previous_outputs
+            assert len(outputs) == 1
+            output = outputs.pop()
+            assert MARKER in output.read_bytes()
+            assert "应用已初始化" in service_row(window, "game")
+            assert "接口/协议/业务：未验证" in title(user.GetDlgItem(window, 273))
+            item["fresh_stdout"] = output.name
+            item["fresh_stdout_sha256_at_initialization"] = sha256(output)
+            item["initialized_readiness"] = title(user.GetDlgItem(window, 273))
+            screenshot(window, probe / ("launch-" + str(launch) + "-initialized.png"))
+            select_service(window, "channel")
+            assert "运行时通道已接入" in title(user.GetDlgItem(window, 273))
+            assert "应用已初始化" not in title(user.GetDlgItem(window, 273))
+            select_service(window, "game")
+            assert "应用已初始化" in title(user.GetDlgItem(window, 273))
+            if launch == 1:
+                click(window, 222)
+                ready(window, "game：已退出", 180)
+                wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 221)), "game stop operation complete")
+                assert "宿主已退出" in title(user.GetDlgItem(window, 273))
+                assert b"main() exited OK" in output.read_bytes()
+                checks["first_application_normal_exit"] = True
+            record["launches"].append(item)
+            print("GUI original game initialization", launch, "PASS", item["application_initialized_seconds"], flush=True)
+        checks["per_launch_pending_then_application_initialized"] = True
+        checks["old_init_and_previous_stdout_do_not_mark_new_launch_ready"] = True
+        checks["channel_readiness_and_business_boundary_preserved"] = True
+        click(window, 224)
+        ready(window, "服务进程已退出，数据库已停止", 180)
+        assert "宿主已退出" in title(user.GetDlgItem(window, 273))
+        outputs = list((instance / "service-logs").glob("game-*.stdout.private.log"))
+        assert len(outputs) == 2 and all(b"main() exited OK" in p.read_bytes() for p in outputs)
+        checks["both_original_game_runs_normal_exit"] = True
+        user.PostMessageW(window, 0x10, 0, 0)
+        process.wait(timeout=30)
+    except Exception as error:
+        record["error"] = type(error).__name__ + ": " + str(error)
+    finally:
+        if process.poll() is None:
+            if window:
+                user.PostMessageW(window, 0x10, 0, 0)
+            try:
+                process.wait(timeout=240)
+            except subprocess.TimeoutExpired:
+                record["forced_cleanup"] = True
+                subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+                process.wait(timeout=10)
+        record["exit_code"] = process.returncode
+        record["diagnostics"] = runtime_diagnostics(instance)
+        checks["source_data_unchanged"] = tree_identity(source / "data") == source_data
+        checks["package_resources_unchanged"] = resources == {
+            p.name: sha256(p) for p in (gui.parent / "resources").iterdir() if p.is_file()}
+        gaps = record["diagnostics"]["gaps"]
+        record["passed"] = (not record.get("error") and not record["forced_cleanup"] and
+                            process.returncode == 0 and not record["diagnostics"]["faults"] and
+                            all(any("nr=" + str(n) + " " in gap for n in [291,332]) for gap in gaps) and
+                            len(record["launches"]) == 2 and all(checks.values()))
+        text = json.dumps(record, indent=2) + "\n"
+        (probe / "receipt.json").write_text(text, encoding="utf-8")
+        (BUILD / "gui-readiness-checks.json").write_text(text, encoding="utf-8")
+        print("GUI game readiness:", "PASS" if record["passed"] else "FAIL", "receipt", probe / "receipt.json", flush=True)
+    if not record["passed"]:
+        raise SystemExit(record.get("error", "GUI readiness validation failed"))
+
+
+if __name__ == "__main__":
+    main()

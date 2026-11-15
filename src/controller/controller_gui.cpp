@@ -1198,8 +1198,12 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         case WM_TIMER:
             if (!app->busy) {
                 bool changed = false;
-                for (auto &service : app->services) if (refresh_service(service)) {
-                    app->append(service.name + L"：" + service.state + L"\r\n诊断日志：" + service.err); changed = true;
+                for (auto &service : app->services) {
+                    if (refresh_service(service)) {
+                        app->append(service.name + L"：" + service.state + L"\r\n诊断日志：" + service.err); changed = true;
+                    } else if (refresh_service_readiness(service)) {
+                        app->append(service.name + L"：" + service.readiness); changed = true;
+                    }
                 }
                 if (changed) { app->show_services(); app->controls(); }
             }
