@@ -44,6 +44,8 @@ flowchart TD
 
 `src/controller/controller_gui.cpp` 使用原生 Win32 控件和一个后台操作线程，操作进行时限制冲突按钮。共享文件接口在 `src/win32_files.h`，支持 Unicode 路径和私有文件权限；ZIP 通过 miniz 和 Win32 HANDLE 解压。
 
+当前 GUI 采用两栏工作区：顶部固定显示当前实例路径和全局操作；左栏承载数据库状态、维护入口、服务 IP 和按“核心/辅助/游戏与插件/安全”标记的单列服务列表；右栏显示当前服务详情、单项/整体服务操作和日志主区。服务列表仍按 `services.ini` 的原始顺序映射到服务索引，分组标记只改变显示，不改变启动和停止顺序。窗口布局按客户区和 DPI 重新计算，支持 `WM_DPICHANGED`；按钮和开关使用主题色焦点环，避免 XOR `DrawFocusRect()` 黑色内框。P1 的矩形收据和真实服务回归保存在仓库外的 `../x/dnf-native-output/P1-20261115/`，这些收据不属于发布资源。
+
 `instance_setup.h` 从 v3 清单校验两个 ZIP、两个宿主和数据库维护工具的身份。新建仅接受空目录，解压后逐文件核对；官方 MySQL 安全初始化后导入 18 个应用库，重新导出与种子 SHA-256 比对。随后生成每实例应用账号、更新数据库连接、准备当前月表、写入服务配置，正常停库后提交实例。失败保留 pending 标记和私有诊断。
 
 `services.ini` 保存 19 个服务的宿主位数、根目录、原 ELF 与 loader 哈希、参数、环境、停服信号和自动启动标志。顺序是 bridge、manager、三个 DBMW、monitor、guild、statics、coserver、community、auction、point、channel、relay、stun、game；zergsvr/secagent/gunnersvr 默认不自动启动。
