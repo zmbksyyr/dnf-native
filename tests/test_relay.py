@@ -1,6 +1,7 @@
 """Verify original relay TCP forwarding and UDP disconnect control on loopback."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 import hashlib
 import json
@@ -28,12 +29,130 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def concurrent_clients(count, duration, checks):
+    """Keep registered peers active, route a ring, replace 10%, then repeat."""
+    peers, accounts = [None] * count, [10000 + index for index in range(count)]
+    checks.update(registered=0, rounds=0, forwarded=0, replaced=0)
+
+    def register(index):
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                peer = socket.create_connection(("127.0.0.1", 7200), timeout=5)
+                break
+            except ConnectionRefusedError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
+        peer.settimeout(5)
+        account = accounts[index]
+        body = struct.pack("<I", account)
+        try:
+            peer.sendall(packet(0, account, 0) + packet(1, account, account, body))
+            if receive(peer, 12 + len(body)) != packet(3, account, account, body):
+                raise RuntimeError("Concurrent relay registration differs")
+            return peer
+        except BaseException:
+            peer.close()
+            raise
+
+    def connect(indices):
+        errors = []
+        last_keepalive = time.monotonic()
+        with ThreadPoolExecutor(max_workers=32) as pool:
+            pending = {pool.submit(register, index): index for index in indices}
+            for future in as_completed(pending):
+                try:
+                    peers[pending[future]] = future.result()
+                    checks["registered"] += 1
+                    if checks["registered"] % 250 == 0:
+                        print("Relay concurrent registrations:", checks["registered"], flush=True)
+                except Exception as error:
+                    errors.append("peer " + str(pending[future]) + ": " + str(error))
+                # Keep successful registrations active while the ramp finishes.
+                # Batch sends before reads to avoid a per-peer round-trip delay.
+                if time.monotonic() - last_keepalive >= 1:
+                    active_peers = [(index, peer) for index, peer in enumerate(peers) if peer is not None]
+                    body = b"ramp-active"
+                    for index, peer in active_peers:
+                        account = accounts[index]
+                        peer.sendall(packet(1, account, account, body))
+                    for index, peer in active_peers:
+                        account = accounts[index]
+                        if receive(peer, 12 + len(body)) != packet(3, account, account, body):
+                            raise RuntimeError("Relay ramp keepalive differs")
+                    last_keepalive = time.monotonic()
+        if errors:
+            checks["registration_errors"] = errors
+            raise RuntimeError("Concurrent relay registration: " + errors[0])
+
+    def forward():
+        sequence = checks["rounds"]
+        for index, peer in enumerate(peers):
+            body = struct.pack("<II", sequence, index) + bytes(range(256))
+            peer.sendall(packet(1, accounts[index], accounts[(index + 1) % count], body))
+        for index, peer in enumerate(peers):
+            source = (index - 1) % count
+            body = struct.pack("<II", sequence, source) + bytes(range(256))
+            if receive(peer, 12 + len(body)) != packet(3, accounts[source], accounts[index], body):
+                raise RuntimeError("Concurrent relay forwarded sender/recipient/payload differs")
+            checks["forwarded"] += 1
+        checks["rounds"] += 1
+
+    started = time.monotonic()
+    try:
+        connect(range(count))
+        checks["initial_connections"] = checks["registered"]
+        active = time.monotonic()
+        while checks["rounds"] == 0 or time.monotonic() - active < duration:
+            forward()
+            time.sleep(0.02)
+        checks["active_seconds"] = round(time.monotonic() - active, 3)
+        replaced = list(range(0, count, 10))
+        for index in replaced:
+            peers[index].shutdown(socket.SHUT_WR)
+        for index in replaced:
+            if peers[index].recv(1) != b"":
+                raise RuntimeError("Relay did not acknowledge the replaced connection's close")
+            peers[index].close(); peers[index] = None
+            accounts[index] += count
+        checks["closed_before_replacement"] = len(replaced)
+        connect(replaced)
+        checks["replaced"] = len(replaced)
+        forward()
+        checks["after_replacement_ring"] = True
+        return checks
+    finally:
+        try:
+            if checks.get("after_replacement_ring"):
+                for peer in peers:
+                    peer.shutdown(socket.SHUT_WR)
+                checks["closed_before_recovery"] = 0
+                for peer in peers:
+                    if peer.recv(1) != b"":
+                        raise RuntimeError("Relay did not acknowledge the final connection's close")
+                    checks["closed_before_recovery"] += 1
+        finally:
+            checks["elapsed_seconds"] = round(time.monotonic() - started, 3)
+            for peer in peers:
+                if peer is not None:
+                    peer.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reconnect-rounds", type=int, default=0)
+    parser.add_argument("--host", type=Path, default=BUILD / "i686/dnf-host.exe")
+    parser.add_argument("--concurrent-clients", type=int, default=0,
+                        help="Exercise the unchanged original max_client=1000 configuration (2..1000)")
+    parser.add_argument("--load-seconds", type=float, default=30)
     args = parser.parse_args()
     if args.reconnect_rounds < 0:
         parser.error("--reconnect-rounds must be nonnegative")
+    if args.concurrent_clients and not 2 <= args.concurrent_clients <= 1000:
+        parser.error("--concurrent-clients must be 0 or 2..1000")
+    if not 0 <= args.load_seconds <= 300:
+        parser.error("--load-seconds must be 0..300")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     instance = BUILD / "probes" / stamp / "relay"
     instance.mkdir(parents=True)
@@ -43,9 +162,10 @@ def main():
         (guest / name).mkdir(exist_ok=True)
     config = guest / "cfg/relay_200.cfg"
     text = config.read_text(encoding="ascii")
-    text = re.sub(r"(?m)^max_client\s*=.*$", "max_client = 16", text)
-    config.write_text(text, encoding="ascii")
-    elf, ld, host = guest / "df_relay_r", instance / "lib/ld-2.17.so", BUILD / "i686/dnf-host.exe"
+    if not args.concurrent_clients:
+        text = re.sub(r"(?m)^max_client\s*=.*$", "max_client = 16", text)
+        config.write_text(text, encoding="ascii")
+    elf, ld, host = guest / "df_relay_r", instance / "lib/ld-2.17.so", args.host.resolve()
     if sha(elf) != RELAY_SHA256:
         raise ValueError("This protocol check requires the recorded original relay ELF")
     command = [str(host), "--root", str(instance), sha(ld), "--env", "HOME=/home/neople",
@@ -58,6 +178,9 @@ def main():
     with (instance / "stdout.log").open("wb") as out, (instance / "stderr.log").open("wb") as err:
         process = subprocess.Popen(command, stdout=out, stderr=err)
         try:
+            if args.concurrent_clients:
+                checks["concurrent"] = {}
+                concurrent_clients(args.concurrent_clients, args.load_seconds, checks["concurrent"])
             deadline = time.monotonic() + 10
             for account in [701, 702]:
                 while True:
@@ -144,6 +267,8 @@ def main():
               "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers; no original monitor/game/client acceptance.",
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
               "config_sha256": sha(config), "checks": checks, "error": error, "gaps": gaps,
+              "source_sha256": sha(Path(__file__)), "concurrent_clients": args.concurrent_clients,
+              "load_seconds": args.load_seconds,
               "exit_code": process.returncode, "sigterm_event_sent": stop_sent, "forced_cleanup": forced,
               "log_sha256": {p.name: sha(p) for p in instance.glob("*.log")}}
     (BUILD / "relay-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

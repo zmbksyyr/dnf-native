@@ -23,7 +23,7 @@ static void release(NrEventFd *event) {
 
 intptr_t nr_eventfd_events(NrRun *run, unsigned fd, short requested) {
     EnterCriticalSection(&run->memory_lock);
-    NrEventFd *event = fd < 256 ? run->eventfds[fd] : NULL;
+    NrEventFd *event = fd < NR_FD_SLOTS ? run->eventfds[fd] : NULL;
     intptr_t result = !event ? 32 : (event->value ? requested & (1 | 64) : 0) |
                      (event->value < UINT64_MAX - 1 ? requested & (4 | 256) : 0);
     LeaveCriticalSection(&run->memory_lock);
@@ -50,8 +50,8 @@ int nr_eventfd(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         update(event);
         EnterCriticalSection(&run->memory_lock);
         unsigned fd;
-        for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
-        if (fd == 256) { release(event); *result = -24; }
+        for (fd = 0; fd < NR_FD_SLOTS && run->file_access[fd]; ++fd) {}
+        if (fd == NR_FD_SLOTS) { release(event); *result = -24; }
         else {
             run->eventfds[fd] = event;
             run->nonblock[fd] = (flags & 0x800) != 0;
@@ -62,7 +62,7 @@ int nr_eventfd(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         LeaveCriticalSection(&run->memory_lock);
         return 1;
     }
-    if (args[0] >= 256) return 0;
+    if (args[0] >= NR_FD_SLOTS) return 0;
     unsigned fd = (unsigned)args[0];
     EnterCriticalSection(&run->memory_lock);
     NrEventFd *event = run->eventfds[fd];

@@ -1,4 +1,4 @@
-#define FD_SETSIZE 256
+#define FD_SETSIZE 1024
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
@@ -7,6 +7,8 @@
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
+
+_Static_assert(FD_SETSIZE == NR_FD_SLOTS, "Winsock sets must cover all guest descriptors");
 
 static intptr_t socket_errno(int error) {
     switch (error) {
@@ -81,7 +83,7 @@ static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
         if (ioctlsocket(s, FIONBIO, &mode)) { intptr_t error = socket_error(); closesocket(s); return error; }
     }
     unsigned fd = nr_fd_reserve(run);
-    if (fd == 256) { closesocket(s); return -24; }
+    if (fd == NR_FD_SLOTS) { closesocket(s); return -24; }
     run->sockets[fd] = (uintptr_t)s;
     run->nonblock[fd] = nonblock != 0;
     run->connect_state[fd] = 0;
@@ -92,10 +94,10 @@ static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
 static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]);
 
 static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
-    if (args[0] > 256) return -22;
+    if (args[0] > NR_FD_SLOTS) return -22;
     size_t bytes = ((args[0] + sizeof(uintptr_t) * 8 - 1) / (sizeof(uintptr_t) * 8)) * sizeof(uintptr_t);
-    unsigned char bits[3][32] = {{0}};
-    SOCKET sockets[256] = {0};
+    unsigned char bits[3][NR_FD_SLOTS / 8] = {{0}};
+    SOCKET sockets[NR_FD_SLOTS] = {0};
     fd_set sets[3];
     for (unsigned i = 0; i < 3; ++i) {
         FD_ZERO(&sets[i]);
@@ -144,7 +146,7 @@ static intptr_t select_sockets(NrRun *run, const uintptr_t args[6]) {
     count = 0;
     for (unsigned i = 0; i < 3; ++i) {
         if (!args[i + 1]) continue;
-        unsigned char output[32] = {0};
+        unsigned char output[NR_FD_SLOTS / 8] = {0};
         for (unsigned fd = 0; fd < args[0]; ++fd) {
             unsigned char bit = (unsigned char)(1u << (fd % 8));
             if (!(bits[i][fd / 8] & bit)) continue;
@@ -187,14 +189,14 @@ static intptr_t poll_descriptors(NrRun *run, NrPoll *entries, unsigned length, i
     ULONGLONG start = GetTickCount64();
     int ready;
     for (;;) {
-        WSAPOLLFD polls[256]; unsigned indices[256]; ULONG count = 0;
+        WSAPOLLFD polls[NR_FD_SLOTS]; unsigned indices[NR_FD_SLOTS]; ULONG count = 0;
         int has_pipes = 0;
         ready = 0;
         for (unsigned i = 0; i < length; ++i) {
             entries[i].revents = 0;
             int fd = entries[i].fd;
             if (fd < 0) continue;
-            if (fd >= 256 || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
+            if (fd >= NR_FD_SLOTS || !run->file_access[fd]) { entries[i].revents = 32; ++ready; continue; }
             if (run->file_access[fd] == NR_EVENTFD) {
                 entries[i].revents = (short)nr_eventfd_events(run, (unsigned)fd, entries[i].events);
                 if (entries[i].revents) ++ready;
@@ -251,8 +253,8 @@ static intptr_t poll_descriptors(NrRun *run, NrPoll *entries, unsigned length, i
 }
 
 static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
-    NrPoll entries[256];
-    if (args[1] > 256) return -22;
+    NrPoll entries[NR_FD_SLOTS];
+    if (args[1] > NR_FD_SLOTS) return -22;
     size_t bytes = (size_t)args[1] * sizeof(entries[0]);
     if (!nr_memory(args[0], bytes, 1)) return -14;
     memcpy(entries, (const void *)args[0], bytes);
@@ -263,7 +265,7 @@ static intptr_t poll_sockets(NrRun *run, const uintptr_t args[6]) {
 
 static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]) {
     size_t bytes = ((args[0] + sizeof(uintptr_t) * 8 - 1) / (sizeof(uintptr_t) * 8)) * sizeof(uintptr_t);
-    unsigned char bits[3][32] = {{0}}, output[3][32] = {{0}};
+    unsigned char bits[3][NR_FD_SLOTS / 8] = {{0}}, output[3][NR_FD_SLOTS / 8] = {{0}};
     for (unsigned i = 0; i < 3; ++i) if (args[i + 1]) {
         if (!nr_memory(args[i + 1], bytes, 1)) return -14;
         memcpy(bits[i], (const void *)args[i + 1], bytes);
@@ -278,7 +280,7 @@ static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]) {
         if (microseconds / 1000 > INT_MAX - 1) return -38;
         timeout = (int)((microseconds + 999) / 1000);
     }
-    NrPoll entries[256]; unsigned count = 0;
+    NrPoll entries[NR_FD_SLOTS]; unsigned count = 0;
     for (unsigned fd = 0; fd < args[0]; ++fd) {
         unsigned bit = 1u << (fd % 8);
         short events = (bits[0][fd / 8] & bit ? 1 : 0) | (bits[1][fd / 8] & bit ? 4 : 0) | (bits[2][fd / 8] & bit ? 2 : 0);
@@ -312,10 +314,10 @@ static intptr_t select_mixed(NrRun *run, const uintptr_t args[6]) {
 static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uintptr_t address,
                            uintptr_t maximum, intptr_t milliseconds) {
     if (!maximum || maximum > INT_MAX || milliseconds < -1) return -22;
-    size_t capacity = maximum > 256 ? 256 : maximum;
+    size_t capacity = maximum > NR_FD_SLOTS ? NR_FD_SLOTS : maximum;
     if (!nr_memory(address, capacity * 12, 1)) return -14;
-    NrPoll polls[256]; unsigned count = 0;
-    for (unsigned fd = 0; fd < 256; ++fd) {
+    NrPoll polls[NR_FD_SLOTS]; unsigned count = 0;
+    for (unsigned fd = 0; fd < NR_FD_SLOTS; ++fd) {
         if (!watches[fd].used) continue;
         polls[count].fd = (int32_t)fd;
         polls[count].events = (int16_t)(watches[fd].events & 5);
@@ -363,14 +365,14 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     if (number == EP_CREATE || number == EP_CREATE1) {
         if ((number == EP_CREATE && (intptr_t)input[0] <= 0) || (number == EP_CREATE1 && (input[0] & ~0x80000u))) { *result = -22; return 1; }
         unsigned fd = nr_fd_reserve(run);
-        if (fd == 256) { *result = -24; return 1; }
-        run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 256 * sizeof(NrWatch));
+        if (fd == NR_FD_SLOTS) { *result = -24; return 1; }
+        run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NR_FD_SLOTS * sizeof(NrWatch));
         if (!run->epolls[fd]) { run->file_access[fd] = 0; *result = -12; return 1; }
         run->file_access[fd] = 8;
         if (epoll_trace_enabled()) fprintf(stderr, "epoll create epfd=%u\n", fd);
         *result = fd; return 1;
     }
-    if (number == CLOSE && input[0] < 256) {
+    if (number == CLOSE && input[0] < NR_FD_SLOTS) {
         unsigned fd = (unsigned)input[0];
         /* Another close walks these sets to remove its descriptor. Keep that
            walk and epoll destruction together so it cannot touch a freed set. */
@@ -380,17 +382,17 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
             LeaveCriticalSection(&run->memory_lock);
             *result = 0; return 1;
         }
-        for (unsigned i = 0; i < 256; ++i) if (run->epolls[i]) run->epolls[i][fd].used = 0;
+        for (unsigned i = 0; i < NR_FD_SLOTS; ++i) if (run->epolls[i]) run->epolls[i][fd].used = 0;
         LeaveCriticalSection(&run->memory_lock);
     }
     if (number == EP_CTL || number == EP_WAIT) {
-        if (input[0] >= 256 || run->file_access[input[0]] != 8) { *result = -9; return 1; }
+        if (input[0] >= NR_FD_SLOTS || run->file_access[input[0]] != 8) { *result = -9; return 1; }
         NrWatch *watches = run->epolls[input[0]];
         if (number == EP_WAIT) {
             *result = epoll_wait(run, (unsigned)input[0], watches, input[1], input[2], (intptr_t)input[3]);
             return 1;
         }
-        if (input[2] >= 256 || !run->file_access[input[2]]) { *result = -9; return 1; }
+            if (input[2] >= NR_FD_SLOTS || !run->file_access[input[2]]) { *result = -9; return 1; }
         if (run->file_access[input[2]] != 4 && run->file_access[input[2]] != NR_EVENTFD &&
             (!run->files[input[2]] || GetFileType(run->files[input[2]]) != FILE_TYPE_PIPE)) {
             *result = -1; return 1;
@@ -441,7 +443,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         fprintf(stderr, "socket op=%d args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n", operation,
                 (unsigned long long)args[0], (unsigned long long)args[1], (unsigned long long)args[2],
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
-    if (!operation && ((number != CLOSE && number != IOCTL && number != FCNTL && number != READ && number != WRITE) || fd >= 256 || run->file_access[fd] != 4)) return 0;
+    if (!operation && ((number != CLOSE && number != IOCTL && number != FCNTL && number != READ && number != WRITE) || fd >= NR_FD_SLOTS || run->file_access[fd] != 4)) return 0;
     if (operation == 1) {
         if (args[0] == 1) { *result = -97; return 1; } /* AF_UNIX is outside the Windows socket subset. */
         if (args[0] != AF_INET || ((args[1] & 15) != SOCK_DGRAM && (args[1] & 15) != SOCK_STREAM) ||
@@ -456,7 +458,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         *result = s == INVALID_SOCKET ? socket_error() : add_socket(run, s, (args[1] & 0x800) != 0);
         return 1;
     }
-    if (fd >= 256 || run->file_access[fd] != 4) { *result = -9; return 1; }
+    if (fd >= NR_FD_SLOTS || run->file_access[fd] != 4) { *result = -9; return 1; }
     SOCKET s = (SOCKET)run->sockets[fd];
     if (!operation && (number == READ || number == WRITE)) {
         int receiving = number == READ;

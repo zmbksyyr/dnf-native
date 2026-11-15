@@ -47,7 +47,7 @@ def main():
         print(arch, "concurrent descriptor allocation/epoll isolation", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     receipt = directory / "receipt.json"
     receipt.write_text(json.dumps({"recorded_utc": stamp, "os": platform.platform(),
-                                  "scope": "8 guest threads, 200 rounds: unique epoll/eventfd/socket/pipe/file/maps/auxv/urandom descriptors, epoll data isolation, close/reuse and allocation rollback",
+                                  "scope": "8 guest threads, 200 rounds above fd 514: unique epoll/eventfd/socket/pipe/file/maps/auxv/urandom descriptors and epoll data isolation; high socket/mixed select, full-length poll, actual RLIMIT_NOFILE exhaustion, close/reuse and allocation rollback",
                                   "results": records}, indent=2) + "\n", encoding="utf-8")
     print("Descriptor receipt:", receipt, flush=True)
     if not all(record["passed"] for record in records):

@@ -220,6 +220,9 @@ static void check_map_lifecycle(void) {
 #endif
 
 __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
+    /* Exercise file, synthetic proc and mmap paths above the old fd ceiling. */
+    for (unsigned i = 0; i < 512; ++i)
+        CHECK(call(OPEN, (word)"/dev/urandom", 0, 0) == (result)(3 + i));
 #ifdef FILE_PEER
     result fd = call(OPEN, (word)"/shared", 2, 0);
     CHECK(fd >= 0);
@@ -393,6 +396,7 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(CLOSE, fd, 0, 0) == 0);
     CHECK(call(WRITE, 1, (word)"files-ok\n", 9) == 9);
 #endif
+    for (unsigned i = 0; i < 512; ++i) CHECK(call(CLOSE, 3 + i, 0, 0) == 0);
     call(EXIT, 42, 0, 0);
     __builtin_unreachable();
 }

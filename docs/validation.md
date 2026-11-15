@@ -2,6 +2,18 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## 原版 relay 配置容量（2026-11-16）
+
+P16 在固定原版 `relay_200.cfg` 的 `max_client=1000` 下实际复现：旧宿主完成 249 个连接注册，第 250 个被重置；已有连接仍可转发，释放后可恢复。共享描述符表只有 256 项，少于应用声明的容量。现将表扩为 `NR_FD_SLOTS=1024`，统一文件、socket、eventfd、文件映射、select/poll/epoll 和 `RLIMIT_NOFILE` 的边界；不修改原版 ELF 或配置。
+
+双架构夹具在 fd 514 以上完成 8 线程、200 轮混合分配和事件隔离，覆盖高编号 socket/mixed select、1024 条 poll、耗尽后的 `EMFILE` 与 pipe 预留回滚。文件夹具预占 512 个描述符后，实际文件、procfs、目录、私有/共享映射及跨进程读写均通过。既有网络、超时/linger、select 并发关闭、poll、epoll、eventfd 和入口夹具也通过。
+
+原版 relay 的并发协议验证分两组记录：持续组在 1000 个连接下转发 60.155 秒、核验 84,000 条消息；替换 100 个连接后，再完成 1000 条消息的完整转发环。该轮随后未等待原连接关闭确认就立即执行新连接恢复，因此整轮收据仍为失败。最终修正探针的批量心跳及关闭确认后，完整流程通过：1000 连接、1.450 秒负载和替换后的 3000 条消息，100 个连接的 EOF/替换，1000 个连接全部 EOF，再完成正常新连接、双向转发、拆/连包、定向断开与三轮重连。两组均无运行时异常或缺口，进程正常退出 0、无强制清理；不将短负载的最终通过写成重跑了 60 秒。
+
+新包完整实例回归通过资源故障拒绝、中文/空格双实例、数据库读回、占用与删除保护、原版 channel/relay-monitor/STUN 协议及 game/DP2/Frida 自然启停，game 初始化 30.737 秒。GUI 退出 0、无运行时异常或强制清理，仅有已知 inotify 291/332 缺口，资源前后哈希不变。原始收据为 `probes/20261115T224727607898Z/instance-workflow/receipt.json`，当前交付为 `P16-20261116-relay-capacity/package/`；GUI/数据库工具沿用 P14，宿主为本阶段构建。
+
+原始失败、各轮探针及最终收据保存在 `P16-20261116-relay-capacity/`，最终并发收据为 `concurrent-final.json`、持续组为 `concurrent-third.json`；私有实例路径由其中 `command` 标识。环境为 Windows 10 x64 10.0.19044、Python 3.14.6、LLVM-MinGW 20261104 MSVCRT。本阶段是固定原版 relay 的协议容量验证，未包含原版 monitor 认证、游戏玩家负载或长期运行验收。
+
 ## STUN 历史 TLS 站点与 ELF 清单（2026-11-16）
 
 P15 将历史 `unimplemented guest TLS site pc=0x1a92c627dfb` 定位到固定 `libpthread.so.0`（SHA-256 `b3bf84a9c150a558b0fe4512ed20e18a346b6485ee0c5e770e55811678505abb`）的 `start_thread+0x1b`，ELF 地址 `0x7dfb`，原指令为 `movq %rdx,%fs:0x620`。这里 TLS 指线程局部存储。原版 `do_clone` 传入 `start_thread`，其入口在调用用户 worker 前必经该写入；STUN 的三个 worker 均由原版 `pthread_create` 创建。
@@ -10,7 +22,7 @@ P15 将历史 `unimplemented guest TLS site pc=0x1a92c627dfb` 定位到固定 `l
 
 同时修复 `tools/elf_manifest.py`：重复的 `DT_NEEDED` 字符串必须按当前条目的偏移解析，此前错误地按标签寻找第一项。全部 121 个 ELF（95 个 32 位、26 个 64 位）的 424 条动态字符串与 LLVM 23.1.5 `llvm-readelf --dynamic` 独立逐项一致；80 个文件的展示得到纠正，原有 `dt_needed` 依赖数组及其他清单字段不变。该工具仅生成离线清单，交付程序与资源无需重建。
 
-环境为 Windows 10 x64 10.0.19044、Python 3.14.6；宿主沿用 LLVM-MinGW 20261104 MSVCRT 构建。原始收据、历史日志身份、原版反汇编及独立清单核对保存在 `P15-20261116-stun/`，本次 STUN 收据为 `verification/receipt.json`，清单核对为 `manifest-verification.json`。当前交付仍为 `P14-20261116-keyboard/delivery/`。
+环境为 Windows 10 x64 10.0.19044、Python 3.14.6；宿主沿用 LLVM-MinGW 20261104 MSVCRT 构建。原始收据、历史日志身份、原版反汇编及独立清单核对保存在 `P15-20261116-stun/`，本次 STUN 收据为 `verification/receipt.json`，清单核对为 `manifest-verification.json`。P15 沿用 `P14-20261116-keyboard/delivery/`。
 
 ## GUI 键盘操作修复（2026-11-16）
 
@@ -200,6 +212,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | 内存与并发 | `python -B tests/test_vm.py`、`tests/test_vm_concurrent.py` | 双架构映射语义及八线程并发路径 |
 | TLS/线程 | `python -B tests/test_tls.py`、`tests/test_futex.py` | 已实现 TLS 和 futex 路径 |
 | 文件、同步、网络原语 | `tests/test_files.py`、`tests/test_file_sync.py`、`tests/test_net.py`、`tests/test_poll.py`、`tests/test_epoll.py`、`tests/test_select_close.py`、`tests/test_process_signal.py` | 对应夹具，均以 `python -B` 执行 |
+| relay 并发容量 | `python -B tests/test_relay.py --host HOST_X86_EXE --concurrent-clients 1000 --load-seconds 60 --reconnect-rounds 3` | 固定 1000-client 配置的注册、转发环、10% 连接替换、EOF 确认和恢复；持续时间可指定，不含 monitor/game/client 验收 |
 | Frida 热加载 | `python -B tests/test_frida_reload.py [--host HOST_X86_EXE]` | 固定原版 Gadget 的覆盖写入/原子替换、实际新版 RPC 结果；不含 game 自然启动或客户端业务 |
 | 编码 | `python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package` | ZIP 内实际 GBK、GB18030、BIG5、BIG5-HKSCS、EUC-KR、UHC 与 UTF-8 字节往返 |
 | 真实实例与 core | `python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 真实资源故障拒绝、双实例、占用、删除、15 个辅助服务协议及 game/DP2/Frida 启停 |
@@ -232,11 +245,11 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 ## 未完成事项
 
-- **当前客户端图形环境**：P12 客户端在认证前失败，同会话 32 位 D3D9 适配器为零；需要可用显卡桌面才能继续当前版本业务验收，历史业务结果不能代替。
-- **长期运行与容量**：历史 relay `0x0805b91a` 异常已在 P7 定位为并发描述符重复分配并修复，见本文后部的前后证据；本轮 GUI 两轮协议通过仍不替代生产负载和长期运行验收。
+- **当前客户端业务**：P12 客户端在认证前失败，同会话 D3D9 适配器为零；P16 末复查已恢复一个适配器且窗口化设备创建成功，将继续独立副本业务尝试。图形探针通过及历史业务结果均不能代替当前客户端验收。
+- **长期运行与容量**：P7 已修复 relay 描述符重复分配；P16 已补齐固定配置的 1000 连接容量并验证持续转发、替换和恢复。生产玩家负载和长期运行仍未验收。
 - **Frida 文件监视接口**：i386 `inotify_init` / `inotify_init1`（syscall 291/332）仍未实现；P11 已实测当前 Gadget 轮询回退可完成覆盖写入及原子替换后的热加载与新版 RPC。该需求已有可复现路径，通用 inotify 及所有脚本/编辑器组合仍未支持。
 - **jbz69 定制 PVF**：原服务 PVF 为 48984，客户端定制 PVF 为 66282；未找到匹配的原版 Linux ELF。缺失模板、BIG5/UTF-8 编码及资源字段差异仍阻塞 Loading Items。模板别名、临时 iconv 映射和 `.str` 重编码实验均未形成可交付兼容结果；认证公钥加载成功不能解释成定制 PVF 可用。
-- **安全与负载**：P10 已验证原版安全组件加载，完整拓扑被缺失的配置中心/安全监控对端及现有配置冲突阻塞；真实大连接数、生产负载、所有插件组合和完整客户端矩阵没有验收。256 描述符及 64 线程槽等限制见[实现说明](architecture.md)。
+- **安全与负载**：P10 已验证原版安全组件加载，完整拓扑被缺失的配置中心/安全监控对端及现有配置冲突阻塞；生产负载、所有插件组合和完整客户端矩阵没有验收。1024 描述符及 64 线程槽等限制见[实现说明](architecture.md)。
 - **操作系统**：干净 Windows 7/11、跨机器迁移及所有离线依赖组合未完成矩阵验证。
 
 ## 历史路径与来源对应

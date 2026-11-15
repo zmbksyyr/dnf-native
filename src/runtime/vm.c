@@ -86,7 +86,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
             if (contains((uintptr_t)run->vm[i].base, run->vm[i].size, address, length)) { v = &run->vm[i]; break; }
         if (!v) return -38;
         if (v->section) return -38;
-        if (!(flags & 0x20) && (!v->image.file || fd >= 256 || !run->files[fd] || !v->source)) return -38;
+        if (!(flags & 0x20) && (!v->image.file || fd >= NR_FD_SLOTS || !run->files[fd] || !v->source)) return -38;
         if (!(flags & 0x20)) {
             BY_HANDLE_FILE_INFORMATION a, b;
             if (!GetFileInformationByHandle(v->source, &a) || !GetFileInformationByHandle(run->files[fd], &b) ||
@@ -137,7 +137,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
            offset zero. Use a real Windows view so aliases/processes share
            pages and writes, rather than pretending a private copy is shared. */
         if ((args[2] & 4) || (offset & 65535)) return -38;
-        if (fd >= 256 || !run->files[fd]) return -9;
+        if (fd >= NR_FD_SLOTS || !run->files[fd]) return -9;
         if (!(run->file_access[fd] & 1) || ((args[2] & 2) && !(run->file_access[fd] & 2))) return -13;
         LARGE_INTEGER size;
         if (!GetFileSizeEx(run->files[fd], &size)) return -5;
@@ -164,7 +164,7 @@ static intptr_t mapping(NrRun *run, const uintptr_t args[6]) {
         if (slot == run->vm_count) ++run->vm_count;
         return (intptr_t)base;
     }
-    if (fd >= 256 || !run->files[fd]) return -9;
+    if (fd >= NR_FD_SLOTS || !run->files[fd]) return -9;
     if (!(run->file_access[fd] & 1)) return -13;
     LARGE_INTEGER file_size;
     if (!GetFileSizeEx(run->files[fd], &file_size)) return -5;

@@ -81,7 +81,7 @@ int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
 }
 
 static HANDLE output_handle(uintptr_t fd) {
-    if (fd >= 256 || !(active->file_access[fd] & 2)) return INVALID_HANDLE_VALUE;
+    if (fd >= NR_FD_SLOTS || !(active->file_access[fd] & 2)) return INVALID_HANDLE_VALUE;
     HANDLE file = active->files[fd];
     if (!file || file == INVALID_HANDLE_VALUE) return INVALID_HANDLE_VALUE;
     SetLastError(NO_ERROR);
@@ -206,7 +206,7 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
         uintptr_t limit;
         if (a == 3) limit = NR_STACK_BYTES;
         else if (a == 4) limit = 0;
-        else if (a == 7) limit = 256;
+        else if (a == 7) limit = NR_FD_SLOTS;
         else return -38;
         if (limits[0] == limit && limits[1] == limit) return 0;
         fprintf(stderr, "setrlimit unsupported resource=%llu soft=%llu hard=%llu\n",
@@ -217,7 +217,7 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
         uintptr_t limit;
         if (a == 3) limit = NR_STACK_BYTES;
         else if (a == 4) limit = 0;
-        else if (a == 7) limit = 256;
+        else if (a == 7) limit = NR_FD_SLOTS;
         else return -38;
         if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;
         uintptr_t values[] = {limit, limit};

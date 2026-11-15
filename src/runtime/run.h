@@ -5,6 +5,8 @@
 
 /* The original game without DP2's allocator needs over 1024 live mappings. */
 #define NR_VM_SLOTS 4096
+/* The fixed relay configuration allows 1000 clients plus its own descriptors. */
+#define NR_FD_SLOTS 1024
 #define NR_EVENTFD 32
 #define NR_FD_RESERVED 255
 typedef struct NrEventFd NrEventFd;
@@ -61,21 +63,21 @@ typedef struct {
     size_t auxv_size;
     wchar_t root[32768];
     char cwd[4096];
-    HANDLE files[256];
-    unsigned char file_access[256];
-    char *synthetic_files[256];
-    size_t synthetic_sizes[256];
-    uint64_t synthetic_offsets[256];
-    unsigned char descriptor_flags[256];
-    uint64_t directory_offset[256];
-    unsigned char flock_mode[256];
-    uintptr_t sockets[256];
-    unsigned char nonblock[256];
-    unsigned char connect_state[256]; /* 1: pending, 2: failed SO_ERROR consumed */
-    uint64_t receive_timeout[256];
-    uint64_t send_timeout[256];
-    NrWatch *epolls[256];
-    NrEventFd *eventfds[256];
+    HANDLE files[NR_FD_SLOTS];
+    unsigned char file_access[NR_FD_SLOTS];
+    char *synthetic_files[NR_FD_SLOTS];
+    size_t synthetic_sizes[NR_FD_SLOTS];
+    uint64_t synthetic_offsets[NR_FD_SLOTS];
+    unsigned char descriptor_flags[NR_FD_SLOTS];
+    uint64_t directory_offset[NR_FD_SLOTS];
+    unsigned char flock_mode[NR_FD_SLOTS];
+    uintptr_t sockets[NR_FD_SLOTS];
+    unsigned char nonblock[NR_FD_SLOTS];
+    unsigned char connect_state[NR_FD_SLOTS]; /* 1: pending, 2: failed SO_ERROR consumed */
+    uint64_t receive_timeout[NR_FD_SLOTS];
+    uint64_t send_timeout[NR_FD_SLOTS];
+    NrWatch *epolls[NR_FD_SLOTS];
+    NrEventFd *eventfds[NR_FD_SLOTS];
     NrVm vm[NR_VM_SLOTS];
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;

@@ -11,8 +11,8 @@ enum { NR_URANDOM = 16, NR_MAPS = 17, NR_AUXV = 18 };
 unsigned nr_fd_reserve(NrRun *run) {
     EnterCriticalSection(&run->memory_lock);
     unsigned fd;
-    for (fd = 0; fd < 256 && run->file_access[fd]; ++fd) {}
-    if (fd < 256) run->file_access[fd] = NR_FD_RESERVED;
+    for (fd = 0; fd < NR_FD_SLOTS && run->file_access[fd]; ++fd) {}
+    if (fd < NR_FD_SLOTS) run->file_access[fd] = NR_FD_RESERVED;
     LeaveCriticalSection(&run->memory_lock);
     return fd;
 }
@@ -208,7 +208,7 @@ static intptr_t statfs_file(NrRun *run, HANDLE file, const wchar_t *input, uintp
 }
 
 static intptr_t getdents_file(NrRun *run, uintptr_t fd, uintptr_t destination, uintptr_t capacity) {
-    if (fd >= 256 || !run->files[fd]) return -9;
+    if (fd >= NR_FD_SLOTS || !run->files[fd]) return -9;
     if (capacity > 65536) capacity = 65536;
     if (!nr_memory(destination, capacity, 1)) return -14;
     BY_HANDLE_FILE_INFORMATION info;
@@ -394,7 +394,7 @@ done:
 }
 
 static intptr_t synthetic_stat(NrRun *run, uintptr_t fd, uintptr_t destination, int legacy) {
-    if (fd >= 256 || (run->file_access[fd] != NR_MAPS && run->file_access[fd] != NR_AUXV)) return -9;
+    if (fd >= NR_FD_SLOTS || (run->file_access[fd] != NR_MAPS && run->file_access[fd] != NR_AUXV)) return -9;
     if (!nr_memory(destination, legacy ? 64 : sizeof(void *) == 8 ? 144 : 96, 1)) return -14;
     unsigned char bytes[144] = {0};
 #ifdef _WIN64
@@ -433,9 +433,9 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         uintptr_t flags = number == PIPE2 ? b : 0;
         if (flags & ~(uintptr_t)0x80800) { *result = -38; return 1; }
         unsigned read_fd = nr_fd_reserve(run);
-        if (read_fd == 256) { *result = -24; return 1; }
+        if (read_fd == NR_FD_SLOTS) { *result = -24; return 1; }
         unsigned write_fd = nr_fd_reserve(run);
-        if (write_fd == 256) { run->file_access[read_fd] = 0; *result = -24; return 1; }
+        if (write_fd == NR_FD_SLOTS) { run->file_access[read_fd] = 0; *result = -24; return 1; }
         HANDLE reader, writer;
         if (!CreatePipe(&reader, &writer, NULL, 4096)) {
             *result = file_error(); run->file_access[read_fd] = run->file_access[write_fd] = 0; return 1;
@@ -454,7 +454,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     if (number == 106) { number = STAT; legacy = 1; }
     if (number == 108) { number = FSTAT; legacy = 1; }
     if (number == 140) {
-        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (a >= NR_FD_SLOTS || !run->files[a]) { *result = -9; return 1; }
         if (!nr_memory(args[3], 8, 1)) { *result = -14; return 1; }
         LARGE_INTEGER offset, position;
         offset.QuadPart = (LONGLONG)(((uint64_t)b << 32) | c);
@@ -466,11 +466,11 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
 #endif
-    if (number == IOCTL && a < 256 && run->file_access[a] && run->file_access[a] != 4 && b == 0x5401) {
+    if (number == IOCTL && a < NR_FD_SLOTS && run->file_access[a] && run->file_access[a] != 4 && b == 0x5401) {
         *result = -25; /* TCGETS on a regular file/pipe is ENOTTY. */
         return 1;
     }
-    if (number == IOCTL && a < 256 && run->files[a] && run->file_access[a] != 4) {
+    if (number == IOCTL && a < NR_FD_SLOTS && run->files[a] && run->file_access[a] != 4) {
         if (b == 0x5451) { /* FIOCLEX */
             run->descriptor_flags[a] = 1; *result = 0; return 1;
         }
@@ -501,7 +501,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FLOCK) {
-        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (a >= NR_FD_SLOTS || !run->files[a]) { *result = -9; return 1; }
         uintptr_t mode = b & ~(uintptr_t)4;
         if (mode != 1 && mode != 2 && mode != 8) { *result = -22; return 1; }
         if (mode == run->flock_mode[a]) { *result = 0; return 1; }
@@ -519,7 +519,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FCNTL) {
-        if (a >= 256 || (!run->files[a] && run->file_access[a] != NR_URANDOM &&
+        if (a >= NR_FD_SLOTS || (!run->files[a] && run->file_access[a] != NR_URANDOM &&
                          run->file_access[a] != NR_MAPS && run->file_access[a] != NR_AUXV)) { *result = -9; return 1; }
         if (b == 1) *result = run->descriptor_flags[a];
         else if (b == 2 && !(c & ~1u)) { run->descriptor_flags[a] = (unsigned char)c; *result = 0; }
@@ -536,7 +536,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FTRUNCATE) {
-        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (a >= NR_FD_SLOTS || !run->files[a]) { *result = -9; return 1; }
         if (!(run->file_access[a] & 2)) { *result = -22; return 1; }
         LARGE_INTEGER zero = {0}, old, length;
         length.QuadPart = (LONGLONG)b;
@@ -557,7 +557,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number == FSTATFS) {
-        if (a >= 256 || !run->files[a]) { *result = -9; return 1; }
+        if (a >= NR_FD_SLOTS || !run->files[a]) { *result = -9; return 1; }
         *result = statfs_file(run, run->files[a], NULL, b);
         return 1;
     }
@@ -582,7 +582,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (number == OPEN && !wcscmp(path + wcslen(run->root), L"\\proc\\self\\maps")) {
             if (b & ~(uintptr_t)0x80000) { *result = -13; return 1; }
             unsigned fd = nr_fd_reserve(run);
-            if (fd == 256) { *result = -24; return 1; }
+            if (fd == NR_FD_SLOTS) { *result = -24; return 1; }
             size_t bytes = 0;
             EnterCriticalSection(&run->memory_lock);
             char *text = maps_text(run, &bytes);
@@ -599,7 +599,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (number == OPEN && !wcscmp(path + wcslen(run->root), L"\\proc\\self\\auxv")) {
             if (b & ~(uintptr_t)(0x8000 | 0x80000) || !run->auxv_address || !run->auxv_size) { *result = -13; return 1; }
             unsigned fd = nr_fd_reserve(run);
-            if (fd == 256) { *result = -24; return 1; }
+            if (fd == NR_FD_SLOTS) { *result = -24; return 1; }
             unsigned char *text = HeapAlloc(GetProcessHeap(), 0, run->auxv_size);
             if (!text || !nr_memory(run->auxv_address, run->auxv_size, 0)) {
                 if (text) HeapFree(GetProcessHeap(), 0, text);
@@ -621,7 +621,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
             else if (b & ~(uintptr_t)(0x800 | 0x8000 | 0x80000)) *result = -38;
             else {
                 unsigned fd = nr_fd_reserve(run);
-                if (fd == 256) *result = -24;
+                if (fd == NR_FD_SLOTS) *result = -24;
                 else {
                     run->descriptor_flags[fd] = (b & 0x80000) != 0;
                     run->nonblock[fd] = (b & 0x800) != 0;
@@ -679,7 +679,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         if (b & ~(uintptr_t)(3 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x8000 | 0x80000 | 0x10000 | 0x20000)) { *result = -38; return 1; }
         if ((b & 0x200) && !(b & 3)) { *result = -38; return 1; }
         unsigned fd = nr_fd_reserve(run);
-        if (fd == 256) { *result = -24; return 1; }
+        if (fd == NR_FD_SLOTS) { *result = -24; return 1; }
         DWORD desired = (b & 3) != 1 ? GENERIC_READ : 0;
         if (b & 3) desired |= b & 0x400 ? FILE_APPEND_DATA : GENERIC_WRITE;
         DWORD creation = b & 0x40 ? (b & 0x80 ? CREATE_NEW : OPEN_ALWAYS) : OPEN_EXISTING;
@@ -716,7 +716,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         return 1;
     }
     if (number != READ && number != CLOSE && number != FSTAT && number != LSEEK) return 0;
-    if (a < 256 && run->file_access[a] == NR_URANDOM) {
+    if (a < NR_FD_SLOTS && run->file_access[a] == NR_URANDOM) {
         if (number == CLOSE) {
             run->descriptor_flags[a] = 0; run->nonblock[a] = 0; run->file_access[a] = 0;
             *result = 0;
@@ -732,7 +732,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         }
         return 1;
     }
-    if (a < 256 && (run->file_access[a] == NR_MAPS || run->file_access[a] == NR_AUXV)) {
+    if (a < NR_FD_SLOTS && (run->file_access[a] == NR_MAPS || run->file_access[a] == NR_AUXV)) {
         if (number == CLOSE) {
             HeapFree(GetProcessHeap(), 0, run->synthetic_files[a]);
             run->synthetic_files[a] = NULL; run->synthetic_sizes[a] = 0; run->synthetic_offsets[a] = 0;
@@ -758,7 +758,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         }
         return 1;
     }
-    HANDLE file = a < 256 ? run->files[a] : NULL;
+    HANDLE file = a < NR_FD_SLOTS ? run->files[a] : NULL;
     if (!file) { *result = -9; return 1; }
     if (number == CLOSE) {
         *result = CloseHandle(file) ? 0 : file_error();
