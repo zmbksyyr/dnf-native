@@ -26,17 +26,25 @@ def main():
     parser.add_argument("--source", type=Path, default=RESOURCES, help="Pinned ZIP baseline directory")
     parser.add_argument("--gui-dir", type=Path, default=BUILD / "gui")
     parser.add_argument("--hosts", type=Path, default=BUILD, help="Current host build directory")
+    parser.add_argument("--login-dir", type=Path, default=BUILD / "login")
     parser.add_argument("--output", type=Path, default=BUILD / "package")
     args = parser.parse_args()
     source, gui, hosts, output = (p.resolve() for p in (args.source, args.gui_dir, args.hosts, args.output))
     output = external_output(output)
     baseline = verify_baseline(source)
+    login = args.login_dir.resolve(strict=True)
+    login_receipt = json.loads((login / "build-receipt.json").read_text(encoding="utf-8"))
+    check_sources(login_receipt["sources"])
+    if sha256(login / "DNFLogin.exe") != login_receipt["output_sha256"]:
+        raise ValueError("Launcher differs from its build receipt")
     ini = configparser.ConfigParser(interpolation=None)
     ini.read(source / "baseline.ini", encoding="utf-16")
     files = {ini["file" + str(n)]["path"]: ini["file" + str(n)]["sha256"]
              for n in range(ini.getint("resources", "count"))}
     dependencies = {"i686": {}, "x86_64": {}}
     with zipfile.ZipFile(source / "native.zip") as archive:
+        if archive.read("home/neople/game/publickey.pem") != (ROOT / "resources/login/publickey.pem").read_bytes():
+            raise ValueError("Server default public key differs from the launcher key pair")
         if set(archive.namelist()) != set(files):
             raise ValueError("Native ZIP members differ from the baseline manifest")
         for name, expected in files.items():
@@ -79,6 +87,24 @@ def main():
         shutil.copy2(hosts / arch / "dnf-host.exe", resources / ("dnf-host-" + label + ".exe"))
     for name in ("native.zip", "mysql.zip"):
         shutil.copy2(source / name, resources / name)
+    launcher = output / "login"
+    launcher.mkdir()
+    shutil.copy2(login / "DNFLogin.exe", launcher / "DNFLogin.exe")
+    # A standalone source kit: all build inputs except the standard compiler.
+    for name in ("src/login", "resources/login"):
+        shutil.copytree(ROOT / name, launcher / "source" / name)
+    for name in ("build_login.py", "bootstrap.py"):
+        target = launcher / "source/tools" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "tools" / name, target)
+    target = launcher / "source/tests/login_crypto.c"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "tests/login_crypto.c", target)
+    docs = output / "docs"
+    docs.mkdir()
+    shutil.copy2(ROOT / "docs/login.md", docs / "login.md")
+    (docs / "evidence").mkdir()
+    shutil.copy2(ROOT / "docs/evidence/login-source.json", docs / "evidence/login-source.json")
     ini["package"] = {name: sha256(resources / name) for name in
                       ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
@@ -91,7 +117,7 @@ def main():
             text = introduction + "## 产品使用" + usage
         # Local source/evidence links belong to the repository, not the product directory.
         text = re.sub(r"\[([^\]]+)\]\((?!https?://)[^)]+\)", r"\1", text)
-        (resources / name).write_text(text, encoding="utf-8", newline="\n")
+        (docs / name).write_text(text, encoding="utf-8", newline="\n")
     record = {"baseline": baseline["files"], "elf_dependency_closure": closure,
               "package_files": {p.relative_to(output).as_posix(): sha256(p) for p in output.rglob("*") if p.is_file()},
               "builder_sha256": sha256(Path(__file__)),

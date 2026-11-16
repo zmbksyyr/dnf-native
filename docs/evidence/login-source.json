@@ -1,0 +1,34 @@
+{
+  "origin": "User-provided dfnlogin_c, explicitly authorized for incorporation on 2026-11-16",
+  "original_files": {
+    "src/main.c": "aa284a3a760976c3516a438d4c56a8510a2cc3485707ac0e9c508e3e2ea84f9f",
+    "src/crypto.c": "070625cdc88117589a635269d0a7bb4e06b8f3769852389bad48290321daa07a",
+    "src/crypto.h": "a886966701bcbd6a439879672e6e90415a5d8416e619b11831553dac3be93013",
+    "src/mysql.c": "52b1338243e8bed28902389cfbff9ed01b98814feab67a252da6ab19071cac42",
+    "src/mysql.h": "963f1ce64373c6d66d6f584fd95df2a0f1f607295af88fc7d4cc9e6cc1474faa",
+    "dnf.manifest": "b5ce0ef2bb9ba5f57fa2b8fd9155b86be5855bf4270649228c1999a22f9d667e",
+    "src/test_crypto.c": "c57d0df656108c309aa9d1d007cce144513499e183df075f632af3a1677e77a5",
+    "src/builtin_key.h": "96358f29452e2c348a81afda0da7e6cee05017e0b58bc505005034702c82310c"
+  },
+  "scope": "Source import; original input remains read-only. Build outputs stay outside repository. Default embedded sample key explicitly authorized by user.",
+  "default_private_key_sha256": "c81ab3a0f52cd828db3f75dafd01ae7c261521b9f48a4d55fc33e1487a625eb9",
+  "originals_reverified_unchanged": true,
+  "integration_changes": [
+    "Current active key-pair export without overwrite; invalid external key fails explicitly",
+    "Remove hardcoded database password and test game account",
+    "Resolve Unicode client path beside launcher; pass child game address with explicit environment override",
+    "Report registration auxiliary-table errors and length-bound MySQL error packets",
+    "Independent source kit; fixed toolchain and external reproducible builds",
+    "User-authorized default private/public pair; only server publickey.pem updated in native ZIP"
+  ],
+  "default_public_key_sha256": "4b8f70c8a2539685c343fb3a34ae872092a961c3254cde312f922a76f7be243d",
+  "baseline_change": {
+    "changed_members": [
+      "home/neople/game/publickey.pem"
+    ],
+    "unchanged_members": 656,
+    "native_sha256": "4af9c4b17e1c0ce166e93390d297258c590e3ab39bbfdde661bd13d8284d07b3"
+  },
+  "validation_receipt": "../x/dnf-native-output/probes/20261116T103234975461Z/login/receipt.json",
+  "source_kit_rebuild_receipt": "../x/dnf-native-output/release-3.0-20261116/source-kit-check.json"
+}

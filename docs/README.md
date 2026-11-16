@@ -4,7 +4,7 @@
 
 当前采用 **GUI + ZIP 资源 + 独立实例目录**，包体积没有上限。旧单文件 MySQL、CAB 和 210 MB 限制属于历史交付形态。
 
-当前发布为 **2.0**：包含按语义处理缺失装备视觉模板、共享宠物脚本独立编号和显式 GBK/BIG5 选择。发布目录为 `../x/DNF-Native-2.0/`，压缩包为 `../x/DNF-Native-2.0.zip`，校验文件为 `../x/DNF-Native-2.0.zip.sha256`。解压后运行 `DNF-Native.exe`；使用与升级步骤见下文。自带 PVF 和指定 jbz69 GBK PVF 已通过完整初始化及正常停服，客户端业务验证仍未完成。
+当前发布为 **3.0**：自动识别 PVF 的 GBK／BIG5 脚本编码，新实例保留可登录的 `game` 数据库账号，并提供私有登录连接配置；附带独立简单登录器、源码及当前密钥对导出按钮，服务端默认公钥与其配对；沿用缺失视觉模板和共享宠物编号修复。发布目录为 `../x/DNF-Native-3.0/`，压缩包为 `../x/DNF-Native-3.0.zip`，校验文件为 `../x/DNF-Native-3.0.zip.sha256`。解压后运行 `DNF-Native.exe`；使用与升级步骤见下文。两份 PVF 的原版初始化、正常停服和新实例工作流已通过；此前 2.0 客户端实测到教程场景，3.0 后续客户端重启受图形初始化故障阻塞，城镇及完整战斗尚未验收。
 
 ## 仓库目录
 
@@ -12,6 +12,7 @@
 | --- | --- |
 | `src/runtime/` | ELF 加载、指令适配和 Linux ABI 到 Windows 的兼容实现 |
 | `src/controller/` | Win32 GUI、实例生命周期、服务控制、日志、IP 和插件设置 |
+| `src/login/` | 用户提供的独立 C 登录器、签名和 MySQL 原生协议，含密钥对导出 |
 | `src/database/` | 官方 MySQL 工具调用、初始化、备份、影子还原与恢复 |
 | `src/win32_files.h` | 控制台和维护程序共用的 Win32 文件接口 |
 | `src/third_party/miniz/` | 内置 ZIP 解压所需的上游代码 |
@@ -31,9 +32,10 @@
 | `resources/native.zip` | 657 个原生服务、Linux 用户库、PVF、DP2/Lua/Frida、配置模板及应用建库种子 |
 | `resources/mysql.zip` | 114 个官方 MySQL 5.7.44 程序、本地依赖及上游许可文件 |
 | `resources/baseline.ini` | 统一目录的 v4 清单，含原生逐文件哈希和种子哈希 |
+| `resources/login/` | 用户授权公开的默认登录器密钥对 |
 | `resources/baseline.json` | 上述三个文件的大小、SHA-256、来源和验证边界 |
 
-两个 ZIP 纳入仓库；native.zip 已按完整 Linux 目录树规整，不纳入自研宿主或 GUI 的历史 EXE。打包时校验基底身份、原生全部成员与 ELF 直接依赖，并用本轮构建的程序重新生成产品 `resources.ini`。本次目录迁移保留所有 ELF、库、资产和种子原字节，仅修改服务模板中的根路径；原 ZIP 和清单可从父提交恢复。基底内嵌的两份自研插件辅助脚本还会与当前源码核对，避免源码变化后静默发布旧实现。
+两个 ZIP 纳入仓库；native.zip 已按完整 Linux 目录树规整，不纳入自研宿主或 GUI 的历史 EXE。打包时校验基底身份、原生全部成员与 ELF 直接依赖，并用本轮构建的程序重新生成产品 `resources.ini`。目录迁移保留所有 ELF、库、资产和种子原字节，仅修改服务模板中的根路径；3.0 按用户授权仅将默认公钥改为与独立登录器配对，657 个成员中其余 656 个内容不变，原 ZIP 和清单可从父提交恢复。基底内嵌的两份自研插件辅助脚本还会与当前源码核对，避免源码变化后静默发布旧实现。
 
 ## 开发构建
 
@@ -65,6 +67,7 @@ python -B tools/build_all.py
 python -B tools/build.py
 python -B tools/build_mysql.py
 python -B tools/build_gui.py
+python -B tools/build_login.py
 python -B tools/build_instance_package.py --output ../x/dnf-native-output/package
 ```
 
@@ -81,6 +84,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 | `resource_baseline.py` | 基底文件身份核验及 ELF 直接依赖读取 |
 | `build.py` | 双架构 ELF 宿主 |
 | `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
+| `build_login.py` | 独立登录器与默认密钥配对核验 |
 | `build_gui.py` | Win32 GUI 与 ZIP 解压组件 |
 | `build_instance_package.py` | 核对资源、源码和构建收据，生成当前产品包 |
 | `build_all.py` | 按顺序调用上述构建步骤 |
@@ -97,7 +101,12 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
     dnf-host-x64.exe
     mysql-control.exe
     resources.ini
+  login/
+    DNFLogin.exe
+    source/
+  docs/
     README.md
+    login.md
     third-party.md
 ```
 
@@ -141,11 +150,14 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 当前升级验证覆盖一个固定旧布局副本的辅助协议、停服维护及 game 自然初始化、插件释放；其他自定义资源和数据库版本仍须按实际组合验证。三个安全组件的现有配置依赖未随包提供的配置服务/安全监控端点；不能仅改成本地配置并自连端口就当作完整安全模式，详见[验证记录](validation.md)。
 
-P25 已用指定客户端及登录器的独立副本实际完成注册、频道认证、角色创建、角色读取和进入教程场景；尚未完成进入城镇与完整战斗验收。该客户端的 `ijl15.dll` 需要有效游戏地址：测试通过环境变量 `GAME_SERVER_IP=127.0.0.1` 提供；登录器的数据库地址不会自动设置游戏地址。服务器公钥必须与登录器签名密钥配对。后续客户端重启仍出现“图表系统建立失败”及访问异常；当前 RDP 下窗口化 D3D9 设备创建通过、全屏设备失败，不能把客户端显示问题当作 PVF 或认证失败。详细现场见[验证记录](validation.md)。
+P25 已用指定客户端及登录器的独立副本实际完成注册、频道认证、角色创建、角色读取和进入教程场景；尚未完成进入城镇与完整战斗验收。该客户端的 `ijl15.dll` 需要有效游戏地址：测试通过环境变量 `GAME_SERVER_IP=127.0.0.1` 提供；原输入登录器的数据库地址不会自动设置游戏地址；3.0 附带的独立登录器在没有显式 `GAME_SERVER_IP` 时，以填写的数据库地址传递给子进程。服务器公钥必须与登录器签名密钥配对。后续客户端重启仍出现“图表系统建立失败”及访问异常；当前 RDP 下窗口化 D3D9 设备创建通过、全屏设备失败，不能把客户端显示问题当作 PVF 或认证失败。详细现场见[验证记录](validation.md)。
+
+独立登录器的放置、密钥导出及构建见 [登录器说明](login.md)。它保留手动连接信息，不读取服务实例；发布包包含可独立构建的对应源码。新实例默认公钥已经匹配，已有实例不会自动替换公钥。
 
 ## 验证入口
 
 ```powershell
+python -B tests/test_login.py
 python -B tests/test_elf.py
 python -B tests/test_entry.py
 python -B tests/test_vm.py

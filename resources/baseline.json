@@ -1,15 +1,15 @@
 {
-  "version": 2,
-  "origin": "Unified Linux directory tree derived from pinned snapshot; ELF, assets, libraries and seed bytes unchanged. Only service root template and container paths changed.",
-  "evidence": "docs/evidence/history.json#/records/p20-instance-delivery.json",
+  "version": 3,
+  "origin": "Pinned original ELF/assets/libraries/PVF/seeds retained. On 2026-11-16 user authorized publishing their standalone launcher and default key pair; only home/neople/game/publickey.pem changed from baseline version 2.",
+  "evidence": "docs/evidence/login-source.json",
   "files": {
     "native.zip": {
-      "bytes": 257674424,
-      "sha256": "ff688a9e672eb0b8dbc0f48f3c1f78ba32059aac5828b0a272ba2835b91a4569"
+      "bytes": 257674421,
+      "sha256": "4af9c4b17e1c0ce166e93390d297258c590e3ab39bbfdde661bd13d8284d07b3"
     },
     "baseline.ini": {
       "bytes": 192392,
-      "sha256": "06aa9bb06b7b1c073b1dd318f947185e90ae573cb793b4f64c6d0430a640ad63"
+      "sha256": "8efb9584803243d097bb7bbcfe693e22d8c7be671948ee0b847de01f7748f0fb"
     },
     "mysql.zip": {
       "bytes": 20527300,
@@ -26,16 +26,16 @@
   "scope": "Pinned service/library/plugin/PVF/seed templates and official database programs. Generated instances, user data, build tools and project host executables are excluded.",
   "previous_files": {
     "native.zip": {
-      "bytes": 257681089,
-      "sha256": "8b14ce63fa667d6e9116324b97bfd05111bf2e180837e352281536a5e590e7a5"
+      "bytes": 257674424,
+      "sha256": "ff688a9e672eb0b8dbc0f48f3c1f78ba32059aac5828b0a272ba2835b91a4569"
+    },
+    "baseline.ini": {
+      "bytes": 192392,
+      "sha256": "06aa9bb06b7b1c073b1dd318f947185e90ae573cb793b4f64c6d0430a640ad63"
     },
     "mysql.zip": {
       "bytes": 20527300,
       "sha256": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc"
-    },
-    "baseline.ini": {
-      "bytes": 199050,
-      "sha256": "23b4a0bc47295ac5269f97505f15ccb1a3cce9804f77807fa278783bf4e83d08"
     }
   },
   "layout": "Unified guest root; service roots are dot; host architecture remains per service."
