@@ -309,6 +309,16 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 
 当前对比、有效运行收据、排除的诊断实验及私有日志位于仓库外 `../x/dnf-native-output/P20-20261116-pvf/`；主要说明为 `PVF对比与兼容问题.md`，机器可读汇总为 `comparison.json`。用户反馈的 Linux 可用结果与本轮 Windows 实测范围分开记录。
 
+## Windows 库函数替代实验（2026-11-16）
+
+按用户提出的精简方向，在仓库外独立实现一个 i686 导入桥接实验，复用本项目 `elf.c` 的哈希校验和映射，依据实际 ELF 符号及 i386 重定位规则，将原 game 的部分库函数导入绑定到 Windows CRT。未使用 `win-port` 的源码、加载器、补丁、配置或编译产物；未加载 Linux 动态加载器、glibc、DP2 或其他插件，未改写 game 指令或输入文件。未实现的强导入在第一次调用时以 122 明确失败，未解析弱符号按 ELF 规则为零。
+
+环境为 Windows 10 x64 10.0.19044，实验程序为 i686，使用固定 llvm-mingw 20261104 的 clang 23.1.5。目标原 game SHA-256 与上节相同。实验执行原 ELF 的 `PackSet` 构造、`open`、`get` 和析构；`open` 使用从原 `InitRDARScript` 指令核对的模式 1。两份 PVF 均成功读取目录和文件，抽取的 5 份文件与此前独立离线解析器的结果逐字节相同；另 3 项不存在检查一致。两份均未找到 `equipment/character/atswordman.lay`，指定 PVF 能读到此前失败装备的 462 字节脚本。实际调用 11 种导入接口，没有触发未实现接口。
+
+这证明 Windows 库函数替代能够执行上述原版 PVF 包读取路径，不代表已运行完整装备解析、全局构造、game 初始化、插件或业务流程，也没有完成本次 PVF 修复。实验 EXE 为 284,160 字节，不能与完整宿主的大小或初始化耗时直接比较。单个 game 有 287 个未定义动态符号；其余服务、Linux DSO 及两种位数的 ABI 仍需分别处理。固定 `native.zip` 的根部 `lib/`、`lib64/` 共 54 个文件，未压缩 19,758,783 字节、压缩数据 9,003,132 字节；这是这两个目录的当前占用，不能作为整个产品移除 Linux 依赖后的净收益。
+
+本阶段决策：保留独立实验作为对照手段，当前产品继续使用原版 Linux 用户库；在证明完整原 game 初始化、当前 PVF 差异及实际插件需求之前，不作整体替换或删减固定资源基底。可复现入口为 `python -B ../x/dnf-native-output/P21-20261116-native-import-probe/run_probe.py`，源码、逐项重定位记录、构建身份及结果均在该外部目录；主要说明为 `原生导入替代实验与决策.md`，收据为 `receipt.json`。
+
 ## 历史路径与来源对应
 
 原阶段 Markdown 已合并；原内容可从 Git 整理前提交 `f7d57f5` 复核，例如 `git show f7d57f5:docs/20-instance-delivery.md`。81 份历史 JSON 合并到 [history.json](evidence/history.json)，通过 `records` 下的原文件名定位，数据内容保持不变。`original_sha256` 记录合并前每份原文件的哈希，精确原字节可从其 `source_commit`（`fbb11f3`）恢复。原有路径、哈希、命令和本机 probe 位置都是当时的身份记录，不自动替换为新路径或实测结论。上轮整理收据仍单独保留为 `reorganization.json`。
