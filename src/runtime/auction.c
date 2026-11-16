@@ -19,6 +19,29 @@ static Visit original_destroy, original_update;
 static Constraint original_constraint;
 static unsigned refine_limit = 7;
 static void *original_utf8_conversion;
+static void *original_tokenizer;
+static char utf8_token[1024];
+static char *utf8_next_token(const char **source,char quote,char separator) {
+    /* Quotes/separators are ASCII. UTF-8 bytes must pass through individually:
+       the original DBCS parser consumes two bytes for every negative char and
+       can swallow a closing quote after an odd number of non-ASCII bytes. */
+    const char *p=*source; size_t n=0; int quoted=0;
+    while(*p) {
+        char c=*p;
+        if(c==quote) quoted=!quoted;
+        else if(!quoted && c==separator) break;
+        else {
+            if(n==sizeof(utf8_token)-1) {
+                fputs("auction UTF8 iteminfo token exceeds original buffer\n",stderr);
+                ExitProcess(125);
+            }
+            utf8_token[n++]=c;
+        }
+        ++p;
+    }
+    utf8_token[n]=0; if(*p) ++p; *source=p;
+    return utf8_token;
+}
 static const char manual_prices[]="UPDATE auction_average_price AS A JOIN auction_manual_average_price AS B ON A.item_id=B.item_id AND A.upgrade=B.upgrade AND A.seperate_upgrade=B.seperate_upgrade SET A.average_price=B.average_price WHERE B.is_apply=0";
 static int utf8_name(char *source,char *destination) {
     size_t n=0; while(n<256 && source[n]) ++n;
@@ -184,8 +207,10 @@ int nr_auction_configure(NrRun *run,const char **error) {
     if(!matches(e,0x080647ae,(const unsigned char *)"\x55\x89\xe5\x57\x56\x53",6)) return 0;
     const unsigned char charset[]={0xc7,0x44,0x24,0x04,0xb5,0x49,0x15,0x08};
     Hook utf8_hook={0x0806b7f4,"\x55\x89\xe5\x53\x83\xec\x14",7,utf8_name,&original_utf8_conversion};
+    Hook token_hook={0x0807c9a4,"\x55\x89\xe5\x83\xec\x38",6,utf8_next_token,&original_tokenizer};
     if(utf8_index && !matches(e,0x0806b78e,charset,sizeof(charset))) return 0;
     if(utf8_index && !matches(e,utf8_hook.pc,(const unsigned char *)utf8_hook.bytes,utf8_hook.length)) return 0;
+    if(utf8_index && !matches(e,token_hook.pc,(const unsigned char *)token_hook.bytes,token_hook.length)) return 0;
     const unsigned char manual_query[]={0xc7,0x44,0x24,0x04,0xec,0x67,0x15,0x08};
     if(price_keys && !matches(e,0x080703cd,manual_query,sizeof(manual_query))) return 0;
     InitializeCriticalSection(&average_lock); refine_limit=refine;
@@ -201,6 +226,7 @@ int nr_auction_configure(NrRun *run,const char **error) {
         memcpy(code+4,&utf8_address,4);
         if(!write_patch(e,0x0806b78e,code,8)) return 0;
         if(!hook(e,&utf8_hook)) return 0;
+        if(!hook(e,&token_hook)) return 0;
     }
     if(price_keys) {
         unsigned char code[8]; memcpy(code,manual_query,8); uint32_t address=(uint32_t)(uintptr_t)manual_prices;

@@ -163,9 +163,12 @@ static bool refresh_service(Service &service) {
     return true;
 }
 
+#include "game_compat.h"
+
 static void start_service(Service &service, const std::wstring &instance, HANDLE job) try {
     refresh_service(service);
     if (service.process) return;
+    prepare_game_compat(service);
     service.state = L"正在启动";
     service.readiness = L"宿主启动中";
     service.application_initialized = false;

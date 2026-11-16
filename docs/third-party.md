@@ -3474,3 +3474,5 @@ the FAQ for more information on the distribution of modified source versions.
 本项目依据固定原版 auction／point 的指令与原函数行为、当前 PVF 的格式和实际数据，独立实现搜索范围、均价分组、索引生成、数据库迁移与 Win32 维护窗口。原 ELF 比较和搜索／均价实验在 `../x/dnf-native-output/P30-20261116T143145Z-auction-refine-pvf-research/`；实际实现及验证范围见[架构](architecture.md#双拍卖维护)和[验证记录](validation.md)。两个原 ELF 仍属于固定 `native.zip` 资产，不因内存适配变成本项目重建的服务。
 
 与参考行为的主要差异是：同时核对两个市场；范围来自当前 PVF，不固定改成 127，不压低 PVF 的锻造或等级；均价扩展保留原算法、真实锻造值和数据库维度；UTF-8 索引不以编号假名替代中文名；缺乏分类依据的定义明确列出；更新前检查存量订单及均价，不把重建索引与清库捆绑。DP2 搜索保护只替换可识别的原脚本片段，周边内容及凭据保留，SQL 失败或无有效记录时保留原包字节。此参考记录不授予该工程未说明的再分发许可。
+
+P32 的 UTF-8 拆分修复依据固定 auction／point 的 `NextToken` 反汇编、真实请求和实际读入结果独立实现；金币门槛接口依据固定 game 的原比较指令、原 DP2/DPX 的可复核接口行为及独立副本实验实现。未从 `dnf-robot-main`、`rednf` 或 `win-port` 搬运相应代码、补丁表或产物。原 ELF 与 DP2/DPX 仍沿用固定 ZIP 的既有来源和分发边界；本轮不修改这些输入资产。

@@ -19,7 +19,8 @@ def main():
         unpack_runtime(root, "i686", ("lib/", "usr/", "home/neople/auction/", "home/neople/point/"))
     (root / "utf8.dat").write_bytes(("2675336 2 "+"1 "*11+"1 `测试金币` `` 13002\r\n"+
         "16400 2 "+"1 "*11+"85 `测试装备85` `` 11105\r\n"+
-        "16401 2 "+"1 "*11+"100 `测试装备100` `` 11105\r\n").encode("utf-8"))
+        "16401 2 "+"1 "*11+"100 `测试装备100` `` 11105\r\n"+
+        "12400 0 "+"1 "*11+"1 `残破的牛皮短裤` `Cracked Leather Pants` 11103\r\n").encode("utf-8"))
     source = (ROOT / "src/runtime/run.c").read_text(encoding="utf-8")
     for old, new in {
         "static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {": "void nr_probe_install(NrRun *run);\nint nr_probe_trap(EXCEPTION_POINTERS *exception);\nstatic LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {",
