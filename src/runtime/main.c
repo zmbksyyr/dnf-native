@@ -57,6 +57,11 @@ int wmain(int argc, wchar_t **argv) {
         return 1;
     }
     if (execute) {
+        if (!nr_game_configure(&run, &error)) {
+            fprintf(stderr, "Game configuration failed: %s\n", error);
+            nr_elf_close(elf);
+            return 1;
+        }
         if (!nr_pvf_encoding(&run, &error)) {
             fprintf(stderr, "PVF encoding selection failed: %s\n", error ? error : "Windows memory operation failed");
             nr_elf_close(elf);

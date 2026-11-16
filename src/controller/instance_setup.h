@@ -207,16 +207,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
         L"INSERT INTO d_taiwan.member_white_account(m_id) VALUES(@demo_uid);"
         L"INSERT INTO taiwan_login.member_login(m_id) VALUES(@demo_uid);");
     if (demo.code) throw std::runtime_error("Create default test login account failed; inspect private setup log");
-    ToolResult date = sql(exe, instance, L"SELECT DATE_FORMAT(NOW(),'%Y%m');");
-    std::string month = date.output.substr(0,6);
-    if (date.code || month.size() != 6 || month.find_first_not_of("0123456789") != std::string::npos)
-        throw std::runtime_error("Read application monthly table date failed");
-    std::wstring monthly;
-    for (const wchar_t *schema : {L"taiwan_cain_auction_gold",L"taiwan_cain_auction_cera"}) for (const wchar_t *table : {L"auction_history",L"auction_history_buyer"})
-        monthly += L"CREATE TABLE IF NOT EXISTS " + std::wstring(schema) + L"." + table + L"_" + decode(month) + L" LIKE " + schema + L"." + table + L";";
-    monthly += L"CREATE TABLE IF NOT EXISTS taiwan_cain_log.log_response_time_" + decode(month) +
-               L" LIKE taiwan_cain_log.log_response_time_202004;";
-    if (sql(exe, instance, monthly.c_str()).code) throw std::runtime_error("Prepare monthly application tables failed");
+    monthly_prepare(exe,instance,true);
     for (const wchar_t *name : {L"dbmw_guild\\cfg\\dbmw_gld_siroco.cfg",L"dbmw_mnt\\cfg\\dbmw_mnt_siroco.cfg",L"dbmw_stat\\cfg\\dbmw_stat_siroco.cfg",
                                L"game\\cfg\\siroco11.cfg",L"auction\\cfg\\auction_siroco.cfg",L"point\\cfg\\point_siroco.cfg"}) {
         std::wstring path = instance + L"\\home\\neople\\" + name;

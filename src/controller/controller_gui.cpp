@@ -12,7 +12,7 @@
 
 enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS,
        SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS,
-       DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE,
+       DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE, LEVEL_CAP, LEVEL_APPLY, LEVEL_LABEL, MONTHLY_PREPARE,
        LOG_SOURCE = 240, LOG_ENCODING, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
        SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES,
        SERVICE_DETAIL = 219, SERVICE_META = 272, SERVICE_READINESS, MAINTENANCE_DETAIL };
@@ -105,6 +105,8 @@ static ToolResult sql(const std::wstring &exe, const std::wstring &instance, con
     return run_tool(exe, instance, {L"mysql", instance, L"--defaults-file=client.private.cnf", L"--connect-timeout=5",
                     L"--batch", L"--skip-column-names", L"--execute=" + std::wstring(query)}, 15000);
 }
+
+#include "monthly_tables.h"
 
 static bool owns_response(const ToolResult &result, const Session &session) {
     std::string expected = "5.7.44\t" + session.uuid + "\t" + std::string(session.pid_name.begin(), session.pid_name.end());
@@ -199,6 +201,7 @@ struct App {
     std::vector<LogSource> log_sources;
     std::wstring operations, shown_log;
     ULONGLONG log_size = 0, log_modified = 0, log_scan = 0;
+    ULONGLONG monthly_checked = 0;
     bool log_loaded = false;
     std::wstring maintenance_summary = L"尚未执行";
     int dpi = 96;
@@ -361,6 +364,12 @@ struct App {
         SetWindowTextW(status, L"插件设置已保存，下次启动 game 生效");
         append(!dp2 ? L"DP2/Lua 已关闭，Frida 已关闭" : frida ? L"DP2/Lua 已启用，Frida 已启用" : L"DP2/Lua 已启用，Frida 已关闭");
     }
+    void show_level() {
+        Service *game = game_service();
+        unsigned level = game ? game->max_level : 70;
+        for (unsigned i = 0; i < sizeof(game_level_choices) / sizeof(*game_level_choices); ++i)
+            if (game_level_choices[i] == level) SendMessageW(GetDlgItem(window,LEVEL_CAP),CB_SETCURSEL,i,0);
+    }
     int selected_service_index() const {
         HWND list = GetDlgItem(window, SERVICE_LIST);
         if (!list) return -1;
@@ -469,7 +478,7 @@ struct App {
         // The worker may be changing process ownership. Inspect it after join.
         if (busy) {
             for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,
-                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE})
+                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE,LEVEL_CAP,LEVEL_APPLY})
                 EnableWindow(GetDlgItem(window, id), FALSE);
             for (int id : {SERVICE_LIST,SERVICE_LOGS}) EnableWindow(GetDlgItem(window,id), FALSE);
             for (int id : {FOLDER,LOGS}) EnableWindow(GetDlgItem(window,id), !current.empty());
@@ -514,13 +523,18 @@ struct App {
         EnableWindow(GetDlgItem(window, DP2_ENABLE), editable);
         EnableWindow(GetDlgItem(window, FRIDA_ENABLE), editable && SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED);
         EnableWindow(GetDlgItem(window, PLUGINS_SAVE), editable);
+        EnableWindow(GetDlgItem(window, LEVEL_CAP), game && !pending);
+        LRESULT choice = SendMessageW(GetDlgItem(window,LEVEL_CAP),CB_GETCURSEL,0,0);
+        bool different = game && choice >= 0 && static_cast<size_t>(choice) < sizeof(game_level_choices)/sizeof(*game_level_choices) &&
+                         game_level_choices[choice] != game->max_level;
+        EnableWindow(GetDlgItem(window, LEVEL_APPLY), different && !pending && (!running(*game) || session.process));
     }
     void load() {
         if (busy || session.process || services_running()) return;
         std::wstring value = window_text(path);
         if (value.empty()) {
             close_instance_lease(); current.clear(); services.clear(); maintenance_summary = L"尚未执行";
-            show_services(); show_plugins(); scan_logs(true); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
+            show_services(); show_plugins(); show_level(); scan_logs(true); SetWindowTextW(status, L"请选择实例目录"); controls(); return;
         }
         std::wstring chosen = full_path(value);
         if (_wcsicmp(chosen.c_str(), current.c_str())) {
@@ -537,7 +551,7 @@ struct App {
         if (known_instance(current) && std::find(recent_instances.begin(),recent_instances.end(),current)==recent_instances.end())
             recent_instances.push_back(current);
         maintenance_summary = L"尚未执行";
-        services = load_services(current, runtime); show_services(); show_plugins(); scan_logs(true);
+        services = load_services(current, runtime); show_services(); show_plugins(); show_level(); scan_logs(true);
         SetWindowTextW(service_ip, configured_service_ip(services).c_str());
         SetWindowTextW(GetDlgItem(window, INITIALIZE), present(resources + L"\\resources.ini") ? L"创建实例" : L"初始化");
         bool initialized = present(current + L"\\data\\auto.cnf");
@@ -573,6 +587,12 @@ struct App {
                 }
             };
             try {
+                auto prepare_months = [&] {
+                    bool repair = std::none_of(services.begin(),services.end(),[](const Service &s) {
+                        return (s.name==L"game" || s.name==L"auction" || s.name==L"point") && running(s);
+                    });
+                    result->details += monthly_prepare(tool,instance,repair) + L"\r\n";
+                };
                 if (id == DELETE_INSTANCE) {
                     if (!known_instance(instance) || instance.size() <= 3 ||
                         (GetFileAttributesW(instance.c_str()) & FILE_ATTRIBUTE_REPARSE_POINT))
@@ -592,8 +612,29 @@ struct App {
                     unsigned changed = update_service_ip(services, instance, target);
                     result->status = L"服务 IP 已更新";
                     result->details = changed ? L"已更新 " + std::to_wstring(changed) + L" 个服务配置文件；原配置已备份，下次启动生效。" : L"服务配置已使用此 IP，无需修改。";
+                } else if (id == LEVEL_APPLY) {
+                    auto game = std::find_if(services.begin(),services.end(),[](const Service &s) {return s.name==L"game";});
+                    if (game == services.end()) throw std::runtime_error("Game service is missing");
+                    unsigned level = std::stoul(target);
+                    if (!game_level_valid(level) || file_sha256(game->elf) != "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979")
+                        throw std::runtime_error("Level switch requires a supported level and the unchanged pinned game ELF");
+                    bool restart = running(*game);
+                    stop_service(*game);
+                    require(WritePrivateProfileStringW(L"gameplay",L"max_level",target.c_str(),(instance+L"\\services.ini").c_str()),"Save game maximum level");
+                    for (const auto &fresh : load_services(instance,runtime)) if (fresh.name==L"game") {
+                        game->environment=fresh.environment; game->max_level=fresh.max_level;
+                    }
+                    if (restart) start_service(*game,instance,service_job);
+                    result->status=L"等级上限已切换为 " + target + (restart ? L"，game 已重新拉起" : L"，下次启动 game 生效");
+                    result->details=result->status+L"；仅修改宿主执行内存，角色等级与经验未改写。";
+                } else if (id == MONTHLY_PREPARE) {
+                    if (!owned.process || !owns_response(sql(tool,instance,identity_query),owned)) throw std::runtime_error("Monthly maintenance instance identity differs");
+                    prepare_months();
+                    result->status=L"当前月与下月的拍卖、响应日志表已核对";
                 } else if (id == ALL_START || id == ALL_STOP || id == ELF_START || id == ELF_STOP) {
                     if (id == ALL_START && !owned.process) result->started = start_database(window, tool, instance);
+                    if (id == ALL_START || (id == ELF_START && selected >= 0 && static_cast<size_t>(selected) < services.size() &&
+                        (services[selected].name==L"game" || services[selected].name==L"auction" || services[selected].name==L"point"))) prepare_months();
                     if (id == ALL_START || id == ALL_STOP) {
                         if (id == ALL_START) {
                             for (auto &service : services) if (service.automatic) {
@@ -613,11 +654,12 @@ struct App {
                         else stop_service(services[selected]);
                         result->status = services[selected].name + L"：" + services[selected].state;
                     }
-                    result->details = result->status;
+                    result->details += result->status;
                 } else if (id == START) {
                     result->started = start_database(window, tool, instance);
+                    prepare_months();
                     result->status = L"数据库 SQL 检查通过（实例身份及 TLS 已核对）";
-                    result->details = result->status + L"\r\n服务器日志：" + result->started.log;
+                    result->details += result->status + L"\r\n服务器日志：" + result->started.log;
                 } else if (id == STOP) {
                     stop_database(window, tool, instance, owned);
                     result->stopped = true;
@@ -1076,6 +1118,14 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             control(L"BUTTON", L"Frida", BS_AUTOCHECKBOX | WS_TABSTOP, FRIDA_ENABLE);
             control(L"BUTTON", L"保存设置", WS_TABSTOP, PLUGINS_SAVE);
             control(L"STATIC", L"停止 game 后修改", 0, 208);
+            control(L"STATIC", L"等级上限", SS_CENTERIMAGE, LEVEL_LABEL);
+            HWND level = control(L"COMBOBOX", L"", CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP, LEVEL_CAP);
+            for (unsigned value : game_level_choices) {
+                std::wstring label = std::to_wstring(value) + L" 级";
+                SendMessageW(level,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
+            }
+            SendMessageW(level,CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
+            control(L"BUTTON", L"应用并重启", WS_TABSTOP, LEVEL_APPLY);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, 206);
             SendMessageW(app->output, WM_SETFONT, reinterpret_cast<WPARAM>(app->log_font), TRUE);
             control(L"STATIC", L"服务", SS_CENTERIMAGE, 207);
@@ -1152,6 +1202,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             // Seven columns and three rows share their hit rectangles with the
             // native selection model; metadata moves to the real detail action.
             place(207,36,108,34,22);place(213,76,108,140,22);
+            place(LEVEL_LABEL,228,105,64,26);place(LEVEL_CAP,294,103,76,30);place(LEVEL_APPLY,378,103,92,30);
             place(DP2_ENABLE,width-574,105,90,26);place(FRIDA_ENABLE,width-474,105,74,26);
             place(PLUGINS_SAVE,width-390,103,76,30);place(SERVICE_INFO,width-310,103,46,30);
             place(ELF_START,width-254,103,68,30);place(ELF_STOP,width-178,103,68,30);place(SERVICE_LOGS,width-102,103,68,30);
@@ -1245,9 +1296,11 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (result->started.process) app->session = result->started;
             if (result->deleted) {
                 app->current.clear(); app->services.clear();
-                SetWindowTextW(app->path, L""); app->show_plugins();
+                SetWindowTextW(app->path, L""); app->show_plugins(); app->show_level();
             }
             if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); }
+            app->show_level();
+            if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
             app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls(); app->scan_logs();
             if (!result->success) {
@@ -1277,6 +1330,9 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 CloseHandle(app->session.process); app->session = {}; app->controls();
             }
             if (GetTickCount64() - app->log_scan >= 2000) { app->scan_logs(); app->log_scan = GetTickCount64(); }
+            if (!app->busy && app->session.process && GetTickCount64()-app->monthly_checked >= 15*60*1000) {
+                app->monthly_checked=GetTickCount64(); app->action(MONTHLY_PREPARE);
+            }
             app->refresh_log();
             return 0;
         case WM_CONTEXTMENU: {
@@ -1320,6 +1376,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 }
                 return 0;
             }
+            if (id == LEVEL_CAP && HIWORD(wparam)==CBN_SELCHANGE) { if (!app->busy) app->controls(); return 0; }
             if (HIWORD(wparam) != BN_CLICKED) return 0;
             if (id == CHECK_RESOURCES && !app->busy) {
                 app->check_resources(); app->controls();
@@ -1401,6 +1458,11 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 app->controls();
             } else if (id == FRIDA_ENABLE) app->controls();
             else if (id == PLUGINS_SAVE) app->save_plugins();
+            else if (id == LEVEL_APPLY) {
+                LRESULT choice=SendMessageW(GetDlgItem(window,LEVEL_CAP),CB_GETCURSEL,0,0);
+                if (choice>=0 && static_cast<size_t>(choice)<sizeof(game_level_choices)/sizeof(*game_level_choices))
+                    app->action(LEVEL_APPLY,std::to_wstring(game_level_choices[choice]));
+            }
             else if (id == IP_APPLY) {
                 std::wstring value = window_text(app->service_ip);
                 if (!valid_ipv4(value)) {

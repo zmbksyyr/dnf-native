@@ -2,6 +2,7 @@
 #pragma once
 #include <winsock2.h>
 #include "../win32_files.h"
+#include "../game_levels.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -11,6 +12,7 @@ struct Service {
     std::wstring name, host, root, cwd, elf, loader_hash, elf_hash, pid_file;
     std::vector<std::wstring> arguments, environment;
     bool automatic = false;
+    unsigned max_level = 70;
     unsigned signal = 15;
     HANDLE process = nullptr;
     DWORD pid = 0;
@@ -37,6 +39,13 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
     if (GetFileAttributesW(file.c_str()) == INVALID_FILE_ATTRIBUTES) return services;
     if (setting(file, L"services", L"version") != L"1") throw std::runtime_error("Unsupported service instance format");
     std::wstring plugin_mode = setting(file, L"plugins", L"mode");
+    std::wstring maximum = setting(file, L"gameplay", L"max_level");
+    unsigned maximum_level = 70;
+    if (!maximum.empty()) {
+        size_t used = 0;
+        maximum_level = std::stoul(maximum, &used);
+        if (used != maximum.size() || !game_level_valid(maximum_level)) throw std::runtime_error("Invalid game maximum level");
+    }
     if (!plugin_mode.empty() && plugin_mode != L"off" && plugin_mode != L"lua" && plugin_mode != L"frida")
         throw std::runtime_error("Unknown game plugin mode");
     unsigned count = GetPrivateProfileIntW(L"services", L"count", 0, file.c_str());
@@ -75,6 +84,14 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
             }), env.end());
             if (plugin_mode != L"off") env.push_back(dp2_preload);
             env.push_back(plugin_mode == L"frida" ? L"DNF_NATIVE_FRIDA=1" : L"DNF_NATIVE_FRIDA=0");
+        }
+        if (service.name == L"game") {
+            service.max_level = maximum_level;
+            auto &env = service.environment;
+            env.erase(std::remove_if(env.begin(), env.end(), [](const std::wstring &value) {
+                return value.rfind(L"DNF_NATIVE_MAX_LEVEL=", 0) == 0;
+            }), env.end());
+            env.push_back(L"DNF_NATIVE_MAX_LEVEL=" + std::to_wstring(maximum_level));
         }
         services.push_back(service);
     }

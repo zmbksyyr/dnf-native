@@ -42,6 +42,7 @@ flowchart TD
 | `signal.c` | 当前服务所需处理器、掩码、SA_SIGINFO/SA_RESTORER/SA_NODEFER、嵌套帧及上下文恢复 |
 | `tls.c` | Linux FS/GS TLS 指令适配和返回路径 |
 | `service.c` | 固定 DBMW/manager ELF 的网络线程停服顺序修正，独立于 syscall 兼容语义 |
+| `game.c` | 固定 game 的等级规则及成长奖励包读取修正；进入原程序前校验并修改执行内存 |
 | `pvf.c` | 固定 game ELF 的可选视觉模板、宠物列表编号及自动脚本编码适配，独立于 syscall 兼容语义 |
 
 映射表最多 4096 项，记录已使用前缀并复用空槽。VM 修改、内存检查和异常读取使用同一进程内临界区，防止 guest 线程争用映射槽。文件、socket 和 eventfd 共用 `NR_FD_SLOTS=1024` 项描述符，`RLIMIT_NOFILE` 与分配、文件映射、select/poll/epoll 使用同一上限；Winsock 集合容量在编译时核对。该容量满足固定 relay 配置的 1000 个客户端及其内部描述符，实际验证见[容量记录](validation.md)。线程表仍为 64 项，描述符耗尽继续返回 `EMFILE`，不支持任意扩容。
@@ -74,6 +75,28 @@ flowchart TD
 原版 `clear()` 漏清动作字符串 `+0x5c`。缺失模板分支在原元数据赋值后，通过 guest 调用原 `std::string::operator=(char const*)`（`0x08708720`）将该字段清空，再返回原 epilogue（`0x089c2826`）；其余动作字段和向量已由原 clear 清理。调用沿用 guest 参数区、原空串与原 COW 字符串所有权，入口指令及空串也先核验。这样交替加载有效和缺失模板不会残留上一层动作路径，层号与 `+0x60` 变体标识保持不变。
 
 宠物列表允许多个编号共用脚本路径。原导入函数按文件名反查编号，只能得到第一项；适配在原导入成功后恢复当前列表项的真实编号，再执行原版属性转换、装备绑定、数据库同步及查重注册。P23 独立验证了指定 PVF 的 243 个编号和 243 个不同对象。编码默认在 `loadStringTable` 的 `0x088bb551` 读取原版 PackSet 已解密的字符串表，核对计数和偏移后，仅对字符串跨度抽样，按 Windows 严格 GBK／BIG5 解码、常用汉字和私用区字符评分，记录分数与结果。纯 ASCII 保留 BIG5；差异不足或表结构损坏明确失败。`DNF_NATIVE_SCRIPT_ENCODING=GBK`／`BIG5` 继续作为显式覆盖。该位置完整原指令 `8b45f0`、原编码常量和原字符串赋值入口均先核验；通过 guest CALL 调用原 `std::string::operator=(char const*)` 更新脚本编码对象，再执行原 MOV。继续由原 Linux iconv 转换，不改写输入 PVF、数据库编码或客户端编码，也不使用 PVF 哈希白名单。所有修改记录哈希、原字节、替换字节及执行内存范围；结束进程或回退宿主即可恢复，PVF、磁盘 ELF 和固定资源基底不变。
+
+## 等级规则与成长奖励
+
+`src/game_levels.h` 定义 13 个等级选项；GUI 将 `[gameplay] max_level` 传为 game 的 `DNF_NATIVE_MAX_LEVEL`，缺省 70。`runtime/game.c` 仅接受固定 i386 game SHA-256 `da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979`。进入程序前同时核对磁盘与执行内存中的完整原指令，再修改等级立即数；未知版本、旧字节不同、重复或无效配置明确拒绝。日志保存身份、地址及旧/新值；进程退出释放映射即恢复，不生成替换 ELF。
+
+以下是依据基底原指令、函数用途独立确定的 15 处操作数，L 为所选上限；十六进制 46/45 分别为原 70/69。SP 初始化/读取、升级事件、状态经验边界、升级道具及角色上限同时调整。
+
+| 操作数字节地址 | 原值 → 新值 | 原函数 |
+| --- | --- | --- |
+| `0x08360c3b`、`0x08360c79` | `46` → L | `CDataManager::set_reward_sp` |
+| `0x08360cc4` | `46` → L | `CDataManager::GetSpAtLevelUp` |
+| `0x08662f55`、`0x086630f3` | `46` → L | `CUser::_check_level_up` |
+| `0x086638f6` | `46` → L | `CUser::_onLevelUp` |
+| `0x08665d28`、`0x08666e9c` | `45` → L−1 | `CUser::increase_status` |
+| `0x0866a4a8` | `45` → L−1 | `CUser::gain_exp_sp` |
+| `0x0866a659`、`0x0866a929`、`0x0866a941` | `46` → L | `CUser::gain_exp_sp` |
+| `0x08689d4b` | `45` → L−1 | `CUser::CalLevelUpItemCheck` |
+| `0x0868fece`、`0x0868feda` | `46` → L | `CUser::SetUserMaxLevel` |
+
+基底 `Dispatcher_Select_Item_Grwoth_Power::read` 在 `0x081db4ea` 的 `74 00` 使成功读取也落入错误块。原正常继续地址为 `0x081db512`，按相对分支公式计算偏移为 26，执行内存修正为 `74 26`。合法选择继续解析；空包和截断选择仍返回原 `0x4a55`、`0x4a5a`。这属于固定原程序的包读取错误，与具体 PVF 无关，不跳过读取或错误检查。
+
+用户提供的 13 份等级 ELF 只作为只读差异证据：70 级版已有 76 字节、35 组与等级无关的改动，其他版本再增加 15 个等级字节。项目不接入这些替换 ELF、不重放共同改动；来源差异见[第三方记录](third-party.md#用户提供的等级补丁)。本功能不重建经验/SP 表或客户端内容，也不回写既有角色等级、经验。
 
 ## 控制台与实例
 
@@ -115,6 +138,10 @@ IP 更新集中于 `service_ip.h`，修改前备份原配置；DP2/Lua/Frida 环
 4. **恢复**：失败或中断时通过 pending 日志恢复原冷目录，保留被拒绝的数据和诊断；解析无效的日志会明确失败，不猜测恢复。
 
 MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和二进制/存储程序往返另有独立证据，不能据一次简单 SQL 查询推断所有数据库语义。中文 defaults 路径使用实例工作目录内的相对配置名。
+
+`controller/monthly_tables.h` 根据原服务实际列清单维护 `taiwan_cain_auction_gold`、`taiwan_cain_auction_cera` 的 `auction_history_YYYYMM`（26 列）、`auction_history_buyer_YYYYMM`（8 列），以及 `taiwan_cain_log.log_response_time_YYYYMM`（6 列）。月份由 MySQL `NOW()` 计算，当前月与下月均准备，不再从不完整种子表 `LIKE` 复制。响应日志使用 `channel_no,occ_time,packet_id,packet_count,total_response_time,avg_response_time`，旧种子同名表实际是其他统计结构。
+
+新实例导入后、数据库启动后及 game/auction/point 启动前运行维护；持有数据库时每 15 分钟由单一后台操作线程复查。运行中允许建立缺失月表；修改既有结构要求这三个写入服务均停止。拍卖表仅补缺列；不识别的关键字段结构明确拒绝。响应表通过原表改名保存、正确新表原子换名处理。每次修改既有表前由官方 `mysqldump` 导出并记录 SHA-256，预先写回滚 SQL；迁移后核对字段，核对失败时执行回滚，失败现场与恢复 SQL 保留。拍卖回滚先改名保留迁移后表，再导回原结构和数据；响应回滚交换原表名称。历史月份及物品名称索引不在维护中删除或更新。
 
 ## 已确认的兼容限制
 

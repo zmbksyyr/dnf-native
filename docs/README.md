@@ -127,6 +127,10 @@ TCP 对端断开后，兼容层按 Linux 语义同时报告读就绪与挂断，
 
 修改服务 IP 要在全部停止后应用；修改 DP2/Lua 和 Frida 开关要先停止 game。日志查看直接读取 stdout、stderr、服务应用日志和 MySQL 日志，可选自动、UTF-8、936、950、949 编码，并支持刷新和跟随滚动。
 
+服务控制条的“等级上限”提供 50、55、60、65、70、75、80、85、86、90、95、99、100 级，默认 70。选择后点击“应用并重启”：正在运行时正常停止并重新拉起 game；停服时保存配置，下次启动生效。等级保存在实例 `services.ini` 的 `[gameplay] max_level`，宿主只修改原 ELF 的执行内存，磁盘文件、角色等级和经验不改写。PVF 的经验/SP 表、任务、物品和客户端仍须配套；仅提高上限不会生成这些内容。具体字节及兼容范围见[实现说明](architecture.md#等级规则与成长奖励)。
+
+控制台负责金币、点券拍卖库的历史及竞价历史月表，并准备响应时间日志表。创建实例、启动数据库及拍卖相关服务前会按数据库日期准备当前月和下月，运行中每 15 分钟核对一次。缺失表自动建立；旧拍卖表补齐原服务所需字段，误用其他统计结构的响应日志表另建正确表，保留旧表。修正前保存官方 SQL 备份、SHA-256 和回滚 SQL 到实例 `.mysql/monthly-*.private.sql*`。已有结构需要修正时须停止 game、auction、point，再从控制台重启数据库；运行中只创建缺失表。维护不删除历史月份、不改变拍卖物品索引，也不修正 PVF 与搜索索引名称不一致的问题。
+
 键盘可用 Tab 切换控件，方向键选择服务或筛选项，回车执行当前焦点按钮，空格切换开关；只读日志和详情框也可用 Tab 离开。Esc 取消当前选择器、下拉框或维护确认框。删除和还原默认选中“取消”；关闭控制台仍通过窗口关闭入口，并沿用正常停服流程。
 
 固定基底中的 Frida 配置为 `on_change=reload`。已验证覆盖写入和临时文件原子替换两种 JS 保存方式，原版 Gadget 均通过轮询回退在约 5 秒后加载新版，并实际返回新版 RPC 结果；这不是即时通知。该验证在 game 自然启动前的 DP2/Lua 夹具中完成，不能扩展为任意脚本、通用 inotify 或客户端业务通过。
@@ -167,6 +171,8 @@ python -B tests/test_luv.py
 python -B tests/test_frida.py --item-reset
 python -B tests/test_frida_reload.py
 python -B tests/test_pvf_templates.py
+python -B tests/test_game_rules.py
+python -B tests/test_gui_gameplay.py --gui ../x/dnf-native-output/package/DNF-Native.exe --instance <已停止的测试实例>
 python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package
 python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe
 ```

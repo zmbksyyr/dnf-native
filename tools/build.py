@@ -37,7 +37,7 @@ def main():
         record = {"arch": arch, "command": command,
                   "compiler_version": subprocess.check_output([str(compiler), "--version"], env=env, text=True),
                   "sources": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-                              for p in sorted((ROOT / "src/runtime").iterdir()) if p.is_file()},
+                              for p in [*sorted((ROOT / "src/runtime").iterdir()), ROOT / "src/game_levels.h"] if p.is_file()},
                   "decoder_commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
                   "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
         records.append(record)

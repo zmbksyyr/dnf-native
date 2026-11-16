@@ -3460,3 +3460,9 @@ the FAQ for more information on the distribution of modified source versions.
 ## 用户提供的简单登录器
 
 `src/login/`、`tests/login_crypto.c` 来源于用户的 `dfnlogin_c`，按 2026-11-16 会话明确授权纳入仓库；当前正式目录仅交付运行程序，源码随仓库管理。原始文件 SHA-256 见 [来源记录](evidence/login-source.json)，不是本项目独立重写的声明。未导入旧 EXE、工具链、build 目录或原构建脚本。密钥导出等集成差异见 `login.md`。`resources/login/` 默认配对经用户明确授权公开使用；服务器 ZIP 只同步其公钥，其余原版资源来源及声明继续有效。Windows CryptoAPI、Shell32、Winsock 属系统接口，不另带第三方加密运行库。
+
+## 用户提供的等级补丁
+
+2026-11-16 用户指定的“各种玩家等级补丁”包含 `df_game_r_50/55/60/65/70/75/80/85/86/90/95/99/100`。这些文件只读分析，未导入源码、资源 ZIP 或交付。以仓库固定原 game 为基线，70 级版有 76 个差异字节、35 组共同修改，涉及 GM、技能、PVP、日志和成长奖励；其他等级各再改变 15 个等级立即数字节。逐文件哈希、全部原/新字节、地址及所属符号保存在本机 `../x/dnf-native-output/P28-20261116T125315Z-level-monthly/patch-differences.json` 与 `等级补丁分析.md`。
+
+项目实现从基底 ELF 的完整指令和原控制流独立确定等级限制以及成功读取包的分支目标；不搬运这些 ELF、共同补丁或其生成器。公开的地址与语义记录见[等级规则](architecture.md#等级规则与成长奖励)。原字节校验、执行内存范围和退出恢复均由本项目宿主实现。此分析不授予未说明的第三方补丁再分发许可。
