@@ -1066,7 +1066,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             control(L"STATIC", L"5.7.44", SS_CENTERIMAGE, 201);
             control(L"STATIC", L"", SS_CENTERIMAGE|SS_ENDELLIPSIS, 212);
             control(L"STATIC", L"未启动", 0, 215);
-            control(L"STATIC", L"端口", 0, 203);
+            control(L"STATIC", L"端口", SS_CENTERIMAGE, 203);
             app->port = control(L"EDIT", L"3306", ES_NUMBER | ES_CENTER | WS_TABSTOP, PORT);
             app->status = control(L"STATIC", L"选择实例目录以开始", SS_LEFT, 204);
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{INITIALIZE,L"初始化"},{START,L"启动"},{STOP,L"停止"},{BACKUP,L"备份…"},{RESTORE,L"还原…"},{RECOVER,L"恢复操作"},{FOLDER,L"实例目录"},{LOGS,L"日志目录"}})
@@ -1145,8 +1145,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             button(FOLDER,compact?34:108);button(CHECK_RESOURCES,compact?34:92);
             SetWindowTextW(GetDlgItem(window,FOLDER),compact?L"\u25a1":L"\u25a1  \u5b9e\u4f8b\u6839\u76ee\u5f55");
             SetWindowTextW(GetDlgItem(window,CHECK_RESOURCES),compact?L"\u2713":L"\u2713  \u68c0\u67e5\u8d44\u6e90");
-            right-=compact?134:174;
-            place(SERVICE_IP,right+(compact?6:44),41,84,20);place(IP_APPLY,right+(compact?94:132),35,36,30);
+            right-=compact?150:188;
+            place(SERVICE_IP,right+(compact?6:44),41,84,20);place(IP_APPLY,right+(compact?104:142),35,46,30);
             int path_left=68+selector;
             place(INSTANCE,path_left+8,41,right-path_left-22,20);
             // Seven columns and three rows share their hit rectangles with the
@@ -1157,7 +1157,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             place(ELF_START,width-254,103,68,30);place(ELF_STOP,width-178,103,68,30);place(SERVICE_LOGS,width-102,103,68,30);
             SetWindowTextW(GetDlgItem(window,SERVICE_LOGS),L"\u67e5\u770b\u65e5\u5fd7");
             place(SERVICE_LIST,36,150,width-72,176);
-            place(202,72,375,54,28);place(201,128,376,48,26);place(203,198,376,28,26);place(PORT,232,380,48,20);
+            place(202,72,375,54,28);place(201,128,376,48,26);place(203,198,375,28,30);place(PORT,232,380,48,20);
             place(212,296,376,std::max(0,width-826),26);
             right=width-34;
             auto db_button=[&](int id,int w) {right-=w;place(id,right,375,w,30);right-=8;};
@@ -1199,10 +1199,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             int width=MulDiv(area.right,96,app->dpi),height=MulDiv(area.bottom,96,app->dpi);
             card(16,84);card(96,342);card(354,450);card(462,height-46);
             bool compact=width<1330;int selector=compact?200:236;
-            int right=width-32-(96+10+96+10+30+10+(compact?34:108)+10+(compact?34:92)+10)-(compact?134:174);
+            int right=width-32-(96+10+96+10+30+10+(compact?34:108)+10+(compact?34:92)+10)-(compact?150:188);
             RECT path={app->px(68+selector),app->px(33),app->px(right-8),app->px(66)};
             rounded(dc,path,RGB(248,250,254),RGB(228,235,248),app->px(8));
-            RECT ip={app->px(right),app->px(35),app->px(right+(compact?134:174)),app->px(65)};
+            RECT ip={app->px(right),app->px(35),app->px(right+(compact?96:134)),app->px(65)};
             rounded(dc,ip,RGB(255,255,255),RGB(220,230,247),app->px(8));
             if(!compact) {RECT label={ip.left+app->px(6),ip.top,ip.left+app->px(42),ip.bottom};text_at(dc,label,L"\u670d\u52a1 IP",RGB(139,157,184),app->small_font);}
             RECT port={app->px(226),app->px(375),app->px(286),app->px(405)};
@@ -1339,7 +1339,14 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 MessageBoxW(window,text.c_str(),L"服务详情",MB_OK|MB_ICONINFORMATION);return 0;
             }
             if(id==DATABASE_INFO) {
-                app->show_maintenance_detail();MessageBoxW(window,window_text(GetDlgItem(window,MAINTENANCE_DETAIL)).c_str(),L"数据库与维护详情",MB_OK|MB_ICONINFORMATION);return 0;
+                app->show_maintenance_detail();
+                std::wstring text = window_text(GetDlgItem(window,MAINTENANCE_DETAIL));
+                std::wstring login = app->current + L"\\login.private.cnf";
+                if (!app->current.empty() && present(login)) {
+                    text += L"\n\n登录器连接参数（仅在此显示，不写入日志）：\n" + decode(read_file(login));
+                    text += L"\n新实例默认游戏账号：test / 123456。\n旧实例以以上连接参数及自己的账号为准。\n按 Ctrl+C 可复制此窗口内容。";
+                }
+                MessageBoxW(window,text.c_str(),L"数据库与维护详情",MB_OK|MB_ICONINFORMATION);return 0;
             }
             if(id==LOG_FILES) {
                 HMENU menu=CreatePopupMenu();

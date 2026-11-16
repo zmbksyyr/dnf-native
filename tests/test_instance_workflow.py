@@ -143,6 +143,16 @@ def main():
                                 capture_output=True, timeout=30)
         assert result.returncode == 0 and result.stdout.splitlines()[0] == b"game@%", "Launcher game account cannot authenticate/read login tables"
         checks["game_launcher_account_unlocked_and_login_tables_readable"] = True
+        import configparser
+        login = configparser.ConfigParser(interpolation=None)
+        login.read(first / "login.private.cnf", encoding="utf-8-sig")
+        assert {key: login["client"][key] for key in ("host", "port", "user", "password")} == {
+            "host": "127.0.0.1", "port": "3306", "user": "game", "password": "uu5!^%jg"}
+        result = subprocess.run([str(tool), "mysql", str(first), "--defaults-file=login.private.cnf", "--batch", "--skip-column-names",
+            "--execute=SELECT COUNT(*) FROM d_taiwan.accounts a JOIN d_taiwan.member_info i ON i.m_id=a.UID JOIN d_taiwan.member_white_account w ON w.m_id=a.UID JOIN taiwan_login.member_login l ON l.m_id=a.UID WHERE a.accountname='test' AND a.password=MD5('123456');"],
+            capture_output=True, timeout=30)
+        assert result.returncode == 0 and result.stdout.strip() == b"1"
+        checks["requested_default_connection_and_test_account_four_tables"] = True
         result = subprocess.run([str(tool), "mysql", str(first), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names",
                                  "--execute=CREATE DATABASE instance_probe; CREATE TABLE instance_probe.saved(id INT PRIMARY KEY); INSERT INTO instance_probe.saved VALUES(73);"],
                                 capture_output=True, timeout=30)

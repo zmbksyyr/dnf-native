@@ -73,6 +73,10 @@ def main():
         for launch in [1, 2]:
             select_service(window, "game")
             previous_outputs = set((instance / "service-logs").glob("game-*.stdout.private.log"))
+            registration = {}
+            for peer in ("monitor", "guild"):
+                folder = instance / manifest[peer]["root"] / manifest[peer]["cwd"].lstrip("/") / "log"
+                registration[peer] = (folder, {p: p.stat().st_size for p in folder.glob("GameServer*.log")})
             started = time.monotonic()
             click(window, 221)
             ready(window, "game：进程运行中", 30)
@@ -99,6 +103,24 @@ def main():
             item["fresh_stdout"] = output.name
             item["fresh_stdout_sha256_at_initialization"] = sha256(output)
             item["initialized_readiness"] = title(user.GetDlgItem(window, 273))
+            # Monitor registration ACKs follow the initialization marker. A
+            # stale TCP peer can reject a restart and request normal shutdown
+            # just after that marker; observe the original registration ACKs.
+            # Original stdout is buffered; use each peer's fresh application
+            # log, never an old registration from the copied instance.
+            def registered():
+                for folder, offsets in registration.values():
+                    fresh = b"\n".join(p.read_bytes()[offsets.get(p, 0):] for p in folder.glob("GameServer*.log"))
+                    assert b"regist failed" not in fresh, "original peer rejected game registration"
+                    if b"Game server regist success. Channel:" not in fresh:
+                        return False
+                return True
+
+            wait_for(registered, "monitor and guild registration", 30)
+            text = output.read_bytes()
+            assert b"main() exited OK" not in text, "game exited after registration"
+            assert b"Channel NO 11 is already registerd" not in text
+            item["original_monitor_and_guild_registration_accepted"] = True
             screenshot(window, probe / ("launch-" + str(launch) + "-initialized.png"))
             select_service(window, "channel")
             assert "运行时通道已接入" in title(user.GetDlgItem(window, 273))

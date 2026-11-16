@@ -118,6 +118,12 @@ def main():
 
     process, window = open_launcher()
     try:
+        for identifier, expected in {1001: "127.0.0.1", 1002: "3306", 1003: "game",
+                                      1004: "uu5!^%jg", 1005: "test", 1006: "123456"}.items():
+            assert title(user.GetDlgItem(window, identifier)) == expected
+        assert user.SendMessageW(user.GetDlgItem(window, 1004), 0xD2, 0, 0) == 0
+        assert user.SendMessageW(user.GetDlgItem(window, 1006), 0xD2, 0, 0) == 0
+        checks["requested_defaults_prefilled_and_visible"] = True
         exported = work / "export-default"; exported.mkdir()
         export(process, window, exported)
         for name in ("private_key.pem", "publickey.pem"):
@@ -190,6 +196,21 @@ def main():
                 1004: cnf["client"]["password"].strip('"'), 1005: account, 1006: secrets.token_hex(8)}.items():
                 text = c.create_unicode_buffer(value)
                 user.SendMessageW(user.GetDlgItem(window, identifier), 0xC, 0, c.addressof(text))
+            def connection_failure(expected_title):
+                dialog = wait_for(lambda: next((h for h in windows(process.pid, "#32770") if title(h) == expected_title), None), expected_title, 15)
+                button = wait_for(lambda: next((i for i in (1, 2) if user.GetDlgItem(dialog, i)), None), "failure close button", 10)
+                click(dialog, button)
+                wait_for(lambda: not user.IsWindow(dialog), "failure dialog closed")
+
+            wrong_password = c.create_unicode_buffer("wrong-" + secrets.token_hex(12))
+            user.SendMessageW(user.GetDlgItem(window, 1004), 0xC, 0, c.addressof(wrong_password))
+            for button in (1008, 1009):
+                click(window, button)
+                connection_failure("数据库认证失败")
+                assert "账号和密码" in title(user.GetDlgItem(window, 1007))
+            checks["wrong_database_password_identified_for_register_and_login"] = True
+            password = c.create_unicode_buffer(cnf["client"]["password"].strip('"'))
+            user.SendMessageW(user.GetDlgItem(window, 1004), 0xC, 0, c.addressof(password))
             click(window, 1008)
             wait_for(lambda: "账号创建成功" in title(user.GetDlgItem(window, 1007)), "four-table registration", 20)
             uid = query("SELECT UID FROM d_taiwan.accounts WHERE accountname='" + account + "'").stdout.decode().strip()

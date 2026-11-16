@@ -1,0 +1,18 @@
+{
+  "scope": "Read-only behavioral references; no reference source or patch incorporated",
+  "findings": [
+    "Monitor processes disconnection by EPOLLIN followed by read EOF/error, then removes peer",
+    "Game rejects duplicate channel registration with original shutdown signal",
+    "Independent Linux ABI correction: TCP EOF/reset with HUP is readable; Winsock HUP mapping previously omitted requested POLLIN"
+  ],
+  "references": {
+    "remake/source/DNFServer/GameServer/Monitor/DNFTcpNetworkThread.cpp": "3ad4c34f4808931bda549e3ff577cc72567e158c82fff92f01c855f63d04c64a",
+    "remake/source/DNFServer/GameServer/Monitor/DNFTcpSocket.cpp": "701dbf15f66ced834a4038c4cdf8fe019a4863335e5b2e23f08100bcdfe72704",
+    "remake/source/DNFServer/GameServer/Monitor/Peer.cpp": "1fdf0b4337bd748a1ef30aee2f0fbe105afd7e47049874283f66583ecaab3984",
+    "remake/source/DNFServer/GameServer/Game/InterDispatcher/dispatch_sig_249.inc": "cd98556cae3b124e5e8b28953a5aca84fb07c07b387b18abf5a134f76b6808d5"
+  },
+  "normative_sources": [
+    "https://man7.org/linux/man-pages/man2/poll.2.html",
+    "https://man7.org/linux/man-pages/man7/epoll.7.html"
+  ]
+}

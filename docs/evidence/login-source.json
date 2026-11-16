@@ -15,11 +15,13 @@
   "originals_reverified_unchanged": true,
   "integration_changes": [
     "Current active key-pair export without overwrite; invalid external key fails explicitly",
-    "Remove hardcoded database password and test game account",
+    "User explicitly authorizes the original database/game demo defaults; retain them prefilled and visible",
     "Resolve Unicode client path beside launcher; pass child game address with explicit environment override",
     "Report registration auxiliary-table errors and length-bound MySQL error packets",
-    "Independent source kit; fixed toolchain and external reproducible builds",
-    "User-authorized default private/public pair; only server publickey.pem updated in native ZIP"
+    "Sources retained in repository; fixed toolchain and external reproducible builds",
+    "User-authorized default private/public pair; only server publickey.pem updated in native ZIP",
+    "Distinguish database authentication failure from address/port connection failure; show original server error",
+    "Runtime delivery follows current AGENTS layout; sources remain in repository"
   ],
   "default_public_key_sha256": "4b8f70c8a2539685c343fb3a34ae872092a961c3254cde312f922a76f7be243d",
   "baseline_change": {
@@ -29,6 +31,6 @@
     "unchanged_members": 656,
     "native_sha256": "4af9c4b17e1c0ce166e93390d297258c590e3ab39bbfdde661bd13d8284d07b3"
   },
-  "validation_receipt": "../x/dnf-native-output/probes/20261116T103234975461Z/login/receipt.json",
-  "source_kit_rebuild_receipt": "../x/dnf-native-output/release-3.0-20261116/source-kit-check.json"
+  "validation_receipt": "../x/dnf-native-output/probes/20261116T112813898575Z/login/receipt.json",
+  "historical_3_0_source_kit_rebuild_receipt": "../x/dnf-native-output/release-3.0-20261116/source-kit-check.json"
 }

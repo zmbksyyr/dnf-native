@@ -3459,4 +3459,4 @@ the FAQ for more information on the distribution of modified source versions.
 
 ## 用户提供的简单登录器
 
-`src/login/`、`tests/login_crypto.c` 来源于用户的 `dfnlogin_c`，按 2026-11-16 会话明确授权纳入仓库并随发布包提供源码。原始文件 SHA-256 见 [来源记录](evidence/login-source.json)，不是本项目独立重写的声明。未导入旧 EXE、工具链、build 目录或原构建脚本。密钥导出等集成差异见 `login.md`。`resources/login/` 默认配对经用户明确授权公开使用；服务器 ZIP 只同步其公钥，其余原版资源来源及声明继续有效。Windows CryptoAPI、Shell32、Winsock 属系统接口，不另带第三方加密运行库。
+`src/login/`、`tests/login_crypto.c` 来源于用户的 `dfnlogin_c`，按 2026-11-16 会话明确授权纳入仓库；当前正式目录仅交付运行程序，源码随仓库管理。原始文件 SHA-256 见 [来源记录](evidence/login-source.json)，不是本项目独立重写的声明。未导入旧 EXE、工具链、build 目录或原构建脚本。密钥导出等集成差异见 `login.md`。`resources/login/` 默认配对经用户明确授权公开使用；服务器 ZIP 只同步其公钥，其余原版资源来源及声明继续有效。Windows CryptoAPI、Shell32、Winsock 属系统接口，不另带第三方加密运行库。

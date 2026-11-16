@@ -53,6 +53,15 @@ static void get_edit_utf8(HWND h, char *out, size_t cap) {
     free(w);
 }
 
+static void database_error(const MyConn *connection) {
+    int authentication = strstr(connection->error, "Access denied for user") != NULL;
+    set_msg(authentication ? "数据库认证失败，请核对账号和密码" : "数据库连接失败，请检查地址和端口");
+    wchar_t details[1024] = L"";
+    MultiByteToWideChar(CP_UTF8, 0, connection->error, -1, details, 1024);
+    MessageBoxW(GetParent(g_msg), details, authentication ? L"数据库认证失败" : L"数据库连接失败",
+                MB_OK | MB_ICONERROR);
+}
+
 /* Build the exe directory and read private_key.pem from it. Returns 1 on
    success (fills pem_out), 0 otherwise. */
 static int load_external_key(char **pem_out, size_t *pem_len, char *path_out, size_t path_cap) {
@@ -192,7 +201,7 @@ static void on_login(void) {
 
     MyConn conn;
     if (my_connect(&conn, ip, (unsigned short)atoi(port), user, dbpass) != 0) {
-        set_msg("数据库连接失败!");
+        database_error(&conn);
         return;
     }
 
@@ -263,7 +272,7 @@ static void on_register(void) {
 
     MyConn conn;
     if (my_connect(&conn, ip, (unsigned short)atoi(port), user, dbpass) != 0) {
-        set_msg("数据库连接失败!");
+        database_error(&conn);
         return;
     }
 
@@ -381,14 +390,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             make_label(hwnd, L"MySQL账号:", LBL_X, 169, LBL_W, 18);
             g_dbUser = make_edit(hwnd, IDC_DB_USER, ED_X, 166, ED_W, 22, L"game");
             make_label(hwnd, L"MySQL密码:", LBL_X, 197, LBL_W, 18);
-            g_dbPass = make_edit(hwnd, IDC_DB_PASS, ED_X, 194, ED_W, 22, L"");
+            g_dbPass = make_edit(hwnd, IDC_DB_PASS, ED_X, 194, ED_W, 22, L"uu5!^%jg");
 
             /* ---- group 2: game account ---- */
             make_group(hwnd, L"游戏账号", LEFT, 234, GROUP_W, 82);
             make_label(hwnd, L"游戏账号:", LBL_X, 257, LBL_W, 18);
-            g_player   = make_edit(hwnd, IDC_PLAYER,    ED_X, 254, ED_W, 22, L"");
+            g_player   = make_edit(hwnd, IDC_PLAYER,    ED_X, 254, ED_W, 22, L"test");
             make_label(hwnd, L"游戏密码:", LBL_X, 285, LBL_W, 18);
-            g_playerPw = make_edit(hwnd, IDC_PLAYER_PW, ED_X, 282, ED_W, 22, L"");
+            g_playerPw = make_edit(hwnd, IDC_PLAYER_PW, ED_X, 282, ED_W, 22, L"123456");
 
             g_msg = CreateWindowExW(0, L"STATIC", L"",
                                     WS_CHILD | WS_VISIBLE | SS_CENTER, LEFT, 324, GROUP_W, 22,
@@ -397,8 +406,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             make_button(hwnd, L"注 册", IDC_BTN_REG,   30,  352, 120, 30);
             make_button(hwnd, L"登 录", IDC_BTN_LOGIN, 166, 352, 120, 30);
 
-            SendMessageW(g_dbPass, EM_SETPASSWORDCHAR, L'●', 0);
-            SendMessageW(g_playerPw, EM_SETPASSWORDCHAR, L'●', 0);
             EnumChildWindows(hwnd, set_font_child, (LPARAM)g_font);
             return 0;
         }

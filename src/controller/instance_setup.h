@@ -186,8 +186,8 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     // independent from the root maintenance credential.
     for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'dnf_game'@'127.0.0.1';";
     // Launchers and the original routine DEFINER both use game. Keep it usable
-    // for login, with application-schema permissions and an instance credential.
-    query += "CREATE USER 'game'@'%' IDENTIFIED BY '" + game + "';";
+    // for login, with application-schema permissions and the public default.
+    query += "CREATE USER 'game'@'%' IDENTIFIED BY 'uu5!^%jg';";
     for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'game'@'%';";
     query += "CREATE USER 'dnf_bridge'@'127.0.0.1' IDENTIFIED BY '" + bridge + "';GRANT SELECT ON d_channel.* TO 'dnf_bridge'@'127.0.0.1';"
              "CREATE USER 'dnf_frida'@'127.0.0.1' IDENTIFIED BY '" + frida + "';CREATE DATABASE frida;"
@@ -196,7 +196,17 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     std::wstring sql_path = instance + L"\\.mysql\\" + unique_name() + L"-accounts.private.sql";
     write_private(sql_path, query); checked_sql_file(exe, instance, sql_path);
     require(DeleteFileW(sql_path.c_str()), "Remove completed private account SQL");
-    write_private(instance + L"\\login.private.cnf", "[client]\nprotocol=TCP\nhost=127.0.0.1\nport=3306\nuser=game\npassword=" + game + "\n");
+    write_private(instance + L"\\login.private.cnf", "[client]\nprotocol=TCP\nhost=127.0.0.1\nport=3306\nuser=game\npassword=uu5!^%jg\n");
+    // Public demo defaults explicitly requested by the user. This runs only
+    // during fresh instance initialization; existing player accounts are not
+    // silently changed when opening an instance.
+    ToolResult demo = sql(exe, instance,
+        L"INSERT INTO d_taiwan.accounts(accountname,password) VALUES('test',MD5('123456'));"
+        L"SET @demo_uid=LAST_INSERT_ID();"
+        L"INSERT INTO d_taiwan.member_info(m_id,user_id) VALUES(@demo_uid,@demo_uid);"
+        L"INSERT INTO d_taiwan.member_white_account(m_id) VALUES(@demo_uid);"
+        L"INSERT INTO taiwan_login.member_login(m_id) VALUES(@demo_uid);");
+    if (demo.code) throw std::runtime_error("Create default test login account failed; inspect private setup log");
     ToolResult date = sql(exe, instance, L"SELECT DATE_FORMAT(NOW(),'%Y%m');");
     std::string month = date.output.substr(0,6);
     if (date.code || month.size() != 6 || month.find_first_not_of("0123456789") != std::string::npos)

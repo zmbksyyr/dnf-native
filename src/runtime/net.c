@@ -242,7 +242,11 @@ static intptr_t poll_descriptors(NrRun *run, NrPoll *entries, unsigned length, i
             if (polls[i].revents & POLLPRI) events |= entries[at].events & 2;
             if (polls[i].revents & POLLWRNORM) events |= entries[at].events & (4 | 256);
             if (polls[i].revents & POLLERR) events |= 8;
-            if (polls[i].revents & POLLHUP) events |= 16;
+            /* Linux TCP EOF (and reset with HUP) is readable: the next read
+               returns zero or the pending error. Winsock reports only HUP,
+               so callers that consume disconnects through EPOLLIN would
+               otherwise retain dead peers indefinitely. */
+            if (polls[i].revents & POLLHUP) events |= 16 | (entries[at].events & (1 | 64));
             if (polls[i].revents & POLLNVAL) events |= 32;
             entries[at].revents = events;
             if (events) ++ready;

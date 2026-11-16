@@ -1,0 +1,155 @@
+{
+  "environment": "Windows 10 x64 10.0.19044; LLVM-MinGW 20261104 MSVCRT; MySQL 5.7.44; original i386 game / glibc 2.17",
+  "before": {
+    "second_game_launch_exits_after_duplicate_registration": true,
+    "poll_epoll_flags_fin": [
+      16,
+      16
+    ],
+    "poll_epoll_flags_reset": [
+      24,
+      24
+    ]
+  },
+  "after": {
+    "both_game_launches_initialized_seconds": [
+      46.373,
+      45.826
+    ],
+    "observed_each_launch_seconds": 75,
+    "both_survived_without_unrequested_exit": true,
+    "monitor_and_guild_accepted_restart": true,
+    "poll_epoll_flags_fin": [
+      17,
+      17
+    ],
+    "poll_epoll_flags_reset": [
+      25,
+      25
+    ],
+    "default_login_without_edits_verified_signature": true,
+    "database_detail_actual_connection": true,
+    "new_instance_default_game_and_test_four_tables": true
+  },
+  "scope": "Actual default launcher database/token path and original server startup/restart/shutdown; parameter-capture child is not a game client, town/combat not accepted",
+  "receipts": {
+    "disconnect_before": {
+      "path": "probes/20261116T112615721311Z/tcp-disconnect/receipt.json",
+      "sha256": "3f27fe4079276c468de2894faa205f45714b64dcfbcebc16ae4c7a0d88f98dda"
+    },
+    "disconnect_after": {
+      "path": "probes/20261116T112652373685Z/tcp-disconnect/receipt.json",
+      "sha256": "2cf16a9c65e31d78fd20732ad5b14451b2c3781a3deca3b98d7ca3d440b59a74"
+    },
+    "launcher": {
+      "path": "probes/20261116T112813898575Z/login/receipt.json",
+      "sha256": "109aae29c0a2c72c5a23a4eb34c5819772164624482dfe8a4d3fad37c5fb3c3c"
+    },
+    "workflow": {
+      "path": "probes/20261116T112803727879Z/instance-workflow/receipt.json",
+      "sha256": "fcef6439daf50e11445833e6b1a13117c2dd911671f6576aef7320e302a0c240"
+    },
+    "original_gui_two_game_launches": {
+      "path": "probes/20261116T113739365741Z/gui-readiness/receipt.json",
+      "sha256": "9b3eb5a62f4ba540d2dd859f4e52ff6c7176e1dc8584fc4991403b1eb6021b9b"
+    },
+    "final_gui_layout": {
+      "path": "probes/20261116T114504664249Z/gui-layout/receipt.json",
+      "sha256": "40c765625db1321beb45cb8aa956d0e780356cc1e2a9d080f0374768320da77d"
+    },
+    "final_package": {
+      "path": "P26-20261116T112009Z-user-startup/delivery-aligned-receipt.json",
+      "sha256": "9cde8b33d0b0d28d25f2adab03b24b2ab85aeecbb48adbdbd29152fa4be7fba0"
+    },
+    "fixed_reproduction": {
+      "path": "P26-20261116T112009Z-user-startup/fixed-reproduction.json",
+      "sha256": "028d044d3d49a10b4c69ad2df541605621cfbd93d7d75ce23ab2fc3666e46275"
+    },
+    "migration_rollback": {
+      "path": "P26-20261116T112009Z-user-startup/migration-copy-rollback.json",
+      "sha256": "123bb4e9404cf5e0f8e4a5961d4aafdec24178da44d69b5cd3a247c46479024a"
+    },
+    "actual_target": {
+      "path": "P26-20261116T112009Z-user-startup/repaired-target-running.json",
+      "sha256": "442e2102b362aef0a8f3a9cc6c5c7c7b64c587d41aa95e2bfbb78e9a6b64f353"
+    },
+    "release_alignment_update": {
+      "path": "P26-20261116T112009Z-user-startup/release-alignment-update.json",
+      "sha256": "60bb611f8ea2bc17abbff979ebd0e4e766d7e6b33e0912b55eab83a1df5afcbc"
+    }
+  },
+  "recorded_utc": "2026-11-16T11:47:41.676943+00:00",
+  "stage": "P26-20261116T112009Z-user-startup",
+  "default_key_filenames": {
+    "launcher": "private_key.pem",
+    "server": "publickey.pem",
+    "launcher_embedded_default": true,
+    "source_client_private_key_matches_default": true
+  },
+  "release": {
+    "directory": "../DNF-Native-3.0/",
+    "package_files": {
+      "DNF-Native.exe": "f91c9292238350b6732ccca4eb78e3509fb611585b499b1b5f806d2bcfd1b052",
+      "resources/dnf-host-x64.exe": "664219b3c9c587e26e4da6c8fb695c3b8e4e1c9e59956b0fef86b204abab5530",
+      "resources/dnf-host-x86.exe": "c19c0c78876998410d41a46a6c17bf9d71a33b9882ce6b0b3f6f16e744484849",
+      "resources/DNFLogin.exe": "8b838812f8b04c4fac96ae007be8db88ec802f445bc486d62773ae62727afd98",
+      "resources/mysql-control.exe": "e221860cc428c600c9adfe5834c268e9c85275477ca0200cb2b4215396382bec",
+      "resources/mysql.zip": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc",
+      "resources/native.zip": "4af9c4b17e1c0ce166e93390d297258c590e3ab39bbfdde661bd13d8284d07b3",
+      "resources/resources.ini": "56d93203e33a5fdbc26bcb2d7ad8978ea95c67082e528763f773e48b86b25fee"
+    },
+    "new_zip_created": false
+  },
+  "gui_layout": {
+    "changes": [
+      "Separate IP input outline from Apply button; equal outer heights and explicit spacing",
+      "Vertically center MySQL port label"
+    ],
+    "default_and_minimum_and_125_percent_layout_passed": true,
+    "physical_multimonitor_tested": false
+  },
+  "gui_before_alignment": {
+    "sha256": "67344d91059d597a6559b7e7dfac52097043a1cd4b3dd03775da6227e7539d6d",
+    "game_initialization_seconds": [
+      47.229,
+      46.239
+    ],
+    "both_monitor_guild_registrations_accepted": true,
+    "normal_shutdown": true
+  },
+  "target_before_alignment": {
+    "initialization_seconds": 49.606,
+    "default_database_and_test_account_verified": true,
+    "monitor_guild_registration_accepted": true,
+    "normal_shutdown_to_apply_gui_update": true
+  },
+  "migration": {
+    "complete_verified_cold_backup": true,
+    "restore_sql_exercised_on_independent_copy": true,
+    "only_selected_target_migrated": true,
+    "other_players_unchanged": true
+  },
+  "source_client_input_identity_unchanged": {
+    "DNFLogin.exe": "cbc12c270ed977ccffd40201975608d6b0776efaeb74b0f1e916a25e75b02844",
+    "dnf.exe": "246b838163fa7c71aa0445fa4aafde04e7ac72aa72855a4b2a7eaeed5eeae264",
+    "private_key.pem": "c81ab3a0f52cd828db3f75dafd01ae7c261521b9f48a4d55fc33e1487a625eb9",
+    "publickey.pem": "4b8f70c8a2539685c343fb3a34ae872092a961c3254cde312f922a76f7be243d",
+    "Script.pvf": "b3272eb24a775fea590eb0bf9d22c4876e2cc44720d505b83227fb01a56156fe"
+  },
+  "actual_target": {
+    "default_game_database_authentication": true,
+    "default_test_account_four_table_match": true,
+    "original_game_initialized_seconds": 49.684,
+    "monitor_and_guild_registration_accepted": true,
+    "default_key_pair_matches": true,
+    "automatic_gbk": true,
+    "left_running_for_user": true
+  },
+  "implementation_sources": {
+    "src/runtime/net.c": "aae8cfabf964ca126f8d43b28bbdf8da52e748fff8f624269260bfdccaec3ef3",
+    "src/login/main.c": "4641dc40908b852aec7cd948ba6301819549c3ca9f1167aac08113f2ef3ffa9d",
+    "src/controller/instance_setup.h": "3f1c98e9abd2f45ad660e8c18904d0ae254771723db1917d8f84d6396f9046f3",
+    "src/controller/controller_gui.cpp": "53cb8c33f483347ae2f7cca1441cdc1be0da16285e7d4678f324ebb2fc35480a",
+    "tools/build_instance_package.py": "70a9ae3eb6afbb586bfe5b7a5021185de5087a138db8e6696852d474f895b343"
+  }
+}

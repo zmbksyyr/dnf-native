@@ -5,7 +5,6 @@ import configparser
 import hashlib
 import json
 from pathlib import Path
-import re
 import shutil
 import zipfile
 
@@ -87,37 +86,11 @@ def main():
         shutil.copy2(hosts / arch / "dnf-host.exe", resources / ("dnf-host-" + label + ".exe"))
     for name in ("native.zip", "mysql.zip"):
         shutil.copy2(source / name, resources / name)
-    launcher = output / "login"
-    launcher.mkdir()
-    shutil.copy2(login / "DNFLogin.exe", launcher / "DNFLogin.exe")
-    # A standalone source kit: all build inputs except the standard compiler.
-    for name in ("src/login", "resources/login"):
-        shutil.copytree(ROOT / name, launcher / "source" / name)
-    for name in ("build_login.py", "bootstrap.py"):
-        target = launcher / "source/tools" / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / "tools" / name, target)
-    target = launcher / "source/tests/login_crypto.c"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / "tests/login_crypto.c", target)
-    docs = output / "docs"
-    docs.mkdir()
-    shutil.copy2(ROOT / "docs/login.md", docs / "login.md")
-    (docs / "evidence").mkdir()
-    shutil.copy2(ROOT / "docs/evidence/login-source.json", docs / "evidence/login-source.json")
+    shutil.copy2(login / "DNFLogin.exe", resources / "DNFLogin.exe")
     ini["package"] = {name: sha256(resources / name) for name in
                       ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
         ini.write(stream)
-    for name in ("README.md", "third-party.md"):
-        text = (ROOT / "docs" / name).read_text(encoding="utf-8")
-        if name == "README.md":
-            introduction = text.split("## 仓库目录", 1)[0]
-            usage = text.split("## 产品使用", 1)[1].split("## 验证入口", 1)[0]
-            text = introduction + "## 产品使用" + usage
-        # Local source/evidence links belong to the repository, not the product directory.
-        text = re.sub(r"\[([^\]]+)\]\((?!https?://)[^)]+\)", r"\1", text)
-        (docs / name).write_text(text, encoding="utf-8", newline="\n")
     record = {"baseline": baseline["files"], "elf_dependency_closure": closure,
               "package_files": {p.relative_to(output).as_posix(): sha256(p) for p in output.rglob("*") if p.is_file()},
               "builder_sha256": sha256(Path(__file__)),

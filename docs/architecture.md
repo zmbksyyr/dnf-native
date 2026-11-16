@@ -136,4 +136,8 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 
 ## 独立登录器
 
-`src/login/` 由用户明确授权提供的 C 工程导入，来源哈希见 `evidence/login-source.json`。它是独立客户端程序，手动连接 MySQL、注册四表并签发原令牌，不读取或依赖服务实例。改动包括当前密钥对导出、无效外部密钥拒绝、去除硬编码私有默认连接、Unicode 客户端路径和子进程游戏地址传递、注册附表失败报错。公钥通过 Windows CryptoAPI 从当前私钥实际 n/e 导出；默认私钥仅以 `resources/login/private_key.pem` 维护，构建在外部生成内嵌头。固定服务资源仅更新默认公钥。发布包附登录器 EXE 及对应源码，不包含用户客户端或数据库。使用与限制见 `login.md`。
+`src/login/` 由用户明确授权提供的 C 工程导入，来源哈希见 `evidence/login-source.json`。它是独立客户端程序，手动连接 MySQL、注册四表并签发原令牌，不读取或依赖服务实例。改动包括当前密钥对导出、无效外部密钥拒绝、去除硬编码私有默认连接、Unicode 客户端路径和子进程游戏地址传递、注册附表失败报错。公钥通过 Windows CryptoAPI 从当前私钥实际 n/e 导出；默认私钥仅以 `resources/login/private_key.pem` 维护，构建在外部生成内嵌头。固定服务资源仅更新默认公钥。正式运行目录仅附登录器 EXE，源码保留在仓库，不包含用户客户端或数据库。使用与限制见 `login.md`。
+
+TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的读就绪必须让调用方读出 EOF 或待决错误，因此兼容层在 socket HUP 时保留 HUP，并补上调用方请求的 POLLIN／POLLRDNORM；epoll 同步得到 EPOLLIN。原 monitor 通过可读事件读取断开并清除频道，同一 game 正常停止后可重新注册，不能通过跳过重复频道检查掩盖。
+
+新实例的公开演示登录使用用户指定的 game 数据库凭据和 test 游戏账号，四张登录表在初始化时建立；内部 dnf_game、维护 root、bridge 和 frida 仍按原职责使用实例凭据。登录器不读取服务端配置，默认值明文显示；控制台数据库详情显示当前实例实际连接参数，不记录到控制台日志。
