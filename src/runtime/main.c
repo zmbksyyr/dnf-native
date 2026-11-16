@@ -57,6 +57,11 @@ int wmain(int argc, wchar_t **argv) {
         return 1;
     }
     if (execute) {
+        if (!nr_pvf_encoding(&run, &error)) {
+            fprintf(stderr, "PVF encoding selection failed: %s\n", error ? error : "Windows memory operation failed");
+            nr_elf_close(elf);
+            return 1;
+        }
         if (!nr_thread_init(&run)) return 1;
         for (unsigned i = 0; i < elf->header->phnum; ++i) {
             if (elf->programs[i].type == 3) {

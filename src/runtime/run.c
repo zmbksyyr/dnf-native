@@ -386,6 +386,11 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     }
 #else
     uintptr_t pc = c->Eip;
+    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
+        int script = nr_pvf_script(active, c);
+        if (script < 0) { fflush(NULL); ExitProcess(126); }
+        if (script) return EXCEPTION_CONTINUE_EXECUTION;
+    }
     if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION &&
         pc == active->program.service_stop_pc) {
         if (!nr_service_stop(active, c)) { fflush(NULL); ExitProcess(126); }

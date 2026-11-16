@@ -22,6 +22,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance", type=Path, required=True)
     parser.add_argument("--gui", type=Path, required=True)
+    parser.add_argument("--pvf", type=Path, help="Read-only PVF input, copied into the private instance")
+    parser.add_argument("--script-encoding", choices=("GBK", "BIG5"), help="Explicit encoding of this PVF")
     args = parser.parse_args()
     source, gui = args.instance.resolve(strict=True), args.gui.resolve(strict=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -33,14 +35,29 @@ def main():
     manifest = configparser.ConfigParser(interpolation=None)
     manifest.read(instance / "services.ini", encoding="utf-16")
     manifest["game"]["automatic"] = "0"
+    if args.script_encoding:
+        environment = [value for key, value in manifest["game"].items() if key.startswith("env")]
+        environment = [value for value in environment if not value.startswith("DNF_NATIVE_SCRIPT_ENCODING=")]
+        for key in list(manifest["game"]):
+            if key.startswith("env"):
+                del manifest["game"][key]
+        environment.append("DNF_NATIVE_SCRIPT_ENCODING=" + args.script_encoding)
+        for index, value in enumerate(environment):
+            manifest["game"]["env" + str(index)] = value
     with (instance / "services.ini").open("w", encoding="utf-16") as stream:
         manifest.write(stream)
     root = instance / manifest["game"]["root"]
+    pvf_input = args.pvf.resolve(strict=True) if args.pvf else root / "home/neople/game/Script.pvf"
+    pvf_hash = sha256(pvf_input)
+    if args.pvf:
+        shutil.copyfile(pvf_input, root / "home/neople/game/Script.pvf")
     old_logs = [p for p in (root / "home/neople/game/log").rglob("*.init") if MARKER in p.read_bytes()]
     assert old_logs, "Use a stopped instance with a previous successful initialization log"
     record = {"recorded_utc": stamp, "os": platform.platform(), "source_instance": str(source),
               "gui_sha256": sha256(gui), "script_sha256": sha256(Path(__file__)),
               "scope": "GUI application initialization from original game stdout; no client or business acceptance",
+              "pvf_sha256": pvf_hash,
+              "script_encoding_override": args.script_encoding,
               "checks": {}, "launches": [], "forced_cleanup": False}
     checks = record["checks"]
     checks["old_successful_application_logs_retained"] = len(old_logs)
@@ -71,6 +88,8 @@ def main():
             assert len(outputs) == 1
             output = outputs.pop()
             assert MARKER in output.read_bytes()
+            if args.script_encoding:
+                assert b"iconv error" not in output.read_bytes(), "PVF encoding conversion failed"
             assert "应用已初始化" in service_row(window, "game")
             assert "接口/协议/业务：未验证" in title(user.GetDlgItem(window, 273))
             item["fresh_stdout"] = output.name
@@ -117,6 +136,8 @@ def main():
         record["exit_code"] = process.returncode
         record["diagnostics"] = runtime_diagnostics(instance)
         checks["source_data_unchanged"] = tree_identity(source / "data") == source_data
+        checks["pvf_input_and_private_copy_unchanged"] = (
+            sha256(pvf_input) == pvf_hash and sha256(root / "home/neople/game/Script.pvf") == pvf_hash)
         checks["package_resources_unchanged"] = resources == {
             p.name: sha256(p) for p in (gui.parent / "resources").iterdir() if p.is_file()}
         gaps = record["diagnostics"]["gaps"]

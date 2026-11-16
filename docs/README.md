@@ -112,6 +112,10 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 游戏 ELF、密钥与 PVF 位于完整的 `home/neople/game/` 路径，不再被分散到架构目录。宿主 EXE 仍区分 x86/x64；32 位与 64 位 Linux 库分别放在 `lib/` 与 `lib64/`。旧实例继续按自己的 `services.ini` 读取，本次不会自动移动或覆盖既有实例。更换 ELF 时仍须同步核对清单哈希。
 
+更换 PVF 前正常停服并保存完整冷副本。jbz69 的指定 GBK PVF 已通过本版本的服务初始化及自然停服；其 46 件装备的缺失视觉模板和共享宠物脚本编号由宿主局部兼容，保留装备、层号、变体及独立宠物编号。该结果不代表客户端、战斗或任意其他 PVF 已通过，具体输入身份与证据见[验证记录](validation.md)。
+
+脚本编码默认沿用原 ELF。对于 GBK PVF，在实例 `services.ini` 的 `[game]` 中新增下一个连续编号的环境项，例如已有 `env0` 至 `env2` 时写 `env3=DNF_NATIVE_SCRIPT_ENCODING=GBK`，再重新打开实例。不要覆盖已有环境项；台服自带 PVF 无需设置。该选项仅支持固定 game ELF 的 `GBK` / `BIG5`，非法值会拒绝启动，不自动猜测编码。命令行等效参数为 `--env DNF_NATIVE_SCRIPT_ENCODING=GBK`。
+
 “整体启动”启动数据库和默认 16 个服务；三个安全组件保留独立入口，其完整业务尚未验收。单个服务的“进程运行中（业务未验证）”只表示宿主已安装停服通道。game 起初显示“等待应用初始化”，读取本次启动的原版完成日志后显示“应用已初始化”；重启会重新等待，不使用旧日志判断。协议和业务仍须单独验证。
 
 修改服务 IP 要在全部停止后应用；修改 DP2/Lua 和 Frida 开关要先停止 game。日志查看直接读取 stdout、stderr、服务应用日志和 MySQL 日志，可选自动、UTF-8、936、950、949 编码，并支持刷新和跟随滚动。

@@ -288,6 +288,7 @@ int nr_adapt(NrElf *elf, const char **error) {
     }
     if (!section_count) return 0;
     if (!nr_service_adapt(elf, error)) return 0;
+    if (!nr_pvf_adapt(elf, error)) return 0;
     for (NrCodePage *page = elf->tls_pages; page; page = page->next) {
         DWORD old;
         if (!VirtualProtect(page, sizeof(*page), PAGE_EXECUTE_READ, &old) ||

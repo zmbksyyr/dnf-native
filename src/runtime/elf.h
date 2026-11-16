@@ -72,6 +72,7 @@ int nr_elf_map(NrElf *elf, const char **error);
 void nr_elf_close(NrElf *elf);
 int nr_adapt(NrElf *elf, const char **error);
 int nr_service_adapt(NrElf *elf, const char **error);
+int nr_pvf_adapt(NrElf *elf, const char **error);
 const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc);
 
 #endif
