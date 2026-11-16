@@ -112,7 +112,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 
 游戏 ELF、密钥与 PVF 位于完整的 `home/neople/game/` 路径，不再被分散到架构目录。宿主 EXE 仍区分 x86/x64；32 位与 64 位 Linux 库分别放在 `lib/` 与 `lib64/`。旧实例继续按自己的 `services.ini` 读取，本次不会自动移动或覆盖既有实例。更换 ELF 时仍须同步核对清单哈希。
 
-更换 PVF 前正常停服并保存完整冷副本。jbz69 的指定 GBK PVF 已通过本版本的服务初始化及自然停服；其 46 件装备的缺失视觉模板和共享宠物脚本编号由宿主局部兼容，保留装备、层号、变体及独立宠物编号。该结果不代表客户端、战斗或任意其他 PVF 已通过，具体输入身份与证据见[验证记录](validation.md)。
+更换 PVF 前正常停服并保存完整冷副本。缺失装备视觉模板按数据语义兼容，不绑定 PVF 哈希或具体模板名称：装备明确提供有效层号、职业与模式在原版支持范围内时，保留层号、变体与原版提交过程，仅省去缺失模板的动作路径展开；仍需从模板取得层号时明确失败。共享宠物脚本保留各列表项的独立编号。适配仍限定固定 game ELF，不能推广到任意服务端版本。jbz69 的指定 GBK PVF 已通过服务初始化及自然停服，该结果不代表客户端、战斗或任意其他 PVF 已通过，具体输入身份与证据见[验证记录](validation.md)。
 
 脚本编码默认沿用原 ELF。对于 GBK PVF，在实例 `services.ini` 的 `[game]` 中新增下一个连续编号的环境项，例如已有 `env0` 至 `env2` 时写 `env3=DNF_NATIVE_SCRIPT_ENCODING=GBK`，再重新打开实例。不要覆盖已有环境项；台服自带 PVF 无需设置。该选项仅支持固定 game ELF 的 `GBK` / `BIG5`，非法值会拒绝启动，不自动猜测编码。命令行等效参数为 `--env DNF_NATIVE_SCRIPT_ENCODING=GBK`。
 
@@ -156,11 +156,12 @@ python -B tests/test_ld.py
 python -B tests/test_luv.py
 python -B tests/test_frida.py --item-reset
 python -B tests/test_frida_reload.py
+python -B tests/test_pvf_templates.py
 python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package
 python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe
 ```
 
-后两项分别验证实际字符编码转换，以及真实 Win32 双实例生命周期、辅助服务协议和 game/DP2/Frida 启停。Lua/Frida 专项以自写夹具的退出码 42 验证接口，不计为游戏自然启动或业务通过。GUI 测试需要可交互 Windows 桌面和空闲的服务端口，会在 `../x/dnf-native-output/probes/` 创建独立实例。其他测试所需输入及本轮实际执行结果见[验证记录](validation.md)。
+PVF 模板专项通过原 loader、全局构造和装备函数，检查有效/缺失模板交替时的层号、变体、视觉清理及必需层号拒绝；这是函数语义验证，不能代替完整启动。后两项分别验证实际字符编码转换，以及真实 Win32 双实例生命周期、辅助服务协议和 game/DP2/Frida 启停。Lua/Frida 专项以自写夹具的退出码 42 验证接口，不计为游戏自然启动或业务通过。GUI 测试需要可交互 Windows 桌面和空闲的服务端口，会在 `../x/dnf-native-output/probes/` 创建独立实例。其他测试所需输入及本轮实际执行结果见[验证记录](validation.md)。
 
 已有已停止的私有实例可作为 GUI 与原版停服专项的复制来源；以下命令使用外部私有实例；布局专项仅读取指定停库夹具的元数据和日志，其他专项建立独立副本：
 

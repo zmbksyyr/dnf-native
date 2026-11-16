@@ -5,12 +5,14 @@
 #ifndef _WIN64
 static const char game_hash[] = "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979";
 enum { LAYOUT_RESULT = 0x089c1d31, ACTION_PATHS = 0x089c1e80, LAYOUT_RETURN = 0x089c2826,
-       CREATURE_PARSED = 0x0833ccdf, SYNC_INSTANCE = 0x0861cbb4 };
+       CREATURE_PARSED = 0x0833ccdf, SYNC_INSTANCE = 0x0861cbb4,
+       STRING_ASSIGN = 0x08708720, EMPTY_STRING = 0x08e15e80 };
 
 /* Original server metadata uses explicit layers/variation names, not the .ani
-   paths. A newer PVF may omit its client-only atswordman layout. Keep original
+   paths. A PVF may omit an action-path layout. Keep original
    layer commit, clear, explicit layer assignment and variation-name assignment;
-   omit only action-path expansion when that particular template is absent.
+   omit only action-path expansion when a template is absent and the equipment
+   supplies its layer. The decision does not depend on a PVF or template name.
    Never substitute another character's layout or invent a default layer. */
 static int original_bytes(const NrElf *elf, uintptr_t pc, const unsigned char *bytes, size_t length) {
     for (unsigned i = 0; i < elf->header->phnum; ++i) {
@@ -82,10 +84,13 @@ int nr_pvf_adapt(NrElf *elf, const char **error) {
     static const unsigned char actions[] = {0x8b, 0x45, 0x18}; /* mov eax,[ebp+18] */
     static const unsigned char creature[] = {0xe8, 0xd0, 0xfe, 0x2d, 0x00}; /* call GetInstanceSyncScript */
     static const unsigned char finish[] = {0x8d, 0x65, 0xf4, 0x83, 0xc4, 0x00, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3};
+    static const unsigned char assign[] = {0x55, 0x89, 0xe5, 0x53, 0x83, 0xec, 0x14};
     if (elf->bias || !original_bytes(elf, LAYOUT_RESULT, result, sizeof(result)) ||
         !original_bytes(elf, ACTION_PATHS, actions, sizeof(actions)) ||
         !original_bytes(elf, CREATURE_PARSED, creature, sizeof(creature)) ||
-        !original_bytes(elf, LAYOUT_RETURN, finish, sizeof(finish))) {
+        !original_bytes(elf, LAYOUT_RETURN, finish, sizeof(finish)) ||
+        !original_bytes(elf, STRING_ASSIGN, assign, sizeof(assign)) ||
+        !original_bytes(elf, EMPTY_STRING, (const unsigned char *)"", 1)) {
         *error = "PVF equipment correction original addresses/bytes differ";
         return 0;
     }
@@ -140,27 +145,41 @@ int nr_pvf_script(NrRun *run, CONTEXT *c) {
         uintptr_t map = *(uint32_t *)(c->Ebp + 8);
         uintptr_t iterator = *(uint32_t *)(c->Ebp - 0x44);
         if (iterator == map + 4) { /* Verified libstdc++ tree header/end layout. */
-            static const char optional[] = "equipment/character/atswordman.lay";
             uintptr_t key_object = *(uint32_t *)(c->Ebp + 0x10);
             if (!nr_memory(key_object, 4, 0)) return layout_failure("invalid layout key");
             uintptr_t key = *(uint32_t *)key_object;
-            if (!nr_memory(key, sizeof(optional), 0) || memcmp((const void *)key, optional, sizeof(optional)))
-                return layout_failure("missing layout outside verified atswordman scope");
+            /* This ELF uses the COW string ABI: length is 12 bytes before data.
+               Bound diagnostic output without imposing a template-name limit. */
+            if (key < 12 || !nr_memory(key - 12, 4, 0)) return layout_failure("invalid layout string");
+            uint32_t length = *(uint32_t *)(key - 12);
+            if (length == UINT32_MAX || !nr_memory(key, length + 1, 0) || *(char *)(key + length))
+                return layout_failure("invalid layout string extent");
             int layer = *(int *)(c->Ebp + 0x14);
             unsigned job = *(uint32_t *)(c->Ebp + 0x20), type = *(uint32_t *)(c->Ebp + 0x24);
+            fprintf(stderr, "pvf visual layout absent key=%.*s layer=%d job=%u type=%u\n",
+                    (int)(length < 256 ? length : 256), (const char *)key, layer, job, type);
             if (layer <= 0 || job > 11 || type > 2)
                 return layout_failure("missing layout required to supply layer or unsupported animation mode");
-            fprintf(stderr, "pvf optional visual layout absent key=%s layer=%d job=%u type=%u; preserving original equipment metadata\n",
-                    optional, layer, job, type);
             c->Eax = 0; /* Local marker; never dereference end()->second. */
         }
         *(uint32_t *)(c->Ebp - 0x20) = c->Eax;
         c->Eip += 3; /* Original MOV has no flag effects. */
     } else if (!*(uint32_t *)(c->Ebp - 0x20)) {
-        /* Original clear left all visual strings/vectors empty. The original
-           layer and variation name have now been assigned. No live temporary
-           remains here; return through the original saved-register epilogue. */
-        c->Eip = LAYOUT_RETURN;
+        /* Original clear omits the final action string at +5c. Clear that too
+           with the original string assignment (including COW ownership), so a
+           previous valid layer cannot leak its path into this missing layout.
+           Execute a guest CALL using its existing outgoing argument area, then
+           return through the original saved-register epilogue. Layer and
+           variation name have already been assigned; no live temporary remains. */
+        uintptr_t ani = *(uint32_t *)(c->Ebp + 0x0c);
+        if (!nr_memory(ani, 0x7c, 1) || c->Esp < 4 || !nr_memory(c->Esp - 4, 12, 1))
+            return layout_failure("invalid layout cleanup frame");
+        c->Esp -= 4;
+        uint32_t *args = (uint32_t *)c->Esp;
+        args[0] = LAYOUT_RETURN;
+        args[1] = ani + 0x5c;
+        args[2] = EMPTY_STRING;
+        c->Eip = STRING_ASSIGN;
     } else {
         c->Eax = *(uint32_t *)(c->Ebp + 0x18);
         c->Eip += 3;
