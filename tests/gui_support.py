@@ -195,25 +195,14 @@ def list_rows(window):
 
 
 def rows(window):
-    # Group headers have no service identity and must never count as a service.
-    return [text for text in list_rows(window) if not text.startswith(("▾ ", "▸ "))]
+    return list_rows(window)
+
 
 def select(window, index):
     box = user.GetDlgItem(window, 220)
-    visible = -1
-    target = None
-    for row in range(user.SendMessageW(box, 0x18B, 0, 0)):
-        text = c.create_unicode_buffer(user.SendMessageW(box, 0x18A, row, 0) + 1)
-        user.SendMessageW(box, 0x189, row, c.addressof(text))
-        if text.value.startswith(("▾ ", "▸ ")):
-            continue
-        visible += 1
-        if visible == index:
-            target = row
-            break
-    if target is None:
-        raise RuntimeError("Service row index is not visible: " + str(index))
-    user.SendMessageW(box, 0x186, target, 0)
+    if index < 0 or index >= user.SendMessageW(box, 0x18B, 0, 0):
+        raise RuntimeError("Service card index is not present: " + str(index))
+    user.SendMessageW(box, 0x186, index, 0)
     user.SendMessageW(window, 0x111, 220 | (1 << 16), box)
 
 

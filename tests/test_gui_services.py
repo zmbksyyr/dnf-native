@@ -57,27 +57,15 @@ def main():
         assert len(rows(window)) == 19
         checks["nineteen_service_entries"] = True
         print("GUI: 19 original service entries", flush=True)
-        # Headers are view rows, so verify both row types through the real controls.
-        assert len(list_rows(window)) == 23
+        assert len(list_rows(window)) == 19
         assert not user.IsWindowEnabled(user.GetDlgItem(window, 221))
-        click(window, 271)
-        wait_for(lambda: len(rows(window)) == 11, "core group collapsed")
-        click(window, 271)
-        wait_for(lambda: len(rows(window)) == 19, "core group expanded")
         select_service(window, "game")
-        def filtered(index):
-            combo = user.GetDlgItem(window, 270)
-            user.SendMessageW(combo, 0x14E, index, 0)
-            user.SendMessageW(window, 0x111, 270 | (1 << 16), combo)
-        for index, count in [(2, 8), (3, 4), (4, 3), (5, 4), (1, 0), (0, 19)]:
-            filtered(index)
-            assert len(rows(window)) == count, (index, list_rows(window))
         assert title(user.GetDlgItem(window, 219)).startswith("game  ·")
         assert "ELF：" in title(user.GetDlgItem(window, 272))
         assert "SHA-256：" in title(user.GetDlgItem(window, 272))
         assert "接口/协议/业务：未验证" in title(user.GetDlgItem(window, 273))
         assert "清单未声明" in title(user.GetDlgItem(window, 273))
-        checks["four_groups_filters_identity_details_and_selection_retained"] = True
+        checks["service_cards_keep_identity_details_and_selection"] = True
         click(window, 223)
         ready(window, "已启动默认服务进程", 90)
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 224)), "whole-stop enabled")

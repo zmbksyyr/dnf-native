@@ -29,6 +29,8 @@ P12 客户端测试只读参考了 `rednf/remake/source/DNFServer/GameServer/Gam
 
 P13 长路径处理依据 Microsoft [GetShortPathNameW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getshortpathnamew)、[GetLongPathNameW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getlongpathnamew) 与 [SHGetNameFromIDList](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetnamefromidlist)，以及当前官方 MySQL 5.7.44 的独立副本实测；没有引入参考工程路径实现。
 
+P19 GUI 重排仅只读参考用户指定的 `C:/Users/Administrator/Desktop/win32/preview.png`、`preview-small.png` 与 `README.md` 的视觉布局、尺寸和交互描述。服务网格、日志标签/过滤、菜单及 DPI 字体处理在现有控制器中独立实现，保持真实服务、数据库和日志链；未读取或复制该参考的 C 源码，未编译、链接或交付其 EXE，也未采用演示实例、模拟服务和伪造日志。参考文件身份与差异记录保存在外部 `P19-20261116-reference-gui/reference.json`。
+
 ## 原始许可材料
 
 下列文本取自原 `LICENSES/` 和已验证交付包的 Linux 许可材料；合并时统一换行并清理行尾空白，每段路径与 SHA-256 标识原文件。原 miniz 源码目录的 `LICENSE` 与 `LICENSES/miniz.txt` 相同，合并保留一份。

@@ -2,6 +2,20 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## 按指定参考重排 GUI（2026-11-16）
+
+P19 按用户指定的 `Desktop/win32` 预览和交互说明独立重排界面：顶部实例下拉、IP 与整体启停，7 列 × 3 行的 19 项真实服务卡片，独立 MySQL 横条，底部日志标签、文件菜单与关键字过滤。实例下拉只列出本窗口实际打开过的实例；原模型、资源、进程所有权、数据库身份/TLS、停服维护与应用初始化检测继续由本项目实现。服务元数据和维护摘要移到“详情”与右键菜单；不采用参考的演示实例、模拟状态或日志，也未读取、复制或编译其 C 源码。
+
+最终交付为 `../x/dnf-native-output/P19-20261116-reference-gui/delivery/`，GUI SHA-256 为 `c8db851f654fd2049c1d98faa0128a851035f124c4d7d3edc3558a6f663cef69`。宿主与数据库维护工具沿用 P16/P13，固定资源不变。最终构建实测：
+
+- `probes/20261116T002259895022Z/gui-layout/receipt.json`：默认 1440×940、最小 1180×760，以及 125% 模拟 DPI 的全部可见控件无越界、同一工具条无重叠；19 张卡片的视觉矩形、命中选择与详情一致。关键字过滤、英文大小写匹配及清空恢复通过。模拟 DPI 暴露的逐行舍入 1 像素越界已修正，截图同目录保留。
+- `probes/20261116T002251932739Z/gui-keyboard/receipt.json`：真实 Win32 消息队列验证 Tab、方向键、回车、空格、实例菜单与两个真实目录切换；删除/还原默认取消、回车和 Esc 保留冷数据；数据库启动经 UUID/TLS 核对后正常停止。未强制清理，来源数据不变。
+- `probes/20261116T002316779146Z/gui-readiness/receipt.json`：两次原版 game 启动分别在 31.055 和 30.119 秒确认本次初始化；旧日志不误触发，切换服务不混淆就绪层级，两次 game 均正常退出、整体停服及 GUI 退出 0。仅有既有 inotify 291/332 缺口，未执行客户端业务。
+
+本阶段较早构建还完成服务协议及日志集成回归，具体程序身份分别记录在收据中：`probes/20261116T001119910956Z/gui-services/receipt.json` 覆盖 channel、relay/monitor、STUN、单服重启、ELF 哈希拒绝、逆序停服和协调备份；`probes/20261116T001713083071Z/gui-logs/receipt.json` 覆盖原文、追加、GBK、轮转、截短、256 KiB 尾部、跟随/保留滚动位置、实际 game/stdout/stderr/MySQL 日志及正常退出。最终构建随后补全实例下拉交互和退出颜色，并执行上列最终回归；不把不同程序哈希的历史结果写成最终二进制的同次验证。
+
+验证限 Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT；未实测物理键鼠、多显示器切换及其他 Windows 系统。原始构建、参考身份、差异、截图与阶段收据保存在外部 P19 目录；客户端和完整安全拓扑的既有边界继续适用。
+
 ## GUI 应用初始化状态（2026-11-16）
 
 P18 修复 game 已完成原版初始化后 GUI 仍停在“运行时通道已接入”的缺口。现在只读取本次宿主新建的 stdout，发现原版完成标记后更新为“应用已初始化”；每次启动清零读取位置和状态，不以旧 `.init` 或上次 stdout 判断。其他服务维持已验证的运行时通道层级，接口/协议/业务标签保留未验证。
@@ -237,6 +251,7 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 | 编码 | `python -B tests/test_resource_encodings.py --package ../x/dnf-native-output/package` | ZIP 内实际 GBK、GB18030、BIG5、BIG5-HKSCS、EUC-KR、UHC 与 UTF-8 字节往返 |
 | 真实实例与 core | `python -B tests/test_instance_workflow.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 真实资源故障拒绝、双实例、占用、删除、15 个辅助服务协议及 game/DP2/Frida 启停 |
 | 长路径实例 | `python -B tests/test_gui_long_path.py --gui ../x/dnf-native-output/package/DNF-Native.exe` | 274 字符根目录的新建、同目录锁、原版启动/协议、CLI 与 GUI 维护；要求文件系统已有可用短名 |
+| GUI 布局 | `python -B tests/test_gui_layout.py --gui PACKAGE_EXE --instance PRIVATE_STOPPED_INSTANCE` | 仅读取停库夹具；网格命中、无重叠/越界、模拟 DPI、日志过滤与截图 |
 | GUI 键盘 | `python -B tests/test_gui_keyboard.py --gui PACKAGE_EXE --instance PRIVATE_STOPPED_INSTANCE` | 独立副本的焦点/Tab、方向键/回车/空格、弹窗取消和数据库启停；投递队列键盘消息，未实测物理键盘 |
 | 数据库维护 | `python -B tests/test_mysql_maintenance.py --exe ../x/dnf-native-output/package/resources/mysql-control.exe --database-source PRIVATE_STOPPED_INSTANCE` | 私有停库副本的备份、影子还原、失败保留与中断恢复 |
 | GUI 停服维护 | `python -B tests/test_gui_maintenance.py --instance PRIVATE_INSTANCE --gui ../x/dnf-native-output/package/DNF-Native.exe` | GUI 从运行态逆序停服再备份 |

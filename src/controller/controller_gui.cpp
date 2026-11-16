@@ -5,8 +5,8 @@
 #include <commctrl.h>
 #include "log_view.h"
 #include <algorithm>
-#include <array>
 #include <cwchar>
+#include <cwctype>
 #include <memory>
 #include <thread>
 
@@ -15,8 +15,9 @@ enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, REST
        DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE,
        LOG_SOURCE = 240, LOG_ENCODING, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
        SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES,
-       SERVICE_DETAIL = 219, SERVICE_FILTER = 270, GROUP_TOGGLE, SERVICE_META,
-       SERVICE_READINESS, MAINTENANCE_DETAIL };
+       SERVICE_DETAIL = 219, SERVICE_META = 272, SERVICE_READINESS, MAINTENANCE_DETAIL };
+enum { INSTANCE_MORE = 280, SERVICE_INFO, DATABASE_INFO, LOG_FILTER,
+       LOG_CONSOLE_TAB, LOG_SERVICE_TAB, LOG_ERROR_TAB, LOG_MYSQL_TAB, LOG_FILES };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
@@ -177,26 +178,6 @@ static std::wstring service_group(const std::wstring &name) {
     return L"其他";
 }
 
-static int service_group_index(const std::wstring &name) {
-    if (name == L"monitor" || name == L"manager" || name == L"dbmw_guild" || name == L"dbmw_mnt" ||
-        name == L"dbmw_stat" || name == L"guild" || name == L"statics" || name == L"coserver") return 0;
-    if (name == L"bridge" || name == L"channel" || name == L"relay" || name == L"community") return 1;
-    if (name == L"game" || name == L"auction" || name == L"point") return 2;
-    if (name == L"stun" || name == L"secagent" || name == L"gunnersvr" || name == L"zergsvr") return 3;
-    return -1;
-}
-
-static const wchar_t *service_group_label(int group) {
-    static const wchar_t *labels[] = {L"核心", L"辅助", L"游戏/插件", L"安全"};
-    return group >= 0 && group < 4 ? labels[group] : L"其他";
-}
-
-struct ServiceRow {
-    int service = -1;
-    int group = -1;
-    bool header = false;
-};
-
 static std::wstring service_readiness(const Service &service) {
     if (!service.readiness.empty()) return service.readiness;
     return service.state == L"未启动" ? L"未启动" : L"未验证";
@@ -204,15 +185,13 @@ static std::wstring service_readiness(const Service &service) {
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, status = nullptr, output = nullptr;
-    HFONT font = nullptr, strong_font = nullptr, log_font = nullptr;
+    HFONT font = nullptr, strong_font = nullptr, log_font = nullptr, small_font = nullptr;
     HBRUSH background = nullptr, surface = nullptr;
     std::wstring exe, initial, current, resources, runtime;
     Session session;
     std::vector<Service> services;
-    std::vector<ServiceRow> service_rows;
-    std::array<bool, 4> group_collapsed{};
+    std::vector<std::wstring> recent_instances;
     std::wstring preferred_service;
-    int service_filter = 0;
     HANDLE service_job = nullptr, instance_lock = nullptr;
     bool busy = false, closing = false;
     int operation = 0;
@@ -236,20 +215,36 @@ struct App {
 
 
     void display_log(const std::wstring &text) {
+        std::wstring filtered;
+        std::wstring needle = window_text(GetDlgItem(window, LOG_FILTER));
+        if (!needle.empty()) {
+            std::transform(needle.begin(), needle.end(), needle.begin(), std::towlower);
+            size_t begin = 0;
+            while (begin < text.size()) {
+                size_t end = text.find(L'\n', begin);
+                if (end == std::wstring::npos) end = text.size(); else ++end;
+                std::wstring line = text.substr(begin, end - begin), lower = line;
+                std::transform(lower.begin(), lower.end(), lower.begin(), std::towlower);
+                if (lower.find(needle) != std::wstring::npos) filtered += line;
+                begin = end;
+            }
+        }
+        const std::wstring &shown = needle.empty() ? text : filtered;
         bool follow = SendMessageW(GetDlgItem(window, LOG_FOLLOW), BM_GETCHECK, 0, 0) == BST_CHECKED;
         DWORD first = 0, last = 0;
         SendMessageW(output, EM_GETSEL, reinterpret_cast<WPARAM>(&first), reinterpret_cast<LPARAM>(&last));
         int line = static_cast<int>(SendMessageW(output, EM_GETFIRSTVISIBLELINE, 0, 0));
         SendMessageW(output, WM_SETREDRAW, FALSE, 0);
-        SetWindowTextW(output, text.c_str());
-        if (follow) SendMessageW(output, EM_SETSEL, text.size(), text.size());
+        SetWindowTextW(output, shown.c_str());
+        if (follow) SendMessageW(output, EM_SETSEL, shown.size(), shown.size());
         else {
-            SendMessageW(output, EM_SETSEL, std::min<size_t>(first, text.size()), std::min<size_t>(last, text.size()));
+            SendMessageW(output, EM_SETSEL, std::min<size_t>(first, shown.size()), std::min<size_t>(last, shown.size()));
         }
         SendMessageW(output, WM_SETREDRAW, TRUE, 0);
         if (follow) SendMessageW(output, EM_SCROLLCARET, 0, 0);
         else SendMessageW(output, EM_LINESCROLL, 0, line);
         InvalidateRect(output, nullptr, TRUE);
+        for (int id : {LOG_CONSOLE_TAB,LOG_SERVICE_TAB,LOG_ERROR_TAB,LOG_MYSQL_TAB}) InvalidateRect(GetDlgItem(window,id),nullptr,FALSE);
     }
     void refresh_log(bool force = false) {
         LRESULT index = SendMessageW(GetDlgItem(window, LOG_SOURCE), CB_GETCURSEL, 0, 0);
@@ -370,23 +365,7 @@ struct App {
         HWND list = GetDlgItem(window, SERVICE_LIST);
         if (!list) return -1;
         LRESULT row = SendMessageW(list, LB_GETCURSEL, 0, 0);
-        if (row < 0 || static_cast<size_t>(row) >= service_rows.size()) return -1;
-        int index = service_rows[static_cast<size_t>(row)].service;
-        return index >= 0 && static_cast<size_t>(index) < services.size() ? index : -1;
-    }
-    int selected_group_index() const {
-        HWND list = GetDlgItem(window, SERVICE_LIST);
-        if (!list) return -1;
-        LRESULT row = SendMessageW(list, LB_GETCURSEL, 0, 0);
-        if (row < 0 || static_cast<size_t>(row) >= service_rows.size()) return -1;
-        const ServiceRow &item = service_rows[static_cast<size_t>(row)];
-        return item.group >= 0 && item.group < 4 ? item.group : -1;
-    }
-    bool service_visible(int index) const {
-        if (index < 0 || static_cast<size_t>(index) >= services.size()) return false;
-        if (service_filter == 1) return running(services[static_cast<size_t>(index)]);
-        if (service_filter >= 2) return service_group_index(services[static_cast<size_t>(index)].name) == service_filter - 2;
-        return true;
+        return row >= 0 && static_cast<size_t>(row) < services.size() ? static_cast<int>(row) : -1;
     }
     std::wstring database_identity() const {
         std::string uuid = session.uuid;
@@ -418,46 +397,19 @@ struct App {
         std::wstring text = L"数据库：" + database_identity() + L"\r\n将按逆序停止：" + stop_plan();
         if (!maintenance_summary.empty()) text += L"\r\n最近维护：" + maintenance_summary;
         SetWindowTextW(detail, text.c_str());
-    }
-    void update_group_toggle() {
-        HWND button = GetDlgItem(window, GROUP_TOGGLE);
-        if (!button) return;
-        int group = selected_group_index();
-        if (group < 0) { SetWindowTextW(button, L"折叠组"); return; }
-        SetWindowTextW(button, group_collapsed[static_cast<size_t>(group)] ? L"展开组" : L"折叠组");
-    }
-    void toggle_selected_group() {
-        int group = selected_group_index();
-        if (group < 0) return;
-        group_collapsed[static_cast<size_t>(group)] = !group_collapsed[static_cast<size_t>(group)];
-        show_services();
-        controls();
+        SetWindowTextW(GetDlgItem(window,212), (L"数据库  " + database_identity()).c_str());
     }
     void show_service_detail() {
         int selected = selected_service_index();
-        int group = selected_group_index();
         if (selected < 0) {
-            if (group < 0) {
-                SetWindowTextW(GetDlgItem(window, SERVICE_DETAIL), L"请选择左侧服务或分组");
-                SetWindowTextW(GetDlgItem(window, SERVICE_META), L"服务详情将在选择后显示");
-                SetWindowTextW(GetDlgItem(window, SERVICE_READINESS), L"就绪层级：未选择");
-            } else {
-                unsigned total = 0, visible = 0, live = 0;
-                for (size_t i = 0; i < services.size(); ++i) if (service_group_index(services[i].name) == group) {
-                    ++total; if (service_visible(static_cast<int>(i))) ++visible; if (running(services[i])) ++live;
-                }
-                std::wstring title = std::wstring(service_group_label(group)) + L"服务  ·  " + std::to_wstring(total) + L" 项";
-                SetWindowTextW(GetDlgItem(window, SERVICE_DETAIL), title.c_str());
-                SetWindowTextW(GetDlgItem(window, SERVICE_META),
-                               (L"当前显示：" + std::to_wstring(visible) + L" 项\r\n运行中：" + std::to_wstring(live) + L" 项").c_str());
-                SetWindowTextW(GetDlgItem(window, SERVICE_READINESS),
-                               group_collapsed[static_cast<size_t>(group)] ? L"分组已折叠 · 双击标题或点击“展开组”" : L"分组已展开 · 双击标题或点击“折叠组”");
-            }
-            update_group_toggle();
+            SetWindowTextW(GetDlgItem(window, SERVICE_DETAIL), L"请选择服务卡片");
+            SetWindowTextW(GetDlgItem(window, SERVICE_META), L"");
+            SetWindowTextW(GetDlgItem(window, SERVICE_READINESS), L"就绪层级：未选择");
             show_maintenance_detail();
             return;
         }
         const Service &service = services[static_cast<size_t>(selected)];
+        SetWindowTextW(GetDlgItem(window,LOG_SERVICE_TAB),service.name.c_str());
         std::wstring architecture = service.host.find(L"x64") != std::wstring::npos ? L"x86_64" : L"i386";
         SetWindowTextW(GetDlgItem(window, SERVICE_DETAIL),
                        (service.name + L"  ·  " + service_group(service.name) + L"  ·  " + architecture).c_str());
@@ -472,64 +424,30 @@ struct App {
                                  L"\r\n接口/协议/业务：未验证  ·  端口/依赖：清单未声明";
         if (!recent.empty()) readiness += L"\r\n最近日志：" + recent;
         SetWindowTextW(GetDlgItem(window, SERVICE_READINESS), readiness.c_str());
-        update_group_toggle();
         show_maintenance_detail();
     }
     void show_services() {
         HWND list = GetDlgItem(window, SERVICE_LIST);
-        int selected_service = selected_service_index();
-        int selected_group = selected_group_index();
+        int selected = selected_service_index();
         if (!preferred_service.empty()) {
             auto found = std::find_if(services.begin(), services.end(), [&](const Service &service) { return service.name == preferred_service; });
-            if (found != services.end()) {
-                selected_service = static_cast<int>(found - services.begin());
-                selected_group = service_group_index(found->name);
-            }
+            if (found != services.end()) selected = static_cast<int>(found - services.begin());
         }
-        LRESULT filter = SendMessageW(GetDlgItem(window, SERVICE_FILTER), CB_GETCURSEL, 0, 0);
-        if (filter >= 0) service_filter = static_cast<int>(filter);
-        service_rows.clear();
-        SendMessageW(list, WM_SETREDRAW, FALSE, 0); SendMessageW(list, LB_RESETCONTENT, 0, 0);
-        for (int group = 0; group < 4; ++group) {
-            unsigned total = 0, visible = 0, live = 0;
-            for (size_t i = 0; i < services.size(); ++i) if (service_group_index(services[i].name) == group) {
-                ++total; if (service_visible(static_cast<int>(i))) ++visible; if (running(services[i])) ++live;
-            }
-            if (!total || (!visible && service_filter != 0 && service_filter != group + 2)) continue;
-            std::wstring row = (group_collapsed[static_cast<size_t>(group)] ? L"▸ " : L"▾ ") +
-                               std::wstring(service_group_label(group)) + L"服务  ·  " + std::to_wstring(visible) +
-                               L"/" + std::to_wstring(total) + L" 显示 · " + std::to_wstring(live) + L" 运行";
-            service_rows.push_back({-1, group, true});
-            SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(row.c_str()));
-            if (group_collapsed[static_cast<size_t>(group)]) continue;
-            for (size_t i = 0; i < services.size(); ++i) {
-                const Service &service = services[i];
-                if (service_group_index(service.name) != group || !service_visible(static_cast<int>(i))) continue;
-                // Keep the established row contract for orchestration probes:
-                // the row reports process state, while the detail panel carries
-                // the finer runtime/protocol/business readiness layers.
-                std::wstring item = service.name + (service.automatic ? L"" : L"（可选）") + L"  |  " + service.state;
-                if (running(service)) item += L" · PID " + std::to_wstring(service.pid);
-                service_rows.push_back({static_cast<int>(i), group, false});
-                SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
-            }
-        }
-        LRESULT select_row = LB_ERR;
-        for (size_t i = 0; i < service_rows.size(); ++i) {
-            if (selected_service >= 0 && service_rows[i].service == selected_service) { select_row = static_cast<LRESULT>(i); break; }
-            if (select_row == LB_ERR && selected_group >= 0 && service_rows[i].header && service_rows[i].group == selected_group)
-                select_row = static_cast<LRESULT>(i);
-        }
-        if (select_row == LB_ERR && !service_rows.empty()) select_row = 0;
-        if (select_row != LB_ERR) {
-            SendMessageW(list, LB_SETCURSEL, select_row, 0);
-            if (select_row == 0) SendMessageW(list, LB_SETTOPINDEX, 0, 0);
-        }
-        SendMessageW(list, WM_SETREDRAW, TRUE, 0); InvalidateRect(list, nullptr, TRUE);
+        SendMessageW(list, WM_SETREDRAW, FALSE, 0);
+        SendMessageW(list, LB_RESETCONTENT, 0, 0);
         unsigned live = 0;
-        for (const auto &service : services) if (service.process && WaitForSingleObject(service.process, 0) == WAIT_TIMEOUT) ++live;
+        for (const auto &service : services) {
+            std::wstring item = service.name + (service.automatic ? L"" : L"（可选）") + L"  |  " + service.state;
+            if (running(service)) { item += L" · PID " + std::to_wstring(service.pid); ++live; }
+            SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
+        }
+        if (!services.empty()) SendMessageW(list, LB_SETCURSEL,
+            selected >= 0 && static_cast<size_t>(selected) < services.size() ? selected : 0, 0);
+        SendMessageW(list, WM_SETREDRAW, TRUE, 0);
+        InvalidateRect(list, nullptr, TRUE);
         std::wstring count = std::to_wstring(live) + L" / " + std::to_wstring(services.size()) + L" 运行中";
         SetWindowTextW(GetDlgItem(window, 213), count.c_str());
+        InvalidateRect(GetDlgItem(window, BROWSE), nullptr, TRUE);
         show_service_detail();
         show_maintenance_detail();
     }
@@ -543,12 +461,13 @@ struct App {
         if (shown_log == L"console") display_log(operations);
     }
     void controls() {
+        InvalidateRect(window,nullptr,FALSE);
         SetWindowTextW(GetDlgItem(window, 215), busy ? L"处理中…" : session.process ? L"运行中" : L"未启动");
         show_maintenance_detail();
         // The worker may be changing process ownership. Inspect it after join.
         if (busy) {
             for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,
-                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE,GROUP_TOGGLE,SERVICE_FILTER})
+                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE})
                 EnableWindow(GetDlgItem(window, id), FALSE);
             for (int id : {SERVICE_LIST,SERVICE_LOGS}) EnableWindow(GetDlgItem(window,id), FALSE);
             for (int id : {FOLDER,LOGS}) EnableWindow(GetDlgItem(window,id), !current.empty());
@@ -560,6 +479,8 @@ struct App {
         SetWindowTextW(GetDlgItem(window,ALL_STOP),L"整体停止");
         bool active = services_running();
         EnableWindow(GetDlgItem(window, CREATE_INSTANCE), resources_ready && !active && !session.process);
+        EnableWindow(GetDlgItem(window, INSTANCE_MORE), !busy);
+        EnableWindow(GetDlgItem(window, SERVICE_INFO), !services.empty());
         EnableWindow(GetDlgItem(window, DELETE_INSTANCE), !current.empty() && known_instance(current) && !active && !session.process);
         EnableWindow(GetDlgItem(window, CHECK_RESOURCES), TRUE);
         bool initialized = !current.empty() && present(current + L"\\data\\auto.cnf");
@@ -580,9 +501,7 @@ struct App {
         EnableWindow(GetDlgItem(window, IP_APPLY), initialized && !active && !session.process && !pending);
         int index = selected_service_index();
         bool selected = index >= 0 && static_cast<size_t>(index) < services.size();
-        EnableWindow(GetDlgItem(window, SERVICE_LIST), !service_rows.empty());
-        EnableWindow(GetDlgItem(window, SERVICE_FILTER), !busy && !services.empty());
-        EnableWindow(GetDlgItem(window, GROUP_TOGGLE), !busy && selected_group_index() >= 0);
+        EnableWindow(GetDlgItem(window, SERVICE_LIST), !services.empty());
         EnableWindow(GetDlgItem(window, ELF_START), selected && session.process && !running(services[static_cast<size_t>(index)]) && !pending);
         EnableWindow(GetDlgItem(window, ELF_STOP), selected && running(services[static_cast<size_t>(index)]));
         EnableWindow(GetDlgItem(window, SERVICE_LOGS), selected);
@@ -593,7 +512,6 @@ struct App {
         EnableWindow(GetDlgItem(window, DP2_ENABLE), editable);
         EnableWindow(GetDlgItem(window, FRIDA_ENABLE), editable && SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED);
         EnableWindow(GetDlgItem(window, PLUGINS_SAVE), editable);
-        update_group_toggle();
     }
     void load() {
         if (busy || session.process || services_running()) return;
@@ -614,6 +532,8 @@ struct App {
             close_instance_lease(); instance_lock = next_lock;
         }
         current = chosen;
+        if (known_instance(current) && std::find(recent_instances.begin(),recent_instances.end(),current)==recent_instances.end())
+            recent_instances.push_back(current);
         maintenance_summary = L"尚未执行";
         services = load_services(current, runtime); show_services(); show_plugins(); scan_logs(true);
         SetWindowTextW(service_ip, configured_service_ip(services).c_str());
@@ -769,72 +689,180 @@ static void focus_ring(HDC dc, RECT area, int inset = 2) {
     SelectObject(dc, old_brush); SelectObject(dc, old_pen); DeleteObject(pen);
 }
 
-static void draw_item(const DRAWITEMSTRUCT &item) {
-    HDC dc = item.hDC;
-    RECT area = item.rcItem;
-    bool selected = (item.itemState & ODS_SELECTED) != 0;
-    bool disabled = (item.itemState & ODS_DISABLED) != 0;
-    COLORREF fill = RGB(255,255,255), ink = RGB(58,74,96), border = RGB(220,228,239);
-    FillRect(dc, &area, app->surface);
-    if (item.CtlID == ALL_START) { fill = disabled ? RGB(235,239,246) : selected ? RGB(29,83,203) : RGB(43,108,246); ink = disabled ? RGB(169,181,200) : RGB(255,255,255); border = fill; }
-    else if (disabled) { fill = RGB(247,249,252); ink = RGB(177,188,205); border = RGB(233,238,246); }
-    else if (selected) { fill = RGB(238,245,255); ink = RGB(35,94,222); border = RGB(179,205,255); }
-    if (item.CtlID == SERVICE_LIST) InflateRect(&area, -app->px(4), -app->px(4));
-    else InflateRect(&area, -1, -1);
-    rounded(dc, area, fill, border, app->px(18));
-    SetBkMode(dc, TRANSPARENT); SetTextColor(dc, ink);
-    if (item.CtlID == SERVICE_LIST && item.itemID != static_cast<UINT>(-1) &&
-        item.itemID < app->service_rows.size()) {
-        const ServiceRow &row = app->service_rows[item.itemID];
-        if (row.header) {
-            COLORREF header_fill = selected ? RGB(232,241,255) : RGB(247,249,252);
-            COLORREF header_ink = selected ? RGB(35,94,222) : RGB(70,91,118);
-            rounded(dc, area, header_fill, selected ? RGB(179,205,255) : RGB(226,233,243), app->px(14));
-            SetTextColor(dc, header_ink);
-            int length = static_cast<int>(SendMessageW(item.hwndItem, LB_GETTEXTLEN, item.itemID, 0));
-            std::wstring label(length + 1, L'\0');
-            SendMessageW(item.hwndItem, LB_GETTEXT, item.itemID, reinterpret_cast<LPARAM>(label.data())); label.resize(length);
-            RECT text = {area.left + app->px(14), area.top, area.right - app->px(8), area.bottom};
-            SelectObject(dc, app->strong_font);
-            DrawTextW(dc, label.c_str(), -1, &text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-        } else if (row.service >= 0 && static_cast<size_t>(row.service) < app->services.size()) {
-            // Read the UI snapshot while the operation worker owns Service.
-            int length = static_cast<int>(SendMessageW(item.hwndItem, LB_GETTEXTLEN, item.itemID, 0));
-            std::wstring snapshot(length + 1, L'\0');
-            SendMessageW(item.hwndItem, LB_GETTEXT, item.itemID, reinterpret_cast<LPARAM>(snapshot.data())); snapshot.resize(length);
+static void text_at(HDC dc, RECT area, const std::wstring &text, COLORREF color,
+                    HFONT font, UINT format = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS) {
+    SetBkMode(dc, TRANSPARENT); SetTextColor(dc, color); SelectObject(dc, font);
+    DrawTextW(dc, text.c_str(), -1, &area, format | DT_NOPREFIX);
+}
+
+static void dot_at(HDC dc, int x, int y, int size, COLORREF color) {
+    HBRUSH brush = CreateSolidBrush(color);
+    HGDIOBJ old_brush = SelectObject(dc, brush), old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+    Ellipse(dc, x, y, x + size, y + size);
+    SelectObject(dc, old_brush); SelectObject(dc, old_pen); DeleteObject(brush);
+}
+
+static std::wstring list_text(HWND list, int index) {
+    LRESULT length = SendMessageW(list, LB_GETTEXTLEN, index, 0);
+    if (length < 0) return {};
+    std::wstring text(static_cast<size_t>(length) + 1, L'\0');
+    SendMessageW(list, LB_GETTEXT, index, reinterpret_cast<LPARAM>(text.data()));
+    text.resize(static_cast<size_t>(length)); return text;
+}
+
+static RECT service_tile(HWND window, int index) {
+    RECT client; GetClientRect(window, &client);
+    int gap = app->px(10), width = (client.right - 6 * gap) / 7;
+    int left = (index % 7) * (width + gap), top = app->px((index / 7) * 62);
+    return {left, top, index % 7 == 6 ? client.right : left + width, top + app->px(52)};
+}
+
+// The native list owns strings, selection and accessibility. Its presentation
+// and hit rectangles use the same row-major grid, including keyboard movement.
+static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+                                         UINT_PTR, DWORD_PTR) {
+    if (message == WM_ERASEBKGND) return TRUE;
+    if (message == LB_GETITEMRECT) {
+        if (wparam >= static_cast<WPARAM>(SendMessageW(window, LB_GETCOUNT, 0, 0))) return LB_ERR;
+        *reinterpret_cast<RECT *>(lparam) = service_tile(window, static_cast<int>(wparam)); return 0;
+    }
+    auto hit = [&](POINT point) {
+        int count = static_cast<int>(SendMessageW(window, LB_GETCOUNT, 0, 0));
+        for (int i = 0; i < count; ++i) { RECT area = service_tile(window, i); if (PtInRect(&area, point)) return i; }
+        return -1;
+    };
+    auto select = [&](int index) {
+        if (index < 0) return;
+        SendMessageW(window, LB_SETCURSEL, index, 0); InvalidateRect(window, nullptr, FALSE);
+        SendMessageW(GetParent(window), WM_COMMAND, MAKEWPARAM(SERVICE_LIST, LBN_SELCHANGE), reinterpret_cast<LPARAM>(window));
+    };
+    if (message == LB_ITEMFROMPOINT) {
+        int index = hit({static_cast<short>(LOWORD(lparam)), static_cast<short>(HIWORD(lparam))});
+        return index < 0 ? MAKELRESULT(0, 1) : MAKELRESULT(index, 0);
+    }
+    if (message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK) {
+        if (!IsWindowEnabled(window)) return 0;
+        SetFocus(window);
+        select(hit({static_cast<short>(LOWORD(lparam)), static_cast<short>(HIWORD(lparam))}));
+        if (message == WM_LBUTTONDBLCLK)
+            SendMessageW(GetParent(window), WM_COMMAND, MAKEWPARAM(SERVICE_LIST, LBN_DBLCLK), reinterpret_cast<LPARAM>(window));
+        return 0;
+    }
+    if (message == WM_LBUTTONUP || message == WM_MOUSEWHEEL) return 0;
+    if (message == WM_KEYDOWN) {
+        int index = static_cast<int>(SendMessageW(window, LB_GETCURSEL, 0, 0));
+        int count = static_cast<int>(SendMessageW(window, LB_GETCOUNT, 0, 0)), target = index;
+        if (wparam == VK_LEFT) --target;
+        else if (wparam == VK_RIGHT) ++target;
+        else if (wparam == VK_UP) target -= 7;
+        else if (wparam == VK_DOWN) target += 7;
+        else if (wparam == VK_HOME) target = 0;
+        else if (wparam == VK_END) target = count - 1;
+        else if (wparam == VK_RETURN) {
+            SendMessageW(GetParent(window), WM_COMMAND, MAKEWPARAM(SERVICE_LIST, LBN_DBLCLK), reinterpret_cast<LPARAM>(window)); return 0;
+        } else return DefSubclassProc(window, message, wparam, lparam);
+        if (target >= 0 && target < count) select(target);
+        return 0;
+    }
+    if (message == WM_GETDLGCODE)
+        return DLGC_WANTARROWS | (wparam == VK_RETURN ? DLGC_WANTALLKEYS : 0);
+    if (message == WM_PAINT || message == WM_PRINTCLIENT) {
+        PAINTSTRUCT paint = {}; HDC target = message == WM_PAINT ? BeginPaint(window, &paint) : reinterpret_cast<HDC>(wparam);
+        RECT client; GetClientRect(window, &client);
+        HDC dc = CreateCompatibleDC(target); HBITMAP bitmap = CreateCompatibleBitmap(target, std::max(1L,client.right), std::max(1L,client.bottom));
+        HGDIOBJ old = SelectObject(dc, bitmap); FillRect(dc, &client, app->surface);
+        int count = static_cast<int>(SendMessageW(window, LB_GETCOUNT, 0, 0));
+        int selected = static_cast<int>(SendMessageW(window, LB_GETCURSEL, 0, 0));
+        for (int i = 0; i < count; ++i) {
+            std::wstring snapshot = list_text(window, i);
             size_t split = snapshot.find(L"  |  ");
-            std::wstring name = snapshot.substr(0, split);
-            std::wstring detail = split == std::wstring::npos ? L"" : snapshot.substr(split + 5);
-            bool live = detail.find(L"进程运行中") != std::wstring::npos;
-            COLORREF dot = live ? RGB(31,158,112) : detail.find(L"失败") != std::wstring::npos || detail.find(L"超时") != std::wstring::npos
-                                                     ? RGB(211,90,100) : RGB(145,161,183);
-        HBRUSH marker = CreateSolidBrush(dot); HGDIOBJ previous = SelectObject(dc, marker), pen = SelectObject(dc, GetStockObject(NULL_PEN));
-        Ellipse(dc, area.left + app->px(12), area.top + app->px(13), area.left + app->px(19), area.top + app->px(20));
-        SelectObject(dc, previous); SelectObject(dc, pen); DeleteObject(marker);
-        RECT text = {area.left + app->px(26), area.top + app->px(5), area.right - app->px(5), area.top + app->px(25)};
-        SelectObject(dc, app->strong_font); DrawTextW(dc, name.c_str(), -1, &text, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-        text.top += app->px(19); text.bottom += app->px(19); SelectObject(dc, app->font); SetTextColor(dc, RGB(134,149,171));
-        DrawTextW(dc, detail.c_str(), -1, &text, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+            std::wstring name = snapshot.substr(0, split), detail = split == std::wstring::npos ? L"" : snapshot.substr(split + 5);
+            size_t optional = name.find(L"\uff08"); if (optional != std::wstring::npos) name.resize(optional);
+            bool live = detail.find(L"\u8fdb\u7a0b\u8fd0\u884c\u4e2d") != std::wstring::npos;
+            size_t code = detail.find(L"代码 ");
+            bool failed = detail.find(L"\u5931\u8d25") != std::wstring::npos || detail.find(L"\u8d85\u65f6") != std::wstring::npos ||
+                          (code != std::wstring::npos && code + 3 < detail.size() && detail[code+3] != L'0');
+            RECT area = service_tile(window, i);
+            bool chosen = i == selected;
+            rounded(dc, area, chosen ? RGB(241,246,255) : failed ? RGB(255,247,247) : live ? RGB(255,255,255) : RGB(249,250,253),
+                    chosen ? RGB(181,205,255) : failed ? RGB(255,208,208) : RGB(230,236,246), app->px(10));
+            int center = (area.top + area.bottom) / 2;
+            dot_at(dc, area.left + app->px(11), center - app->px(3), app->px(6),
+                   live ? RGB(24,173,94) : failed ? RGB(223,49,53) : RGB(194,204,219));
+            RECT label = {area.left + app->px(25), area.top, area.right - app->px(live ? 40 : 10), area.bottom};
+            text_at(dc, label, name, chosen ? RGB(37,91,239) : failed ? RGB(220,42,49) : live ? RGB(36,51,75) : RGB(130,147,172),
+                    chosen ? app->strong_font : app->font);
+            size_t pid = detail.find(L"PID ");
+            if (pid != std::wstring::npos) {
+                RECT number = {area.right-app->px(38),area.top,area.right-app->px(8),area.bottom};
+                text_at(dc, number, detail.substr(pid+4), RGB(153,169,192), app->small_font, DT_RIGHT|DT_VCENTER|DT_SINGLELINE);
+            }
+            if (chosen && GetFocus() == window && !(SendMessageW(window, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS))
+                focus_ring(dc, area, app->px(2));
         }
-    } else if (item.CtlID == LOG_SOURCE || item.CtlID == LOG_ENCODING || item.CtlID == SERVICE_FILTER) {
-        FillRect(dc, &item.rcItem, app->surface);
-        RECT row = item.rcItem; InflateRect(&row, -app->px(3), -app->px(2));
-        if (selected) rounded(dc, row, RGB(238,245,255), RGB(238,245,255), app->px(10));
-        SetTextColor(dc, selected ? RGB(35,94,222) : RGB(58,74,96));
+        if (!count) text_at(dc, client, L"\u9009\u62e9\u6216\u521b\u5efa\u5b9e\u4f8b\u540e\u663e\u793a\u670d\u52a1", RGB(145,160,183), app->font, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        BitBlt(target,0,0,client.right,client.bottom,dc,0,0,SRCCOPY);
+        SelectObject(dc,old); DeleteObject(bitmap); DeleteDC(dc);
+        if (message == WM_PAINT) EndPaint(window,&paint);
+        return 0;
+    }
+    LRESULT result = DefSubclassProc(window,message,wparam,lparam);
+    if (message == LB_SETCURSEL || message == WM_SETFOCUS || message == WM_KILLFOCUS || message == WM_ENABLE)
+        InvalidateRect(window,nullptr,FALSE);
+    return result;
+}
+
+static void draw_item(const DRAWITEMSTRUCT &item) {
+    HDC dc = item.hDC; RECT area = item.rcItem;
+    bool pressed = (item.itemState & ODS_SELECTED) != 0, disabled = (item.itemState & ODS_DISABLED) != 0;
+    bool hover = GetPropW(item.hwndItem,L"hover") != nullptr;
+    COLORREF fill = RGB(255,255,255), ink = RGB(54,77,112), border = RGB(215,225,242);
+    FillRect(dc, &area, app->surface);
+    if (item.CtlType == ODT_COMBOBOX) {
+        if (pressed) fill=RGB(240,245,255);
+        FillRect(dc, &area, app->surface);
+        if (pressed) rounded(dc,area,fill,fill,app->px(8));
         std::wstring value;
         if (item.itemID != static_cast<UINT>(-1)) {
-            int length = static_cast<int>(SendMessageW(item.hwndItem, CB_GETLBTEXTLEN, item.itemID, 0));
-            if (length >= 0) { value.assign(length + 1, L'\0'); SendMessageW(item.hwndItem, CB_GETLBTEXT, item.itemID, reinterpret_cast<LPARAM>(value.data())); value.resize(length); }
+            int length=static_cast<int>(SendMessageW(item.hwndItem,CB_GETLBTEXTLEN,item.itemID,0));
+            if (length>=0) {value.assign(length+1,L'\0');SendMessageW(item.hwndItem,CB_GETLBTEXT,item.itemID,reinterpret_cast<LPARAM>(value.data()));value.resize(length);}
         }
-        RECT text = item.rcItem; InflateRect(&text, -app->px(12), 0);
-        SelectObject(dc, app->font); DrawTextW(dc, value.c_str(), -1, &text,
-                                               DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-        return;
-    } else if (item.CtlID != SERVICE_LIST) {
-        SelectObject(dc, app->strong_font); std::wstring text = window_text(item.hwndItem);
-        DrawTextW(dc, text.c_str(), -1, &area, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        area.left+=app->px(10); text_at(dc,area,value,ink,app->font); return;
     }
-    if (item.itemState & ODS_FOCUS) focus_ring(dc, area, app->px(2));
+    if (disabled) { fill=RGB(247,249,252); ink=RGB(181,192,211); border=RGB(233,237,246); }
+    else if (item.CtlID==ALL_START) {fill=pressed?RGB(28,77,201):hover?RGB(57,112,255):RGB(43,96,239); ink=RGB(255,255,255);border=fill;}
+    else if (item.CtlID==ALL_STOP) {ink=RGB(215,54,57);border=RGB(252,205,205);fill=pressed?RGB(255,235,235):RGB(255,255,255);}
+    else if (pressed || hover) {fill=RGB(242,247,255);ink=RGB(37,91,239);border=RGB(181,205,255);}
+    bool tab=item.CtlID>=LOG_CONSOLE_TAB && item.CtlID<=LOG_MYSQL_TAB;
+    if (tab) {
+        LRESULT index=SendMessageW(GetDlgItem(app->window,LOG_SOURCE),CB_GETCURSEL,0,0);
+        bool active=false;
+        if (index>=0 && static_cast<size_t>(index)<app->log_sources.size()) {
+            const auto &source=app->log_sources[static_cast<size_t>(index)];
+            active=item.CtlID==LOG_CONSOLE_TAB?source.path.empty():item.CtlID==LOG_MYSQL_TAB?source.label==L"MySQL \u539f\u751f\u65e5\u5fd7":
+                   item.CtlID==LOG_ERROR_TAB?source.label.find(L"\u6807\u51c6\u9519\u8bef")==0:!source.path.empty()&&source.label!=L"MySQL \u539f\u751f\u65e5\u5fd7"&&source.label.find(L"\u6807\u51c6\u9519\u8bef")!=0;
+        }
+        text_at(dc,area,window_text(item.hwndItem),active?RGB(39,93,241):RGB(112,132,162),active?app->strong_font:app->font,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        if(active) {RECT line={area.left,area.bottom-app->px(2),area.right,area.bottom};HBRUSH brush=CreateSolidBrush(RGB(43,96,239));FillRect(dc,&line,brush);DeleteObject(brush);}
+    } else if (item.CtlID==BROWSE) {
+        InflateRect(&area,-1,-1); rounded(dc,area,RGB(251,252,255),border,app->px(12));
+        dot_at(dc,area.left+app->px(12),area.top+app->px(13),app->px(8),app->current.empty()?RGB(194,204,219):RGB(24,173,94));
+        std::wstring name=app->current.empty()?L"\u9009\u62e9\u5b9e\u4f8b":app->current.substr(app->current.find_last_of(L"\\/")+1);
+        RECT label={area.left+app->px(30),area.top+app->px(4),area.right-app->px(24),area.top+app->px(25)};
+        text_at(dc,label,name,RGB(29,43,63),app->strong_font);
+        label.top=area.top+app->px(25);label.bottom=area.bottom-app->px(3);
+        text_at(dc,label,window_text(GetDlgItem(app->window,213))+L" \u00b7 MySQL "+window_text(GetDlgItem(app->window,215)),RGB(139,157,184),app->small_font);
+        label={area.right-app->px(20),area.top,area.right-app->px(6),area.bottom};text_at(dc,label,L"\u2304",RGB(139,157,184),app->font);
+    } else {
+        bool ghost=item.CtlID==CHECK_RESOURCES||item.CtlID==FOLDER||item.CtlID==INSTANCE_MORE||item.CtlID==RECOVER||item.CtlID==PLUGINS_SAVE||item.CtlID==DATABASE_INFO||item.CtlID==SERVICE_INFO||item.CtlID==LOG_REFRESH;
+        if(ghost && !pressed && !hover) {fill=RGB(255,255,255);border=fill;}
+        InflateRect(&area,-1,-1);rounded(dc,area,fill,border,app->px(8));
+        std::wstring label=window_text(item.hwndItem);
+        if(item.CtlID==ALL_START)label=L"\u25b6 "+label;
+        if(item.CtlID==ALL_STOP)label=L"\u25cf "+label;
+        text_at(dc,area,label,ink,app->font,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+    }
+    if((item.itemState & ODS_FOCUS) && !(SendMessageW(item.hwndItem,WM_QUERYUISTATE,0,0)&UISF_HIDEFOCUS)) focus_ring(dc,area,app->px(2));
 }
 
 // Preserve the native combo's keyboard, accessibility and popup behavior.
@@ -863,6 +891,12 @@ static LRESULT CALLBACK button_proc(HWND window, UINT message, WPARAM wparam, LP
     // The dialog manager changes default-button styles while moving focus.
     // Keep the custom renderer when it requests ordinary/default push styles.
     if (message == BM_SETSTYLE) wparam = (wparam & ~static_cast<WPARAM>(BS_TYPEMASK)) | BS_OWNERDRAW;
+    if (message == WM_MOUSEMOVE && !GetPropW(window,L"hover")) {
+        SetPropW(window,L"hover",reinterpret_cast<HANDLE>(1));
+        TRACKMOUSEEVENT track={sizeof(track),TME_LEAVE,window,0}; TrackMouseEvent(&track);
+        InvalidateRect(window,nullptr,FALSE);
+    }
+    if (message == WM_MOUSELEAVE) { RemovePropW(window,L"hover"); InvalidateRect(window,nullptr,FALSE); }
     LRESULT result = DefSubclassProc(window, message, wparam, lparam);
     // Owner-draw changes appearance, but Enter must still activate the focused
     // push button through IsDialogMessage's normal command handling.
@@ -953,6 +987,30 @@ static std::wstring choose_folder(HWND owner, const wchar_t *title, const std::w
     return chosen;
 }
 
+static void update_fonts() {
+    HFONT old[] = {app->font,app->strong_font,app->log_font,app->small_font};
+    auto font=[](int size,int weight,const wchar_t *face) {
+        return CreateFontW(-app->px(size),0,0,0,weight,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+                           OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,face);
+    };
+    app->font=font(12,FW_NORMAL,L"Microsoft YaHei UI");
+    app->strong_font=font(13,FW_SEMIBOLD,L"Microsoft YaHei UI");
+    app->log_font=font(12,FW_NORMAL,L"Consolas");
+    app->small_font=font(10,FW_NORMAL,L"Microsoft YaHei UI");
+    for(HWND child=GetWindow(app->window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)) {
+        int id=GetDlgCtrlID(child);HFONT use=app->font;
+        if(id==202 || id==207 || id==209 || id==214 || id==SERVICE_DETAIL)use=app->strong_font;
+        if(id==201 || id==205 || id==210 || id==212)use=app->small_font;
+        if(id==206)use=app->log_font;
+        SendMessageW(child,WM_SETFONT,reinterpret_cast<WPARAM>(use),TRUE);
+    }
+    for(int id:{LOG_SOURCE,LOG_ENCODING}) {
+        SendMessageW(GetDlgItem(app->window,id),CB_SETITEMHEIGHT,0,app->px(32));
+        SendMessageW(GetDlgItem(app->window,id),CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
+    }
+    for(HFONT previous:old)if(previous)DeleteObject(previous);
+}
+
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     try {
         switch (message) {
@@ -962,9 +1020,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return CreateFontW(-app->px(size), 0, 0, 0, weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, face);
             };
-            app->font = font(14, FW_NORMAL, L"Microsoft YaHei UI");
-            app->strong_font = font(14, FW_SEMIBOLD, L"Microsoft YaHei UI");
-            app->log_font = font(14, FW_NORMAL, L"Consolas");
+            app->font = font(12, FW_NORMAL, L"Microsoft YaHei UI");
+            app->strong_font = font(13, FW_SEMIBOLD, L"Microsoft YaHei UI");
+            app->small_font = font(10, FW_NORMAL, L"Microsoft YaHei UI");
+            app->log_font = font(12, FW_NORMAL, L"Consolas");
             app->background = CreateSolidBrush(RGB(244,247,251)); app->surface = CreateSolidBrush(RGB(255,255,255));
             auto control = [&](const wchar_t *type, const wchar_t *text, DWORD style, int id) {
                 bool checkbox = !std::wcscmp(type, L"BUTTON") && (style & BS_TYPEMASK) == BS_AUTOCHECKBOX;
@@ -998,11 +1057,12 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             control(L"BUTTON", L"创建实例", WS_TABSTOP, CREATE_INSTANCE);
             control(L"BUTTON", L"删除实例", WS_TABSTOP, DELETE_INSTANCE);
             control(L"STATIC", L"0 / 0 运行中", SS_CENTERIMAGE, 213);
-            control(L"STATIC", L"实例目录", 0, 201);
             app->path = control(L"EDIT", app->initial.c_str(), ES_AUTOHSCROLL | WS_TABSTOP, INSTANCE);
             SendMessageW(app->path, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(app->px(8),app->px(6)));
             control(L"BUTTON", L"选择…", WS_TABSTOP, BROWSE);
-            control(L"STATIC", L"MySQL 5.7.44", 0, 202);
+            control(L"STATIC", L"MySQL", SS_CENTERIMAGE, 202);
+            control(L"STATIC", L"5.7.44", SS_CENTERIMAGE, 201);
+            control(L"STATIC", L"", SS_CENTERIMAGE|SS_ENDELLIPSIS, 212);
             control(L"STATIC", L"未启动", 0, 215);
             control(L"STATIC", L"端口", 0, 203);
             app->port = control(L"EDIT", L"3306", ES_NUMBER | ES_CENTER | WS_TABSTOP, PORT);
@@ -1016,7 +1076,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             control(L"STATIC", L"停止 game 后修改", 0, 208);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, 206);
             SendMessageW(app->output, WM_SETFONT, reinterpret_cast<WPARAM>(app->log_font), TRUE);
-            control(L"STATIC", L"服务分组", 0, 207);
+            control(L"STATIC", L"服务", SS_CENTERIMAGE, 207);
             control(L"STATIC", L"请选择左侧服务查看详情", SS_ENDELLIPSIS, SERVICE_DETAIL);
             control(L"EDIT", L"服务元数据", ES_MULTILINE | ES_READONLY | ES_AUTOHSCROLL | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, SERVICE_META);
             control(L"EDIT", L"就绪层级：未选择", ES_MULTILINE | ES_READONLY | ES_AUTOHSCROLL | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, SERVICE_READINESS);
@@ -1025,15 +1085,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             SendMessageW(app->service_ip, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(app->px(6), app->px(6)));
             control(L"BUTTON", L"应用", WS_TABSTOP, IP_APPLY);
             control(L"STATIC", L"全部停止后应用，下次启动生效", 0, 217);
-            control(L"COMBOBOX", L"", CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP, SERVICE_FILTER);
-            HWND filter = GetDlgItem(window, SERVICE_FILTER);
-            for (auto label : {L"全部服务", L"仅显示运行中", L"核心服务", L"辅助服务", L"游戏/插件", L"安全组件"})
-                SendMessageW(filter, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
-            SendMessageW(filter, CB_SETCURSEL, 0, 0);
-            SendMessageW(filter, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), app->px(28));
-            control(L"BUTTON", L"折叠组", WS_TABSTOP, GROUP_TOGGLE);
-            control(L"LISTBOX", L"", LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_TABSTOP | WS_VSCROLL, SERVICE_LIST);
-            SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_SETITEMHEIGHT, 0, app->px(54));
+            control(L"LISTBOX", L"", LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_TABSTOP, SERVICE_LIST);
+            SetWindowSubclass(GetDlgItem(window, SERVICE_LIST), service_grid_proc, 1, 0);
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{ELF_START,L"启动所选"},{ELF_STOP,L"停止所选"},{ALL_START,L"整体启动"},{ALL_STOP,L"整体停止"},{SERVICE_LOGS,L"查看所选日志"}})
                 control(L"BUTTON", button.second, WS_TABSTOP | ((button.first == ALL_START || button.first == ALL_STOP) ? BS_OWNERDRAW : 0), button.first);
             control(L"STATIC", L"原始日志", 0, 209);
@@ -1053,65 +1106,74 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             for (int id : {202,207,209,214,static_cast<int>(SERVICE_DETAIL)})
                 SendMessageW(GetDlgItem(window, id), WM_SETFONT, reinterpret_cast<WPARAM>(app->strong_font), TRUE);
             SendMessageW(app->output, EM_LIMITTEXT, 4 * 1024 * 1024, 0);
-            ShowWindow(GetDlgItem(window, INITIALIZE), SW_HIDE);
+            control(L"BUTTON", L"⋯", WS_TABSTOP, INSTANCE_MORE);
+            control(L"BUTTON", L"详情", WS_TABSTOP, SERVICE_INFO);
+            control(L"BUTTON", L"详情", WS_TABSTOP, DATABASE_INFO);
+            control(L"EDIT", L"", ES_AUTOHSCROLL|WS_TABSTOP, LOG_FILTER);
+            SendMessageW(GetDlgItem(window,LOG_FILTER), EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"过滤关键字…"));
+            for (const auto &tab : std::vector<std::pair<int,const wchar_t *>>{{LOG_CONSOLE_TAB,L"控制台操作"},{LOG_SERVICE_TAB,L"服务日志"},{LOG_ERROR_TAB,L"宿主诊断"},{LOG_MYSQL_TAB,L"MySQL"},{LOG_FILES,L"日志文件 ⌄"}})
+                control(L"BUTTON",tab.second,WS_TABSTOP,tab.first);
+            for (int id : std::initializer_list<int>{214,218,215,216,217,208,209,SERVICE_DETAIL,SERVICE_META,SERVICE_READINESS,MAINTENANCE_DETAIL,INITIALIZE,DELETE_INSTANCE,LOGS,LOG_SOURCE,LOG_FOLDER})
+                ShowWindow(GetDlgItem(window,id),SW_HIDE);
+            SendMessageW(GetDlgItem(window,201),WM_SETFONT,reinterpret_cast<WPARAM>(app->small_font),FALSE);
+            SendMessageW(GetDlgItem(window,212),WM_SETFONT,reinterpret_cast<WPARAM>(app->small_font),FALSE);
+            SendMessageW(GetDlgItem(window,205),WM_SETFONT,reinterpret_cast<WPARAM>(app->small_font),FALSE);
+            SendMessageW(GetDlgItem(window,210),WM_SETFONT,reinterpret_cast<WPARAM>(app->small_font),FALSE);
+            HWND tooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP,
+                                        CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,nullptr,nullptr);
+            for(auto tip:{std::pair<int,const wchar_t *>{BROWSE,L"选择或切换本地实例目录"},{CREATE_INSTANCE,L"在空目录创建新实例"},{FOLDER,L"打开实例根目录"},{CHECK_RESOURCES,L"核对交付资源与校验清单"},{INSTANCE_MORE,L"初始化、删除实例及维护日志"},{SERVICE_LIST,L"单击选择 · 双击日志 · 右键操作与详情"},{LOG_FILES,L"选择应用日志、标准输出或宿主诊断"}}) {
+                TOOLINFOW info={};info.cbSize=sizeof(info);info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
+                info.hwnd=window;info.uId=reinterpret_cast<UINT_PTR>(GetDlgItem(window,tip.first));info.lpszText=const_cast<wchar_t *>(tip.second);
+                SendMessageW(tooltip,TTM_ADDTOOLW,0,reinterpret_cast<LPARAM>(&info));
+            }
             app->check_resources(); app->load(); SetTimer(window, 1, 500, nullptr);
             return 0;
         }
         case WM_SIZE: {
             if (wparam == SIZE_MINIMIZED) return 0;
-            int width = MulDiv(LOWORD(lparam), 96, app->dpi), height = MulDiv(HIWORD(lparam), 96, app->dpi);
-            int left_width = std::clamp(width * 32 / 100, 360, 420);
-            int left_right = 24 + left_width;
-            int right_left = left_right + 16;
-            int right_width = std::max(260, width - right_left - 24);
-            int logs_top = 460, panel_bottom = std::max(logs_top + 180, height - 54);
-            auto place = [&](int id, int x, int y, int w, int h) {
-                MoveWindow(GetDlgItem(window, id), app->px(x), app->px(y), app->px(std::max(0, w)), app->px(std::max(0, h)), TRUE);
-            };
-            // Header: the current instance remains a global context, while all
-            // instance/database actions are kept in one compact command band.
-            place(214,42,39,78,24); place(201,128,39,64,24);
-            place(INSTANCE,202,38,width-710,26); place(BROWSE,width-500,33,64,36);
-            place(FOLDER,width-424,33,90,36); place(LOGS,width-324,33,90,36);
-            place(ALL_STOP,width-222,33,90,36); place(ALL_START,width-122,33,92,36);
-            place(218,40,88,width-450,24); place(CHECK_RESOURCES,width-398,83,92,34);
-            place(CREATE_INSTANCE,width-296,83,118,34); place(DELETE_INSTANCE,width-168,83,118,34);
-            // Left column: instance/database context, then the grouped service list.
-            place(207,40,182,left_width-144,24); place(213,left_right-116,182,92,24);
-            place(202,40,216,118,24); place(215,164,216,64,24); place(203,236,216,34,24); place(PORT,272,214,58,26);
-            place(205,40,246,left_width-56,22); ShowWindow(GetDlgItem(window,205), left_width >= 390 ? SW_SHOW : SW_HIDE);
-            place(INITIALIZE,40,274,80,36); place(START,126,274,80,36); place(STOP,212,274,80,36);
-            place(BACKUP,40,316,80,36); place(RESTORE,126,316,80,36); place(RECOVER,212,316,80,36);
-            place(MAINTENANCE_DETAIL,40,366,left_width-56,72);
-            place(216,40,454,56,24); place(SERVICE_IP,108,450,142,26); place(IP_APPLY,256,446,66,36);
-            place(217,40,488,left_width-56,24);
-            place(SERVICE_FILTER,40,520,left_width-154,32); place(GROUP_TOGGLE,left_right-106,520,82,32);
-            int list_top = 560;
-            place(SERVICE_LIST,40,list_top,left_width-56,std::max(80,panel_bottom-list_top-8));
-            SendMessageW(GetDlgItem(window, SERVICE_LIST), LB_SETITEMHEIGHT, 0, app->px(54));
-
-            // Right column: selected-service details and the log work area.
-            place(SERVICE_DETAIL,right_left+16,182,right_width-32,28);
-            place(SERVICE_META,right_left+16,218,right_width-32,78);
-            place(SERVICE_READINESS,right_left+16,304,right_width-32,60);
-            place(DP2_ENABLE,right_left+16,374,112,28); place(FRIDA_ENABLE,right_left+136,374,104,28);
-            place(PLUGINS_SAVE,right_left+248,371,88,34); place(208,right_left+352,378,right_width-368,22);
-            place(ELF_START,right_left+16,414,108,34); place(ELF_STOP,right_left+132,414,108,34); place(SERVICE_LOGS,right_left+248,414,120,34);
-
-            ShowWindow(GetDlgItem(window,209), SW_HIDE);
-            place(LOG_SOURCE,right_left+16,logs_top+15,std::max(150,right_width-310),32);
-            place(LOG_ENCODING,right_left+right_width-280,logs_top+15,132,32);
-            place(LOG_REFRESH,right_left+right_width-140,logs_top+15,64,32);
-            place(LOG_FOLDER,right_left+right_width-70,logs_top+15,64,32);
-            place(LOG_FOLLOW,right_left+16,logs_top+53,112,26);
-            place(210,right_left+144,logs_top+55,std::max(150,right_width-176),22);
-            place(206,right_left+16,logs_top+88,right_width-32,std::max(80,panel_bottom-logs_top-128));
-            place(204,40,panel_bottom+12,width-80,22);
-            InvalidateRect(window, nullptr, TRUE);
-            return 0;
+            int width=MulDiv(LOWORD(lparam),96,app->dpi),height=MulDiv(HIWORD(lparam),96,app->dpi);
+            auto place=[&](int id,int x,int y,int w,int h) {MoveWindow(GetDlgItem(window,id),app->px(x),app->px(y),app->px(std::max(0,w)),app->px(std::max(0,h)),TRUE);};
+            bool compact=width<1330;
+            int selector=compact?200:236;
+            place(BROWSE,32,27,selector,46);place(CREATE_INSTANCE,44+selector,35,30,30);
+            SetWindowTextW(GetDlgItem(window,CREATE_INSTANCE),L"+");
+            int right=width-32;
+            auto button=[&](int id,int w) {right-=w;place(id,right,35,w,30);right-=10;};
+            button(ALL_START,96);button(ALL_STOP,96);button(INSTANCE_MORE,30);
+            button(FOLDER,compact?34:108);button(CHECK_RESOURCES,compact?34:92);
+            SetWindowTextW(GetDlgItem(window,FOLDER),compact?L"\u25a1":L"\u25a1  \u5b9e\u4f8b\u6839\u76ee\u5f55");
+            SetWindowTextW(GetDlgItem(window,CHECK_RESOURCES),compact?L"\u2713":L"\u2713  \u68c0\u67e5\u8d44\u6e90");
+            right-=compact?134:174;
+            place(SERVICE_IP,right+(compact?6:44),41,84,20);place(IP_APPLY,right+(compact?94:132),35,36,30);
+            int path_left=68+selector;
+            place(INSTANCE,path_left+8,41,right-path_left-22,20);
+            // Seven columns and three rows share their hit rectangles with the
+            // native selection model; metadata moves to the real detail action.
+            place(207,36,108,34,22);place(213,76,108,140,22);
+            place(DP2_ENABLE,width-574,105,90,26);place(FRIDA_ENABLE,width-474,105,74,26);
+            place(PLUGINS_SAVE,width-390,103,76,30);place(SERVICE_INFO,width-310,103,46,30);
+            place(ELF_START,width-254,103,68,30);place(ELF_STOP,width-178,103,68,30);place(SERVICE_LOGS,width-102,103,68,30);
+            SetWindowTextW(GetDlgItem(window,SERVICE_LOGS),L"\u67e5\u770b\u65e5\u5fd7");
+            place(SERVICE_LIST,36,150,width-72,176);
+            place(202,72,375,54,28);place(201,128,376,48,26);place(203,198,376,28,26);place(PORT,232,380,48,20);
+            place(212,296,376,std::max(0,width-826),26);
+            right=width-34;
+            auto db_button=[&](int id,int w) {right-=w;place(id,right,375,w,30);right-=8;};
+            db_button(DATABASE_INFO,42);db_button(RECOVER,76);db_button(RESTORE,76);db_button(BACKUP,76);db_button(START,54);db_button(STOP,54);
+            place(205,38,423,width-76,20);
+            int log_top=462,log_bottom=height-46;
+            place(LOG_CONSOLE_TAB,28,log_top+6,96,38);place(LOG_SERVICE_TAB,128,log_top+6,92,38);
+            place(LOG_ERROR_TAB,224,log_top+6,86,38);place(LOG_MYSQL_TAB,314,log_top+6,74,38);place(LOG_FILES,400,log_top+10,94,30);
+            place(LOG_FILTER,width-500,log_top+16,170,20);place(LOG_ENCODING,width-312,log_top+9,100,30);
+            place(LOG_REFRESH,width-204,log_top+10,50,30);place(LOG_FOLLOW,width-144,log_top+12,110,26);
+            place(206,36,log_top+54,width-72,std::max(0,log_bottom-log_top-86));
+            place(210,40,log_bottom-25,width-80,18);place(204,32,height-28,width-64,20);
+            for(int id:{INITIALIZE,DELETE_INSTANCE,LOGS,LOG_SOURCE})ShowWindow(GetDlgItem(window,id),SW_HIDE);
+            InvalidateRect(window,nullptr,TRUE);return 0;
         }
         case WM_DPICHANGED: {
             app->dpi = HIWORD(wparam);
+            update_fonts();
             RECT suggested = *reinterpret_cast<RECT *>(lparam);
             SetWindowPos(window, nullptr, suggested.left, suggested.top,
                          suggested.right - suggested.left, suggested.bottom - suggested.top,
@@ -1119,7 +1181,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             return 0;
         }
         case WM_GETMINMAXINFO:
-            reinterpret_cast<MINMAXINFO *>(lparam)->ptMinTrackSize = {app->px(1120), app->px(820)}; return 0;
+            reinterpret_cast<MINMAXINFO *>(lparam)->ptMinTrackSize = {app->px(1180), app->px(760)}; return 0;
         case WM_MEASUREITEM:
             reinterpret_cast<MEASUREITEMSTRUCT *>(lparam)->itemHeight=app->px(32); return TRUE;
         case WM_DRAWITEM:
@@ -1128,36 +1190,36 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             RECT area; GetClientRect(window, &area); FillRect(reinterpret_cast<HDC>(wparam), &area, app->background); return TRUE;
         }
         case WM_PAINT: {
-            PAINTSTRUCT paint; HDC dc = BeginPaint(window, &paint);
-            RECT area; GetClientRect(window, &area); int width = area.right, height = area.bottom;
-            int logical_width = MulDiv(width, 96, app->dpi);
-            int left_width = std::clamp(logical_width * 32 / 100, 360, 420);
-            int left_right = app->px(24 + left_width), right_left = app->px(24 + left_width + 16);
-            int detail_top = app->px(162), detail_bottom = app->px(450), logs_top = app->px(460);
-            int panel_bottom = std::max(logs_top + app->px(180), height - app->px(54));
-            RECT footer = {0,height-app->px(38),width,height}; FillRect(dc,&footer,app->surface);
-            auto card = [&](int left, int top, int right, int bottom) {
-                RECT shadow = {left,top+app->px(3),right,bottom+app->px(3)};
-                rounded(dc,shadow,RGB(233,237,245),RGB(233,237,245),app->px(24));
-                RECT panel = {left,top,right,bottom};
-                rounded(dc,panel,RGB(255,255,255),RGB(228,234,243),app->px(24));
-            };
-            card(app->px(24),app->px(20),width-app->px(24),app->px(140));
-            card(app->px(24),app->px(162),left_right,panel_bottom);
-            card(right_left,detail_top,width-app->px(24),detail_bottom);
-            card(right_left,logs_top,width-app->px(24),panel_bottom);
-            RECT path_border = {app->px(198),app->px(32),width-app->px(432),app->px(70)};
-            rounded(dc,path_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
-            RECT port_border = {app->px(268),app->px(210),app->px(334),app->px(242)};
-            rounded(dc,port_border,RGB(255,255,255),RGB(225,233,246),app->px(14));
-            RECT ip_border = {app->px(102),app->px(446),app->px(250),app->px(482)};
-            rounded(dc,ip_border,RGB(255,255,255),RGB(225,233,246),app->px(16));
-            HPEN line = CreatePen(PS_SOLID,1,RGB(239,243,249)); HGDIOBJ old=SelectObject(dc,line);
-            for (int y : {app->px(76), app->px(213), logs_top+app->px(53), logs_top+app->px(88), height-app->px(38)}) {
-                MoveToEx(dc,app->px(24),y,nullptr); LineTo(dc,width-app->px(24),y);
-            }
-            MoveToEx(dc,left_right+app->px(8),app->px(162),nullptr); LineTo(dc,left_right+app->px(8),panel_bottom);
-            SelectObject(dc,old);DeleteObject(line);EndPaint(window, &paint); return 0;
+            PAINTSTRUCT paint;HDC target=BeginPaint(window,&paint);RECT area;GetClientRect(window,&area);
+            HDC dc=CreateCompatibleDC(target);HBITMAP bitmap=CreateCompatibleBitmap(target,std::max(1L,area.right),std::max(1L,area.bottom));
+            HGDIOBJ old=SelectObject(dc,bitmap);FillRect(dc,&area,app->background);
+            auto card=[&](int top,int bottom) {RECT panel={app->px(20),app->px(top),area.right-app->px(20),app->px(bottom)};rounded(dc,panel,RGB(255,255,255),RGB(228,234,245),app->px(14));};
+            int width=MulDiv(area.right,96,app->dpi),height=MulDiv(area.bottom,96,app->dpi);
+            card(16,84);card(96,342);card(354,450);card(462,height-46);
+            bool compact=width<1330;int selector=compact?200:236;
+            int right=width-32-(96+10+96+10+30+10+(compact?34:108)+10+(compact?34:92)+10)-(compact?134:174);
+            RECT path={app->px(68+selector),app->px(33),app->px(right-8),app->px(66)};
+            rounded(dc,path,RGB(248,250,254),RGB(228,235,248),app->px(8));
+            RECT ip={app->px(right),app->px(35),app->px(right+(compact?134:174)),app->px(65)};
+            rounded(dc,ip,RGB(255,255,255),RGB(220,230,247),app->px(8));
+            if(!compact) {RECT label={ip.left+app->px(6),ip.top,ip.left+app->px(42),ip.bottom};text_at(dc,label,L"\u670d\u52a1 IP",RGB(139,157,184),app->small_font);}
+            RECT port={app->px(226),app->px(375),app->px(286),app->px(405)};
+            rounded(dc,port,RGB(255,255,255),RGB(220,230,247),app->px(8));
+            RECT search={app->px(width-508),app->px(472),app->px(width-322),app->px(502)};
+            rounded(dc,search,RGB(251,252,255),RGB(220,230,247),app->px(8));
+            RECT icon={app->px(36),app->px(375),app->px(62),app->px(403)};
+            rounded(dc,icon,RGB(242,246,255),RGB(242,246,255),app->px(8));
+            HPEN pen=CreatePen(PS_SOLID,1,RGB(43,96,239));HGDIOBJ old_pen=SelectObject(dc,pen),old_brush=SelectObject(dc,GetStockObject(NULL_BRUSH));
+            for(int y:{381,387,393}) {Ellipse(dc,app->px(42),app->px(y),app->px(56),app->px(y+6));}
+            MoveToEx(dc,app->px(42),app->px(384),nullptr);LineTo(dc,app->px(42),app->px(396));
+            MoveToEx(dc,app->px(56),app->px(384),nullptr);LineTo(dc,app->px(56),app->px(396));
+            SelectObject(dc,old_brush);SelectObject(dc,old_pen);DeleteObject(pen);
+            dot_at(dc,app->px(184),app->px(386),app->px(6),app->session.process?RGB(24,173,94):RGB(194,204,219));
+            RECT hint={app->px(22),app->px(418),area.right-app->px(22),app->px(448)};
+            HBRUSH pale=CreateSolidBrush(RGB(251,252,255));FillRect(dc,&hint,pale);DeleteObject(pale);
+            RECT footer={0,area.bottom-app->px(32),area.right,area.bottom};FillRect(dc,&footer,app->surface);
+            BitBlt(target,0,0,area.right,area.bottom,dc,0,0,SRCCOPY);
+            SelectObject(dc,old);DeleteObject(bitmap);DeleteDC(dc);EndPaint(window,&paint);return 0;
         }
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLORBTN:
@@ -1215,19 +1277,36 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (GetTickCount64() - app->log_scan >= 2000) { app->scan_logs(); app->log_scan = GetTickCount64(); }
             app->refresh_log();
             return 0;
+        case WM_CONTEXTMENU: {
+            if (reinterpret_cast<HWND>(wparam) != GetDlgItem(window,SERVICE_LIST) || app->busy) break;
+            POINT point={static_cast<short>(LOWORD(lparam)),static_cast<short>(HIWORD(lparam))};
+            if (point.x==-1 && point.y==-1) {
+                RECT tile=service_tile(GetDlgItem(window,SERVICE_LIST),std::max(0,app->selected_service_index()));
+                point={tile.left,tile.bottom};ClientToScreen(GetDlgItem(window,SERVICE_LIST),&point);
+            } else {
+                POINT local=point;ScreenToClient(GetDlgItem(window,SERVICE_LIST),&local);
+                LRESULT hit=SendMessageW(GetDlgItem(window,SERVICE_LIST),LB_ITEMFROMPOINT,0,MAKELPARAM(local.x,local.y));
+                if (HIWORD(hit)) return 0;
+                SendMessageW(GetDlgItem(window,SERVICE_LIST),LB_SETCURSEL,LOWORD(hit),0);
+                SendMessageW(window,WM_COMMAND,MAKEWPARAM(SERVICE_LIST,LBN_SELCHANGE),reinterpret_cast<LPARAM>(GetDlgItem(window,SERVICE_LIST)));
+            }
+            HMENU menu=CreatePopupMenu();
+            for (auto entry : {std::pair<int,const wchar_t *>{ELF_START,L"启动所选"},{ELF_STOP,L"停止所选"},{SERVICE_LOGS,L"查看日志"},{SERVICE_INFO,L"服务详情"}})
+                AppendMenuW(menu,MF_STRING|(IsWindowEnabled(GetDlgItem(window,entry.first))?MF_ENABLED:MF_GRAYED),entry.first,entry.second);
+            int chosen=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,point.x,point.y,0,window,nullptr);DestroyMenu(menu);
+            if(chosen)SendMessageW(window,WM_COMMAND,chosen,0);
+            return 0;
+        }
         case WM_COMMAND: {
             int id = LOWORD(wparam);
+            if (id==LOG_FILTER && HIWORD(wparam)==EN_CHANGE) {app->refresh_log(true);return 0;}
             if (id == INSTANCE && HIWORD(wparam) == EN_CHANGE) { if (app->status && app->output) app->load(); return 0; }
             if (id == SERVICE_LIST && HIWORD(wparam) == LBN_SELCHANGE && !app->busy) {
                 int selected = app->selected_service_index();
                 app->preferred_service = selected >= 0 ? app->services[static_cast<size_t>(selected)].name : L"";
                 app->show_service_detail(); app->controls(); app->scan_logs(true); return 0;
             }
-            if (id == SERVICE_LIST && HIWORD(wparam) == LBN_DBLCLK) { app->toggle_selected_group(); return 0; }
-            if (id == SERVICE_FILTER && HIWORD(wparam) == CBN_SELCHANGE) {
-                app->service_filter = static_cast<int>(SendMessageW(GetDlgItem(window, SERVICE_FILTER), CB_GETCURSEL, 0, 0));
-                app->show_services(); app->controls(); app->scan_logs(true); return 0;
-            }
+            if (id == SERVICE_LIST && HIWORD(wparam) == LBN_DBLCLK) { app->scan_logs(true); return 0; }
             if ((id == LOG_SOURCE || id == LOG_ENCODING) && HIWORD(wparam) == CBN_SELCHANGE) { app->refresh_log(true); return 0; }
             if (id == LOG_REFRESH) { app->scan_logs(); app->refresh_log(true); return 0; }
             if (id == LOG_FOLLOW) { app->refresh_log(true); return 0; }
@@ -1240,7 +1319,51 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return 0;
             }
             if (HIWORD(wparam) != BN_CLICKED) return 0;
-            if (id == CHECK_RESOURCES && !app->busy) { app->check_resources(); app->controls(); return 0; }
+            if (id == CHECK_RESOURCES && !app->busy) {
+                app->check_resources(); app->controls();
+                app->append(window_text(GetDlgItem(window,218)));
+                SetWindowTextW(app->status,window_text(GetDlgItem(window,218)).c_str());return 0;
+            }
+            if (id==INSTANCE_MORE) {
+                HMENU menu=CreatePopupMenu();
+                for(auto entry:{std::pair<int,const wchar_t *>{INITIALIZE,L"初始化当前目录(&I)"},{DELETE_INSTANCE,L"删除当前实例(&D)…"},{LOGS,L"打开维护日志目录(&L)"}})
+                    AppendMenuW(menu,MF_STRING|(IsWindowEnabled(GetDlgItem(window,entry.first))?MF_ENABLED:MF_GRAYED),entry.first,entry.second);
+                RECT button;GetWindowRect(GetDlgItem(window,INSTANCE_MORE),&button);
+                int chosen=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTALIGN,button.right,button.bottom,0,window,nullptr);DestroyMenu(menu);
+                if(chosen)SendMessageW(window,WM_COMMAND,chosen,0);return 0;
+            }
+            if(id==SERVICE_INFO) {
+                std::wstring text=window_text(GetDlgItem(window,SERVICE_DETAIL))+L"\n\n"+window_text(GetDlgItem(window,SERVICE_META))+L"\n\n"+window_text(GetDlgItem(window,SERVICE_READINESS));
+                MessageBoxW(window,text.c_str(),L"服务详情",MB_OK|MB_ICONINFORMATION);return 0;
+            }
+            if(id==DATABASE_INFO) {
+                app->show_maintenance_detail();MessageBoxW(window,window_text(GetDlgItem(window,MAINTENANCE_DETAIL)).c_str(),L"数据库与维护详情",MB_OK|MB_ICONINFORMATION);return 0;
+            }
+            if(id==LOG_FILES) {
+                HMENU menu=CreatePopupMenu();
+                for(size_t i=0;i<app->log_sources.size();++i)AppendMenuW(menu,MF_STRING,1000+i,app->log_sources[i].label.c_str());
+                AppendMenuW(menu,MF_SEPARATOR,0,nullptr);
+                AppendMenuW(menu,MF_STRING,LOG_FOLDER,L"打开当前日志目录");
+                RECT button;GetWindowRect(GetDlgItem(window,LOG_FILES),&button);
+                int chosen=TrackPopupMenu(menu,TPM_RETURNCMD,button.left,button.bottom,0,window,nullptr);DestroyMenu(menu);
+                if(chosen>=1000 && static_cast<size_t>(chosen-1000)<app->log_sources.size()) {
+                    SendMessageW(GetDlgItem(window,LOG_SOURCE),CB_SETCURSEL,chosen-1000,0);app->refresh_log(true);
+                } else if(chosen==LOG_FOLDER)SendMessageW(window,WM_COMMAND,LOG_FOLDER,0);
+                return 0;
+            }
+            if(id>=LOG_CONSOLE_TAB && id<=LOG_MYSQL_TAB) {
+                auto matches=[&](const LogSource &source) {
+                    if(id==LOG_CONSOLE_TAB)return source.path.empty();
+                    if(id==LOG_MYSQL_TAB)return source.label==L"MySQL 原生日志";
+                    if(id==LOG_ERROR_TAB)return source.label.find(L"标准错误")==0;
+                    return !source.path.empty()&&source.label!=L"MySQL 原生日志"&&source.label.find(L"标准错误")!=0;
+                };
+                auto found=std::find_if(app->log_sources.begin(),app->log_sources.end(),matches);
+                if(found!=app->log_sources.end()) {
+                    SendMessageW(GetDlgItem(window,LOG_SOURCE),CB_SETCURSEL,found-app->log_sources.begin(),0);app->refresh_log(true);
+                } else SetWindowTextW(app->status,L"当前实例尚无这类日志");
+                return 0;
+            }
             if (id == CREATE_INSTANCE && !app->busy) {
                 auto chosen = choose_folder(window, L"选择用于新实例的空文件夹（可在此新建文件夹）", app->current);
                 if (!chosen.empty()) {
@@ -1258,7 +1381,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return 0;
             }
             if (id == SERVICE_LOGS) { app->scan_logs(true); return 0; }
-            if (id == GROUP_TOGGLE) { app->toggle_selected_group(); return 0; }
             if (id == FOLDER || id == LOGS) {
                 std::wstring path = full_path(window_text(app->path)) + (id == LOGS ? L"\\.mysql" : L"");
                 ShellExecuteW(window, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL); return 0;
@@ -1279,7 +1401,24 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 app->action(IP_APPLY, value);
             }
             else if (id == BROWSE) {
-                auto chosen = choose_folder(window, L"选择本地实例目录", app->current);
+                HMENU menu=CreatePopupMenu();
+                for(size_t i=0;i<app->recent_instances.size();++i) {
+                    const auto &path=app->recent_instances[i];
+                    UINT flags=MF_STRING|(path==app->current?MF_CHECKED:0);
+                    std::wstring label=path;
+                    for(size_t at=0;(at=label.find(L'&',at))!=std::wstring::npos;at+=2)label.insert(at,1,L'&');
+                    label=(i<9?L"&"+std::to_wstring(i+1)+L"  ":L"")+label;
+                    AppendMenuW(menu,flags,2000+i,label.c_str());
+                }
+                if(!app->recent_instances.empty())AppendMenuW(menu,MF_SEPARATOR,0,nullptr);
+                AppendMenuW(menu,MF_STRING,1,L"选择其他实例目录(&O)…");
+                AppendMenuW(menu,MF_STRING|(IsWindowEnabled(GetDlgItem(window,CREATE_INSTANCE))?MF_ENABLED:MF_GRAYED),2,L"新建实例(&N)…");
+                RECT button;GetWindowRect(GetDlgItem(window,BROWSE),&button);
+                int selected=TrackPopupMenu(menu,TPM_RETURNCMD,button.left,button.bottom,0,window,nullptr);DestroyMenu(menu);
+                if(selected==2) {SendMessageW(window,WM_COMMAND,CREATE_INSTANCE,0);return 0;}
+                std::wstring chosen;
+                if(selected==1)chosen=choose_folder(window,L"选择本地实例目录",app->current);
+                else if(selected>=2000 && static_cast<size_t>(selected-2000)<app->recent_instances.size())chosen=app->recent_instances[selected-2000];
                 if (!chosen.empty()) { SetWindowTextW(app->path, chosen.c_str()); app->load(); }
             } else if (id == FOLDER || id == LOGS) {
                 std::wstring path = full_path(window_text(app->path)) + (id == LOGS ? L"\\.mysql" : L"");
@@ -1312,7 +1451,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             DestroyWindow(window); return 0;
         case WM_DESTROY:
             KillTimer(window, 1); app->close_instance_lease();
-            for (HFONT font : {app->font, app->strong_font, app->log_font}) DeleteObject(font);
+            for (HFONT font : {app->font, app->strong_font, app->log_font, app->small_font}) DeleteObject(font);
             DeleteObject(app->background); DeleteObject(app->surface); PostQuitMessage(0); return 0;
         }
     } catch (const std::exception &error) {

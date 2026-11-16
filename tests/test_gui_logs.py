@@ -19,6 +19,7 @@ from gui_support import user, windows, wait_for, click, ready, title, screenshot
 from gui_support import rows, select, choose_log_source
 
 from gui_support import guest_root
+from runtime_support import tree_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,10 +33,13 @@ def main():
     parser.add_argument('--instance', type=Path, required=True)
     parser.add_argument('--gui', type=Path, required=True)
     args = parser.parse_args()
-    instance, gui = external_output(args.instance).resolve(strict=True), args.gui.resolve(strict=True)
+    source, gui = external_output(args.instance).resolve(strict=True), args.gui.resolve(strict=True)
+    source_data = tree_identity(source / 'data')
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     probe = BUILD / 'probes' / stamp / 'gui-logs'
     probe.mkdir(parents=True)
+    instance = probe / 'instance'
+    shutil.copytree(source, instance, ignore=shutil.ignore_patterns('.mysql', 'service-logs'))
     receipt = {'recorded_utc': stamp, 'os': platform.platform(), 'gui_sha256': sha256(gui),
                'script_sha256': sha256(Path(__file__)), 'instance': str(instance.relative_to(BUILD)),
                'scope': 'Private viewer fixtures and actual original game/peer/MySQL logs; no client gameplay acceptance.',
@@ -51,7 +55,8 @@ def main():
     checks = receipt['checks']
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, 'DNFNativeController')), None), 'window')
-        wait_for(lambda: user.SendMessageW(user.GetDlgItem(window, 220), 0x18E, 0, 0) == 0, 'initial selected service visible')
+        wait_for(lambda: len(rows(window)) == 19, 'all service cards loaded')
+        assert user.SendMessageW(user.GetDlgItem(window, 220), 0x188, 0, 0) == 0
         checks['initial_selected_service_visible'] = True
         game = next(i for i, row in enumerate(rows(window)) if row.startswith('game'))
         select(window, game)
@@ -129,7 +134,7 @@ def main():
         checks['peer_protocols'] = {'channel': channel(7001), 'relay_and_real_monitor_rejection': relay(True), 'stun': stun()}
         choose_log_source(window, original.name)
         user.SetWindowPos.argtypes = [c.c_void_p, c.c_void_p, c.c_int, c.c_int, c.c_int, c.c_int, c.c_uint]
-        user.SetWindowPos(window, None, 0, 0, 1040, 760, 0x16)
+        user.SetWindowPos(window, None, 0, 0, 1180, 760, 0x16)
         time.sleep(0.3)
         screenshot(window, probe / 'minimum-window.png')
         checks['minimum_window_captured'] = True
@@ -161,6 +166,7 @@ def main():
                 receipt['forced_cleanup'] = True
                 subprocess.run(['taskkill.exe', '/PID', str(process.pid), '/T', '/F'], capture_output=True, timeout=15)
         receipt['exit_code'] = process.returncode
+        checks['source_database_unchanged'] = tree_identity(source / 'data') == source_data
         for path in log_dir.glob('gui-viewer.fixture.*'):
             path.unlink()
         (probe / 'receipt.json').write_text(json.dumps(receipt, ensure_ascii=True, indent=2) + '\n', encoding='utf-8')

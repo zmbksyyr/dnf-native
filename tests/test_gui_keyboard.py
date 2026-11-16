@@ -37,6 +37,11 @@ def focused(window):
     return info.focus
 
 
+def menu_open(window):
+    info = GuiInfo(cbSize=c.sizeof(GuiInfo))
+    return user.GetGUIThreadInfo(user.GetWindowThreadProcessId(window, None), c.byref(info)) and info.flags & 4
+
+
 def focus(window, target):
     if not user.IsWindowVisible(target) or not user.IsWindowEnabled(target):
         raise RuntimeError("Keyboard target is hidden or disabled")
@@ -98,10 +103,12 @@ def main():
             if expected == path:
                 break
             assert len(visited) < 60, visited
-        assert len(set(visited)) == len(visited) and {102, 111, 113, 114, 220, 242, 260, 261, 270, 271}.issubset(visited)
+        assert len(set(visited)) == len(visited) and {102, 111, 113, 114, 220, 242, 260, 280, 283, 284}.issubset(visited)
 
         focus(window, user.GetDlgItem(window, 102))
         key(window, 13)
+        wait_for(lambda: menu_open(window), "instance selector opens", 5)
+        key(window, ord("O"))
         picker = wait_for(lambda: next(iter(windows(process.pid, "#32770")), None), "Enter opens folder picker", 5)
         wait_for(lambda: user.IsWindowVisible(picker), "folder picker shown", 5)
         key(picker, 27)
@@ -109,33 +116,47 @@ def main():
         assert title(path) == str(instance)
         checks["enter_activates_focused_button_and_escape_cancels_picker"] = True
 
-        box = user.GetDlgItem(window, 220)
-        user.SendMessageW(box, 0x186, 0, 0)  # First group header.
-        focus(window, box)
-        key(window, 40)
-        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 1, "Down selects a service", 5)
-        selected_name = list_rows(window)[1].split("  |  ", 1)[0]
-        wait_for(lambda: title(user.GetDlgItem(window, 219)).startswith(selected_name + "  "), "service details follow keyboard selection", 5)
-        key(window, 38)
-        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 0, "Up selects group header", 5)
-        focus(window, user.GetDlgItem(window, 271))
+        focus(window, user.GetDlgItem(window, 102))
         key(window, 13)
-        wait_for(lambda: len(rows(window)) == 11, "Enter collapses selected group", 5)
+        wait_for(lambda: menu_open(window), "instance selector opens again", 5)
+        key(window, ord("O"))
+        select_folder(process, source)
+        wait_for(lambda: title(path) == str(source), "second real instance selected", 5)
+        focus(window, user.GetDlgItem(window, 102))
         key(window, 13)
-        wait_for(lambda: len(rows(window)) == 19, "Enter expands selected group", 5)
-        checks["arrows_update_service_details_and_enter_toggles_group"] = True
+        wait_for(lambda: menu_open(window), "real instance history opens", 5)
+        key(window, ord("1"))
+        wait_for(lambda: title(path) == str(instance), "history switches back to private copy", 5)
+        assert len(rows(window)) == 19
+        checks["selector_switches_between_real_instances_and_retains_private_test_target"] = True
 
-        combo = user.GetDlgItem(window, 270)
+        box = user.GetDlgItem(window, 220)
+        user.SendMessageW(box, 0x186, 0, 0)
+        focus(window, box)
+        key(window, 39)
+        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 1, "Right selects next card", 5)
+        selected_name = list_rows(window)[1].split("  |  ", 1)[0].removesuffix("（可选）")
+        wait_for(lambda: title(user.GetDlgItem(window, 219)).startswith(selected_name + "  "), "service details follow keyboard selection", 5)
+        key(window, 40)
+        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 8, "Down moves seven columns", 5)
+        key(window, 38)
+        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 1, "Up restores previous row", 5)
+        key(window, 37)
+        wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 0, "Left restores first card", 5)
+        assert len(rows(window)) == 19
+        checks["grid_arrows_update_selection_and_details_without_losing_services"] = True
+
+        combo = user.GetDlgItem(window, 241)
         focus(window, combo)
         key(window, 40)
-        wait_for(lambda: len(rows(window)) == 0, "Down filters running services", 5)
+        wait_for(lambda: user.SendMessageW(combo, 0x147, 0, 0) == 1, "Down changes log encoding", 5)
         key(window, 38)
-        wait_for(lambda: len(rows(window)) == 19, "Up restores all services", 5)
-        key(window, 0x73)  # F4 opens the native drop-down.
-        wait_for(lambda: user.SendMessageW(combo, 0x157, 0, 0), "filter drop-down opens", 5)
+        wait_for(lambda: user.SendMessageW(combo, 0x147, 0, 0) == 0, "Up restores auto encoding", 5)
+        key(window, 0x73)
+        wait_for(lambda: user.SendMessageW(combo, 0x157, 0, 0), "encoding drop-down opens", 5)
         key(window, 27)
-        wait_for(lambda: not user.SendMessageW(combo, 0x157, 0, 0), "Escape closes filter drop-down", 5)
-        checks["native_filter_arrows_and_escape"] = True
+        wait_for(lambda: not user.SendMessageW(combo, 0x157, 0, 0), "Escape closes encoding drop-down", 5)
+        checks["native_encoding_arrows_and_escape"] = True
 
         follow = user.GetDlgItem(window, 242)
         previous = user.SendMessageW(follow, 0xF0, 0, 0)
@@ -151,8 +172,14 @@ def main():
         cancelled_restore.mkdir()
         for identifier, caption in [(261, "\u5220\u9664\u5b9e\u4f8b"), (114, "\u786e\u8ba4\u8fd8\u539f")]:
             for cancel_key in [13, 27]:
-                focus(window, user.GetDlgItem(window, identifier))
-                key(window, 13)
+                if identifier == 261:
+                    focus(window, user.GetDlgItem(window, 280))
+                    key(window, 13)
+                    wait_for(lambda: menu_open(window), "instance menu opens", 5)
+                    key(window, ord("D"))  # Native menu mnemonic activates Delete.
+                else:
+                    focus(window, user.GetDlgItem(window, identifier))
+                    key(window, 13)
                 if identifier == 114:
                     select_folder(process, cancelled_restore)
                 dialog = wait_for(lambda: next((h for h in windows(process.pid, "#32770")
