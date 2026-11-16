@@ -93,6 +93,18 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
             }), env.end());
             env.push_back(L"DNF_NATIVE_MAX_LEVEL=" + std::to_wstring(maximum_level));
         }
+        if (service.name == L"auction" || service.name == L"point") {
+            auto &env=service.environment;
+            env.erase(std::remove_if(env.begin(),env.end(),[](const std::wstring &s) {return s.rfind(L"DNF_NATIVE_AUCTION_",0)==0;}),env.end());
+            unsigned level=GetPrivateProfileIntW(L"auction",L"level_limit",70,file.c_str());
+            unsigned refine=GetPrivateProfileIntW(L"auction",L"refine_limit",7,file.c_str());
+            if(!level || level>127 || refine>31) throw std::runtime_error("Invalid auction runtime limits");
+            env.push_back(L"DNF_NATIVE_AUCTION_LEVEL="+std::to_wstring(level));
+            env.push_back(L"DNF_NATIVE_AUCTION_REFINE="+std::to_wstring(refine));
+            if(setting(instance+L"\\.mysql\\market-index.ini",L"index",L"encoding")==L"UTF8")
+                env.push_back(L"DNF_NATIVE_AUCTION_ENCODING=UTF8");
+            if(setting(file,L"auction",L"price_keys")==L"1" || setting(file,L"auction",L"price_keys_"+service.name)==L"1") env.push_back(L"DNF_NATIVE_AUCTION_PRICE_KEYS=1");
+        }
         services.push_back(service);
     }
     return services;

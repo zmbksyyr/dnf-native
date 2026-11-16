@@ -57,6 +57,10 @@ int wmain(int argc, wchar_t **argv) {
         return 1;
     }
     if (execute) {
+        if (!nr_auction_configure(&run, &error)) {
+            fprintf(stderr, "Auction configuration failed: %s\n", error);
+            nr_elf_close(elf); return 1;
+        }
         if (!nr_game_configure(&run, &error)) {
             fprintf(stderr, "Game configuration failed: %s\n", error);
             nr_elf_close(elf);

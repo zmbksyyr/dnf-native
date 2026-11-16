@@ -19,6 +19,8 @@ enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, REST
 enum { INSTANCE_MORE = 280, SERVICE_INFO, DATABASE_INFO, LOG_FILTER,
        LOG_CONSOLE_TAB, LOG_SERVICE_TAB, LOG_ERROR_TAB, LOG_MYSQL_TAB, LOG_FILES };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
+enum { MARKET_OPEN=300, MARKET_LEVELS=301, MARKET_REFINE, MARKET_DP2, MARKET_AUTO,
+       MARKET_SCOPE, MARKET_REPORT, MARKET_CLOSE, MARKET_SUMMARY };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
@@ -107,6 +109,7 @@ static ToolResult sql(const std::wstring &exe, const std::wstring &instance, con
 }
 
 #include "monthly_tables.h"
+#include "auction_maintenance.h"
 
 static bool owns_response(const ToolResult &result, const Session &session) {
     std::string expected = "5.7.44\t" + session.uuid + "\t" + std::string(session.pid_name.begin(), session.pid_name.end());
@@ -187,6 +190,8 @@ static std::wstring service_readiness(const Service &service) {
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, status = nullptr, output = nullptr;
+    HWND market_window = nullptr;
+    std::wstring market_report = L"点击“检查兼容性”读取当前 PVF 与存量订单。";
     HFONT font = nullptr, strong_font = nullptr, log_font = nullptr, small_font = nullptr;
     HBRUSH background = nullptr, surface = nullptr;
     std::wstring exe, initial, current, resources, runtime;
@@ -477,8 +482,8 @@ struct App {
         show_maintenance_detail();
         // The worker may be changing process ownership. Inspect it after join.
         if (busy) {
-            for (int id : {INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,
-                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE,LEVEL_CAP,LEVEL_APPLY})
+            for (int id : std::initializer_list<int>{INSTANCE,BROWSE,PORT,INITIALIZE,START,STOP,BACKUP,RESTORE,RECOVER,
+                           CREATE_INSTANCE,DELETE_INSTANCE,CHECK_RESOURCES,SERVICE_IP,IP_APPLY,ELF_START,ELF_STOP,ALL_START,ALL_STOP,DP2_ENABLE,FRIDA_ENABLE,PLUGINS_SAVE,LEVEL_CAP,LEVEL_APPLY,static_cast<int>(MARKET_OPEN)})
                 EnableWindow(GetDlgItem(window, id), FALSE);
             for (int id : {SERVICE_LIST,SERVICE_LOGS}) EnableWindow(GetDlgItem(window,id), FALSE);
             for (int id : {FOLDER,LOGS}) EnableWindow(GetDlgItem(window,id), !current.empty());
@@ -524,6 +529,7 @@ struct App {
         EnableWindow(GetDlgItem(window, FRIDA_ENABLE), editable && SendMessageW(GetDlgItem(window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED);
         EnableWindow(GetDlgItem(window, PLUGINS_SAVE), editable);
         EnableWindow(GetDlgItem(window, LEVEL_CAP), game && !pending);
+        EnableWindow(GetDlgItem(window, MARKET_OPEN), game && !pending);
         LRESULT choice = SendMessageW(GetDlgItem(window,LEVEL_CAP),CB_GETCURSEL,0,0);
         bool different = game && choice >= 0 && static_cast<size_t>(choice) < sizeof(game_level_choices)/sizeof(*game_level_choices) &&
                          game_level_choices[choice] != game->max_level;
@@ -567,6 +573,14 @@ struct App {
         current = full_path(window_text(path));
         const std::wstring instance = current, tool = exe, port_text = window_text(port), assets = resources;
         const Session owned = session;
+        market::Options market_options=market::options(instance);
+        if(market_window && id>=market::Check && id<=market::Reset) {
+            market_options={SendMessageW(GetDlgItem(market_window,MARKET_LEVELS),BM_GETCHECK,0,0)==BST_CHECKED,
+                SendMessageW(GetDlgItem(market_window,MARKET_REFINE),BM_GETCHECK,0,0)==BST_CHECKED,
+                SendMessageW(GetDlgItem(market_window,MARKET_DP2),BM_GETCHECK,0,0)==BST_CHECKED,
+                SendMessageW(GetDlgItem(market_window,MARKET_AUTO),BM_GETCHECK,0,0)==BST_CHECKED};
+            EnableWindow(market_window,FALSE);
+        }
         if (id == BACKUP || id == RESTORE || id == RECOVER) {
             maintenance_summary = (id == BACKUP ? L"备份" : id == RESTORE ? L"还原" : L"恢复") +
                                   std::wstring(L"准备中") + (target.empty() ? L"" : L" · " + target);
@@ -575,7 +589,7 @@ struct App {
         }
         operation = id; busy = true; controls();
         SetWindowTextW(status, L"正在执行操作…");
-        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets] {
+        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets,market_options] {
             auto result = std::make_unique<Result>();
             auto stop_owned_services = [&] {
                 for (auto item = services.rbegin(); item != services.rend(); ++item) {
@@ -587,13 +601,26 @@ struct App {
                 }
             };
             try {
+                auto market_identity=[&] {
+                    const Session &s=owned.process ? owned:result->started;
+                    if(!s.process || !owns_response(sql(tool,instance,identity_query),s)) throw std::runtime_error("Auction maintenance requires this controller's own database session");
+                };
+                auto prepare_market=[&] {
+                    if(services.empty() || !market::options(instance).automatic) return;
+                    auto pvf=market::game_pvf(services);
+                    if(market::index_matches(instance,market::indexes(services),file_sha256(pvf))) return;
+                    result->details+=market::maintain(tool,instance,assets,services,service_job,market::Sync,2,market::options(instance),market_identity)+L"\r\n";
+                };
                 auto prepare_months = [&] {
                     bool repair = std::none_of(services.begin(),services.end(),[](const Service &s) {
                         return (s.name==L"game" || s.name==L"auction" || s.name==L"point") && running(s);
                     });
                     result->details += monthly_prepare(tool,instance,repair) + L"\r\n";
                 };
-                if (id == DELETE_INSTANCE) {
+                if(id>=market::Check && id<=market::Reset) {
+                    result->details=market::maintain(tool,instance,assets,services,service_job,id,selected<0?2:selected,market_options,market_identity);
+                    result->status=id==market::Check?L"双拍卖兼容性检查完成":L"双拍卖维护完成";
+                } else if (id == DELETE_INSTANCE) {
                     if (!known_instance(instance) || instance.size() <= 3 ||
                         (GetFileAttributesW(instance.c_str()) & FILE_ATTRIBUTE_REPARSE_POINT))
                         throw std::runtime_error("Select a real instance directory before deleting");
@@ -630,11 +657,14 @@ struct App {
                 } else if (id == MONTHLY_PREPARE) {
                     if (!owned.process || !owns_response(sql(tool,instance,identity_query),owned)) throw std::runtime_error("Monthly maintenance instance identity differs");
                     prepare_months();
+                    prepare_market();
                     result->status=L"当前月与下月的拍卖、响应日志表已核对";
                 } else if (id == ALL_START || id == ALL_STOP || id == ELF_START || id == ELF_STOP) {
                     if (id == ALL_START && !owned.process) result->started = start_database(window, tool, instance);
                     if (id == ALL_START || (id == ELF_START && selected >= 0 && static_cast<size_t>(selected) < services.size() &&
                         (services[selected].name==L"game" || services[selected].name==L"auction" || services[selected].name==L"point"))) prepare_months();
+                    if(id==ALL_START || (id==ELF_START && selected>=0 && static_cast<size_t>(selected)<services.size() &&
+                        (services[selected].name==L"game" || services[selected].name==L"auction" || services[selected].name==L"point"))) prepare_market();
                     if (id == ALL_START || id == ALL_STOP) {
                         if (id == ALL_START) {
                             for (auto &service : services) if (service.automatic) {
@@ -876,6 +906,7 @@ static void draw_item(const DRAWITEMSTRUCT &item) {
     if (disabled) { fill=RGB(247,249,252); ink=RGB(181,192,211); border=RGB(233,237,246); }
     else if (item.CtlID==ALL_START) {fill=pressed?RGB(28,77,201):hover?RGB(57,112,255):RGB(43,96,239); ink=RGB(255,255,255);border=fill;}
     else if (item.CtlID==ALL_STOP) {ink=RGB(215,54,57);border=RGB(252,205,205);fill=pressed?RGB(255,235,235):RGB(255,255,255);}
+    else if(item.CtlID>=market::CleanInvalid && item.CtlID<=market::Reset) {ink=RGB(200,40,48);border=RGB(247,205,207);fill=pressed?RGB(255,234,235):RGB(255,255,255);}
     else if (pressed || hover) {fill=RGB(242,247,255);ink=RGB(37,91,239);border=RGB(181,205,255);}
     bool tab=item.CtlID>=LOG_CONSOLE_TAB && item.CtlID<=LOG_MYSQL_TAB;
     if (tab) {
@@ -1055,6 +1086,7 @@ static void update_fonts() {
     for(HFONT previous:old)if(previous)DeleteObject(previous);
 }
 
+#include "auction_window.h"
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     try {
         switch (message) {
@@ -1126,6 +1158,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             }
             SendMessageW(level,CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
             control(L"BUTTON", L"应用并重启", WS_TABSTOP, LEVEL_APPLY);
+            control(L"BUTTON", L"双拍卖维护…", WS_TABSTOP, MARKET_OPEN);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, 206);
             SendMessageW(app->output, WM_SETFONT, reinterpret_cast<WPARAM>(app->log_font), TRUE);
             control(L"STATIC", L"服务", SS_CENTERIMAGE, 207);
@@ -1203,6 +1236,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             // native selection model; metadata moves to the real detail action.
             place(207,36,108,34,22);place(213,76,108,140,22);
             place(LEVEL_LABEL,228,105,64,26);place(LEVEL_CAP,294,103,76,30);place(LEVEL_APPLY,378,103,92,30);
+            place(MARKET_OPEN,482,103,100,30);
             place(DP2_ENABLE,width-574,105,90,26);place(FRIDA_ENABLE,width-474,105,74,26);
             place(PLUGINS_SAVE,width-390,103,76,30);place(SERVICE_INFO,width-310,103,46,30);
             place(ELF_START,width-254,103,68,30);place(ELF_STOP,width-178,103,68,30);place(SERVICE_LOGS,width-102,103,68,30);
@@ -1303,6 +1337,13 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
             app->show_services(); SetWindowTextW(app->status, result->status.c_str()); app->append(result->details); app->controls(); app->scan_logs();
+            if(app->operation>=market::Check && app->operation<=market::Reset) {
+                app->market_report=result->status+L"\r\n"+result->details;
+                if(app->market_window) {
+                    EnableWindow(app->market_window,TRUE);
+                    SetWindowTextW(GetDlgItem(app->market_window,MARKET_REPORT),app->market_report.c_str()); market_summary();
+                }
+            }
             if (!result->success) {
                 for (size_t i=0;i<app->log_sources.size();++i) if (app->log_sources[i].path.empty()) {
                     SendMessageW(GetDlgItem(window,LOG_SOURCE),CB_SETCURSEL,i,0);app->refresh_log(true);break;
@@ -1330,7 +1371,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 CloseHandle(app->session.process); app->session = {}; app->controls();
             }
             if (GetTickCount64() - app->log_scan >= 2000) { app->scan_logs(); app->log_scan = GetTickCount64(); }
-            if (!app->busy && app->session.process && GetTickCount64()-app->monthly_checked >= 15*60*1000) {
+            if (!app->busy && !app->market_window && app->session.process && GetTickCount64()-app->monthly_checked >= 15*60*1000) {
                 app->monthly_checked=GetTickCount64(); app->action(MONTHLY_PREPARE);
             }
             app->refresh_log();
@@ -1357,6 +1398,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         }
         case WM_COMMAND: {
             int id = LOWORD(wparam);
+            if(id==MARKET_OPEN && HIWORD(wparam)==BN_CLICKED && !app->busy) {open_market_window();return 0;}
             if (id==LOG_FILTER && HIWORD(wparam)==EN_CHANGE) {app->refresh_log(true);return 0;}
             if (id == INSTANCE && HIWORD(wparam) == EN_CHANGE) { if (app->status && app->output) app->load(); return 0; }
             if (id == SERVICE_LIST && HIWORD(wparam) == LBN_SELCHANGE && !app->busy) {
@@ -1564,6 +1606,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         ShowWindow(window, show); UpdateWindow(window);
         MSG message;
         while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+            if(state.market_window && IsDialogMessageW(state.market_window,&message)) continue;
             if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
         }
         CoUninitialize();

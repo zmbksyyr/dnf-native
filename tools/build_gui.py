@@ -52,7 +52,7 @@ def main():
     target = work / "runtime/mysql-control.exe"
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, ROOT / "src/win32_files.h", ROOT / "src/game_levels.h", ROOT / "src/controller/service_processes.h", ROOT / "src/controller/monthly_tables.h", ROOT / "src/controller/log_view.h", ROOT / "src/controller/service_ip.h", ROOT / "src/controller/instance_setup.h", ROOT / "src/controller/resource_zip.h", ROOT / "src/controller/resource_check.h", ROOT / "src/controller/instance_files.h", Path(__file__)]},
+                          for p in [source, manifest, ROOT / "src/win32_files.h", ROOT / "src/game_levels.h", *sorted((ROOT / "src/controller").glob("*.h")), Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

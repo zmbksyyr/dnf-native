@@ -141,7 +141,25 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 
 `controller/monthly_tables.h` 根据原服务实际列清单维护 `taiwan_cain_auction_gold`、`taiwan_cain_auction_cera` 的 `auction_history_YYYYMM`（26 列）、`auction_history_buyer_YYYYMM`（8 列），以及 `taiwan_cain_log.log_response_time_YYYYMM`（6 列）。月份由 MySQL `NOW()` 计算，当前月与下月均准备，不再从不完整种子表 `LIKE` 复制。响应日志使用 `channel_no,occ_time,packet_id,packet_count,total_response_time,avg_response_time`，旧种子同名表实际是其他统计结构。
 
-新实例导入后、数据库启动后及 game/auction/point 启动前运行维护；持有数据库时每 15 分钟由单一后台操作线程复查。运行中允许建立缺失月表；修改既有结构要求这三个写入服务均停止。拍卖表仅补缺列；不识别的关键字段结构明确拒绝。响应表通过原表改名保存、正确新表原子换名处理。每次修改既有表前由官方 `mysqldump` 导出并记录 SHA-256，预先写回滚 SQL；迁移后核对字段，核对失败时执行回滚，失败现场与恢复 SQL 保留。拍卖回滚先改名保留迁移后表，再导回原结构和数据；响应回滚交换原表名称。历史月份及物品名称索引不在维护中删除或更新。
+新实例导入后、数据库启动后及 game/auction/point 启动前运行月表维护；持有数据库时每 15 分钟由单一后台操作线程复查。运行中允许建立缺失月表；修改既有结构要求这三个写入服务均停止。拍卖表仅补缺列；不识别的关键字段结构明确拒绝。响应表通过原表改名保存、正确新表原子换名处理。每次修改既有表前由官方 `mysqldump` 导出并记录 SHA-256，预先写回滚 SQL；迁移后核对字段，核对失败时执行回滚，失败现场与恢复 SQL 保留。拍卖回滚先改名保留迁移后表，再导回原结构和数据；响应回滚交换原表名称。月表维护不删除历史月份；主动重置市场数据库是下面独立的红字操作。
+
+## 双拍卖维护
+
+`controller/auction_window.h` 提供维护窗口，复用主窗口按钮、开关和单一后台线程；`auction_maintenance.h` 管理检查、备份、迁移与恢复；`auction_pvf.h` 独立读取 PVF；`runtime/auction.c` 适配固定原版 i386 auction／point。功能与作用域见[使用说明](README.md)。配置保存到已有 `services.ini [auction]`，保留原服务入口等字段；`extend_levels/extend_refine/dp2_guard/auto_check` 是选项，`level_limit/refine_limit` 是应用后的数值。宿主环境由控制台生成。
+
+固定 ELF 身份分别为 auction `b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c`、point `0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256`。每个站点先核对文件与执行映射的完整旧指令，再写执行内存，并记录旧新字节；不修改磁盘 ELF，退出后恢复。具体站点与预期字节集中在 `auction.c`，拒绝其他 ELF 身份。
+
+搜索原本用动态 map 保存锻造维度，但请求校验只接受 0～7；`0x0808281c` 只调整该上限，等级在 `0x080811d5/0x0808292b/0x08083471/0x0808347c` 调整。范围取当前 PVF；等级受原指令表示限制到 127，锻造受 `UpgradeSeparateInfo::GetUpgradeSeparate` 的五位物品协议限制到 31，超限明确拒绝。不会把 PVF 压回 70／7，也不把请求改成任意 127。
+
+原均价容器只构造每强化 8 档 map，直接放宽校验会使锻造 8 与下一强化档锻造 0 共用地址。现在每 8 个锻造值使用一个完整原版 `AveragePriceDictionary`：额外组独立构造、保留原算法、对象池、ROI 和约束，make／Add／Get 按组转发，Update／析构覆盖各组。外层 Auction 仍序列化真实锻造值。数据库普通均价主键及 ROI 唯一键加入 `seperate_upgrade`；人工均价补该列，原人工更新 SQL 的 join 也匹配锻造值。只有 schema 标志存在时启用 SQL 适配，不猜测迁移未知唯一键。
+
+PVF 解析读取目录、字符串表、equipment／stackable 主列表、实际脚本及 PVF 内 `etc/iteminfo.dat`。支持 GBK／Big5 自动判断、9／10 间接名称引用以及自带 PVF 表尾的 `[explain]` 说明，合并当前真实名称、稀有度、等级和职业。分类依据当前 PVF 自带条目与类型／子类型／目录的无歧义证据；没有依据、无名、原版缓冲无法表示的条目列为待处理，不用编号假名、不凭空填分类。金币条目只有主列表及脚本实际存在才保留。UTF-8 的 17 字段 dat 同步到两市场；原 CodePage 初始化改为 UTF-8，原 `script2Database` 同编码分支不填目标缓冲，因此执行内存回调补上真实复制，防止中文名变空。
+
+检查覆盖两个市场的 `auction_main` 和普通／ROI／人工均价，核对实际 ID、可索引性、强化／锻造／等级、旧名称／分类／稀有度，以及上次同步记录的类型、路径、大小和目录 CRC。订单与均价冲突分别列出；自动同步不删除其中任何数据。`auction_system_main` 在本基底只含排程字段，没有物品 ID，清空在售时显式清除。已有索引及定义记录用于检测 ID 改用途；首次迁移没有旧定义身份时只能比较现有索引字段，不能证明脚本全部语义相同。
+
+索引清单 `.mysql/market-index.ini` 绑定 PVF、两份 dat 哈希和 UTF-8 编码，定义记录另存 `market-definitions.txt`。相关启动前及 15 分钟复查发现哈希变化后检查候选；关闭自动检查时由维护窗口手动应用。候选在内存完整生成后才进入写入。写操作限定当前控制台 SQL UUID／PID／TLS 身份；停止本窗口持有的三个写入服务后再次检查，官方 SQL 备份覆盖选中市场全部表。索引操作额外备份 dat、配置、manifest、定义与 DP2 脚本，以临时文件和原子替换提交。失败导回 SQL 及原文件，保持相关服务停止；成功按原运行集合重新拉起，不用存活证明业务通过。上一版 dat 绑定其旧 manifest 的 PVF，未知来源记录为空，恢复时拒绝不同或未知 PVF。
+
+DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和用户代码；未知自定义 hook 明确拒绝启用，关闭只还原本项目已安装的段。按原分发入口解析每项，只对有效装备 ID／实例 ID 和装备组查询，要求 SQL 成功、有且仅一条、HEX 为恰好 30 字节并带非空孔记录才覆盖；无记录及失败保持原包字节，加入重入保护与异常日志。此实现未改变上架、购买、定价和机器人逻辑。
 
 ## 已确认的兼容限制
 

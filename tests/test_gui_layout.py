@@ -64,7 +64,7 @@ def main():
             client = w.RECT()
             user.GetClientRect(window, c.byref(client))
             visible = {}
-            for identifier in range(100, 290):
+            for identifier in range(100, 301):
                 child = user.GetDlgItem(window, identifier)
                 if not child or not user.IsWindowVisible(child):
                     continue
@@ -94,7 +94,7 @@ def main():
                 assert identifier in visible
             assert visible[102][3] < visible[220][1] < visible[202][1] < visible[206][1]
             for identifiers in [[102, 260, 101, 250, 251, 262, 116, 280, 224, 223],
-                                [235, 233, 234, 230, 231, 232, 281, 221, 222, 225],
+                                [235, 233, 234, 300, 230, 231, 232, 281, 221, 222, 225],
                                 [112, 111, 113, 114, 115, 282],
                                 [284, 285, 286, 287, 288, 283, 241, 243, 242]]:
                 for a, b in zip(identifiers, identifiers[1:]):

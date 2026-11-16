@@ -88,9 +88,9 @@ public:
         }
         return result;
     }
-    void extract(const std::map<std::string, std::wstring> &targets) {
+    void extract(const std::map<std::string, std::wstring> &targets, bool complete = true) {
         auto entries = files();
-        if (entries.size() != targets.size()) throw std::runtime_error("ZIP file list differs from manifest");
+        if (complete && entries.size() != targets.size()) throw std::runtime_error("ZIP file list differs from manifest");
         for (const auto &[name, destination] : targets) {
             auto item = entries.find(name);
             if (item == entries.end()) throw std::runtime_error("ZIP resource is missing: " + name);

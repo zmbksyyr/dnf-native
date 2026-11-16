@@ -1,0 +1,89 @@
+{
+  "reference": "用户指定 dnf-robot-main；只读语义参考，未运行或纳入交付",
+  "reference_files": [
+    {
+      "path": "internal/capability/marketapp/marketapp_memory_patch.go",
+      "sha256": "e13e05c878953bc353c5b400aaab3ee8f923cffa44c8541a8a767ae1f4e30cce",
+      "size": 12019,
+      "read_scope": "26–32：6项设置；97起：全量预检、写入、回读和恢复；只处理df_auction_r"
+    },
+    {
+      "path": "internal/capability/marketapp/marketapp_auto.go",
+      "sha256": "d3aea7a61608e814c66aa35fc93337c27f3e7e376953cfa935ae8f38e98f3079",
+      "size": 6987,
+      "read_scope": "自动任务中的拍卖服务启动和再次补丁"
+    },
+    {
+      "path": "internal/capability/pvf/pvf_core.go",
+      "sha256": "c2016973039fd2a297df96fbb78c496f4eb3ecaed61b9bb9362746a3048e362d",
+      "size": 23516,
+      "read_scope": "343起：导出与缓存；431起：合并实际脚本；502起：Big5/编号名回退；551起：等级硬压70"
+    },
+    {
+      "path": "internal/capability/pvf/pvf_archive.go",
+      "sha256": "4728f8d5d7997b55414e4f8fbc6f96cf3c3a536f54dd495e1230b5cfdb45b8e5",
+      "size": 14996,
+      "read_scope": "260–266：参考客户端特定的扩展属性过滤规则"
+    },
+    {
+      "path": "internal/capability/pvf/pvf_iteminfo_test.go",
+      "sha256": "a73a1c750e2dffcd9b64841fce7bc6775592412c147d70a7c1f33a88f97a7697",
+      "size": 10490,
+      "read_scope": "iteminfo名称编码及ASCII回退的参考测试"
+    },
+    {
+      "path": "internal/foundation/charset/charset.go",
+      "sha256": "be94972c8a27db1baeb0f9265b124810594d33478ea4843d2f0779403ee5a01d",
+      "size": 3805,
+      "read_scope": "14–19：Big5编码，没有简繁转换"
+    },
+    {
+      "path": "internal/capability/marketapp/marketapp_pvf.go",
+      "sha256": "144824e9a03c7cc79f8b9f2f99c348cd1407703a6f05b58a389de17b89dbca58",
+      "size": 18248,
+      "read_scope": "29起：合并/同步；131起：发布；182起：发布前清理商品与均价；321起：均价删除"
+    },
+    {
+      "path": "internal/capability/marketapp/marketapp_cera_iteminfo.go",
+      "sha256": "bfa52170a70a2c9f96d731201fa3194c8900172fab4ae1dc2775bd9c58ec0a36",
+      "size": 7016,
+      "read_scope": "15起：读取目标原有ID；35–67：PVF优先并保留源中缺失的服务条目"
+    },
+    {
+      "path": "internal/capability/marketapp/marketapp_auction_guard.go",
+      "sha256": "0727253c3e8ba67366a02b27f9f60c571f95bcfc3ca3efe07e0109398b98c8ac",
+      "size": 9119,
+      "read_scope": "21–100：搜索保护语义；102起：脚本备份与安装"
+    },
+    {
+      "path": "internal/capability/pvf/pvf_upgrade_separate.go",
+      "sha256": "9b69de99244dcea38fe989ee579b6891edf72a25b30536cb13b012cb0dfd13ab",
+      "size": 10929,
+      "read_scope": "修改PVF锻造最大值，不属于本次建议接入范围"
+    }
+  ],
+  "implementation_basis": "本仓库固定原 ELF 反汇编、原函数实验、PVF 格式与实际元数据；独立实现，未复制参考代码、补丁表或生成器",
+  "original_elfs": [
+    {
+      "name": "df_auction_r",
+      "sha256": "b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c",
+      "size": 12202759,
+      "source": "resources/native.zip"
+    },
+    {
+      "name": "df_point_r",
+      "sha256": "0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256",
+      "size": 12202755,
+      "source": "resources/native.zip"
+    }
+  ],
+  "differences": [
+    "同时处理 auction 和 point；分别识别 ELF 哈希与完整旧指令",
+    "范围取当前 PVF，拒绝超出原协议值；不降 PVF 等级或锻造上限，不固定为 127",
+    "均价保留原算法并分配独立八档容器，数据库键和人工 SQL 包含真实锻造值",
+    "UTF-8 索引保留原名称；分类依据当前 PVF 证据，不用物品编号假名",
+    "同步前检查订单和普通/ROI/人工均价；未知分类或改变的定义明确报告",
+    "不把发布索引与清库捆绑；危险数据动作独立红字按钮，先备份、停服，失败回滚",
+    "DP2 搜索保护独立实现并保留无有效记录时的原包字节；不导入其他参考脚本"
+  ]
+}
