@@ -30,7 +30,7 @@ def main():
     probe = BUILD / "probes" / stamp / "gui-readiness"
     instance = probe / "instance"
     source_data = tree_identity(source / "data")
-    shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
+    shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs", ".instance.lock"))
     import configparser
     manifest = configparser.ConfigParser(interpolation=None)
     manifest.read(instance / "services.ini", encoding="utf-16")
@@ -88,8 +88,12 @@ def main():
             assert len(outputs) == 1
             output = outputs.pop()
             assert MARKER in output.read_bytes()
-            if args.script_encoding:
-                assert b"iconv error" not in output.read_bytes(), "PVF encoding conversion failed"
+            diagnostic = output.with_name(output.name.replace(".stdout.", ".stderr.")).read_bytes()
+            assert b"iconv error" not in output.read_bytes() + diagnostic, "PVF encoding conversion failed"
+            item["script_encoding_selection"] = [line for line in diagnostic.decode("utf-8", "replace").splitlines()
+                                                 if line.startswith("pvf script encoding source=")]
+            assert len(item["script_encoding_selection"]) == 1, "Missing original script codepage selection"
+            assert ("source=explicit" if args.script_encoding else "source=auto") in item["script_encoding_selection"][0]
             assert "应用已初始化" in service_row(window, "game")
             assert "接口/协议/业务：未验证" in title(user.GetDlgItem(window, 273))
             item["fresh_stdout"] = output.name

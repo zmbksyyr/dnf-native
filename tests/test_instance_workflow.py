@@ -137,6 +137,12 @@ def main():
         assert not user.IsWindowEnabled(user.GetDlgItem(window, 261))
         assert not user.IsWindowEnabled(user.GetDlgItem(window, 260))
         tool = resources / "mysql-control.exe"
+        assert (first / "login.private.cnf").is_file()
+        result = subprocess.run([str(tool), "mysql", str(first), "--defaults-file=login.private.cnf", "--batch", "--skip-column-names",
+                                 "--execute=SELECT CURRENT_USER(); SELECT COUNT(*) FROM d_taiwan.accounts; SELECT COUNT(*) FROM d_taiwan.member_info; SELECT COUNT(*) FROM d_taiwan.member_white_account; SELECT COUNT(*) FROM taiwan_login.member_login;"],
+                                capture_output=True, timeout=30)
+        assert result.returncode == 0 and result.stdout.splitlines()[0] == b"game@%", "Launcher game account cannot authenticate/read login tables"
+        checks["game_launcher_account_unlocked_and_login_tables_readable"] = True
         result = subprocess.run([str(tool), "mysql", str(first), "--defaults-file=client.private.cnf", "--batch", "--skip-column-names",
                                  "--execute=CREATE DATABASE instance_probe; CREATE TABLE instance_probe.saved(id INT PRIMARY KEY); INSERT INTO instance_probe.saved VALUES(73);"],
                                 capture_output=True, timeout=30)

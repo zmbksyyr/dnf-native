@@ -395,6 +395,8 @@ struct App {
         HWND detail = GetDlgItem(window, MAINTENANCE_DETAIL);
         if (!detail) return;
         std::wstring text = L"数据库：" + database_identity() + L"\r\n将按逆序停止：" + stop_plan();
+        if (!current.empty() && present(current + L"\\login.private.cnf"))
+            text += L"\r\n登录器数据库账号：game\r\n连接信息：" + current + L"\\login.private.cnf";
         if (!maintenance_summary.empty()) text += L"\r\n最近维护：" + maintenance_summary;
         SetWindowTextW(detail, text.c_str());
         SetWindowTextW(GetDlgItem(window,212), (L"数据库  " + database_identity()).c_str());

@@ -92,6 +92,7 @@ typedef struct {
     char **argv;
     int environment_count;
     char *environment[32];
+    unsigned script_encoding, script_encoding_assigning;
 } NrRun;
 
 int nr_run(NrRun *run);

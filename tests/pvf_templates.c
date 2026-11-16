@@ -121,9 +121,43 @@ static int fixture_main(int argc, char **argv, char **environment) {
     (void)environment;
     CHECK(argc == 3);
     ((void (*)(void))symbol("_ZN8CodePage12initCodePageEv"))();
+    if (!strcmp(argv[2], "encoding-synthetic")) {
+        const UINT pages[] = {936, 950, 0, 0, 0};
+        for (unsigned i = 0; i < 5; ++i) {
+            uint32_t table[128] = {1, 8, 8};
+            const wchar_t *text = i == 0 ? L"\u8fd9\u662f\u4e00\u4e2a\u4eba\u7684" : L"\u9019\u662f\u4e00\u500b\u4eba\u7684";
+            int length = i < 2 ? WideCharToMultiByte(pages[i], WC_NO_BEST_FIT_CHARS, text, -1,
+                                                    (char *)(table + 3), sizeof(table) - 12, NULL, NULL) : 1;
+            CHECK(length > 0);
+            table[2] += (unsigned)length;
+            if (i == 3) { table[3] = 0xa1; } /* Incomplete multibyte text. */
+            if (i == 4) { ++table[2]; } /* Offset past the actual extent. */
+            uint32_t frame[8] = {(uint32_t)(12 + length), (uint32_t)(uintptr_t)table}, outgoing[4];
+            CONTEXT context = {0};
+            context.Eip = 0x088bb551;
+            context.Ebp = (DWORD)(uintptr_t)(frame + 4);
+            context.Esp = (DWORD)(uintptr_t)(outgoing + 1);
+            int result = nr_pvf_script(fixture_run, &context);
+            if (i >= 3) { CHECK(result == -1); continue; }
+            CHECK(result == 1 && context.Eip == 0x08708720);
+            ((void (*)(void *, const char *))0x08708720)((void *)(uintptr_t)outgoing[1], (const char *)(uintptr_t)outgoing[2]);
+            const char *selected = ((const char *(*)(void))symbol("_ZN8CodePage6scriptEv"))();
+            CHECK(!strcmp(selected, i == 0 ? "GBK" : "BIG5"));
+            context.Eip = 0x088bb551;
+            CHECK(nr_pvf_script(fixture_run, &context) == 1 && context.Eip == 0x088bb554 && context.Eax == frame[0]);
+        }
+        puts("PVF_ENCODING synthetic GBK/BIG5/ASCII selected; ambiguous/malformed rejected");
+        return 42;
+    }
     int error = -1;
     CHECK(((int (*)(const char *, int, const char *, int *))symbol("_Z14InitRDARScriptPKcbS0_Pi"))
           (".", 1, argv[1], &error) && !error);
+    if (!strncmp(argv[2], "encoding-", 9)) {
+        const char *encoding = ((const char *(*)(void))symbol("_ZN8CodePage6scriptEv"))();
+        CHECK(!strcmp(encoding, argv[2] + 9));
+        printf("PVF_ENCODING original-loader script=%s\n", encoding);
+        return 42;
+    }
     ((void (*)(void))symbol("_Z25InitMapEquipmentAniScriptv"))();
     void *map = *(void **)symbol("g_mapEquipmentAniScript");
     if (!strcmp(argv[2], "mixed")) {

@@ -185,10 +185,10 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     // Keep permissions at the application's existing schema boundary. This is
     // independent from the root maintenance credential.
     for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'dnf_game'@'127.0.0.1';";
-    // Original stored routines use this definer. Keep their definitions intact;
-    // the locked account is only an execution identity, never a login account.
-    query += "CREATE USER 'game'@'%' IDENTIFIED BY '" + instance_secret(24) + "' ACCOUNT LOCK;"
-             "GRANT ALL ON taiwan_cain.* TO 'game'@'%';GRANT ALL ON taiwan_billing.* TO 'game'@'%';";
+    // Launchers and the original routine DEFINER both use game. Keep it usable
+    // for login, with application-schema permissions and an instance credential.
+    query += "CREATE USER 'game'@'%' IDENTIFIED BY '" + game + "';";
+    for (const wchar_t *schema : application_schemas) query += "GRANT ALL ON `" + ascii(schema) + "`.* TO 'game'@'%';";
     query += "CREATE USER 'dnf_bridge'@'127.0.0.1' IDENTIFIED BY '" + bridge + "';GRANT SELECT ON d_channel.* TO 'dnf_bridge'@'127.0.0.1';"
              "CREATE USER 'dnf_frida'@'127.0.0.1' IDENTIFIED BY '" + frida + "';CREATE DATABASE frida;"
              "GRANT ALL ON d_taiwan.* TO 'dnf_frida'@'127.0.0.1';GRANT ALL ON frida.* TO 'dnf_frida'@'127.0.0.1';"
@@ -196,6 +196,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     std::wstring sql_path = instance + L"\\.mysql\\" + unique_name() + L"-accounts.private.sql";
     write_private(sql_path, query); checked_sql_file(exe, instance, sql_path);
     require(DeleteFileW(sql_path.c_str()), "Remove completed private account SQL");
+    write_private(instance + L"\\login.private.cnf", "[client]\nprotocol=TCP\nhost=127.0.0.1\nport=3306\nuser=game\npassword=" + game + "\n");
     ToolResult date = sql(exe, instance, L"SELECT DATE_FORMAT(NOW(),'%Y%m');");
     std::string month = date.output.substr(0,6);
     if (date.code || month.size() != 6 || month.find_first_not_of("0123456789") != std::string::npos)

@@ -1,11 +1,14 @@
 #include "run.h"
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifndef _WIN64
 static const char game_hash[] = "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979";
 enum { LAYOUT_RESULT = 0x089c1d31, ACTION_PATHS = 0x089c1e80, LAYOUT_RETURN = 0x089c2826,
        CREATURE_PARSED = 0x0833ccdf, SYNC_INSTANCE = 0x0861cbb4,
+       STRING_TABLE = 0x088bb551, SCRIPT_CODEPAGE = 0x093febf8,
        STRING_ASSIGN = 0x08708720, EMPTY_STRING = 0x08e15e80 };
 
 /* Original server metadata uses explicit layers/variation names, not the .ani
@@ -32,6 +35,64 @@ static int layout_failure(const char *reason) {
     fprintf(stderr, "pvf script compatibility failed: %s\n", reason);
     return -1;
 }
+
+/* The original PackSet decrypts the table. Inspect only its string spans, not
+   encrypted bytes, filenames or a PVF identity. Offsets are relative to +4.
+   Strict decoding and ordinary Chinese function words distinguish GBK/Big5;
+   neither "no conversion error" nor a single readable string proves a charset. */
+static unsigned table_encoding(const unsigned char *table, uint32_t size) {
+    if (size < 8) return 0;
+    uint32_t count;
+    memcpy(&count, table, 4);
+    if (count > (size - 8) / 4) return 0;
+    const uint32_t *offsets = (const uint32_t *)(table + 4);
+    uint32_t begin = offsets[0];
+    if (begin < (count + 1) * 4 || begin > size - 4) return 0;
+    for (uint32_t i = 1; i <= count; ++i) {
+        if (offsets[i] < offsets[i - 1] || offsets[i] > size - 4) return 0;
+    }
+    const UINT pages[] = {936, 950};
+    /* A small, independently chosen language sample; no reference byte tables. */
+    static const wchar_t common[] = L"的一是不在人有我和这這为為个個中来來上大们們到说說时時要会會对對能以地得可也就出子生自年过過于於着著下";
+    int64_t scores[2] = {0};
+    unsigned invalid[2] = {0}, words[2] = {0}, private_chars[2] = {0}, samples = 0;
+    wchar_t *wide = NULL;
+    size_t capacity = 0;
+    uint32_t stride = count > 16384 ? count / 16384 : 1;
+    for (uint32_t i = 0; i < count; i += stride) {
+        uint32_t length = offsets[i + 1] - offsets[i];
+        const char *text = (const char *)table + 4 + offsets[i];
+        unsigned nonascii = 0;
+        for (uint32_t j = 0; j < length; ++j) nonascii += (unsigned char)text[j] >= 128;
+        if (!nonascii) continue;
+        if (length > INT_MAX) { free(wide); return 0; }
+        if (capacity < length) {
+            wchar_t *larger = realloc(wide, (size_t)length * sizeof(*wide));
+            if (!larger) { free(wide); return 0; }
+            wide = larger;
+            capacity = length;
+        }
+        ++samples;
+        for (unsigned p = 0; p < 2; ++p) {
+            int n = MultiByteToWideChar(pages[p], MB_ERR_INVALID_CHARS, text, (int)length, wide, (int)capacity);
+            if (!n) { invalid[p] += nonascii; scores[p] -= nonascii; continue; }
+            for (int j = 0; j < n; ++j) {
+                if (wide[j] && wcschr(common, wide[j])) { ++words[p]; scores[p] += 8; }
+                if (wide[j] >= 0xe000 && wide[j] <= 0xf8ff) { ++private_chars[p]; scores[p] -= 4; }
+            }
+        }
+    }
+    free(wide);
+    unsigned chosen = 0;
+    if (!samples) chosen = 950; /* ASCII is identical in both encodings. */
+    else if (scores[0] > 0 && scores[0] - scores[1] >= 16) chosen = 936;
+    else if (scores[1] > 0 && scores[1] - scores[0] >= 16) chosen = 950;
+    fprintf(stderr, "pvf script encoding auto samples=%u GBK(score=%lld invalid_bytes=%u common=%u private=%u) BIG5(score=%lld invalid_bytes=%u common=%u private=%u) selected=%s\n",
+            samples, (long long)scores[0], invalid[0], words[0], private_chars[0],
+            (long long)scores[1], invalid[1], words[1], private_chars[1],
+            chosen == 936 ? "GBK" : chosen == 950 ? "BIG5" : "ambiguous");
+    return chosen;
+}
 #endif
 
 int nr_pvf_encoding(NrRun *run, const char **error) {
@@ -52,25 +113,7 @@ int nr_pvf_encoding(NrRun *run, const char **error) {
         *error = "script encoding selection supports GBK/BIG5 on the fixed game ELF only";
         return 0;
     }
-    const uintptr_t pc = 0x08108da2;
-    static const unsigned char original[] = {0xc7, 0x44, 0x24, 0x04, 0xd5, 0x46, 0xb4, 0x08};
-    if (!original_bytes(elf, pc, original, sizeof(original)) ||
-        !original_bytes(elf, 0x08b446d1, (const unsigned char *)"GBK\0BIG5", 9)) {
-        *error = "script encoding selection original bytes/constants differ";
-        return 0;
-    }
-    if (!strcmp(encoding, "GBK")) {
-        DWORD old, ignored;
-        uint32_t value = 0x08b446d1;
-        if (!VirtualProtect((void *)pc, sizeof(original), PAGE_EXECUTE_READWRITE, &old)) return 0;
-        memcpy((void *)(pc + 4), &value, sizeof(value));
-        if (!VirtualProtect((void *)pc, sizeof(original), old, &ignored) ||
-            !FlushInstructionCache(GetCurrentProcess(), (void *)pc, sizeof(original))) return 0;
-        fprintf(stderr, "pvf script encoding sha256=%s encoding=GBK pc=0x%lx original=c7442404d546b408 replacement=c7442404d146b408 scope=execution-memory\n",
-                elf->sha256, (unsigned long)pc);
-    } else {
-        fprintf(stderr, "pvf script encoding encoding=BIG5 original behavior retained\n");
-    }
+    run->script_encoding = !strcmp(encoding, "GBK") ? 936 : 950;
     return 1;
 #endif
 }
@@ -85,19 +128,22 @@ int nr_pvf_adapt(NrElf *elf, const char **error) {
     static const unsigned char creature[] = {0xe8, 0xd0, 0xfe, 0x2d, 0x00}; /* call GetInstanceSyncScript */
     static const unsigned char finish[] = {0x8d, 0x65, 0xf4, 0x83, 0xc4, 0x00, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3};
     static const unsigned char assign[] = {0x55, 0x89, 0xe5, 0x53, 0x83, 0xec, 0x14};
+    static const unsigned char table[] = {0x8b, 0x45, 0xf0}; /* mov eax,[ebp-10] */
     if (elf->bias || !original_bytes(elf, LAYOUT_RESULT, result, sizeof(result)) ||
         !original_bytes(elf, ACTION_PATHS, actions, sizeof(actions)) ||
         !original_bytes(elf, CREATURE_PARSED, creature, sizeof(creature)) ||
         !original_bytes(elf, LAYOUT_RETURN, finish, sizeof(finish)) ||
+        !original_bytes(elf, STRING_TABLE, table, sizeof(table)) ||
+        !original_bytes(elf, 0x08b446d1, (const unsigned char *)"GBK\0BIG5", 9) ||
         !original_bytes(elf, STRING_ASSIGN, assign, sizeof(assign)) ||
         !original_bytes(elf, EMPTY_STRING, (const unsigned char *)"", 1)) {
         *error = "PVF equipment correction original addresses/bytes differ";
         return 0;
     }
-    uintptr_t sites[] = {LAYOUT_RESULT, ACTION_PATHS, CREATURE_PARSED};
-    const unsigned char *bytes[] = {result, actions, creature};
-    unsigned lengths[] = {sizeof(result), sizeof(actions), sizeof(creature)};
-    for (unsigned i = 0; i < 3; ++i) {
+    uintptr_t sites[] = {LAYOUT_RESULT, ACTION_PATHS, CREATURE_PARSED, STRING_TABLE};
+    const unsigned char *bytes[] = {result, actions, creature, table};
+    unsigned lengths[] = {sizeof(result), sizeof(actions), sizeof(creature), sizeof(table)};
+    for (unsigned i = 0; i < 4; ++i) {
         DWORD old, ignored;
         if (!VirtualProtect((void *)sites[i], 2, PAGE_EXECUTE_READWRITE, &old)) return 0;
         memcpy((void *)sites[i], "\x0f\x0b", 2);
@@ -115,8 +161,35 @@ int nr_pvf_script(NrRun *run, CONTEXT *c) {
 #ifdef _WIN64
     (void)run; (void)c;
 #else
-    if ((c->Eip != LAYOUT_RESULT && c->Eip != ACTION_PATHS && c->Eip != CREATURE_PARSED) ||
+    if ((c->Eip != LAYOUT_RESULT && c->Eip != ACTION_PATHS && c->Eip != CREATURE_PARSED && c->Eip != STRING_TABLE) ||
         strcmp(run->program.sha256, game_hash)) return 0;
+    if (c->Eip == STRING_TABLE) {
+        if (c->Ebp < 0x10 || !nr_memory(c->Ebp - 0x10, 8, 0))
+            return layout_failure("invalid string table frame");
+        uint32_t size = *(uint32_t *)(c->Ebp - 0x10);
+        if (run->script_encoding_assigning) {
+            run->script_encoding_assigning = 0;
+            c->Eax = size;
+            c->Eip += 3; /* Original MOV, flags unchanged. */
+            return 1;
+        }
+        uintptr_t table = *(uint32_t *)(c->Ebp - 0x0c);
+        if (!nr_memory(table, size, 0)) return layout_failure("invalid string table extent");
+        unsigned encoding = run->script_encoding ? run->script_encoding : table_encoding((const unsigned char *)table, size);
+        if (!encoding) return layout_failure("PVF encoding ambiguous or malformed; DNF_NATIVE_SCRIPT_ENCODING can explicitly select GBK/BIG5");
+        if (!nr_memory(SCRIPT_CODEPAGE, 4, 1) || c->Esp < 4 || !nr_memory(c->Esp - 4, 12, 1))
+            return layout_failure("invalid script codepage assignment frame");
+        fprintf(stderr, "pvf script encoding source=%s encoding=%s; original string assignment and conversion retained\n",
+                run->script_encoding ? "explicit" : "auto", encoding == 936 ? "GBK" : "BIG5");
+        run->script_encoding_assigning = 1;
+        c->Esp -= 4;
+        uint32_t *args = (uint32_t *)c->Esp;
+        args[0] = STRING_TABLE;
+        args[1] = SCRIPT_CODEPAGE;
+        args[2] = encoding == 936 ? 0x08b446d1 : 0x08b446d5;
+        c->Eip = STRING_ASSIGN;
+        return 1;
+    }
     if (c->Eip == CREATURE_PARSED) {
         /* importCreatureScript reverse-searches by filename, which collapses
            distinct list IDs sharing a file to the first ID. The caller already

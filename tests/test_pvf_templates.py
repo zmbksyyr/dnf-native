@@ -1,8 +1,10 @@
 """Exercise name-independent layout semantics in original ELF functions, not a full startup."""
+import argparse
 import datetime
 import json
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -13,6 +15,10 @@ from resource_baseline import RESOURCES, verify_baseline
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pvf", type=Path, help="Read-only PVF for original loader encoding verification")
+    parser.add_argument("--expect-encoding", choices=("GBK", "BIG5"), default="BIG5")
+    args = parser.parse_args()
     verify_baseline()
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     work = BUILD / "probes" / stamp / "pvf-templates"
@@ -27,6 +33,8 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(archive.read(name))
     (root / "tmp").mkdir()
+    if args.pvf:
+        shutil.copyfile(args.pvf.resolve(strict=True), root / "home/neople/game/Script.pvf")
     # Private host only: enter a fixture at original main, after real ctors.
     text = (ROOT / "src/runtime/run.c").read_text(encoding="utf-8")
     changes = {
@@ -56,23 +64,28 @@ def main():
     compiled.check_returncode()
     game = root / "home/neople/game/df_game_r"
     loader = root / "lib/ld-2.17.so"
-    cases = [("mixed", 42), ("present-default", 42), ("missing-layer", 126),
+    cases = [("encoding-" + args.expect_encoding, 42)]
+    if not args.pvf:
+        cases += [("encoding-synthetic", 42), ("mixed", 42), ("present-default", 42), ("missing-layer", 126),
              ("negative-layer", 126), ("invalid-job", 126), ("invalid-type", 126)]
     record = {"os": platform.platform(), "scope": __doc__, "build_command": command,
               "host_sha256": sha256(host), "elf_sha256": sha256(game), "pvf_sha256": sha256(game.parent / "Script.pvf"),
               "fixture_sha256": sha256(ROOT / "tests/pvf_templates.c"), "cases": []}
     for case, expected in cases:
-        args = [str(host), "--root", str(root), sha256(loader), "--env", "LD_LIBRARY_PATH=/home/neople/game",
+        command_args = [str(host), "--root", str(root), sha256(loader), "--env", "LD_LIBRARY_PATH=/home/neople/game",
                 "--cwd", "/home/neople/game", "--run", str(game), sha256(game), "/home/neople/game/df_game_r", "Script.pvf", case]
-        result = subprocess.run(args, capture_output=True, timeout=45)
+        result = subprocess.run(command_args, capture_output=True, timeout=45)
         (work / (case + ".stdout.log")).write_bytes(result.stdout)
         (work / (case + ".stderr.log")).write_bytes(result.stderr)
-        row = {"case": case, "command": args, "expected_exit": expected, "exit_code": result.returncode,
+        row = {"case": case, "command": command_args, "expected_exit": expected, "exit_code": result.returncode,
                "stdout_sha256": sha256(work / (case + ".stdout.log")),
                "stderr_sha256": sha256(work / (case + ".stderr.log"))}
         row["passed"] = result.returncode == expected and b"unhandled exception" not in result.stderr
         if case == "mixed":
             row["passed"] &= result.stdout.count(b"metadata=preserved") == 36
+        if case == "encoding-" + args.expect_encoding:
+            row["passed"] &= ("PVF_ENCODING original-loader script=" + args.expect_encoding).encode() in result.stdout
+            row["passed"] &= ("source=auto encoding=" + args.expect_encoding).encode() in result.stderr
         if expected == 126:
             row["passed"] &= b"missing layout required to supply layer or unsupported animation mode" in result.stderr
         record["cases"].append(row)
