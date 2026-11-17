@@ -256,8 +256,9 @@ struct App {
     int dpi = 96;
     int px(int value) const { return MulDiv(value, dpi, 96); }
     bool resources_ready = false;
-    ULONGLONG metrics_tick = 0, metrics_process = 0;
-    bool metrics_ready = false;
+    struct ProcessMetric { DWORD pid; ULONGLONG creation, cpu; };
+    std::vector<ProcessMetric> metrics_processes;
+    ULONGLONG metrics_tick = 0;
     void restore_instance_history() {
         wchar_t folder[32768];
         DWORD size=GetEnvironmentVariableW(L"LOCALAPPDATA",folder,32768);
@@ -294,26 +295,60 @@ struct App {
         save_instance_history();
     }
     void update_title_metrics() {
-        FILETIME creation{}, exit{}, kernel{}, user{};
-        if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) return;
+        // Include the controller and its whole process tree: ELF hosts, database
+        // wrapper/tools and mysqld. Never read Service handles owned by the worker.
+        HANDLE snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+        if(snapshot==INVALID_HANDLE_VALUE) {
+            metrics_processes.clear(); metrics_tick=0;
+            SetWindowTextW(window,L"DNF Native 控制台  ·  CPU --  ·  内存 --");
+            return;
+        }
+        std::vector<std::pair<DWORD,DWORD>> parents;
+        PROCESSENTRY32W entry{}; entry.dwSize=sizeof(entry);
+        bool complete=Process32FirstW(snapshot,&entry)!=FALSE;
+        if(complete) do {
+            parents.emplace_back(entry.th32ProcessID,entry.th32ParentProcessID);
+        } while(Process32NextW(snapshot,&entry));
+        CloseHandle(snapshot);
+        std::vector<DWORD> pids{GetCurrentProcessId()};
+        for(size_t i=0;i<pids.size();++i)
+            for(const auto &child:parents)
+                if(child.second==pids[i] && std::find(pids.begin(),pids.end(),child.first)==pids.end())
+                    pids.push_back(child.first);
         auto ticks=[](const FILETIME &value) -> ULONGLONG {
             return (static_cast<ULONGLONG>(value.dwHighDateTime)<<32) | value.dwLowDateTime;
         };
-        ULONGLONG now=GetTickCount64(), process=ticks(kernel)+ticks(user);
-        PROCESS_MEMORY_COUNTERS memory{}; memory.cb=sizeof(memory);
-        SIZE_T working=0; if (GetProcessMemoryInfo(GetCurrentProcess(),&memory,sizeof(memory))) working=memory.WorkingSetSize;
-        double cpu=0.0;
-        if (metrics_ready && now>metrics_tick && process>=metrics_process) {
-            SYSTEM_INFO system{}; GetSystemInfo(&system);
-            unsigned processors=std::max(1u,static_cast<unsigned>(system.dwNumberOfProcessors));
-            cpu=(static_cast<double>(process-metrics_process)/10000.0*100.0)/
-                (static_cast<double>(now-metrics_tick)*processors);
+        ULONGLONG now=GetTickCount64(), elapsed_cpu=0, working=0;
+        std::vector<ProcessMetric> samples;
+        for(DWORD pid:pids) {
+            HANDLE process=OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,pid);
+            if(!process) { if(GetLastError()!=ERROR_INVALID_PARAMETER) complete=false; continue; }
+            FILETIME creation{}, exit{}, kernel{}, user{};
+            PROCESS_MEMORY_COUNTERS memory{}; memory.cb=sizeof(memory);
+            bool sampled=GetProcessTimes(process,&creation,&exit,&kernel,&user) &&
+                         GetProcessMemoryInfo(process,&memory,sizeof(memory));
+            bool stopped=WaitForSingleObject(process,0)==WAIT_OBJECT_0;
+            CloseHandle(process);
+            if(stopped) continue;
+            if(!sampled) {complete=false;continue;}
+            ProcessMetric sample{pid,ticks(creation),ticks(kernel)+ticks(user)};
+            auto previous=std::find_if(metrics_processes.begin(),metrics_processes.end(),
+                [&](const ProcessMetric &old) {return old.pid==pid && old.creation==sample.creation;});
+            if(previous!=metrics_processes.end() && sample.cpu>=previous->cpu) elapsed_cpu+=sample.cpu-previous->cpu;
+            samples.push_back(sample);
+            working+=memory.WorkingSetSize;
         }
-        metrics_tick=now; metrics_process=process; metrics_ready=true;
+        double cpu=0.0;
+        if (metrics_tick && now>metrics_tick) {
+            DWORD processors=std::max(1ul,GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
+            cpu=std::min(100.0,(static_cast<double>(elapsed_cpu)/10000.0*100.0)/
+                (static_cast<double>(now-metrics_tick)*processors));
+        }
+        metrics_tick=now; metrics_processes=std::move(samples);
         wchar_t title[160];
-        if (working) std::swprintf(title,160,L"DNF Native 控制台  ·  CPU %.1f%%  ·  内存 %.1f MB",cpu,
-                                   static_cast<double>(working)/(1024.0*1024.0));
-        else std::swprintf(title,160,L"DNF Native 控制台  ·  CPU %.1f%%",cpu);
+        if(complete) std::swprintf(title,160,L"DNF Native 控制台  ·  CPU %.1f%%  ·  内存 %.1f MB",cpu,
+                                  static_cast<double>(working)/(1024.0*1024.0));
+        else std::swprintf(title,160,L"DNF Native 控制台  ·  CPU --  ·  内存 --");
         SetWindowTextW(window,title);
     }
     void check_resources() {
