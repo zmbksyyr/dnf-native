@@ -16,6 +16,7 @@ struct Service {
     unsigned signal = 15;
     HANDLE process = nullptr;
     DWORD pid = 0;
+    bool stopping = false;
     std::wstring state = L"未启动", out, err;
     // The runtime channel is an observable boundary, not business readiness.
     // Keep the distinction explicit so the controller cannot present a live
@@ -157,8 +158,10 @@ static bool refresh_service(Service &service) {
         while (!text.empty() && std::strchr("\r\n \t", text.back())) text.pop_back();
         if (text == std::to_string(service.pid)) require(DeleteFileW(service.pid_file.c_str()), "Remove exited owned service PID marker");
     }
-    service.state = L"已退出，代码 " + std::to_wstring(code);
+    bool expected_stop = service.stopping;
+    service.state = expected_stop ? L"已停止" : L"已退出，代码 " + std::to_wstring(code);
     service.readiness = L"宿主已退出（接口/业务未验证）";
+    service.stopping = false;
     CloseHandle(service.process); service.process = nullptr;
     return true;
 }
@@ -168,6 +171,7 @@ static bool refresh_service(Service &service) {
 static void start_service(Service &service, const std::wstring &instance, HANDLE job) try {
     refresh_service(service);
     if (service.process) return;
+    service.stopping = false;
     prepare_game_compat(service);
     service.state = L"正在启动";
     service.readiness = L"宿主启动中";
@@ -220,6 +224,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
 }
 
 static void stop_service(Service &service) {
+    service.stopping = true;
     if (refresh_service(service) || !service.process) return;
     std::wstring prefix = service.signal == 12 ? L"Local\\dnf-native-sigusr2-" : L"Local\\dnf-native-terminate-";
     HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, (prefix + std::to_wstring(service.pid)).c_str());
