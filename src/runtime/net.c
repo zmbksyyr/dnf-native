@@ -42,10 +42,7 @@ static intptr_t socket_io_error(void) {
     return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
 }
 
-static int epoll_trace_enabled(void) {
-    wchar_t value[2];
-    return GetEnvironmentVariableW(L"DNF_NATIVE_EPOLL_TRACE", value, 2) == 1 && value[0] == L'1';
-}
+static int epoll_trace_enabled(const NrRun *run) { return run->epoll_trace_enabled != 0; }
 
 static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout) {
     if (!timeout) return 0;
@@ -337,7 +334,7 @@ static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uint
         unsigned char *out = (unsigned char *)address + written * 12;
         memcpy(out, &events, 4); memcpy(out + 4, &watches[polls[i].fd].data, 8); ++written;
     }
-    if (epoll_trace_enabled()) {
+    if (epoll_trace_enabled(run)) {
         fprintf(stderr, "epoll wait epfd=%u max=%llu timeout=%lld watches=%u ready=%lld returned=%lld\n",
                 epoll_fd, (unsigned long long)maximum, (long long)milliseconds, count,
                 (long long)ready, (long long)written);
@@ -373,7 +370,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NR_FD_SLOTS * sizeof(NrWatch));
         if (!run->epolls[fd]) { run->file_access[fd] = 0; *result = -12; return 1; }
         run->file_access[fd] = 8;
-        if (epoll_trace_enabled()) fprintf(stderr, "epoll create epfd=%u\n", fd);
+        if (epoll_trace_enabled(run)) fprintf(stderr, "epoll create epfd=%u\n", fd);
         *result = fd; return 1;
     }
     if (number == CLOSE && input[0] < NR_FD_SLOTS) {
@@ -403,7 +400,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         NrWatch *watch = &watches[input[2]];
         if (input[1] == 2) {
-            if (epoll_trace_enabled()) fprintf(stderr,
+            if (epoll_trace_enabled(run)) fprintf(stderr,
                 "epoll ctl epfd=%u op=%llu fd=%u used=%u data=0x%llx\n",
                 (unsigned)input[0], (unsigned long long)input[1], (unsigned)input[2],
                 watch->used, (unsigned long long)watch->data);
@@ -417,7 +414,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         if ((input[1] == 1 && watch->used) || (input[1] == 3 && !watch->used)) { *result = watch->used ? -17 : -2; return 1; }
         watch->used = 1; watch->events = events; memcpy(&watch->data, (const void *)(input[3] + 4), 8);
-        if (epoll_trace_enabled()) fprintf(stderr,
+        if (epoll_trace_enabled(run)) fprintf(stderr,
             "epoll ctl epfd=%u op=%llu fd=%u events=0x%x data=0x%llx\n",
             (unsigned)input[0], (unsigned long long)input[1], (unsigned)input[2], events,
             (unsigned long long)watch->data);
@@ -443,7 +440,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
 #endif
     uintptr_t fd = args[0];
-    if (operation && GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
+    if (operation && run->trace_enabled)
         fprintf(stderr, "socket op=%d args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n", operation,
                 (unsigned long long)args[0], (unsigned long long)args[1], (unsigned long long)args[2],
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);

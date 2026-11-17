@@ -45,6 +45,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             SendMessageW(level,CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
             add(L"BUTTON",L"DP2",BS_AUTOCHECKBOX|WS_TABSTOP,DP2_ENABLE,264,108,80,30);
             add(L"BUTTON",L"Frida",BS_AUTOCHECKBOX|WS_TABSTOP,FRIDA_ENABLE,452,108,84,30);
+            add(L"BUTTON",L"Robot",BS_AUTOCHECKBOX|WS_TABSTOP,ROBOT_ENABLE,554,108,90,30);
             add(L"BUTTON",L"应用并重启",BS_OWNERDRAW|WS_TABSTOP,LEVEL_APPLY,674,108,174,30);
             add(L"STATIC",L"兼容设置",SS_CENTERIMAGE,322,32,170,96,22);
             add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,32,198,396,30);
@@ -70,7 +71,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             add(L"BUTTON",L"重置拍卖库",BS_OWNERDRAW|WS_TABSTOP,market::Reset,653,396,195,38);
             for(int id:std::initializer_list<int>{325,322,MARKET_INDEX_LABEL,MARKET_DATA_LABEL})
                 SendMessageW(GetDlgItem(w,id),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
-            app->show_plugins(); app->show_level(); app->controls();
+            app->show_plugins(); app->show_level(); app->show_robot(); app->controls();
             market_summary();
             app->market_tooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
                 CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,w,nullptr,GetModuleHandleW(nullptr),nullptr);
@@ -111,7 +112,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
         case WM_COMMAND: {
             int id=LOWORD(wp);
             if(id==IDCANCEL) { SendMessageW(w,WM_CLOSE,0,0); return 0; }
-            if(id==DP2_ENABLE || id==FRIDA_ENABLE || id==LEVEL_CAP || id==LEVEL_APPLY) {
+            if(id==DP2_ENABLE || id==FRIDA_ENABLE || id==ROBOT_ENABLE || id==LEVEL_CAP || id==LEVEL_APPLY) {
                 SendMessageW(app->window,WM_COMMAND,wp,lp);return 0;
             }
             if(id>=market::Check && id<=market::Reset && HIWORD(wp)==BN_CLICKED && !app->busy) {

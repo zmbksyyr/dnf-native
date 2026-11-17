@@ -99,7 +99,7 @@ static intptr_t write_copy(HANDLE file, const void *bytes, DWORD count) {
 
 static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
     uintptr_t a = args[0], b = args[1], c = args[2];
-    if (GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0))
+    if (active->trace_enabled)
         fprintf(stderr, "trace pc=0x%llx nr=%llu args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n",
                 (unsigned long long)pc, (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
@@ -129,9 +129,8 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
         } else if (a == 5 || a == 6) {
             nanoseconds = 1000000;
         } else if (a == 1) {
-            LARGE_INTEGER rate;
-            if (!QueryPerformanceFrequency(&rate)) return -5;
-            nanoseconds = (1000000000ULL + (uint64_t)rate.QuadPart - 1) / (uint64_t)rate.QuadPart;
+            if (!active->qpc_frequency) return -5;
+            nanoseconds = (1000000000ULL + active->qpc_frequency - 1) / active->qpc_frequency;
         } else return -38;
         if (b) {
             if (!nr_memory(b, 2 * sizeof(uintptr_t), 1)) return -14;
@@ -149,9 +148,9 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
             ticks = (((uint64_t)time.dwHighDateTime << 32) | time.dwLowDateTime) - 116444736000000000ULL;
             frequency = 10000000;
         } else {
-            LARGE_INTEGER counter, rate;
-            if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&rate)) return -5;
-            ticks = (uint64_t)counter.QuadPart; frequency = (uint64_t)rate.QuadPart;
+            LARGE_INTEGER counter;
+            if (!QueryPerformanceCounter(&counter) || !active->qpc_frequency) return -5;
+            ticks = (uint64_t)counter.QuadPart; frequency = active->qpc_frequency;
         }
         uintptr_t values[] = {(uintptr_t)(ticks / frequency), (uintptr_t)(ticks % frequency * 1000000000 / frequency)};
         memcpy((void *)b, values, sizeof(values)); return 0;
@@ -567,6 +566,11 @@ int nr_run(NrRun *run) {
         bytes += n;
     }
     active = run;
+    run->trace_enabled = GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0) != 0;
+    wchar_t trace[2] = {};
+    run->epoll_trace_enabled = GetEnvironmentVariableW(L"DNF_NATIVE_EPOLL_TRACE", trace, 2) == 1 && trace[0] == L'1';
+    LARGE_INTEGER qpc = {};
+    run->qpc_frequency = QueryPerformanceFrequency(&qpc) ? (uint64_t)qpc.QuadPart : 0;
     InitializeCriticalSection(&run->memory_lock);
     wchar_t event_name[80];
     swprintf(event_name, 80, L"Local\\dnf-native-terminate-%lu", GetCurrentProcessId());

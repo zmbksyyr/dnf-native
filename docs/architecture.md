@@ -114,7 +114,7 @@ game 的应用初始化状态取自当前宿主本次创建的 stdout，逐段�
 
 窗口与服务网格使用 GDI 双缓冲，主窗口使用 `WS_EX_COMPOSITED` 合成子控件；调整大小时用 `BeginDeferWindowPos`／`EndDeferWindowPos` 批量更新控件位置，禁止中途重绘和旧像素拷贝，再同步刷新。重复点击已选模块不重新触发选中通知或日志扫描。按钮按鼠标、按下、禁用和键盘焦点绘制，保留原生回车及 Tab 行为。尺寸按客户区及 DPI 重算，清单声明每显示器 DPI 感知，DPI 变化同时重建字体；先对逻辑行坐标缩放，避免 125% 时逐行舍入累积越界。当前最小窗口为 1180×760 DIP；模拟 DPI 检查不能代替实际多显示器或其他系统验证。参考工程保持只读，未复制、编译或接入其源码、模拟业务及构建产物。P19 的原始构建、截图和验证收据位于仓库外 `../x/dnf-native-output/P19-20261116-reference-gui/`。
 
-`instance_setup.h` 从 v4 清单校验两个 ZIP、两个宿主和数据库维护工具的身份。新建仅接受空目录，解压后逐文件核对；官方 MySQL 安全初始化后导入 18 个应用库，重新导出与种子 SHA-256 比对。随后生成每实例应用账号、更新数据库连接、准备当前月表、写入服务配置，正常停库后提交实例。失败保留 pending 标记和私有诊断。
+`instance_setup.h` 从 v4 清单校验两个 ZIP、两个宿主、数据库维护工具和独立 Robot 模块的身份。新建仅接受空目录，解压后逐文件核对；官方 MySQL 安全初始化后导入 18 个应用库，重新导出与种子 SHA-256 比对。随后生成每实例应用账号、更新数据库连接、准备当前月表、写入服务配置，正常停库后提交实例。失败保留 pending 标记和私有诊断。
 
 新资源包以一个 Linux 目录树释放到实例根目录，服务清单 `root=.`；`home/neople/` 汇集所有服务，`dp2/` 保存插件，`lib/` 与 `lib64/` 保留 Linux 原有库位数区分。已有拆分目录实例继续由原清单解析，不自动迁移用户数据。
 
@@ -202,3 +202,9 @@ DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和�
 TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的读就绪必须让调用方读出 EOF 或待决错误，因此兼容层在 socket HUP 时保留 HUP，并补上调用方请求的 POLLIN／POLLRDNORM；epoll 同步得到 EPOLLIN。原 monitor 通过可读事件读取断开并清除频道，同一 game 正常停止后可重新注册，不能通过跳过重复频道检查掩盖。
 
 新实例的公开演示登录使用用户指定的 game 数据库凭据和 test 游戏账号，四张登录表在初始化时建立；内部 dnf_game、维护 root、bridge 和 frida 仍按原职责使用实例凭据。登录器不读取服务端配置，默认值明文显示；控制台数据库详情显示当前实例实际连接参数，不记录到控制台日志。
+
+## Robot 与性能阶段实现
+
+`src/runtime/elf.c` 的全文件哈希仍保持 SHA-256 身份校验，但读取改为 64 KiB `ReadFile` 分块，减少大 ELF 启动时对只读映射工作集的影响。`NrRun` 在启动时缓存 `DNF_NATIVE_TRACE`、`DNF_NATIVE_EPOLL_TRACE` 和 QPC 频率，syscall、socket、epoll 与文件热路径不再重复查询环境变量或频率。
+
+Robot 通过独立 `robot.exe` 进程接入服务列表末尾。Native 只创建实例目录配置、命名停止事件和 Job Object 归属；Robot 通过 `--config-dir`、`--stop-event` 及 `host-profile.json` 选择宿主。市场维护的 Linux `/proc`、shell 和内存写入操作在 Windows 返回明确错误或记录 controller 归属，避免假成功。详见 [Robot 接入](robot.md)。

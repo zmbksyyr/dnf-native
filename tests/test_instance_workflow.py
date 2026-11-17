@@ -90,7 +90,7 @@ def main():
         wait_for(lambda: "资源齐全" in log_text(window), "delivered resources verified", 15)
         assert not title(user.GetDlgItem(window, 101))
         checks["cold_start_idle_and_create_available"] = True
-        for name in ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "resources.ini"]:
+        for name in ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "robot.exe", "resources.ini"]:
             p = resources / name
             missing = p.with_suffix(p.suffix + ".test-missing")
             p.rename(missing); renamed = missing

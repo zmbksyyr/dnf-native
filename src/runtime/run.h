@@ -93,6 +93,8 @@ typedef struct {
     int environment_count;
     char *environment[32];
     unsigned script_encoding, script_encoding_assigning;
+    unsigned trace_enabled, epoll_trace_enabled;
+    uint64_t qpc_frequency;
 } NrRun;
 
 int nr_run(NrRun *run);

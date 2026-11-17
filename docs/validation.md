@@ -726,3 +726,16 @@ P2 实现四组折叠、状态/功能筛选、选择保留、服务元数据及�
 GUI 专项收据 `probes/20261115T194156105324Z/gui-services/receipt.json` 再次记录 `dbmw_guild` 停止标记缺失，全部 stderr 同样记录上述三个服务的停服异常。DBMW 固定 ELF 的 SHA-256 为 `0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967`，PC `0x8057daf` 位于 `CTcpHandler::GetEventPtr()+0x9`；manager 的 PC 为 `0x805494f`。固定 ELF 的 dispatch 指令读取到空 handler；P7 提交时尚未定位销毁与线程退出顺序，后续结论和修复见本文顶部 P8 记录。
 
 两项集成脚本在最终清理后汇总所有服务的异常与缺口：实例脚本遇未处理异常必须失败，GUI 脚本提前失败时也保留 `runtime_faults/runtime_gaps`。P7 以保留现场复验汇总逻辑，两轮均检出三个服务异常，当时没有将现场复验写成整轮通过。P8 已修正停服并重新完成完整 GUI 流程；各专项及目标系统结果分别记录。
+
+## 本阶段回归（2026-11-17）
+
+| 范围 | 结果 | 证据 |
+| --- | --- | --- |
+| Native x86/x64 | 构建通过 | `../x/dnf-native-output/i686/`、`x86_64/` |
+| Native GUI | 构建通过 | `../x/dnf-native-output/gui/` |
+| Robot Windows | `GOOS=windows GOARCH=amd64 CGO_ENABLED=0` 构建通过；`go test ./...` 通过 | `../x/dnf-native-output/robot/` |
+| Robot 参数入口 | `robot.exe --help` 退出成功并列出 `--config-dir`、`--stop-event` | 同上 |
+| 发布包 | 包含 `DNF-Native.exe`、两个宿主、MySQL 工具、登录器、ZIP 基底和 `robot.exe`；资源哈希写入清单 | `../x/dnf-native-output/package-robot-final/` |
+| 默认密钥 | 登录器导出公钥与 `resources/native.zip` 中服务端公钥一致 | `tools/build_login.py` 收据 |
+
+本阶段未改动固定 ZIP 基底；构建、收据和测试现场均在仓库外 `../x/`。Robot 的 Windows 市场内存维护依赖 Linux `/proc`，当前会明确失败或交由 Native controller，不报告为已完成操作。

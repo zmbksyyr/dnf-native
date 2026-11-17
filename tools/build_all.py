@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
     args.output = external_output(args.output)
     for script, arguments in [
-        ("build.py", []), ("build_mysql.py", []), ("build_gui.py", []), ("build_login.py", []),
+        ("build.py", []), ("build_mysql.py", []), ("build_robot.py", []), ("build_gui.py", []), ("build_login.py", []),
         ("build_instance_package.py", ["--output", str(args.output)]),
     ]:
         subprocess.run([sys.executable, "-B", str(ROOT / "tools" / script), *arguments], cwd=ROOT, check=True)

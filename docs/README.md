@@ -224,3 +224,9 @@ python -B tests/test_gui_readiness.py --instance <曾完成 game 初始化的停
 就绪状态专项保留来源实例的旧初始化日志，验证两次真实 game 启动均先等待本次初始化，再更新 GUI；重启、切换服务和正常停服后状态正确，详情显示当前启动状态。
 
 当前已补齐真实 game/Frida 触发的 `SA_NODEFER`、跨映射 `munmap` 和验证码字体的普通私有文件映射。双架构原语、原版 Frida hook/RPC、两种保存方式的轮询热加载与 game 自然启停均通过；inotify 本身仍未实现。安全组件加载已通过；配置依赖及验证系统见验证记录。原始收据见[验证记录](validation.md)。
+
+## 当前性能与 Robot 接入阶段
+
+本阶段的性能改动集中在运行时热路径：启动时缓存 trace 开关和 QPC 频率，ELF 身份校验改为 64 KiB 文件块读取，避免为计算完整 SHA-256 触碰整份只读映射。ELF 映射、重定位和 syscall 语义保持不变；x86 与 x64 宿主均已重新构建。
+
+Robot 是独立 Windows 模块，通过 `resources/robot.exe` 随发布包提供。控制台只管理生命周期和观测，实例内的 `robot` 目录保存配置和状态；详细协议与 Windows 支持边界见 [Robot 接入](robot.md)。

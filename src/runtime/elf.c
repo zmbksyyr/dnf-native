@@ -25,6 +25,7 @@ static int file_hash(NrElf *elf) {
     unsigned char digest[32];
     DWORD object_size = 0, written = 0;
     unsigned char *object = NULL;
+    unsigned char buffer[64 * 1024];
     int ok = 0;
     static const char hex[] = "0123456789abcdef";
     if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0) < 0)
@@ -35,8 +36,24 @@ static int file_hash(NrElf *elf) {
     object = HeapAlloc(GetProcessHeap(), 0, object_size);
     if (!object || BCryptCreateHash(algorithm, &hash, object, object_size, NULL, 0, 0) < 0)
         goto done;
-    if (BCryptHashData(hash, elf->file, (ULONG)elf->file_size, 0) < 0 ||
-        BCryptFinishHash(hash, digest, sizeof(digest), 0) < 0)
+    /* Hash through the original file handle instead of touching every byte
+       of the immutable mapping.  ELF headers and load segments still use the
+       mapping below, while debug/symbol data stays file-backed and cold. */
+    LARGE_INTEGER origin;
+    origin.QuadPart = 0;
+    if (!elf->file_handle || !SetFilePointerEx(elf->file_handle, origin, NULL, FILE_BEGIN))
+        goto done;
+    size_t remaining = elf->file_size;
+    while (remaining) {
+        DWORD want = remaining > sizeof(buffer) ? (DWORD)sizeof(buffer) : (DWORD)remaining;
+        DWORD got = 0;
+        if (!ReadFile(elf->file_handle, buffer, want, &got, NULL) || !got || got > remaining)
+            goto done;
+        if (BCryptHashData(hash, buffer, got, 0) < 0)
+            goto done;
+        remaining -= got;
+    }
+    if (BCryptFinishHash(hash, digest, sizeof(digest), 0) < 0)
         goto done;
     for (unsigned i = 0; i < sizeof(digest); ++i) {
         elf->sha256[2 * i] = hex[digest[i] >> 4];

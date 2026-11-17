@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--gui-dir", type=Path, default=BUILD / "gui")
     parser.add_argument("--hosts", type=Path, default=BUILD, help="Current host build directory")
     parser.add_argument("--login-dir", type=Path, default=BUILD / "login")
+    parser.add_argument("--robot-dir", type=Path, default=BUILD / "robot")
     parser.add_argument("--output", type=Path, default=BUILD / "package")
     args = parser.parse_args()
     source, gui, hosts, output = (p.resolve() for p in (args.source, args.gui_dir, args.hosts, args.output))
@@ -71,6 +72,10 @@ def main():
         raise ValueError("GUI differs from its build receipt")
     if sha256(gui / "runtime/mysql-control.exe") != gui_receipt["mysql_sha256"]:
         raise ValueError("Database helper differs from the GUI build receipt")
+    robot = args.robot_dir.resolve(strict=True)
+    robot_receipt = json.loads((robot / "build-receipt.json").read_text(encoding="utf-8"))
+    if sha256(robot / "robot.exe") != robot_receipt["output_sha256"]:
+        raise ValueError("Robot differs from its build receipt")
     host_receipts = json.loads((hosts / "build-receipt.json").read_text(encoding="utf-8"))
     for arch in ("i686", "x86_64"):
         receipt = next(r for r in host_receipts if r["arch"] == arch)
@@ -87,8 +92,9 @@ def main():
     for name in ("native.zip", "mysql.zip"):
         shutil.copy2(source / name, resources / name)
     shutil.copy2(login / "DNFLogin.exe", resources / "DNFLogin.exe")
+    shutil.copy2(robot / "robot.exe", resources / "robot.exe")
     ini["package"] = {name: sha256(resources / name) for name in
-                      ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe"]}
+                      ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "robot.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
         ini.write(stream)
     record = {"baseline": baseline["files"], "elf_dependency_closure": closure,
