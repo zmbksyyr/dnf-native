@@ -17,7 +17,7 @@ import traceback
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 from bootstrap import BUILD, sha256
 from runtime_support import tree_identity
-from gui_support import user, windows, wait_for, click, ready, title, hidden_startup, screenshot, select_service
+from gui_support import user, windows, wait_for, click, ready, ready_stopped, title, hidden_startup, screenshot, select_service
 
 GOLD="taiwan_cain_auction_gold"
 CERA="taiwan_cain_auction_cera"
@@ -188,7 +188,7 @@ def main():
                 # Wait for fresh application statistics, then inspect flushed
                 # initialization and replay errors after normal shutdown.
                 wait_for(lambda:statistics.exists() and statistics.read_bytes()!=old_stat and b"[REGIST_ITEM" in statistics.read_bytes(),"fresh original market work-loop statistics",45)
-                click(window,222);ready(window,name+"：已退出",45)
+                click(window,222);ready_stopped(window,name,45)
                 assert b"Server Frame Start Ver1.0" in fresh.read_bytes() and b"0904patch_bug" not in fresh.read_bytes()
                 err=Path(str(fresh).replace(".stdout.",".stderr.")).read_bytes()
                 assert b"guest exit status=0" in err and b"unhandled exception" not in err

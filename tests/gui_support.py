@@ -2,6 +2,7 @@
 
 import ctypes as c
 from ctypes import wintypes as w
+import re
 import struct
 import subprocess
 import time
@@ -23,6 +24,7 @@ user.IsWindow.argtypes = [w.HWND]
 user.SendMessageTimeoutW.argtypes = [w.HWND, w.UINT, c.c_size_t, c.c_ssize_t, w.UINT, w.UINT, c.POINTER(c.c_size_t)]
 callback_type = c.WINFUNCTYPE(w.BOOL, w.HWND, c.c_ssize_t)
 user.EnumWindows.argtypes = [callback_type, c.c_ssize_t]
+user.EnumChildWindows.argtypes = [w.HWND, callback_type, c.c_ssize_t]
 
 
 def title(window):
@@ -50,6 +52,30 @@ def windows(pid, class_name=None):
     return found
 
 
+def children(window):
+    found = []
+
+    @callback_type
+    def visit(child, unused):
+        found.append(child)
+        return True
+
+    user.EnumChildWindows(window, visit, 0)
+    return found
+
+
+def class_name(window):
+    name = c.create_unicode_buffer(256)
+    user.GetClassNameW(window, name, len(name))
+    return name.value
+
+
+def pid_of(window):
+    owner = w.DWORD()
+    user.GetWindowThreadProcessId(window, c.byref(owner))
+    return owner.value
+
+
 def wait_for(check, description, timeout=120):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -75,15 +101,52 @@ def click(window, identifier):
         user.PostMessageW(window, 0x111, identifier, button)
 
 
+LOG_VIEW, LOG_PATH = 206, 210
+LOG_CONSOLE_TAB = 284
+LOG_FILE_COMMAND = 1000
+
+
+def log_text(window):
+    """The operation log, the only surface that reports controller status."""
+    console = "控制台操作记录"
+    if console not in title(user.GetDlgItem(window, LOG_PATH)):
+        click(window, LOG_CONSOLE_TAB)
+        wait_for(lambda: console in title(user.GetDlgItem(window, LOG_PATH)), "console log shown", 5)
+    return title(user.GetDlgItem(window, LOG_VIEW))
+
+
+def press(button):
+    """Click a button handle, including one inside a modal dialog."""
+    wait_for(lambda: user.IsWindowEnabled(button), "button enabled", 5)
+    user.PostMessageW(button, 0x00F5, 0, 0)  # BM_CLICK
+
+
 def status(window):
-    return title(user.GetDlgItem(window, 204))
+    """The most recent log line without its timestamp, as last-wins status."""
+    lines = [line for line in log_text(window).splitlines() if line.strip()]
+    return re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", lines[-1]) if lines else ""
+
+
+def stopped_text(row):
+    """A stopped service card, whether the controller asked or it exited itself."""
+    return "已停止" in row or "已退出" in row
+
+
+def ready_stopped(window, name, timeout=180):
+    """Wait for a service stop result; the wording differs for requested stops."""
+    wait_for(lambda: any(text in log_text(window) for text in (name + "：已停止", name + "：已退出")),
+             name + " stopped", timeout)
 
 
 def ready(window, expected, timeout=120):
+    # The log is append-only, so a baseline offset keeps "operation failed" from
+    # an earlier run from aborting an unrelated wait.
+    base = len(log_text(window))
+
     def check():
-        text = status(window)
-        if text.startswith("操作失败"):
-            raise RuntimeError(text)
+        text = log_text(window)[base:]
+        if "操作失败" in text:
+            raise RuntimeError(text.strip()[-400:])
         return expected in text
     wait_for(check, expected, timeout)
 
@@ -216,21 +279,43 @@ def select_service(window, name):
     select(window, index)
 
 
-def log_sources(window):
-    combo = user.GetDlgItem(window, 240)
-    result = []
-    for index in range(user.SendMessageW(combo, 0x146, 0, 0)):
-        text = c.create_unicode_buffer(user.SendMessageW(combo, 0x149, index, 0) + 1)
-        user.SendMessageW(combo, 0x148, index, c.addressof(text))
-        result.append(text.value)
-    return result
+def dialog_text(window, command, expected):
+    """Click a 详情 button and read the message box it opens, then dismiss it."""
+    click(window, command)
+    box = wait_for(lambda: next((item for item in windows(pid_of(window), "#32770") if title(item) == expected), None), expected, 10)
+    # The frame appears before its children; wait for the message text itself.
+    wait_for(lambda: any(class_name(child) == "Static" and title(child).strip() for child in children(box)), expected + " text", 5)
+    parts = [title(child) for child in children(box) if class_name(child) == "Static"]
+    text = "\n".join(part for part in parts if part.strip())
+    # MessageBox button ids are not fixed, so press the button itself.
+    button = wait_for(lambda: next((child for child in children(box) if class_name(child) == "Button"), None), expected + " button", 5)
+    press(button)
+    wait_for(lambda: not user.IsWindow(box), expected + " closed", 10)
+    return text
 
 
-def choose_log_source(window, label):
-    index = wait_for(lambda: next((i + 1 for i, text in enumerate(log_sources(window)) if label in text), None), label) - 1
-    combo = user.GetDlgItem(window, 240)
-    user.SendMessageW(combo, 0x14E, index, 0)
-    user.SendMessageW(window, 0x111, 240 | (1 << 16), combo)
+def service_details(window):
+    """服务详情: the selected card's identity, host metadata and readiness."""
+    return dialog_text(window, 281, "服务详情")
+
+
+def database_details(window):
+    """数据库与维护详情: database identity, stopped service order and last result."""
+    return dialog_text(window, 282, "数据库与维护详情")
+
+
+def choose_log_source(window, fragment):
+    """Open the log source whose path (printed under the viewer) contains fragment.
+
+    The log-file menu posts LOG_FILE_COMMAND+n for the n-th source, and the
+    window handles that id directly, so the same command opens a source without
+    driving the popup. "控制台操作记录" identifies the console source.
+    """
+    for index in range(32):
+        user.SendMessageW(window, 0x111, LOG_FILE_COMMAND + index, 0)
+        if fragment in title(user.GetDlgItem(window, LOG_PATH)):
+            return
+    raise RuntimeError("Log source is not offered: " + fragment)
 
 
 def guest_root(instance, service="game"):

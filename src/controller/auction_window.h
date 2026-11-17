@@ -113,11 +113,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             if(id==MARKET_CLOSE) { SendMessageW(w,WM_CLOSE,0,0); return 0; }
             if(id>=market::Check && id<=market::Reset && HIWORD(wp)==BN_CLICKED && !app->busy) {
                 int scope=(id<=market::Apply) ? 2 : market_scope(w);
-                if(scope<0) {
-                    app->append(L"拍卖维护：至少选择一个市场范围");
-                    SetWindowTextW(app->status,L"至少选择一个市场范围");
-                    return 0;
-                }
+                if(scope<0) { app->notice(L"拍卖维护：至少选择一个市场范围"); return 0; }
                 app->action(id,L"",scope); return 0;
             }
             return 0;
@@ -130,7 +126,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
         }
     } catch(const std::exception &e) {
         std::wstring message=L"拍卖维护失败："+decode(e.what());
-        app->append(message); SetWindowTextW(app->status,message.c_str());
+        app->notice(message);
     }
     return DefWindowProcW(w,message,wp,lp);
 }

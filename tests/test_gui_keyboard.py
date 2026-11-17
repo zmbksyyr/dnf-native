@@ -136,7 +136,7 @@ def main():
         key(window, 39)
         wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 1, "Right selects next card", 5)
         selected_name = list_rows(window)[1].split("  |  ", 1)[0].removesuffix("（可选）")
-        wait_for(lambda: title(user.GetDlgItem(window, 219)).startswith(selected_name + "  "), "service details follow keyboard selection", 5)
+        wait_for(lambda: title(user.GetDlgItem(window, 285)) == selected_name, "service details follow keyboard selection", 5)
         key(window, 40)
         wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 8, "Down moves seven columns", 5)
         key(window, 38)

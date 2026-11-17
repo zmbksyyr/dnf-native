@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import sha256, BUILD
 from runtime_support import tree_identity
 from probe_core_protocols import channel, relay, stun
-from gui_support import user, kernel, windows, wait_for, click, ready, screenshot
+from gui_support import user, kernel, windows, wait_for, click, ready, ready_stopped, screenshot
 from gui_support import rows, select_service, service_row
 
 from gui_support import guest_root
@@ -219,7 +219,7 @@ def main():
         checks["dp2_off_natural_game_startup_seconds"] = round(time.monotonic() - started, 3)
         checks["protocols_with_dp2_disabled"] = {"channel": channel(7001), "relay": relay(True), "stun": stun()}
         screenshot(window, probe / "plugins-off-running.png")
-        click(window, 222); ready(window, "game：已退出", 210)
+        click(window, 222); ready_stopped(window, "game", 210)
         checks["dp2_off_game_stop_code_zero"] = "代码 0" in service_row(window, "game")
         save(True, True)
         checks["plugins_editable_again_after_natural_game_stop"] = True

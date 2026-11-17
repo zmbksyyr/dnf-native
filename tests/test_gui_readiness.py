@@ -11,8 +11,8 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import BUILD, sha256
-from gui_support import (user, windows, wait_for, click, ready, title, status,
-                         hidden_startup, select_service, service_row, screenshot, responsive)
+from gui_support import (user, windows, wait_for, click, ready, ready_stopped, title, log_text,
+                         hidden_startup, select_service, service_row, screenshot, responsive, service_details)
 from runtime_support import runtime_diagnostics, tree_identity
 
 MARKER = b" server has been started successfully."
@@ -67,7 +67,7 @@ def main():
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
         select_service(window, "game")
-        assert "应用已初始化" not in title(user.GetDlgItem(window, 273))
+        assert "应用已初始化" not in log_text(window)
         click(window, 223)
         ready(window, "已启动默认服务进程", 90)
         for launch in [1, 2]:
@@ -78,15 +78,17 @@ def main():
                 folder = instance / manifest[peer]["root"] / manifest[peer]["cwd"].lstrip("/") / "log"
                 registration[peer] = (folder, {p: p.stat().st_size for p in folder.glob("GameServer*.log")})
             started = time.monotonic()
+            base = len(log_text(window))
             click(window, 221)
             ready(window, "game：进程运行中", 30)
             wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 222)), "game start operation complete")
-            pending = title(user.GetDlgItem(window, 273))
+            wait_for(lambda: "等待应用初始化" in log_text(window)[base:], "pending readiness recorded", 15)
+            pending = log_text(window)[base:]
             assert "等待应用初始化" in pending and "应用已初始化" not in pending, pending
             assert "应用已初始化" not in service_row(window, "game")
             item = {"launch": launch, "pending_readiness": pending, "window_response_ms": responsive(window)}
             screenshot(window, probe / ("launch-" + str(launch) + "-pending.png"))
-            wait_for(lambda: "应用已初始化" in title(user.GetDlgItem(window, 273)), "original game initialization in GUI", 180)
+            wait_for(lambda: "应用已初始化" in log_text(window)[base:], "original game initialization in GUI", 180)
             item["application_initialized_seconds"] = round(time.monotonic() - started, 3)
             outputs = set((instance / "service-logs").glob("game-*.stdout.private.log")) - previous_outputs
             assert len(outputs) == 1
@@ -99,10 +101,12 @@ def main():
             assert len(item["script_encoding_selection"]) == 1, "Missing original script codepage selection"
             assert ("source=explicit" if args.script_encoding else "source=auto") in item["script_encoding_selection"][0]
             assert "应用已初始化" in service_row(window, "game")
-            assert "接口/协议/业务：未验证" in title(user.GetDlgItem(window, 273))
+            assert "应用已初始化" in log_text(window)[base:]
+            details = service_details(window)
+            assert "接口/协议/业务：未验证" in details and "清单未声明" in details, details
             item["fresh_stdout"] = output.name
             item["fresh_stdout_sha256_at_initialization"] = sha256(output)
-            item["initialized_readiness"] = title(user.GetDlgItem(window, 273))
+            item["initialized_readiness"] = log_text(window)[base:][-600:]
             # Monitor registration ACKs follow the initialization marker. A
             # stale TCP peer can reject a restart and request normal shutdown
             # just after that marker; observe the original registration ACKs.
@@ -123,15 +127,18 @@ def main():
             item["original_monitor_and_guild_registration_accepted"] = True
             screenshot(window, probe / ("launch-" + str(launch) + "-initialized.png"))
             select_service(window, "channel")
-            assert "运行时通道已接入" in title(user.GetDlgItem(window, 273))
-            assert "应用已初始化" not in title(user.GetDlgItem(window, 273))
+            # channel only exposes the runtime channel, never application init;
+            # read the real detail dialog because that level is not a log event.
+            channel_details = service_details(window)
+            assert "运行时通道已接入" in channel_details, channel_details
+            assert "应用已初始化" not in channel_details, channel_details
             select_service(window, "game")
-            assert "应用已初始化" in title(user.GetDlgItem(window, 273))
+            assert "应用已初始化" in log_text(window)[base:]
             if launch == 1:
                 click(window, 222)
-                ready(window, "game：已退出", 180)
+                ready_stopped(window, "game", 180)
                 wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 221)), "game stop operation complete")
-                assert "宿主已退出" in title(user.GetDlgItem(window, 273))
+                wait_for(lambda: "宿主已退出" in log_text(window)[base:], "host exit readiness recorded", 15)
                 assert b"main() exited OK" in output.read_bytes()
                 checks["first_application_normal_exit"] = True
             record["launches"].append(item)
@@ -141,7 +148,7 @@ def main():
         checks["channel_readiness_and_business_boundary_preserved"] = True
         click(window, 224)
         ready(window, "服务进程已退出，数据库已停止", 180)
-        assert "宿主已退出" in title(user.GetDlgItem(window, 273))
+        assert "宿主已退出" in log_text(window)
         outputs = list((instance / "service-logs").glob("game-*.stdout.private.log"))
         assert len(outputs) == 2 and all(b"main() exited OK" in p.read_bytes() for p in outputs)
         checks["both_original_game_runs_normal_exit"] = True

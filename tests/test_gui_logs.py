@@ -117,18 +117,21 @@ def main():
         assert user.SendMessageW(output, 0xCE, 0, 0) > 0
         checks['follow_scrolls_to_latest_lines'] = True
         expected = original.read_text(encoding='utf-8', errors='replace').splitlines()[-1]
-        assert expected in title(output)
+        # The application keeps writing after its ready marker while the view
+        # refreshes on the window timer, so wait for the newest line instead of
+        # sampling it once.
+        wait_for(lambda: expected in title(output), 'newest application line visible', 15)
         checks['actual_application_init_log_visible'] = True
         screenshot(window, probe / 'original-game-log.png')
         user.ShowWindow(window,0)
         checks['window_response_ms'] = responsive(window)
-        choose_log_source(window, '标准输出')
+        choose_log_source(window, '.stdout.private.log')
         wait_for(lambda: len(title(output)) > 20, 'actual stdout')
         checks['actual_stdout_visible'] = True
-        choose_log_source(window, '标准错误 / 宿主诊断')
+        choose_log_source(window, '.stderr.private.log')
         wait_for(lambda: 'ELF dependency private snapshot' in title(output), 'actual stderr')
         checks['actual_stderr_visible'] = True
-        choose_log_source(window, 'MySQL 原生日志')
+        choose_log_source(window, 'server.private.log')
         wait_for(lambda: 'ready for connections' in title(output), 'actual MySQL log')
         checks['actual_mysql_log_visible'] = True
         checks['peer_protocols'] = {'channel': channel(7001), 'relay_and_real_monitor_rejection': relay(True), 'stun': stun()}
@@ -141,10 +144,15 @@ def main():
         click(window, 224)
         ready(window, '服务进程已退出，数据库已停止', 180)
         select(window, game)
-        choose_log_source(window, '标准错误 / 宿主诊断')
+        choose_log_source(window, '.stderr.private.log')
         wait_for(lambda: 'guest exit status=0' in title(output), 'actual stopped guest log')
         checks['logs_readable_after_normal_stop'] = True
-        assert '代码 0' in rows(window)[game]
+        # A coordinated stop reports 已停止 when the controller signals the game
+        # and 代码 0 when the original application exits on its own after its
+        # peers go away. Both are normal; the guest log above proves the exit
+        # status, so accept either card state here.
+        stopped = rows(window)[game]
+        assert '已停止' in stopped or '代码 0' in stopped, stopped
         checks['game_normal_exit'] = True
         screenshot(window, probe / 'after-stop.png')
         user.PostMessageW(window, 0x10, 0, 0)

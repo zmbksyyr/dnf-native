@@ -2,6 +2,18 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准；映射、进程存活、端口监听或测试数量均不能单独作为业务验收。
 
+## P36 隐藏控件清理与观测通道收口（2026-11-17）
+
+主窗口最后 7 个只隐藏、从不显示的控件已删除：204 状态、218 资源文本、219 服务详情、272 服务元数据、273 就绪层级、274 维护摘要、240 日志源下拉。这些内容改存 `App` 成员（`resource_note`、`service_detail_text`、`service_meta_text`、`service_readiness_text`、`maintenance_detail_text`、`log_selected`），“服务详情”和“数据库与维护详情”两个弹窗直接由成员拼文本；日志视图的当前源由 `log_selected` 表示，日志文件菜单项仍是 `LOG_FILE_COMMAND + 序号`，窗口直接处理同一命令 id，弹窗与消息共用一套契约。
+
+状态消息原先只写进隐藏的 204，用户实际看不到；现在统一经 `notice()`／`finish()` 追加到“控制台操作”日志，错误路径（如“该目录已有实例，请选择新的空文件夹”“服务 IP 必须是有效的 IPv4 地址”“该实例正在另一个窗口中使用”）第一次可见。服务退出时日志同时记录进程状态与就绪层级，因为二者是不同事实，而日志是唯一能回读两者的地方。
+
+测试观测通道改为真实界面，不再依赖隐藏控件：状态与就绪层级读“控制台操作”日志（`log_text`、`status`、`ready` 以日志偏移为基线，避免把上一轮失败当成本轮失败）；服务身份、宿主元数据、就绪边界读“服务详情”消息框，维护结果读“数据库与维护详情”消息框；日志源按命令 id 选择，再按底部路径行（210）匹配。
+
+顺带修正一处 1ed2747 引入的语义漂移：请求停服后服务卡片只显示“已停止”，把退出码吞掉了，而 5 个 GUI／停服脚本仍在等“已退出，代码 N”，实际会一直超时。现在卡片统一为“已停止，代码 N”／“已退出，代码 N”，请求停服与自行退出仍可区分，但退出码不再丢失；测试改用 `stopped_text` 与 `ready_stopped` 判定，不再依赖某一种措辞。`tests/test_gui_logs.py` 另修了两处竞态：应用在就绪标记后继续写日志时按“等待新行”判定；协调停服的卡片状态接受两种正常结果。
+
+环境为 Windows 10 x64 10.0.19044，LLVM-MinGW 20261104 MSVCRT。构建目录 `../x/dnf-native-output/P36-gui-controls/gui/`，运行包为同阶段 `package-full/`（`tools/build_all.py` 生成的 v4 清单）。`tests/test_gui_layout.py` 三档 DPI PASS，收据 `../x/dnf-native-output/probes/20261117T024813123627Z/gui-layout/receipt.json`。`tests/test_instance_workflow.py` 全部 21 项 PASS，收据 `../x/dnf-native-output/probes/20261117T024821414105Z/instance-workflow/receipt.json`：资源缺失逐项命名、损坏 ZIP 与非空目录拒绝、两个实例新建、实例菜单删除确认、第二个窗口的实例锁拒绝、15 个原版 peer 协议、game 37.1 秒原生启动与 DP2/Frida 正常退出均通过，`runtime_faults` 为空，仅有既有的 nr=291／332 采集缺口。`tests/test_gui_logs.py` 全部 19 项 PASS，收据 `../x/dnf-native-output/probes/20261117T025131348303Z/gui-logs/receipt.json`。`tests/test_gui_services.py` 全部 24 项 PASS，收据 `../x/dnf-native-output/probes/20261117T025347464732Z/gui-services/receipt.json`，覆盖 15 个 peer 启动、单服务停止与重启、ELF 哈希拒绝、整序停服、协调备份与关闭，`runtime_faults` 与 `runtime_gaps` 均为空。`tests/test_gui_readiness.py` 两次原版 game 启动均 PASS（51.9 秒、51.1 秒到“应用已初始化”），收据 `../x/dnf-native-output/probes/20261117T024510638017Z/gui-readiness/receipt.json`：待就绪与已就绪都从日志读回，`channel` 只暴露运行时通道、不声称应用初始化，两次启动都正常退出。为让单个服务的启停同样可回读，启停结果现在除状态外还写一行“就绪层级：…”，逻辑与退出时一致。`test_gui_maintenance.py`、`test_gui_keyboard.py`、`test_gui_plugins.py`、`test_gui_auction.py`、`test_gui_long_path.py`、`test_service_shutdown.py` 已按新通道与措辞改写但本轮未执行，不能视为已回归。
+
 ## P35 GUI 细节收口（2026-11-17）
 
 输入框底色与描边统一：路径、服务 IP、端口、日志过滤四处改由 `WM_SIZE` 记录矩形、`WM_PAINT` 复用绘制，不再各自算一遍坐标，路径框的淡蓝底与白色 EDIT、纵向 8/5 内缩不对称同时消除。服务控制行改为左侧固定簇、右侧贴右簇、中间弹性留白，`DP2` 与 `Frida` 开关按标签实测宽度加宽到 84／92（文字区 32／40 px），开关与按钮文字补 `DT_END_ELLIPSIS` 兜底。数据库卡片由 96 px 压到 60 px，删除底部说明横条与窗口底部 32 px 空白白条，日志卡片底边落到 `height-16`，日志可视高度增加 74 px；原说明文字移入“数据库与维护详情”首行。控件树删除 10 个隐藏遗留控件（全局控制、MySQL 状态、服务 IP 标签、停止 game 后修改、全部停止提示、原始日志、备份说明、日志目录、初始化、删除实例），实例菜单的可启用状态改由 `instance_initialized`／`instance_pending`／`instance_deletable` 判定，状态类文本改存成员变量。维护窗口重排为摘要、兼容设置、索引维护一行四键、数据维护一行四键、市场范围五段，双列改单行，关闭键移到右下，客户区 860×580 → 880×536；摘要与面板同底色、长路径换行、警示文字改为红色，“兼容设置”标题改用独立 id 322（原先与“索引维护”同为 320，字体循环落在错误控件上）。

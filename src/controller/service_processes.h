@@ -158,8 +158,10 @@ static bool refresh_service(Service &service) {
         while (!text.empty() && std::strchr("\r\n \t", text.back())) text.pop_back();
         if (text == std::to_string(service.pid)) require(DeleteFileW(service.pid_file.c_str()), "Remove exited owned service PID marker");
     }
+    // A requested stop is reported as such, but the exit code stays visible so a
+    // crash during shutdown cannot hide behind the word "已停止".
     bool expected_stop = service.stopping;
-    service.state = expected_stop ? L"已停止" : L"已退出，代码 " + std::to_wstring(code);
+    service.state = (expected_stop ? L"已停止，代码 " : L"已退出，代码 ") + std::to_wstring(code);
     service.readiness = L"宿主已退出（接口/业务未验证）";
     service.stopping = false;
     CloseHandle(service.process); service.process = nullptr;

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import sha256, BUILD
 from probe_core_protocols import channel, relay, stun
-from gui_support import (user, windows, wait_for, click, ready, status, title,
+from gui_support import (user, windows, wait_for, click, ready, status, title, log_text,
                       select_folder, screenshot, hidden_startup, responsive)
 from gui_support import rows, select_service
 
@@ -86,15 +86,17 @@ def main():
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
         assert user.IsWindowEnabled(user.GetDlgItem(window, 260))
-        assert "资源齐全" in title(user.GetDlgItem(window, 218))
+        click(window, 262)
+        wait_for(lambda: "资源齐全" in log_text(window), "delivered resources verified", 15)
         assert not title(user.GetDlgItem(window, 101))
         checks["cold_start_idle_and_create_available"] = True
         for name in ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "resources.ini"]:
             p = resources / name
             missing = p.with_suffix(p.suffix + ".test-missing")
             p.rename(missing); renamed = missing
+            base = len(log_text(window))
             click(window, 262)
-            assert name in title(user.GetDlgItem(window, 218))
+            wait_for(lambda: name in log_text(window)[base:], "missing resource reported: " + name, 15)
             assert not user.IsWindowEnabled(user.GetDlgItem(window, 260))
             renamed.rename(p); renamed = None
             click(window, 262)
@@ -166,7 +168,7 @@ def main():
         checks["second_created_and_automatically_selected"] = True
         second_process = subprocess.Popen([str(gui), "--instance", str(second)], startupinfo=hidden_startup())
         other_window = wait_for(lambda: next(iter(windows(second_process.pid, "DNFNativeController")), None), "second controller")
-        assert "另一个窗口" in status(other_window), "Instance ownership rejection is missing"
+        wait_for(lambda: "另一个窗口" in log_text(other_window), "instance ownership rejection", 15)
         assert not title(user.GetDlgItem(other_window, 101))
         assert not user.IsWindowEnabled(user.GetDlgItem(other_window, 261))
         assert not user.IsWindowEnabled(user.GetDlgItem(other_window, 111))

@@ -14,7 +14,7 @@ import traceback
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import BUILD, sha256
-from gui_support import (user, windows, wait_for, click, ready, rows, service_row,
+from gui_support import (user, windows, wait_for, click, ready, ready_stopped, rows, service_row,
                          select_service, hidden_startup)
 from runtime_support import runtime_diagnostics
 
@@ -52,7 +52,7 @@ def main():
             if delay:
                 time.sleep(delay)
             start = time.monotonic()
-            click(window, 222); ready(window, name + "：已退出", 45)
+            click(window, 222); ready_stopped(window, name, 45)
             text = log.read_text(encoding="utf-8", errors="replace")
             cycle = {"service": name, "settle_seconds": delay,
                      "stop_seconds": round(time.monotonic() - start, 3),

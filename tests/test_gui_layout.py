@@ -117,7 +117,7 @@ def main():
                 user.PostMessageW(grid, 0x0202, 0, point)
                 wait_for(lambda: user.SendMessageW(grid, 0x188, 0, 0) == index, "mouse selects card", 5)
                 selected = rows(window)[index].split("  |  ", 1)[0].removesuffix("（可选）")
-                wait_for(lambda: title(user.GetDlgItem(window, 219)).startswith(selected + "  "), "details match card", 5)
+                wait_for(lambda: title(user.GetDlgItem(window, 285)) == selected, "details match card", 5)
                 tiles.append([area.left, area.top, area.right, area.bottom])
             assert tiles[0][1] == tiles[6][1] < tiles[7][1] == tiles[13][1] < tiles[14][1] == tiles[18][1]
             for identifier in [102, 223, 224, 220, 202, 111, 113, 114, 206, 283, 284, 285, 286, 287]:
