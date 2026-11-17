@@ -25,7 +25,7 @@ enum { INSTANCE_MORE = 280, SERVICE_INFO, DATABASE_INFO, LOG_FILTER,
 enum { LOG_FILE_COMMAND = 1000, LOG_FILE_SLOTS = 64 };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 enum { MARKET_OPEN=300, MARKET_LEVELS=301, MARKET_REFINE, MARKET_DP2, MARKET_AUTO,
-       MARKET_CLOSE=307, MARKET_SUMMARY=308,
+       MARKET_SUMMARY=308, MARKET_STATUS=309,
        MARKET_SCOPE_GOLD=318, MARKET_SCOPE_CERA=319, MARKET_INDEX_LABEL=320,
        MARKET_DATA_LABEL=321, MARKET_SCOPE_LABEL=323,
        MARKET_WARNING=324 };
@@ -198,7 +198,8 @@ static std::wstring service_readiness(const Service &service) {
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, output = nullptr;
-    HWND market_window = nullptr;
+    HWND market_window = nullptr, market_tooltip = nullptr;
+    std::wstring market_pvf_text;
     std::wstring market_report = L"点击“检查兼容性”读取当前 PVF 与存量订单。";
     HFONT font = nullptr, strong_font = nullptr, log_font = nullptr, small_font = nullptr;
     HBRUSH background = nullptr, surface = nullptr;
@@ -206,6 +207,7 @@ struct App {
     Session session;
     std::vector<Service> services;
     std::vector<std::wstring> recent_instances;
+    std::wstring history_file;
     std::wstring preferred_service;
     HANDLE service_job = nullptr, instance_lock = nullptr;
     bool busy = false, closing = false;
@@ -239,6 +241,41 @@ struct App {
     bool resources_ready = false;
     ULONGLONG metrics_tick = 0, metrics_process = 0;
     bool metrics_ready = false;
+    void restore_instance_history() {
+        wchar_t folder[32768];
+        DWORD size=GetEnvironmentVariableW(L"LOCALAPPDATA",folder,32768);
+        if(!size || size>=32768)
+            require(SUCCEEDED(SHGetFolderPathW(nullptr,CSIDL_LOCAL_APPDATA,nullptr,SHGFP_TYPE_CURRENT,folder)),"Find local application settings");
+        history_file=std::wstring(folder)+L"\\DNF-Native\\instances.ini";
+        unsigned count=std::min(64u,GetPrivateProfileIntW(L"instances",L"count",0,history_file.c_str()));
+        for(unsigned i=0;i<count;++i) {
+            auto path=setting(history_file,L"instances",L"path"+std::to_wstring(i));
+            if(!path.empty() && known_instance(path) && std::none_of(recent_instances.begin(),recent_instances.end(),
+                [&](const std::wstring &old) {return !_wcsicmp(old.c_str(),path.c_str());})) recent_instances.push_back(path);
+        }
+        auto selected=setting(history_file,L"instances",L"selected");
+        if(!selected.empty() && known_instance(selected)) initial=selected;
+    }
+    void save_instance_history() {
+        try {
+            directory(history_file.substr(0,history_file.find_last_of(L"\\/")));
+            std::wstring text=L"[instances]\r\ncount="+std::to_wstring(recent_instances.size())+L"\r\nselected="+current+L"\r\n";
+            for(size_t i=0;i<recent_instances.size();++i) text+=L"path"+std::to_wstring(i)+L"="+recent_instances[i]+L"\r\n";
+            std::string bytes("\xff\xfe",2);
+            bytes.append(reinterpret_cast<const char *>(text.data()),text.size()*sizeof(wchar_t));
+            write_private(history_file+L".tmp",bytes);
+            require(MoveFileExW((history_file+L".tmp").c_str(),history_file.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH),"Save instance history");
+        } catch(const std::exception &e) {notice(L"实例列表保存失败："+decode(e.what()));}
+    }
+    void remember_instance() {
+        if(!known_instance(current)) return;
+        if(std::none_of(recent_instances.begin(),recent_instances.end(),
+            [&](const std::wstring &old) {return !_wcsicmp(old.c_str(),current.c_str());})) {
+            if(recent_instances.size()==64) recent_instances.erase(recent_instances.begin());
+            recent_instances.push_back(current);
+        }
+        save_instance_history();
+    }
     void update_title_metrics() {
         FILETIME creation{}, exit{}, kernel{}, user{};
         if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) return;
@@ -648,8 +685,6 @@ struct App {
             close_instance_lease(); instance_lock = next_lock;
         }
         current = chosen;
-        if (known_instance(current) && std::find(recent_instances.begin(),recent_instances.end(),current)==recent_instances.end())
-            recent_instances.push_back(current);
         maintenance_summary = L"尚未执行";
         services = load_services(current, runtime); show_services(); show_plugins(); show_level(); scan_logs(true);
         SetWindowTextW(service_ip, configured_service_ip(services).c_str());
@@ -659,6 +694,7 @@ struct App {
             if (at != std::string::npos) SetWindowTextW(port, decode(config.substr(at + 6, config.find_first_of("\r\n", at + 6) - at - 6)).c_str());
         }
         controls();
+        remember_instance();
     }
     void action(int id, const std::wstring &target = L"", int selected = -1) {
         current = full_path(window_text(path));
@@ -900,7 +936,7 @@ static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wpar
         return -1;
     };
     auto select = [&](int index) {
-        if (index < 0) return;
+        if (index < 0 || index==SendMessageW(window,LB_GETCURSEL,0,0)) return;
         SendMessageW(window, LB_SETCURSEL, index, 0); InvalidateRect(window, nullptr, FALSE);
         SendMessageW(GetParent(window), WM_COMMAND, MAKEWPARAM(SERVICE_LIST, LBN_SELCHANGE), reinterpret_cast<LPARAM>(window));
     };
@@ -980,6 +1016,9 @@ static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wpar
 }
 
 static void draw_item(const DRAWITEMSTRUCT &item) {
+    // Selection/focus changes in the native list may draw synchronously. Its
+    // item renderer stays empty; the grid's buffered WM_PAINT owns every pixel.
+    if(item.CtlType==ODT_LISTBOX && item.CtlID==SERVICE_LIST) return;
     HDC dc = item.hDC; RECT area = item.rcItem;
     bool pressed = (item.itemState & ODS_SELECTED) != 0, disabled = (item.itemState & ODS_DISABLED) != 0;
     bool hover = GetPropW(item.hwndItem,L"hover") != nullptr;
@@ -1110,6 +1149,8 @@ static LRESULT CALLBACK combo_proc(HWND window, UINT message, WPARAM wparam, LPA
 static WNDPROC checkbox_proc;
 static LRESULT CALLBACK switch_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     if (message == WM_ERASEBKGND) return TRUE;
+    if(message==WM_LBUTTONDOWN)
+        SendMessageW(GetAncestor(window,GA_ROOT),WM_CHANGEUISTATE,MAKEWPARAM(UIS_SET,UISF_HIDEFOCUS),0);
     if (message == WM_MOUSEMOVE && !GetPropW(window,L"hover")) {
         SetPropW(window,L"hover",reinterpret_cast<HANDLE>(1));
         TRACKMOUSEEVENT track={sizeof(track),TME_LEAVE,window,0}; TrackMouseEvent(&track);
@@ -1134,11 +1175,12 @@ static LRESULT CALLBACK switch_proc(HWND window, UINT message, WPARAM wparam, LP
         area.right = track.left-app->px(10); SelectObject(dc, app->font); SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, enabled ? RGB(67,86,114) : RGB(172,184,202));
         std::wstring text = window_text(window); DrawTextW(dc, text.c_str(), -1, &area, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-        if (GetFocus() == window) focus_ring(dc, client, app->px(2));
+        if (GetFocus() == window && !(SendMessageW(window,WM_QUERYUISTATE,0,0)&UISF_HIDEFOCUS))
+            focus_ring(dc, client, app->px(2));
         EndPaint(window, &paint); return 0;
     }
     LRESULT result = CallWindowProcW(checkbox_proc, window, message, wparam, lparam);
-    if (message == BM_SETCHECK || message == WM_ENABLE || message == WM_SETFOCUS || message == WM_KILLFOCUS)
+    if (message == BM_SETCHECK || message == WM_ENABLE || message == WM_SETFOCUS || message == WM_KILLFOCUS || message==WM_UPDATEUISTATE)
         InvalidateRect(window, nullptr, FALSE);
     return result;
 }
@@ -1259,7 +1301,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->service_ip = control(L"EDIT", L"127.0.0.1", ES_AUTOHSCROLL | WS_TABSTOP, SERVICE_IP);
             SendMessageW(app->service_ip, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(app->px(6), app->px(6)));
             control(L"BUTTON", L"应用", WS_TABSTOP, IP_APPLY);
-            control(L"LISTBOX", L"", LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_TABSTOP, SERVICE_LIST);
+            control(L"LISTBOX", L"", LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_TABSTOP, SERVICE_LIST);
             SetWindowSubclass(GetDlgItem(window, SERVICE_LIST), service_grid_proc, 1, 0);
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{ELF_START,L"启动所选"},{ELF_STOP,L"停止所选"},{ALL_START,L"整体启动"},{ALL_STOP,L"整体停止"},{SERVICE_LOGS,L"查看所选日志"}})
                 control(L"BUTTON", button.second, WS_TABSTOP | ((button.first == ALL_START || button.first == ALL_STOP) ? BS_OWNERDRAW : 0), button.first);
@@ -1298,7 +1340,13 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         case WM_SIZE: {
             if (wparam == SIZE_MINIMIZED) return 0;
             int width=MulDiv(LOWORD(lparam),96,app->dpi),height=MulDiv(HIWORD(lparam),96,app->dpi);
-            auto place=[&](int id,int x,int y,int w,int h) {MoveWindow(GetDlgItem(window,id),app->px(x),app->px(y),app->px(std::max(0,w)),app->px(std::max(0,h)),TRUE);};
+            HDWP positions=BeginDeferWindowPos(48);
+            require(positions!=nullptr,"Begin controller layout");
+            auto place=[&](int id,int x,int y,int w,int h) {
+                positions=DeferWindowPos(positions,GetDlgItem(window,id),nullptr,app->px(x),app->px(y),app->px(std::max(0,w)),app->px(std::max(0,h)),
+                    SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW|SWP_NOCOPYBITS);
+                require(positions!=nullptr,"Place controller control");
+            };
             // Input frames are painted from these rects in WM_PAINT; keeping the
             // numbers here is the single source for both the border and the EDIT.
             auto frame=[&](RECT &field,int x,int y,int w,int h) {
@@ -1308,13 +1356,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             int log_top=394,log_bottom=height-16;
             int selector=compact?200:236;
             place(BROWSE,32,27,selector,46);place(CREATE_INSTANCE,44+selector,35,30,30);
-            SetWindowTextW(GetDlgItem(window,CREATE_INSTANCE),L"+");
             int right=width-32;
             auto button=[&](int id,int w) {right-=w;place(id,right,35,w,30);right-=10;};
             button(ALL_START,96);button(ALL_STOP,96);button(INSTANCE_MORE,30);
             button(FOLDER,compact?34:108);button(CHECK_RESOURCES,compact?34:92);
-            SetWindowTextW(GetDlgItem(window,FOLDER),compact?L"\u25a1":L"\u25a1  \u5b9e\u4f8b\u6839\u76ee\u5f55");
-            SetWindowTextW(GetDlgItem(window,CHECK_RESOURCES),compact?L"\u2713":L"\u2713  \u68c0\u67e5\u8d44\u6e90");
             right-=compact?150:188;
             place(SERVICE_IP,right+(compact?6:44),40,84,20);place(IP_APPLY,right+(compact?104:142),35,46,30);
             int path_left=84+selector;
@@ -1337,7 +1382,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             action(SERVICE_INFO,42);action(PLUGINS_SAVE,72);
             right-=92;place(FRIDA_ENABLE,right,105,92,26);right-=10;
             right-=84;place(DP2_ENABLE,right,105,84,26);right-=12;
-            SetWindowTextW(GetDlgItem(window,SERVICE_LOGS),L"\u67e5\u770b\u65e5\u5fd7");
             place(SERVICE_LIST,36,150,width-72,148);
             place(202,72,337,54,28);place(201,128,338,48,26);place(203,198,337,28,30);place(PORT,232,342,48,20);
             place(212,296,338,std::max(0,width-826),26);
@@ -1350,7 +1394,16 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             place(LOG_REFRESH,width-204,log_top+10,50,30);place(LOG_FOLLOW,width-144,log_top+12,110,26);
             place(206,36,log_top+54,width-72,std::max(0,log_bottom-log_top-86));
             place(210,40,log_bottom-25,width-80,18);
-            InvalidateRect(window,nullptr,TRUE);return 0;
+            require(EndDeferWindowPos(positions),"Commit controller layout");
+            auto label=[&](int id,const wchar_t *text) {
+                HWND control=GetDlgItem(window,id);
+                if(window_text(control)!=text) SetWindowTextW(control,text);
+            };
+            label(CREATE_INSTANCE,L"+");
+            label(FOLDER,compact?L"\u25a1":L"\u25a1  \u5b9e\u4f8b\u6839\u76ee\u5f55");
+            label(CHECK_RESOURCES,compact?L"\u2713":L"\u2713  \u68c0\u67e5\u8d44\u6e90");
+            label(SERVICE_LOGS,L"\u67e5\u770b\u65e5\u5fd7");
+            RedrawWindow(window,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);return 0;
         }
         case WM_DPICHANGED: {
             app->dpi = HIWORD(wparam);
@@ -1417,10 +1470,13 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             if (result->stopped && app->session.process) { CloseHandle(app->session.process); app->session = {}; }
             if (result->started.process) app->session = result->started;
             if (result->deleted) {
+                app->recent_instances.erase(std::remove_if(app->recent_instances.begin(),app->recent_instances.end(),
+                    [&](const std::wstring &path) {return !_wcsicmp(path.c_str(),app->current.c_str());}),app->recent_instances.end());
                 app->current.clear(); app->services.clear();
+                app->save_instance_history();
                 SetWindowTextW(app->path, L""); app->show_plugins(); app->show_level();
             }
-            if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); }
+            if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); app->remember_instance(); }
             app->show_level();
             if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
@@ -1694,7 +1750,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         state.runtime = gui_folder + L"\\resources";
         state.exe = state.runtime + L"\\mysql-control.exe";
         state.resources = state.runtime;
-        state.initial = L"";
+        state.restore_instance_history();
         int count; wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
         require(args != nullptr, "Read application arguments");
         if (count == 3 && std::wstring(args[1]) == L"--instance") {
@@ -1706,7 +1762,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         WNDCLASSW type = {}; type.hInstance = instance; type.lpfnWndProc = window_proc; type.lpszClassName = L"DNFNativeController";
         type.hCursor = LoadCursorW(nullptr, IDC_ARROW); type.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
         require(RegisterClassW(&type) != 0, "Register native window");
-        HWND window = CreateWindowExW(0, type.lpszClassName, L"DNF Native 控制台", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+        // Present the parent and its child controls as one composed surface.
+        HWND window = CreateWindowExW(WS_EX_COMPOSITED, type.lpszClassName, L"DNF Native 控制台", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                        CW_USEDEFAULT,CW_USEDEFAULT,state.px(1440),state.px(940),nullptr,nullptr,instance,nullptr);
         require(window != nullptr, "Create native window");
         ShowWindow(window, show); UpdateWindow(window);

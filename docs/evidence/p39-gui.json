@@ -1,0 +1,152 @@
+{
+  "environment": "Windows 10 x64 10.0.19044; LLVM-MinGW 20261104 MSVCRT; MySQL 5.7.44",
+  "scope": "GUI drawing/layout and selected-instance persistence. Single-service startup dependencies unchanged. All service/database tests used independent copies.",
+  "tests": [
+    {
+      "test": "gui-interactions",
+      "result": "PASS",
+      "receipt": "probes/20261117T045309403996Z/gui-interactions/receipt.json",
+      "receipt_sha256": "1a9538e1682dba4041a696884c6359e8305cfef8d1cd3d927160af3ba56d0714",
+      "gui_sha256": "a99a22d416c0b6683e511cc9ca42190706da964387894f1c6cf0bfb62977148b",
+      "final_delivery_binary": true,
+      "checks": {
+        "repeated_selected_card_has_no_native_blue_row_or_log_reload": true,
+        "mouse_hides_focus_ring_and_tab_restores_keyboard_cue": true,
+        "repeated_minimum_default_resize_remains_responsive": true,
+        "market_escape_closes_and_restores_main_window": true,
+        "selection_only_saves_both_instances_and_restores_last_across_restarts": true
+      }
+    },
+    {
+      "test": "gui-layout",
+      "result": "PASS",
+      "receipt": "probes/20261117T045228622565Z/gui-layout/receipt.json",
+      "receipt_sha256": "8c0340c3243e8e1ce0229ada15d9c9b89e6bd0baa7aef42b514100eeba153c48",
+      "gui_sha256": "a99a22d416c0b6683e511cc9ca42190706da964387894f1c6cf0bfb62977148b",
+      "final_delivery_binary": true,
+      "checks": [
+        "title_bar_shows_live_cpu_and_memory",
+        "all_cards_and_controls_fit_at_default_minimum_and_125_percent_layout",
+        "all_19_mouse_hit_rectangles_match_visual_and_detail_selection",
+        "log_filter_and_clear_use_actual_console_text",
+        "auction_two_rows_four_columns_and_data_scopes",
+        "empty_scope_reported_only_in_main_log_and_no_scrollbars",
+        "source_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-keyboard",
+      "result": "PASS",
+      "receipt": "probes/20261117T045231025319Z/gui-keyboard/receipt.json",
+      "receipt_sha256": "ea0492b3ab8bf2a428b596f78c7ee812f14bc13447205fb0ebc730926cb3ad75",
+      "gui_sha256": "a99a22d416c0b6683e511cc9ca42190706da964387894f1c6cf0bfb62977148b",
+      "final_delivery_binary": true,
+      "checks": [
+        "tab_traverses_enabled_visible_controls",
+        "enter_activates_focused_button_and_escape_cancels_picker",
+        "selector_switches_between_real_instances_and_retains_private_test_target",
+        "grid_arrows_update_selection_and_details_without_losing_services",
+        "native_encoding_arrows_and_escape",
+        "space_toggles_native_checkbox",
+        "delete_restore_default_to_cancel_and_enter_escape_preserve_cold_data",
+        "enter_runs_database_identity_tls_start_and_normal_stop",
+        "keyboard_preserves_owner_draw_and_checkbox_rendering_types",
+        "source_data_unchanged"
+      ]
+    },
+    {
+      "test": "instance-workflow",
+      "result": "PASS",
+      "receipt": "probes/20261117T044051581355Z/instance-workflow/receipt.json",
+      "receipt_sha256": "0206d645d38317d9dbf11f7e816334c56bad347f24767001979ccbac95f04da5",
+      "gui_sha256": "aef7154ccd9902869879057d54c0cd6673f7af1491fa061f897e23a236611881",
+      "final_delivery_binary": false,
+      "checks": [
+        "cold_start_idle_and_create_available",
+        "each_missing_resource_named_and_creation_disabled",
+        "native_zip_has_browsable_paths_and_trimmed_files",
+        "changed_zip_rejected_before_instance_writes",
+        "nonempty_creation_target_unchanged",
+        "creation_response_ms",
+        "unified_game_assets_stun_and_both_library_architectures",
+        "first_created_selected_and_official_tools_released",
+        "game_launcher_account_unlocked_and_login_tables_readable",
+        "requested_default_connection_and_test_account_four_tables",
+        "database_runs_from_instance_and_delete_disabled_while_running",
+        "second_created_and_automatically_selected",
+        "second_controller_cannot_start_or_delete_owned_instance",
+        "switch_to_existing_preserves_saved_database",
+        "delete_cancel_preserves_entire_instance",
+        "delete_removes_whole_tree_and_clears_selection",
+        "shared_resources_unchanged",
+        "trimmed_peer_protocols",
+        "trimmed_game_natural_startup_seconds",
+        "game_dp2_frida_startup_and_normal_shutdown",
+        "runtime_faults",
+        "runtime_gaps"
+      ]
+    },
+    {
+      "test": "gui-auction",
+      "result": "PASS",
+      "receipt": "probes/20261117T044443436802Z/gui-auction/receipt.json",
+      "receipt_sha256": "ab5d271e3ab9c57d8455749b07ca0c27270b0488e234eff42b65b7fea5efbb70",
+      "gui_sha256": "aef7154ccd9902869879057d54c0cd6673f7af1491fa061f897e23a236611881",
+      "final_delivery_binary": false,
+      "checks": [
+        "pvf_and_stored_order_check",
+        "conflicting_index_sync_preserves_orders_and_files",
+        "sync_both_indexes_and_currency_definitions",
+        "restore_rejects_untracked_legacy_index",
+        "restore_rejects_other_pvf_and_preserves_old_binding",
+        "orphan_price_blocks_sync_without_implicit_deletion",
+        "normal_roi_and_manual_price_keys_keep_refinements_distinct",
+        "cleanup_only_incompatible_orders_in_selected_market",
+        "clear_orders_respects_market_scope",
+        "clear_prices_respects_market_scope",
+        "second_market_failure_restores_first_and_second_database",
+        "previous_index_restore_checks_matching_pvf",
+        "index_restore_preserves_unrelated_settings_and_script",
+        "dp2_search_protection_saved_by_apply",
+        "reset_selected_database_keeps_other_market",
+        "official_sql_backups_have_matching_hashes",
+        "original_markets_replay_level85_refine10_orders_on_two_normal_starts",
+        "source_database_unchanged"
+      ]
+    }
+  ],
+  "integration_binary_difference": "Integration and auction ran before adding WS_EX_COMPOSITED and synchronous resize redraw; final GUI interaction/layout/keyboard receipts use the delivered hash.",
+  "resize_capture": {
+    "receipt": "P39-gui-fixes/resize-screen-release.json",
+    "receipt_sha256": "f480b3831e20aaa2ca65a2725f88b2b99ef0fc061bd26691a77e95b12f6c781f",
+    "gui_sha256": "a99a22d416c0b6683e511cc9ca42190706da964387894f1c6cf0bfb62977148b",
+    "baseline_hashes": {
+      "1180": "b221daf34dd9dfe15bcd06f2ee3ee2404b98d3af99f54bccb208dc63e41d6593",
+      "1440": "1002ece25e2207e7b4a70d7fb0d4787ea713ab890cd4fd729b2711d9b7a4ca40"
+    },
+    "frame_counts": {
+      "1002ece25e2207e7b4a70d7fb0d4787ea713ab890cd4fd729b2711d9b7a4ca40": 85,
+      "b221daf34dd9dfe15bcd06f2ee3ee2404b98d3af99f54bccb208dc63e41d6593": 78
+    },
+    "transitional_frame_count": 0,
+    "total_samples": 163,
+    "capture": "desktop DC acquired and released each frame; service toolbar; 80 resizes"
+  },
+  "retries": [
+    {
+      "receipt": "probes/20261117T044415682969Z/gui-auction/receipt.json",
+      "reason": "Initial fixture used the baseline PVF with refine limit 8, while this test requires refine limit 10. Retried successfully on an isolated copy with the user-designated client PVF; source files unchanged."
+    }
+  ],
+  "delivery": {
+    "directory": "../DNF-Native-3.0",
+    "gui_sha256": "a99a22d416c0b6683e511cc9ca42190706da964387894f1c6cf0bfb62977148b",
+    "all_eight_files_match_package": true,
+    "receipt": "P39-gui-fixes/delivery-receipt.json",
+    "receipt_sha256": "86198237d3425f042ccd4374f5e0cf6ae5344fa957d0b5d204ae16345ddf7eda",
+    "package_receipt": "P39-gui-fixes/package-release-receipt.json",
+    "package_receipt_sha256": "bf0589bff3d4ccf2189fe9deb041880f6d065bb1ad5117c42db6332feb2d5d76",
+    "backup": "P39-gui-fixes/previous-delivery"
+  },
+  "local_settings": "%LOCALAPPDATA%/DNF-Native/instances.ini; path list and selection only; tests used isolated profiles."
+}

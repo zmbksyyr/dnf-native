@@ -169,7 +169,7 @@ def main():
             assert sha256(Path(str(p)[:-7]))==p.read_text().strip()
         checks["official_sql_backups_have_matching_hashes"]=True
         screenshot(market,work/"market-window.png")
-        click(market,307);wait_for(lambda:not user.IsWindow(market),"close maintenance window")
+        user.PostMessageW(market,0x10,0,0);wait_for(lambda:not user.IsWindow(market),"close maintenance window")
         screenshot(window,work/"controller-window.png")
         # Actual original service startup must replay supported high-level,
         # high-refine stored orders twice, rather than merely keep a PID alive.

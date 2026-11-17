@@ -158,22 +158,28 @@ def main():
         market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market maintenance window", 5)
         market_client = w.RECT()
         user.GetClientRect(market, c.byref(market_client))
-        market_controls = [301, 302, 303, 304, 307, 308, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 323, 324]
+        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 323, 324]
         for identifier in market_controls:
             child = user.GetDlgItem(market, identifier)
             assert child and user.IsWindowVisible(child), (identifier, "market control missing")
             area = rect(child, market)
             assert 0 <= area.left < area.right <= market_client.right
             assert 0 <= area.top < area.bottom <= market_client.bottom, (identifier, area.top, area.bottom, market_client.bottom)
-        for column, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
-            areas=[rect(user.GetDlgItem(market, identifier), market) for identifier in column]
-            assert len({area.left for area in areas}) == 1
-            assert all(a.bottom < b.top for a,b in zip(areas,areas[1:]))
+        for row, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
+            areas=[rect(user.GetDlgItem(market, identifier), market) for identifier in row]
+            assert len({area.top for area in areas}) == 1
+            assert all(a.right < b.left for a,b in zip(areas,areas[1:]))
             assert rect(user.GetDlgItem(market, header), market).bottom <= areas[0].top
-        for left,right in zip([310,311,312,313],[314,315,316,317]):
-            a,b=rect(user.GetDlgItem(market,left),market),rect(user.GetDlgItem(market,right),market)
-            assert a.top==b.top and a.bottom==b.bottom and a.right<b.left
+        for top,bottom in zip([310,311,312,313],[314,315,316,317]):
+            a,b=rect(user.GetDlgItem(market,top),market),rect(user.GetDlgItem(market,bottom),market)
+            assert a.left==b.left and a.right==b.right and a.bottom<b.top
         assert rect(user.GetDlgItem(market, 318), market).top == rect(user.GetDlgItem(market, 319), market).top
+        assert rect(user.GetDlgItem(market, 313), market).bottom < rect(user.GetDlgItem(market,318),market).top
+        assert rect(user.GetDlgItem(market, 318), market).bottom <= rect(user.GetDlgItem(market,314),market).top
+        assert not user.GetDlgItem(market,307)
+        summary=rect(user.GetDlgItem(market,308),market)
+        state=rect(user.GetDlgItem(market,309),market)
+        assert summary.bottom<=state.top and state.bottom-summary.top<=round(40*120/96)
         assert user.SendMessageW(user.GetDlgItem(market, 318), 0x00F0, 0, 0) == 1
         assert user.SendMessageW(user.GetDlgItem(market, 319), 0x00F0, 0, 0) == 1
         click(market,318)
@@ -187,8 +193,9 @@ def main():
         assert not user.GetDlgItem(market,306) and not user.GetDlgItem(window,204)
         assert not user.GetWindowLongW(user.GetDlgItem(window,206),-16) & 0x00300000
         screenshot(market,probe/"market-window.png")
-        click(market, 307)
-        checks["auction_two_columns_four_rows_and_independent_scopes"] = True
+        user.PostMessageW(market,0x10,0,0)
+        wait_for(lambda:not user.IsWindow(market),"market title-bar close",5)
+        checks["auction_two_rows_four_columns_and_data_scopes"] = True
         checks["empty_scope_reported_only_in_main_log_and_no_scrollbars"] = True
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
