@@ -1,0 +1,217 @@
+{
+  "environment": "Windows 10 x64 10.0.19044; LLVM-MinGW 20261104 MSVCRT; MySQL 5.7.44",
+  "scope": "Feature-window settings and maintenance, simplified service toolbar, inspection log, smooth switches and scrollbar-free mouse-wheel reading; all service/database changes confined to independent test copies.",
+  "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+  "tests": [
+    {
+      "test": "gui-layout",
+      "result": "PASS",
+      "receipt": "probes/20261117T052748351693Z/gui-layout/receipt.json",
+      "receipt_sha256": "587da7c14b529257de3b133f6e4ef6a9d17a4bd54afc957cb0fd2182471f8a2a",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "title_bar_shows_live_cpu_and_memory",
+        "all_cards_and_controls_fit_at_default_minimum_and_125_percent_layout",
+        "all_19_mouse_hit_rectangles_match_visual_and_detail_selection",
+        "log_filter_and_clear_use_actual_console_text",
+        "feature_settings_and_auction_two_rows_four_columns",
+        "both_market_scope_is_fixed_and_logs_have_no_scrollbars",
+        "source_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-interactions",
+      "result": "PASS",
+      "receipt": "probes/20261117T052750444948Z/gui-interactions/receipt.json",
+      "receipt_sha256": "fc85f550b788aeb4b9c52c1fd2a2e875b2a36101536a6b9187b978ebc0d3b0df",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "repeated_selected_card_has_no_native_blue_row_or_log_reload",
+        "mouse_hides_focus_ring_and_tab_restores_keyboard_cue",
+        "repeated_minimum_default_resize_remains_responsive",
+        "market_escape_closes_and_restores_main_window",
+        "service_context_inspection_uses_main_log_without_dialog",
+        "selection_only_saves_both_instances_and_restores_last_across_restarts"
+      ]
+    },
+    {
+      "test": "gui-keyboard",
+      "result": "PASS",
+      "receipt": "probes/20261117T051721897856Z/gui-keyboard/receipt.json",
+      "receipt_sha256": "96e740bed3954421a8b25e873a2557e093a34bad4c588dc747820f1dd60c2822",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "tab_traverses_enabled_visible_controls",
+        "enter_activates_focused_button_and_escape_cancels_picker",
+        "selector_switches_between_real_instances_and_retains_private_test_target",
+        "grid_arrows_update_selection_and_details_without_losing_services",
+        "native_encoding_arrows_and_escape",
+        "space_toggles_native_checkbox",
+        "delete_restore_default_to_cancel_and_enter_escape_preserve_cold_data",
+        "enter_runs_database_identity_tls_start_and_normal_stop",
+        "keyboard_preserves_owner_draw_and_checkbox_rendering_types",
+        "source_data_unchanged"
+      ]
+    },
+    {
+      "test": "gui-logs",
+      "result": "PASS",
+      "receipt": "probes/20261117T051730043722Z/gui-logs/receipt.json",
+      "receipt_sha256": "5ee8ac7141f27487a814b7b1c48a5cea28234d413d836ac8ffdbd13819dbab95",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "initial_selected_service_visible",
+        "original_text_without_controller_prefix",
+        "automatic_append",
+        "explicit_gbk_encoding_and_truncation",
+        "rotated_file_reopened",
+        "large_log_tail_bounded",
+        "wheel_without_scrollbars_hover_routing_partial_deltas_and_pause_follow",
+        "unfollowed_scroll_preserved",
+        "original_game_natural_start_seconds_after_launch",
+        "follow_scrolls_to_latest_lines",
+        "actual_application_init_log_visible",
+        "window_response_ms",
+        "actual_stdout_visible",
+        "actual_stderr_visible",
+        "actual_mysql_log_visible",
+        "peer_protocols",
+        "minimum_window_captured",
+        "logs_readable_after_normal_stop",
+        "game_normal_exit",
+        "source_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-auction",
+      "result": "PASS",
+      "receipt": "probes/20261117T052127144228Z/gui-auction/receipt.json",
+      "receipt_sha256": "aec55b31d51f4626ca6699df39ec0cef36db835716b4499a370788188d6b45b6",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "pvf_and_stored_order_check",
+        "conflicting_index_sync_preserves_orders_and_files",
+        "sync_both_indexes_and_currency_definitions",
+        "restore_rejects_untracked_legacy_index",
+        "restore_rejects_other_pvf_and_preserves_old_binding",
+        "orphan_price_blocks_sync_without_implicit_deletion",
+        "normal_roi_and_manual_price_keys_keep_refinements_distinct",
+        "cleanup_incompatible_orders_in_both_markets",
+        "clear_orders_covers_both_markets",
+        "clear_prices_covers_both_markets",
+        "second_market_failure_restores_first_and_second_database",
+        "previous_index_restore_checks_matching_pvf",
+        "index_restore_preserves_unrelated_settings_and_script",
+        "dp2_search_protection_saved_by_apply",
+        "reset_covers_both_markets",
+        "official_sql_backups_have_matching_hashes",
+        "original_markets_replay_level85_refine10_orders_on_two_normal_starts",
+        "source_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-plugins",
+      "result": "PASS",
+      "receipt": "probes/20261117T052449562520Z/gui-plugins/receipt.json",
+      "receipt_sha256": "94f2e213c37f3ead4160fcd0430dac546c605f92f9ba8d725091f590bb7fdfbf",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "original_module_backup_matches_before_save",
+        "repeated_save_preserves_module_bytes",
+        "saved_lua_only_mode_survives_gui_restart",
+        "lua_running_without_frida_mapped",
+        "frida_reenabled_real_hook_and_bidirectional_rpc",
+        "frida_disabled_again_without_stopping_peers",
+        "dp2_off_also_disables_frida",
+        "dp2_off_live_modules",
+        "dp2_off_natural_game_startup_seconds",
+        "protocols_with_dp2_disabled",
+        "dp2_off_game_stop_code_zero",
+        "plugins_editable_again_after_natural_game_stop",
+        "close_normally_stops_remaining_peers_and_database",
+        "source_cold_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-gameplay",
+      "result": "PASS",
+      "receipt": "probes/20261117T052754244376Z/gui-gameplay/receipt.json",
+      "receipt_sha256": "6fcdc62aff403d991ee40ba8c8f21d9484ddd305eb749a1c319bba8b7685fbcf",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "both_months_and_both_auction_databases_accept_original_column_lists",
+        "legacy_rows_and_verified_official_backups_retained",
+        "generated_rollback_restores_legacy_schema_and_rows",
+        "maintenance_is_idempotent",
+        "game_restarts_70_85_70_and_peers_keep_their_pids",
+        "live_bytes_and_saved_level_match_and_disk_elf_unchanged",
+        "three_games_exit_normally",
+        "source_data_unchanged"
+      ]
+    },
+    {
+      "test": "gui-services",
+      "result": "PASS",
+      "receipt": "probes/20261117T053214078967Z/gui-services/receipt.json",
+      "receipt_sha256": "eecea738b44f495a9f5e886d6f7d74b8f626b72a48790f67083752617e5768cd",
+      "gui_sha256": "7d69006deb38cc24f6afca51c8920900f64b325491c5106a1e2bab942cb445a9",
+      "checks": [
+        "nineteen_service_entries",
+        "service_cards_keep_identity_details_and_selection",
+        "start_window_response_ms",
+        "fifteen_original_peer_processes",
+        "current_launch_runtime_channel_status",
+        "direct_stop_disabled_and_both_maintenance_actions_enabled_while_services_run",
+        "channel_protocol",
+        "relay_and_real_monitor_rejection",
+        "stun_protocol",
+        "individual_channel_normal_stop",
+        "selected_real_log_visible",
+        "changed_elf_rejected_without_stopping_other_services",
+        "individual_channel_restart_protocol",
+        "real_context_menu_start_and_stop_without_toolbar_buttons",
+        "live_count_updates_before_whole_stop_completes",
+        "reverse_order_whole_stop_completed",
+        "owned_pid_markers_removed_after_stop",
+        "backup_enabled_after_whole_stop",
+        "second_launch_channel_protocol",
+        "second_launch_relay_and_monitor_protocol",
+        "second_launch_stun_protocol",
+        "actual_stop_trace_matches_manifest_reverse_order",
+        "backup_stops_services_and_database_before_running",
+        "maintenance_identity_target_and_result_visible",
+        "close_normally_stops_all_owned_elf_hosts",
+        "database_normal_shutdown_after_peers",
+        "runtime_faults",
+        "runtime_gaps"
+      ]
+    }
+  ],
+  "retries": [
+    {
+      "receipt": "probes/20261117T051853627324Z/gui-auction/receipt.json",
+      "reason": "Order replay assertion still expected the second market to retain an old order after reset. Updated the assertion for reset of both markets and reran the full test."
+    },
+    {
+      "receipt": "probes/20261117T052701856571Z/gui-gameplay/receipt.json",
+      "reason": "Migration fixture inherited repaired month tables; recreate only the copied current-month tables in their legacy form before testing migration."
+    },
+    {
+      "receipt": "probes/20261117T053035514204Z/gui-services/receipt.json",
+      "reason": "Keyboard test helper name collided with a later local loop variable; alias the helper and rerun the complete test."
+    }
+  ],
+  "profile_cleanup": "An initial layout probe stored its metadata-only fixture in the normal history. Removed that fixture record, restored the currently selected real instance, retained a private backup outside the repository; layout tests now isolate LOCALAPPDATA internally.",
+  "delivery": {
+    "directory": "../DNF-Native-3.0",
+    "all_eight_files_match_package": true,
+    "receipt": "P40-gui-functions/delivery-receipt.json",
+    "receipt_sha256": "0c5877c7c00cd55337571f60e2fd7cce4975b89a089891a04a2b72dd27a502ba",
+    "package_receipt": "P40-gui-functions/package-final-receipt.json",
+    "package_receipt_sha256": "e5b905d863c487d5ab0ede171a481584b242ca084823c281098c0c3636bd5cf2",
+    "changed_files": [
+      "DNF-Native.exe"
+    ],
+    "previous_gui_retained_while_running": true
+  }
+}

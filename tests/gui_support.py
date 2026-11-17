@@ -88,8 +88,14 @@ def wait_for(check, description, timeout=120):
 
 def click(window, identifier):
     button = user.GetDlgItem(window, identifier)
+    if not button and identifier in (221, 222, 225):
+        # Service actions are now context-menu commands. The controller checks
+        # the same availability predicate for the menu and these WM_COMMANDs.
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "service commands enabled", 10)
+        user.PostMessageW(window, 0x111, identifier, 0)
+        return
     if not button:
-        raise RuntimeError("Requested GUI button is disabled: " + str(identifier))
+        raise RuntimeError("Requested GUI button is missing: " + str(identifier))
     wait_for(lambda: user.IsWindowEnabled(button), "button enabled: " + str(identifier), 5)
     if user.IsWindowVisible(button):
         user.PostMessageW(button, 0x00F5, 0, 0)  # BM_CLICK through the actual control.
@@ -281,6 +287,16 @@ def select_service(window, name):
     select(window, index)
 
 
+def open_features(window):
+    click(window, 300)
+    return wait_for(lambda: next(iter(windows(pid_of(window), "DnfNativeMarketMaintenance")), None), "feature window", 5)
+
+
+def close_features(feature):
+    user.PostMessageW(feature, 0x10, 0, 0)
+    wait_for(lambda: not user.IsWindow(feature), "feature window closed", 10)
+
+
 def dialog_text(window, command, expected):
     """Click a 详情 button and read the message box it opens, then dismiss it."""
     click(window, command)
@@ -298,7 +314,10 @@ def dialog_text(window, command, expected):
 
 def service_details(window):
     """服务详情: the selected card's identity, host metadata and readiness."""
-    return dialog_text(window, 281, "服务详情")
+    before = len(log_text(window))
+    click(window, 262)
+    wait_for(lambda: len(log_text(window)) > before, "resource and service information in log", 5)
+    return log_text(window)[before:]
 
 
 def database_details(window):

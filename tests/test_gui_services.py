@@ -24,6 +24,7 @@ from gui_support import (user, kernel, windows, wait_for, click, ready, ready_st
 
 from gui_support import guest_root
 from runtime_support import runtime_diagnostics
+from test_gui_keyboard import focus, key as keyboard_key, menu_open
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,10 +60,10 @@ def main():
         checks["nineteen_service_entries"] = True
         print("GUI: 19 original service entries", flush=True)
         assert len(list_rows(window)) == 19
-        assert not user.IsWindowEnabled(user.GetDlgItem(window, 221))
+        assert not user.GetDlgItem(window, 221)
         select_service(window, "game")
         details = service_details(window)
-        assert details.startswith("game  ·"), details
+        assert "game  ·" in details, details
         assert "ELF：" in details and "SHA-256：" in details, details
         assert "就绪层级：未启动" in details and "清单未声明" in details, details
         checks["service_cards_keep_identity_details_and_selection"] = True
@@ -92,7 +93,17 @@ def main():
         print("GUI: channel, relay/monitor and STUN protocols passed", flush=True)
         screenshot(window, probe / "running.png")
         # Stop/restart only channel; the database and peers remain owned and active.
-        select_service(window, "channel"); click(window, 222); ready_stopped(window, "channel", 45)
+        select_service(window, "channel")
+        user.ShowWindow(window,4)
+        def context_action(letter):
+            grid=user.GetDlgItem(window,220)
+            focus(window,grid)
+            user.PostMessageW(window,0x7B,grid,-1)
+            wait_for(lambda:menu_open(window),"service context menu")
+            keyboard_key(window,ord(letter))
+            wait_for(lambda:not menu_open(window),"context command activated")
+        context_action("T")
+        ready_stopped(window, "channel", 45)
         checks["individual_channel_normal_stop"] = "代码 0" in service_row(window, "channel")
         click(window, 225)
         # Application files now have their own live view; select the runtime's
@@ -105,12 +116,13 @@ def main():
         damaged = bytearray(original); damaged[-1] ^= 1; elf.write_bytes(damaged)
         click(window, 221)
         wait_for(lambda: status(window).startswith("操作失败"), "ELF identity rejection")
-        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 221)), "failed start completed")
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "failed start completed")
         checks["changed_elf_rejected_without_stopping_other_services"] = sum("进程运行中" in row for row in rows(window)) == 14
         elf.write_bytes(original)
-        click(window, 221); ready(window, "channel：进程运行中", 20)
+        context_action("S"); ready(window, "channel：进程运行中", 20)
         time.sleep(1)
         checks["individual_channel_restart_protocol"] = channel(7001)
+        checks["real_context_menu_start_and_stop_without_toolbar_buttons"] = True
         print("GUI: ELF hash rejection and restart passed", flush=True)
         counts=[int(title(user.GetDlgItem(window,213)).split('/')[0])]
         baseline=len(log_text(window))

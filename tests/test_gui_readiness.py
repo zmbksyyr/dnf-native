@@ -81,7 +81,7 @@ def main():
             base = len(log_text(window))
             click(window, 221)
             ready(window, "game：进程运行中", 30)
-            wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 222)), "game start operation complete")
+            wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "game start operation complete")
             wait_for(lambda: "等待应用初始化" in log_text(window)[base:], "pending readiness recorded", 15)
             pending = log_text(window)[base:]
             assert "等待应用初始化" in pending and "应用已初始化" not in pending, pending
@@ -137,7 +137,7 @@ def main():
             if launch == 1:
                 click(window, 222)
                 ready_stopped(window, "game", 180)
-                wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 221)), "game stop operation complete")
+                wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "game stop operation complete")
                 wait_for(lambda: "宿主已退出" in log_text(window)[base:], "host exit readiness recorded", 15)
                 assert b"main() exited OK" in output.read_bytes()
                 checks["first_application_normal_exit"] = True

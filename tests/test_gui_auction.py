@@ -51,9 +51,7 @@ def main():
     def count(db): return int(sql(f"SELECT COUNT(*) FROM {db}.auction_main;"))
     def insert(db,order,item=16400,refine=8):
         sql(f"INSERT INTO {db}.auction_main(auction_id,occ_time,expire_time,owner_id,owner_name,owner_type,owner_nexon_id,buyer_id,buyer_name,price,instant_price,seal_flag,item_id,add_info,upgrade,amplify_option,amplify_value,seal_cnt,endurance,extend_info,black_point,unit_price,random_option,roi_high_key,roi_low_key,seperate_upgrade,item_guid) VALUES({order},NOW(),2147483647,100,'fixture',0,'fixture',0,'',100,200,0,{item},1,0,0,0,0,100,0,0,200,'',0,0,{refine},'');")
-    def operation(identifier,scope=2,fail=False):
-        for control,checked in [(318,scope!=1),(319,scope!=0)]:
-            user.SendMessageW(user.GetDlgItem(market,control),0xF1,int(checked),0)
+    def operation(identifier,fail=False):
         base=len(log_text(window))
         # Completion is the actual worker enabling its owned maintenance window.
         click(market,identifier)
@@ -114,7 +112,7 @@ def main():
         operation(311,fail=True)
         assert [sha256(p) for p in paths]==synced
         assert int(sql(f"SELECT COUNT(*) FROM {GOLD}.auction_average_price;"))==1
-        operation(316,0)
+        operation(316)
         checks["orphan_price_blocks_sync_without_implicit_deletion"]=True
         for db in [GOLD,CERA]:
             sql(f"INSERT INTO {db}.auction_average_price(item_id,upgrade,seperate_upgrade,average_price) VALUES(16400,0,7,107),(16400,0,8,108),(16400,0,10,110),(16400,1,0,200);")
@@ -128,20 +126,21 @@ def main():
             insert(db,91000000011)
             insert(db,91000000012,2147483000,0)
             insert(db,91000000013,16400,11)
-        operation(314,0)
-        assert count(GOLD)==1 and count(CERA)==3
-        checks["cleanup_only_incompatible_orders_in_selected_market"]=True
-        operation(315,1);assert count(GOLD)==1 and count(CERA)==0
-        checks["clear_orders_respects_market_scope"]=True
-        operation(316,0)
+        operation(314)
+        assert count(GOLD)==1 and count(CERA)==1
+        checks["cleanup_incompatible_orders_in_both_markets"]=True
+        operation(315);assert count(GOLD)==0 and count(CERA)==0
+        checks["clear_orders_covers_both_markets"]=True
+        operation(316)
         assert int(sql(f"SELECT COUNT(*) FROM {GOLD}.auction_average_price;"))==0
-        assert int(sql(f"SELECT COUNT(*) FROM {CERA}.auction_average_price;"))==4
-        checks["clear_prices_respects_market_scope"]=True
+        assert int(sql(f"SELECT COUNT(*) FROM {CERA}.auction_average_price;"))==0
+        checks["clear_prices_covers_both_markets"]=True
+        insert(GOLD,91000000021)
         insert(CERA,91000000021)
         # MySQL trigger deliberately fails the second DB after the first DB
         # has actually deleted its row, forcing the production recovery path.
         sql(f"CREATE TRIGGER {CERA}.native_test_fail BEFORE DELETE ON {CERA}.auction_main FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated rollback experiment';")
-        operation(315,2,fail=True)
+        operation(315,fail=True)
         assert count(GOLD)==1 and count(CERA)==1
         sql(f"DROP TRIGGER {CERA}.native_test_fail;")
         checks["second_market_failure_restores_first_and_second_database"]=True
@@ -162,9 +161,9 @@ def main():
         js=(instance/"dp2/df_game_r.js").read_text(encoding="utf-8")
         assert "nativeAuctionDepth" in js and "HEX(jewel_data)" in js and "bytes[0] === 0" in js
         checks["dp2_search_protection_saved_by_apply"]=True
-        operation(317,0)
-        assert count(GOLD)==0 and count(CERA)==1
-        checks["reset_selected_database_keeps_other_market"]=True
+        operation(317)
+        assert count(GOLD)==0 and count(CERA)==0
+        checks["reset_covers_both_markets"]=True
         for p in (instance/".mysql").glob("market-*/*.sql.sha256"):
             assert sha256(Path(str(p)[:-7]))==p.read_text().strip()
         checks["official_sql_backups_have_matching_hashes"]=True
@@ -194,7 +193,7 @@ def main():
                 assert b"Server Frame Start Ver1.0" in fresh.read_bytes() and b"0904patch_bug" not in fresh.read_bytes()
                 err=Path(str(fresh).replace(".stdout.",".stderr.")).read_bytes()
                 assert b"guest exit status=0" in err and b"unhandled exception" not in err
-                assert count(GOLD)==1 and count(CERA)==2
+                assert count(GOLD)==1 and count(CERA)==1
         checks["original_markets_replay_level85_refine10_orders_on_two_normal_starts"]=True
         click(window,112);wait_for(lambda:user.IsWindowEnabled(user.GetDlgItem(window,111)),"database stopped",60)
         user.PostMessageW(window,0x10,0,0);process.wait(timeout=20);process=None

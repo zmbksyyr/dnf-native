@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import BUILD, sha256
 from runtime_support import tree_identity, runtime_diagnostics
 from gui_support import (user, kernel, windows, wait_for, click, ready, title, hidden_startup,
-                         select_service, service_row, screenshot, guest_root)
+                         select_service, service_row, screenshot, guest_root, open_features, close_features)
 
 LEVELS = [50,55,60,65,70,75,80,85,86,90,95,99,100]
 
@@ -74,18 +74,21 @@ def main():
         for db in ("taiwan_cain_auction_gold","taiwan_cain_auction_cera"):
             for family in ("auction_history","auction_history_buyer"):
                 name = db+"."+family+"_"+month
-                sql("CREATE TABLE IF NOT EXISTS "+name+" LIKE "+db+"."+family+"; INSERT INTO "+name+"(auction_id,occ_time) VALUES(91000000001,NOW());")
+                # This private copy may already have current repaired month
+                # tables. Recreate the legacy fixture before testing migration.
+                sql("DROP TABLE IF EXISTS "+name+"; CREATE TABLE "+name+" LIKE "+db+"."+family+"; INSERT INTO "+name+"(auction_id,occ_time) VALUES(91000000001,NOW());")
                 columns = sql("SHOW COLUMNS FROM "+name+";")
                 tables.append((name,columns,sql("SELECT * FROM "+name+" WHERE auction_id=91000000001;")))
         log = "taiwan_cain_log.log_response_time_"+month
-        sql("CREATE TABLE IF NOT EXISTS "+log+" LIKE taiwan_cain_log.log_response_time_202004; INSERT INTO "+log+"(level,occ_date) VALUES(123,NOW());")
+        sql("DROP TABLE IF EXISTS "+log+"; CREATE TABLE "+log+" LIKE taiwan_cain_log.log_response_time_202004; INSERT INTO "+log+"(level,occ_date) VALUES(123,NOW());")
         log_row = sql("SELECT * FROM "+log+" WHERE level=123;")
         assert "item_guid" not in tables[0][1] and "commission" not in tables[1][1]
         sql("SHUTDOWN;"); server.wait(timeout=60); server = None
         process = subprocess.Popen([str(gui),"--instance",str(instance)],startupinfo=hidden_startup())
         window = wait_for(lambda: next(iter(windows(process.pid,"DNFNativeController")),None),"controller")
-        combo = user.GetDlgItem(window,233)
-        assert user.SendMessageW(combo,0x146,0,0) == len(LEVELS)
+        feature=open_features(window)
+        assert user.SendMessageW(user.GetDlgItem(feature,233),0x146,0,0) == len(LEVELS)
+        close_features(feature)
         click(window,111); ready(window,"数据库 SQL 检查通过",60)
         for db in ("taiwan_cain_auction_gold","taiwan_cain_auction_cera"):
             for m in months:
@@ -143,9 +146,12 @@ def main():
         prior = None
         for level in (70,85,70):
             if prior:
+                feature=open_features(window)
+                combo=user.GetDlgItem(feature,233)
                 user.SendMessageW(combo,0x14E,LEVELS.index(level),0)
-                user.SendMessageW(window,0x111,233 | (1<<16),combo)
-                click(window,234); ready(window,"等级上限已切换为 "+str(level),210)
+                user.SendMessageW(feature,0x111,233 | (1<<16),combo)
+                click(feature,234); ready(window,"等级上限已切换为 "+str(level),210)
+                close_features(feature)
             started = time.monotonic()
             wait_for(lambda: "应用已初始化" in service_row(window,"game"),"original game initialized at "+str(level),180)
             current = pids()

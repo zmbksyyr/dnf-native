@@ -148,7 +148,7 @@ def main():
         record["selection_frames"] = {"samples": samples, "system_highlight_baseline": baseline, "system_highlight_maximum": maximum}
         checks["repeated_selected_card_has_no_native_blue_row_or_log_reload"] = True
 
-        switch = user.GetDlgItem(window, 230)
+        switch = user.GetDlgItem(window, 242)
         user.SendMessageW(switch, 0x201, 1, 10 | (10 << 16))
         user.SendMessageW(switch, 0x202, 0, 10 | (10 << 16))
         time.sleep(.1)
@@ -176,6 +176,17 @@ def main():
         wait_for(lambda: not user.IsWindow(market), "Esc closes market")
         assert user.IsWindowEnabled(window)
         checks["market_escape_closes_and_restores_main_window"] = True
+
+        # The service area has only the feature button. Open the real native
+        # context menu and activate inspection, which now writes the main log.
+        focus(window, grid)
+        baseline = len(title(user.GetDlgItem(window, 206)))
+        user.PostMessageW(window, 0x7B, grid, -1)
+        wait_for(lambda: menu_open(window), "service context menu")
+        key(window, ord("I"))
+        wait_for(lambda: "SHA-256：" in title(user.GetDlgItem(window, 206))[baseline:], "inspection from context menu")
+        assert not windows(process.pid, "#32770")
+        checks["service_context_inspection_uses_main_log_without_dialog"] = True
 
         focus(window, user.GetDlgItem(window, 102))
         key(window, 13)

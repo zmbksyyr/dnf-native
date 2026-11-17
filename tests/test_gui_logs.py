@@ -2,6 +2,7 @@
 
 import argparse
 import ctypes as c
+from ctypes import wintypes as w
 import datetime
 import json
 from pathlib import Path
@@ -20,6 +21,7 @@ from gui_support import rows, select, choose_log_source
 
 from gui_support import guest_root
 from runtime_support import tree_identity
+from test_gui_keyboard import focus, focused
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -85,6 +87,31 @@ def main():
         wait_for(lambda: 'LATEST ORIGINAL LINE' in title(output), 'bounded tail')
         assert len(title(output)) < 300000
         checks['large_log_tail_bounded'] = True
+        # Real queued wheel messages over the viewer, with focus on another
+        # control, must work despite the absence of WS_VSCROLL/WS_HSCROLL.
+        user.ShowWindow(window,4)
+        click(window,243)
+        wait_for(lambda:user.SendMessageW(output,0xCE,0,0)>50,"followed log at bottom")
+        assert not user.GetWindowLongW(output,-16)&0x00300000
+        target=user.GetDlgItem(window,283)
+        focus(window,target)
+        point=w.POINT(40,40)
+        user.ClientToScreen.argtypes=[w.HWND,c.POINTER(w.POINT)]
+        user.ClientToScreen(output,c.byref(point))
+        location=(point.x&65535)|((point.y&65535)<<16)
+        def wheel(delta):user.PostMessageW(window,0x20A,(delta&65535)<<16,location)
+        before_wheel=user.SendMessageW(output,0xCE,0,0)
+        wheel(60);time.sleep(.1)
+        assert user.SendMessageW(output,0xCE,0,0)==before_wheel
+        wheel(60)
+        wait_for(lambda:user.SendMessageW(output,0xCE,0,0)<before_wheel,"high-resolution wheel scrolls up")
+        assert user.SendMessageW(user.GetDlgItem(window,242),0xF0,0,0)==0
+        above=user.SendMessageW(output,0xCE,0,0)
+        wheel(-120)
+        wait_for(lambda:user.SendMessageW(output,0xCE,0,0)>above,"wheel scrolls down")
+        assert focused(window)==target
+        checks['wheel_without_scrollbars_hover_routing_partial_deltas_and_pause_follow']=True
+        click(window,242)  # Restore follow before the existing preservation check.
         click(window, 242)
         user.SendMessageW(output, 0xB1, 0, 10)
         user.SendMessageW(output, 0xB6, 0, 30)

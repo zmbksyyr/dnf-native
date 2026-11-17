@@ -23,7 +23,7 @@ from bootstrap import sha256, BUILD
 from runtime_support import tree_identity
 from probe_core_protocols import channel, relay, stun
 from gui_support import user, kernel, windows, wait_for, click, ready, ready_stopped, screenshot, log_text
-from gui_support import rows, select_service, service_row
+from gui_support import rows, select_service, service_row, open_features, close_features
 
 from gui_support import guest_root
 
@@ -138,20 +138,29 @@ def main():
         process = subprocess.Popen([str(gui), "--instance", str(instance)], env=env)
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "native plugin window")
 
+    def panel():
+        return next(iter(windows(process.pid,"DnfNativeMarketMaintenance")),None) or open_features(window)
+
+    def close_panel():
+        feature=next(iter(windows(process.pid,"DnfNativeMarketMaintenance")),None)
+        if feature: close_features(feature)
+
     def checked(identifier):
-        return user.SendMessageW(user.GetDlgItem(window, identifier), 0xF0, 0, 0) == 1
+        return user.SendMessageW(user.GetDlgItem(panel(), identifier), 0xF0, 0, 0) == 1
 
     def save(dp2, frida):
         if checked(230) != dp2:
-            click(window, 230); wait_for(lambda: checked(230) == dp2, "DP2 checkbox")
+            click(panel(), 230); wait_for(lambda: checked(230) == dp2, "DP2 checkbox")
         if dp2 and checked(231) != frida:
-            click(window, 231); wait_for(lambda: checked(231) == frida, "Frida checkbox")
+            click(panel(), 231); wait_for(lambda: checked(231) == frida, "Frida checkbox")
         base=len(log_text(window))
-        click(window, 232); ready(window, "插件设置已保存",since=base)
+        click(panel(), 232); ready(window, "插件设置已保存",since=base)
+        close_panel()
         ini.read(manifest, encoding="utf-16")
         assert ini["plugins"]["mode"] == ("off" if not dp2 else "frida" if frida else "lua")
 
     def fixture(frida):
+        close_panel()
         select_service(window, "game")
         previous = set((instance / "service-logs").glob("game-*.stdout.private.log"))
         click(window, 221)
@@ -159,12 +168,14 @@ def main():
         log = wait_for(lambda: next(iter(set((instance / "service-logs").glob("game-*.stdout.private.log")) - previous), None), "new game log")
         marker = b"dnf-native-plugin-probe-hold"
         wait_for(lambda: marker in log.read_bytes(), "actual Lua/Frida fixture", 90)
-        assert all(not user.IsWindowEnabled(user.GetDlgItem(window, key)) for key in [230, 231, 232])
+        assert all(not user.IsWindowEnabled(user.GetDlgItem(panel(), key)) for key in [230, 231, 232])
+        close_panel()
         pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         observed = loaded_plugins(pid, instance)
         assert observed == {"dp2": True, "frida": frida}, observed
         wait_for(lambda: "已退出，代码 42" in service_row(window, "game"), "intentional fixture exit", 30)
-        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 232)), "plugin editing after game exit")
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(panel(), 232)), "plugin editing after game exit")
+        close_panel()
         output = log.read_bytes()
         if frida:
             assert all(marker in output for marker in [b"dnf-native-original-game-hook-ok", b"dnf-native-js-lua-roundtrip-ok calls=32", b"dnf-native-lua-js-roundtrip-ok calls=32"])
@@ -184,6 +195,7 @@ def main():
         user.PostMessageW(window, 0x10, 0, 0); process.wait(timeout=30)
         launch()
         checks["saved_lua_only_mode_survives_gui_restart"] = checked(230) and not checked(231)
+        close_panel()
         click(window, 223); ready(window, "已启动默认服务进程", 90)
         time.sleep(25)
         assert sum("进程运行中" in row for row in rows(window)) == 15
@@ -198,13 +210,15 @@ def main():
         save(True, False)
         checks["frida_disabled_again_without_stopping_peers"] = fixture(False)
         save(False, False)
-        assert not checked(231) and not user.IsWindowEnabled(user.GetDlgItem(window, 231))
+        assert not checked(231) and not user.IsWindowEnabled(user.GetDlgItem(panel(), 231))
         checks["dp2_off_also_disables_frida"] = True
         lua.write_bytes(lua_before); js.write_bytes(js_before)
+        close_panel()
         select_service(window, "game"); click(window, 221); ready(window, "game：进程运行中", 30)
         started = time.monotonic()
         log_dir = guest_root(instance) / "home/neople/game/log"
         wait_for(lambda: any(b"All DB Open Success" in path.read_bytes() for path in log_dir.rglob("*.init")), "original game database initialization", 90)
+        close_panel()
         pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         checks["dp2_off_live_modules"] = loaded_plugins(pid, instance)
         assert checks["dp2_off_live_modules"] == {"dp2": False, "frida": False}

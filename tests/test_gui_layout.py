@@ -4,6 +4,7 @@ import ctypes as c
 from ctypes import wintypes as w
 import datetime
 import json
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -78,7 +79,8 @@ def main():
     record = {"os": platform.platform(), "gui_sha256": sha256(gui), "checks": {},
               "scope": "Real Win32 layout, mouse selection and filtering. DPI messages exercise layout only, not a physical monitor or cross-OS acceptance."}
     checks = record["checks"]
-    process = subprocess.Popen([str(gui), "--instance", str(source)])
+    process = subprocess.Popen([str(gui), "--instance", str(source)],
+                               env=dict(os.environ, LOCALAPPDATA=str(probe / "profile")))
     window = None
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
@@ -122,13 +124,12 @@ def main():
             assert tiles[0][1] == tiles[6][1] < tiles[7][1] == tiles[13][1] < tiles[14][1] == tiles[18][1]
             for identifier in [102, 223, 224, 220, 202, 111, 113, 114, 206, 283, 284, 285, 286, 287]:
                 assert identifier in visible
-            for identifier in [230, 231]:
-                area = visible[identifier]
-                needed = text_width(title(user.GetDlgItem(window, identifier)), dpi) + round(SWITCH_CHROME * dpi / 96)
-                assert area[2] - area[0] >= needed, (identifier, "switch label is clipped", area[2] - area[0], needed)
+            for identifier in [230,231,232,233,234,235,281,221,222,225]:
+                assert not user.GetDlgItem(window,identifier), (identifier,"removed main-window control")
+            assert visible[101][2] + round(44*dpi/96) < visible[250][0], "directory and IP groups touch"
             assert visible[102][3] < visible[220][1] < visible[202][1] < visible[206][1]
             for identifiers in [[102, 260, 101, 250, 251, 262, 116, 280, 224, 223],
-                                [235, 233, 234, 300, 230, 231, 232, 281, 221, 222, 225],
+                                [207, 213, 300],
                                 [112, 111, 113, 114, 115, 282],
                                 [284, 285, 286, 287, 288, 283, 241, 243, 242]]:
                 for a, b in zip(identifiers, identifiers[1:]):
@@ -144,7 +145,7 @@ def main():
         assert full
         edit = user.GetDlgItem(window, 283)
         set_text(edit, "mysql")
-        wait_for(lambda: title(user.GetDlgItem(window, 206)) == full, "case-insensitive MySQL match", 5)
+        wait_for(lambda: title(user.GetDlgItem(window, 206)) == "".join(line for line in full.splitlines(keepends=True) if "mysql" in line.lower()), "case-insensitive MySQL match", 5)
         needle = "GUI-NO-SUCH-LOG-LINE-" + stamp
         set_text(edit, needle)
         wait_for(lambda: not title(user.GetDlgItem(window, 206)), "filter removes nonmatching lines", 5)
@@ -158,7 +159,7 @@ def main():
         market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market maintenance window", 5)
         market_client = w.RECT()
         user.GetClientRect(market, c.byref(market_client))
-        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 323, 324]
+        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 320, 321, 324, 325, 326, 230, 231, 232, 233, 234, 235]
         for identifier in market_controls:
             child = user.GetDlgItem(market, identifier)
             assert child and user.IsWindowVisible(child), (identifier, "market control missing")
@@ -173,30 +174,28 @@ def main():
         for top,bottom in zip([310,311,312,313],[314,315,316,317]):
             a,b=rect(user.GetDlgItem(market,top),market),rect(user.GetDlgItem(market,bottom),market)
             assert a.left==b.left and a.right==b.right and a.bottom<b.top
-        assert rect(user.GetDlgItem(market, 318), market).top == rect(user.GetDlgItem(market, 319), market).top
-        assert rect(user.GetDlgItem(market, 313), market).bottom < rect(user.GetDlgItem(market,318),market).top
-        assert rect(user.GetDlgItem(market, 318), market).bottom <= rect(user.GetDlgItem(market,314),market).top
+        for identifier in [318,319,323,307]:
+            assert not user.GetDlgItem(market,identifier)
+        for identifier in [230,231,301,302,303,304]:
+            area=rect(user.GetDlgItem(market,identifier),market)
+            needed=text_width(title(user.GetDlgItem(market,identifier)),120)+round(SWITCH_CHROME*120/96)
+            assert area.right-area.left>=needed, (identifier,"clipped switch text")
+        for identifiers in [[235,233,234,230,231,232],[301,302],[303,304]]:
+            for left,right in zip(identifiers,identifiers[1:]):
+                assert rect(user.GetDlgItem(market,left),market).right < rect(user.GetDlgItem(market,right),market).left
         assert not user.GetDlgItem(market,307)
         summary=rect(user.GetDlgItem(market,308),market)
         state=rect(user.GetDlgItem(market,309),market)
         assert summary.bottom<=state.top and state.bottom-summary.top<=round(40*120/96)
-        assert user.SendMessageW(user.GetDlgItem(market, 318), 0x00F0, 0, 0) == 1
-        assert user.SendMessageW(user.GetDlgItem(market, 319), 0x00F0, 0, 0) == 1
-        click(market,318)
-        wait_for(lambda:user.SendMessageW(user.GetDlgItem(market,318),0xF0,0,0)==0,"gold scope unchecked",5)
-        assert user.SendMessageW(user.GetDlgItem(market,319),0xF0,0,0)==1
-        click(market,319)
-        wait_for(lambda:user.SendMessageW(user.GetDlgItem(market,319),0xF0,0,0)==0,"cera scope unchecked",5)
-        click(market,315)
-        wait_for(lambda:"至少选择一个市场范围" in title(user.GetDlgItem(window,206)),"empty scope rejected in main log",5)
-        assert user.IsWindowEnabled(market)
+        assert all(not user.IsWindowEnabled(user.GetDlgItem(market,identifier)) for identifier in range(310,318))
+        assert title(market)=="功能"
         assert not user.GetDlgItem(market,306) and not user.GetDlgItem(window,204)
         assert not user.GetWindowLongW(user.GetDlgItem(window,206),-16) & 0x00300000
         screenshot(market,probe/"market-window.png")
         user.PostMessageW(market,0x10,0,0)
         wait_for(lambda:not user.IsWindow(market),"market title-bar close",5)
-        checks["auction_two_rows_four_columns_and_data_scopes"] = True
-        checks["empty_scope_reported_only_in_main_log_and_no_scrollbars"] = True
+        checks["feature_settings_and_auction_two_rows_four_columns"] = True
+        checks["both_market_scope_is_fixed_and_logs_have_no_scrollbars"] = True
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
         record["traceback"] = traceback.format_exc()
