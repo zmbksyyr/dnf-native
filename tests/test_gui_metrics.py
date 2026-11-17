@@ -58,12 +58,29 @@ def process_tree(pid):
             ok = kernel.Process32NextW(snapshot, c.byref(entry))
     finally:
         kernel.CloseHandle(snapshot)
-    found = {pid}
+    def created(process_id):
+        handle = kernel.OpenProcess(0x1000, False, process_id)
+        if not handle:
+            if c.get_last_error() == 87:
+                return None
+            raise c.WinError(c.get_last_error())
+        try:
+            times = [w.FILETIME() for _ in range(4)]
+            assert kernel.GetProcessTimes(handle, *[c.byref(value) for value in times])
+            return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        finally:
+            kernel.CloseHandle(handle)
+    found = {pid: created(pid)}
     while True:
-        children = {p for p, (parent, _) in entries.items() if parent in found}
-        if children <= found:
+        children = {}
+        for process_id, (parent, _) in entries.items():
+            if parent in found and process_id not in found:
+                birth = created(process_id)
+                if birth is not None and birth >= found[parent]:
+                    children[process_id] = birth
+        if not children:
             return {p: entries[p][1] for p in found}
-        found |= children
+        found.update(children)
 
 
 def counters(pids):

@@ -310,17 +310,33 @@ struct App {
             parents.emplace_back(entry.th32ProcessID,entry.th32ParentProcessID);
         } while(Process32NextW(snapshot,&entry));
         CloseHandle(snapshot);
-        std::vector<DWORD> pids{GetCurrentProcessId()};
-        for(size_t i=0;i<pids.size();++i)
-            for(const auto &child:parents)
-                if(child.second==pids[i] && std::find(pids.begin(),pids.end(),child.first)==pids.end())
-                    pids.push_back(child.first);
         auto ticks=[](const FILETIME &value) -> ULONGLONG {
             return (static_cast<ULONGLONG>(value.dwHighDateTime)<<32) | value.dwLowDateTime;
         };
+        std::vector<ProcessMetric> pids;
+        auto add_process=[&](DWORD pid,ULONGLONG parent_creation) {
+            // Parent PIDs in a snapshot can refer to an earlier process that
+            // has exited. Read creation time with limited rights before asking
+            // for memory access; protected old system processes allow this.
+            HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid);
+            if(!process) {if(GetLastError()!=ERROR_INVALID_PARAMETER) complete=false;return;}
+            FILETIME creation{},exit{},kernel{},user{};
+            bool sampled=GetProcessTimes(process,&creation,&exit,&kernel,&user)!=FALSE;
+            CloseHandle(process);
+            if(!sampled) {complete=false;return;}
+            ULONGLONG created=ticks(creation);
+            if(created>=parent_creation) pids.push_back({pid,created,0});
+        };
+        add_process(GetCurrentProcessId(),0);
+        for(size_t i=0;i<pids.size();++i)
+            for(const auto &child:parents)
+                if(child.second==pids[i].pid && std::none_of(pids.begin(),pids.end(),
+                   [&](const ProcessMetric &known) {return known.pid==child.first;}))
+                    add_process(child.first,pids[i].creation);
         ULONGLONG now=GetTickCount64(), elapsed_cpu=0, working=0;
         std::vector<ProcessMetric> samples;
-        for(DWORD pid:pids) {
+        for(const auto &identity:pids) {
+            DWORD pid=identity.pid;
             HANDLE process=OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,pid);
             if(!process) { if(GetLastError()!=ERROR_INVALID_PARAMETER) complete=false; continue; }
             FILETIME creation{}, exit{}, kernel{}, user{};
@@ -332,6 +348,7 @@ struct App {
             if(stopped) continue;
             if(!sampled) {complete=false;continue;}
             ProcessMetric sample{pid,ticks(creation),ticks(kernel)+ticks(user)};
+            if(sample.creation!=identity.creation) continue; // PID reused after the snapshot.
             auto previous=std::find_if(metrics_processes.begin(),metrics_processes.end(),
                 [&](const ProcessMetric &old) {return old.pid==pid && old.creation==sample.creation;});
             if(previous!=metrics_processes.end() && sample.cpu>=previous->cpu) elapsed_cpu+=sample.cpu-previous->cpu;
