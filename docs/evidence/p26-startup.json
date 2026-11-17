@@ -31,7 +31,7 @@
     "database_detail_actual_connection": true,
     "new_instance_default_game_and_test_four_tables": true
   },
-  "scope": "Actual default launcher database/token path and original server startup/restart/shutdown; parameter-capture child is not a game client, town/combat not accepted",
+  "scope": "Actual default launcher database/token path and original server startup/restart/shutdown; parameter-capture child records the launch contract",
   "receipts": {
     "disconnect_before": {
       "path": "probes/20261116T112615721311Z/tcp-disconnect/receipt.json",

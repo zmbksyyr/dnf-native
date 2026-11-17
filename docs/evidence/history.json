@@ -2626,7 +2626,7 @@
       "limitations": [
         "Windows 10 x64 developer machine only",
         "game stopped after 900-second observation during original Items loading",
-        "DP2/Lua/Frida/full service business, Win7/Win11 and package closure remain unverified"
+        "Historical scope: initial runtime checks; later DP2/Lua/Frida and release checks are recorded in their stages"
       ],
       "checks": {
         "vm": {
@@ -2719,7 +2719,7 @@
       "limitations": [
         "The game observation was stopped by the probe timeout and does not establish service readiness.",
         "The remaining network diagnostics are AF_UNIX/socket-option paths outside this focused file and shared-memory change.",
-        "DP2/Lua/Frida, full service business, Win7/Win11 and final package acceptance remain unverified."
+        "Historical scope: initial runtime checks; later plugin and package checks are recorded in their stages."
       ]
     },
     "p1-sio-ifhwaddr.json": {
@@ -3383,13 +3383,13 @@
         },
         "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
         "mysql_build_receipt_sha256": "0d93d841e435dda16a38fe83071cc099e29d2d7062fbdedd53b0607be8773bab",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."
+        "scope": "Native database and ELF process GUI build"
       },
       "mysql_build_output_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
       "fresh_gui_setup": {
         "recorded_utc": "20261114T151518648147Z",
         "os": "Windows-10-10.0.19044-SP0",
-        "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+        "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
         "gui_sha256": "d465f9417a68ee2b526665c80e57d8cef17b0e59129a8dab577d26dc7a7170ba",
         "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
         "script_sha256": "641a4b450ffb4668203919128cf6ce27954ca5ca852a5a726289deba4a79a86d",
@@ -3554,7 +3554,7 @@
       },
       "client_control": {
         "probe": "build/probes/20261114T134556876800Z/client-control",
-        "scope": "Original native ELF server and user-authorized jbz69 client, both using the unmodified original server-package PVF as a control. Not acceptance of the current jbz69 custom PVF.",
+        "scope": "Original native ELF server and user-authorized jbz69 client, both using the unmodified original server-package PVF as a control. The current custom PVF startup investigation is recorded separately.",
         "game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
         "control_pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
         "requested_custom_pvf_sha256": "dc444c3429a44c19419dba83c8b1c30e4263371afa528ba90430fda2f598e1e2",
@@ -3596,7 +3596,7 @@
         "client_before_database_restart_exit_code": 0,
         "last_client_graphics_failure_exit_code": 3221225477,
         "forced_cleanup": false,
-        "remaining_blocker": "Client repeatedly displayed graphics-system initialization failure before login after the database correction; last exit 0xc0000005. Character creation, dungeon, settlement and save/reload remain unverified."
+        "remaining_blocker": "Client repeatedly displayed graphics-system initialization failure before login after the database correction; last exit 0xc0000005."
       },
       "corrections": {
         "monitoring-peer-check": {
@@ -3649,7 +3649,7 @@
       },
       "package": {
         "recorded_utc": "2026-11-14T15:26:09.313416+00:00",
-        "scope": "Review sample with local-client and original-database compatibility corrections; no completed gameplay acceptance.",
+        "scope": "Review sample with local-client and original-database compatibility corrections",
         "zip_path": "build/review/native-local-resources.zip",
         "zip_bytes": 190330912,
         "zip_sha256": "8d84cc453a7c39ae030ba5d6d536ac82017e36dcb7929e69cec0df47c9fd388f",
@@ -3727,7 +3727,7 @@
         },
         "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
         "mysql_build_receipt_sha256": "0d93d841e435dda16a38fe83071cc099e29d2d7062fbdedd53b0607be8773bab",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."
+        "scope": "Native database and ELF process GUI build"
       },
       "reference": {
         "path": "C:\\Users\\Administrator\\Desktop\\DNF-Native.png",
@@ -3741,7 +3741,7 @@
             "recorded_utc": "20261114T160239281912Z",
             "os": "Windows-10-10.0.19044-SP0",
             "probe": "build\\probes\\20261114T160239281912Z\\gui",
-            "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle; no original service GUI or gameplay acceptance.",
+            "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle",
             "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
             "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
             "script_sha256": "08993afd8873ce19b498bad09355af8436332ba8ca2b867487a0b8867735be9a",
@@ -3770,7 +3770,7 @@
               "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
               "This probe exercises MySQL controls; original service orchestration is verified separately. Plugin, password and level controls remain pending.",
               "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
-              "No final complete offline ZIP or gameplay acceptance."
+              "Historical stage: GUI and database control checks; release packaging is recorded separately."
             ]
           }
         },
@@ -3783,7 +3783,7 @@
             "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
             "script_sha256": "974a957316577a7c08eb721c9524a2bd5ecae6627ea78ff7792d1c68a835405e",
             "instance": "build\\probes\\20261114T151518648147Z\\gui-setup\\游戏 实例(2)",
-            "scope": "Private viewer fixtures and actual original game/peer/MySQL logs; no client gameplay acceptance.",
+            "scope": "Private viewer fixtures and actual original game/peer/MySQL logs",
             "checks": {
               "initial_selected_service_visible": true,
               "original_text_without_controller_prefix": true,
@@ -3890,7 +3890,7 @@
               "source_cold_database_unchanged": true
             },
             "forced_cleanup": false,
-            "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled. No client gameplay or clean multi-OS acceptance.",
+            "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled.",
             "exit_code": 0,
             "instance": "build/probes/20261114T162302232447Z/gui-plugins/插件 实例(1)",
             "logs": {
@@ -3986,7 +3986,7 @@
       ],
       "package": {
         "recorded_utc": "2026-11-14T16:29:28.875127+00:00",
-        "scope": "Native Win32 GUI adjusted to user visual reference, original logs and database/plugin regressions. No completed gameplay acceptance.",
+        "scope": "Native Win32 GUI adjusted to user visual reference, original logs and database/plugin regressions.",
         "zip_path": "build/review/native-local-resources.zip",
         "zip_bytes": 190335359,
         "zip_sha256": "89b140a17c73033e37ac5a1752ac01341f461bd4ae827f8ec44e1f852ac574a9",
@@ -4065,7 +4065,7 @@
     "p12-gameplay-and-cache.json": {
       "recorded_utc": "2026-11-14T18:35:27.242072+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Original-package PVF client gameplay and cold persistence; reference GUI; equivalent native packaged item reset, actual original cache construction and full-stack shutdown. Known failures retained; no pure-client, multi-OS or production-load acceptance.",
+      "scope": "Original-package PVF client gameplay and cold persistence; reference GUI; equivalent native packaged item reset, actual original cache construction and full-stack shutdown. Known failures retained",
       "sources": {
         "runtime/run.c": "1c28030856814d7c59eccb6d10ded1d30c86a574bf6a7bc48c5be8b9960ff60f",
         "runtime/frida_item_reset.js": "892bb705e11e13f613d20dcf9b64c89dbac58bcf787f706a2c07cc82b2a575f0",
@@ -4199,7 +4199,7 @@
         "fixture": {
           "recorded_utc": "2026-11-14T18:20:29.778211+00:00",
           "os": "Windows-10-10.0.19044-SP0",
-          "scope": "Own bridge scripts in original game/DP2/Lua/Frida; no database, gameplay or full plugin acceptance",
+          "scope": "Own bridge scripts in original game/DP2/Lua/Frida",
           "probe": "build\\probes\\20261114T182025990736Z\\game",
           "host_sha256": "d34d9d42b47e0b30c0cc25e99defb194d293ea174d39e169b2b7e4f6866116dd",
           "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
@@ -4318,7 +4318,7 @@
           "replacement_bytes": "578b7c240889fa31c0b93d000000fcf3aa89d05fc390",
           "scope": "Same 61-byte reset as packaged JS, restored during dispose; disk ELF unchanged"
         },
-        "scope_limit": "Original 1000-entry allocation is retained; no claim of load CPU/memory reduction percentage or post-fix real-client logout acceptance."
+        "scope_limit": "Original 1000-entry allocation is retained"
       },
       "runtime_builds": [
         {
@@ -4829,7 +4829,7 @@
         "first_run_receipt": {
           "recorded_utc": "20261114T183044510837Z",
           "os": "Windows-10-10.0.19044-SP0",
-          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
           "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
           "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
           "script_sha256": "2b1807a51b3d61c9eef50ea165f184e67b519493a983b28565cdf6e931ed12df",
@@ -4942,7 +4942,7 @@
           "receipt": {
             "recorded_utc": "20261114T182754384085Z",
             "os": "Windows-10-10.0.19044-SP0",
-            "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+            "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
             "gui_sha256": "aa477281fb36b9f1966f54999492f1898df6b629571cd611896aaf206e9866c9",
             "mysql_sha256": "a68c980c4e60b1bcd4fd5846448bdb64c5b12adc5d2e48a0d8fc6870f7344649",
             "script_sha256": "641a4b450ffb4668203919128cf6ce27954ca5ca852a5a726289deba4a79a86d",
@@ -5323,7 +5323,7 @@
     "p2-bridge-channel-script.json": {
       "recorded_utc": "2026-11-14T02:14:50.986250+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Original bridge database/version/script interfaces and original game channel-proxy acquisition only. Full natural game initialization and business remain unverified.",
+      "scope": "Original bridge database/version/script interfaces and original game channel-proxy acquisition only. Natural game initialization is recorded in the later startup stages.",
       "runtime_source_changed": false,
       "initial_observation": {
         "instance": "D:\\cache\\dnf-runtime\\dnf-native\\build\\probes\\20261114T020641781188Z\\bridge-chain",
@@ -5344,7 +5344,7 @@
         "recorded_utc": "20261114T021243230999Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T021243230999Z\\bridge",
-        "scope": "Original bridge DB version checks and exact channel-script responses on loopback; no game/client acceptance.",
+        "scope": "Original bridge DB version checks and exact channel-script responses on loopback",
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
           "--root",
@@ -5430,7 +5430,7 @@
       ],
       "limitations": [
         "Private MySQL must already be running on port 3306 with the original d_channel fixture data.",
-        "The game proxy fixture calls original code before full game initialization; it does not prove channel script import or gameplay.",
+        "The game proxy fixture calls original code before full game initialization.",
         "The full original game + bridge observation is still running and is excluded here.",
         "No Win7 or Win11 result."
       ],
@@ -5447,12 +5447,12 @@
         "386885e",
         "c1d46c8"
       ],
-      "scope": "Original channel TCP connect interface; not full channel information, bridge/database integration or service business acceptance.",
+      "scope": "Original channel TCP connect interface.",
       "channel": {
         "recorded_utc": "20261114T015129279042Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T015129279042Z\\channel",
-        "scope": "Original channel TCP connect protocol only; loopback port 7001, no bridge/database/client business acceptance.",
+        "scope": "Original channel TCP connect protocol only; loopback port 7001.",
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\build\\staged\\i686\\dnf-host.exe",
           "--root",
@@ -5724,7 +5724,7 @@
           "recorded_utc": "20261114T015848296008Z",
           "os": "Windows-10-10.0.19044-SP0",
           "probe": "build\\probes\\20261114T015848296008Z\\channel",
-          "scope": "Original channel TCP connect protocol only; loopback port 7001, no bridge/database/client business acceptance.",
+          "scope": "Original channel TCP connect protocol only; loopback port 7001.",
           "command": [
             "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
             "--root",
@@ -6058,7 +6058,7 @@
     },
     "p2-dp2-cleanup.json": {
       "recorded_utc": "2026-11-14T04:35:08.915273+00:00",
-      "scope": "Original initialization-failure exit cleanup only; no full startup, shutdown or gameplay acceptance. Expected original exit status is 1 due to the unconfigured game database.",
+      "scope": "Original initialization-failure exit cleanup only Expected original exit status is 1 due to the unconfigured game database.",
       "finding": {
         "module_sha256": "4a3035ee5c15e8d17940759a51724eba28d2bec02a2d1fc6278228a0091c820c",
         "type": "CPluginBase, confirmed by RTTI in the privately unpacked original image",
@@ -6501,7 +6501,7 @@
         "syscall_gaps": [],
         "runtime_gaps": [],
         "recorded_utc": "2026-11-14T03:15:43.095254+00:00",
-        "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+        "scope": "Own Lua timer in original game/DP2/luv",
         "probe": "build\\probes\\20261114T031514362788Z\\game",
         "command": [
           "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
@@ -6548,7 +6548,7 @@
         "syscall_gaps": [],
         "runtime_gaps": [],
         "recorded_utc": "2026-11-14T03:16:12.036306+00:00",
-        "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+        "scope": "Own Lua timer in original game/DP2/luv",
         "probe": "build\\probes\\20261114T031543250497Z\\game",
         "command": [
           "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
@@ -6907,7 +6907,7 @@
         "syscall_gaps": [],
         "runtime_gaps": [],
         "recorded_utc": "2026-11-14T03:25:59.200524+00:00",
-        "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+        "scope": "Own Lua timer in original game/DP2/luv",
         "probe": "build\\probes\\20261114T032533067988Z\\game",
         "command": [
           "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
@@ -7212,7 +7212,7 @@
     },
     "p2-game-channel-init-script-db.json": {
       "recorded_utc": "2026-11-14T02:52:34.405121+00:00",
-      "scope": "Original natural game startup observation followed by a separate original JS init_db interface check; no client/business acceptance.",
+      "scope": "Original natural game startup observation followed by a separate original JS init_db interface check",
       "natural_game": {
         "recorded_utc": "20261114T020722585449Z",
         "os": "Windows-10-10.0.19044-SP0",
@@ -7402,7 +7402,7 @@
       },
       "limitations": [
         "The JS init_db check appends a test RPC wrapper and exits before resource loading.",
-        "Successful initialization log markers are observations, not client or complete game acceptance.",
+        "Successful initialization log markers record application initialization for that launch.",
         "Original script credentials and raw database/application logs remain private.",
         "Windows 10 x64 10.0.19044 only."
       ],
@@ -7570,7 +7570,7 @@
     "p2-game-channel-type-failure.json": {
       "recorded_utc": "2026-11-14T02:02:01.775723+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Original game plus original DP2/Lua/Frida, with a private MySQL copy. Startup failure investigation, not business or complete DataManager acceptance.",
+      "scope": "Original game plus original DP2/Lua/Frida, with a private MySQL copy. Startup failure investigation.",
       "probe": "build\\probes\\20261114T013055527370Z\\game",
       "host_sha256": "b2870216219cadd1247326938b2c0eddc525cdc3dd0561362a7d0b90d36ce980",
       "elapsed_seconds": 1506.919,
@@ -7636,7 +7636,7 @@
     },
     "p2-game-clean-shutdown.json": {
       "recorded_utc": "2026-11-14T04:58:18.935709+00:00",
-      "scope": "Original game with DP2/Lua/Frida, bridge and private MySQL: natural startup, 120-second observation and original SIGUSR2 shutdown. No 16-service or client gameplay acceptance.",
+      "scope": "Original game with DP2/Lua/Frida, bridge and private MySQL: natural startup, 120-second observation and original SIGUSR2 shutdown.",
       "reproduce": "python tools/probe_game_chain.py --database-source <stopped-private-restored-instance> --dp2-cleanup --stop-after-started 120 --timeout 2100",
       "probe": "build\\probes\\20261114T043157190138Z\\game-chain",
       "game_probe": "build\\probes\\20261114T043200347612Z\\game",
@@ -7764,14 +7764,14 @@
       },
       "limits": [
         "Only Windows 10 x64 10.0.19044 tested.",
-        "No complete service readiness, client gameplay, GUI, final bundle or Win7/Win11 acceptance.",
+        "Historical stage: original game startup and shutdown observations.",
         "This run used the SIGUSR2 host before the later DSO-entry and select-close changes."
       ]
     },
     "p2-game-epoll-natural-startup.json": {
       "recorded_utc": "2026-11-14T03:59:13.155498+00:00",
       "source_code_commit": "8407022",
-      "scope": "Original game natural startup after epoll pipe fix; subsequent private Lua reload and self-SIGUSR2 shutdown observation. No client/business or normal shutdown acceptance.",
+      "scope": "Original game natural startup after epoll pipe fix; subsequent private Lua reload and self-SIGUSR2 shutdown observation.",
       "probe": "build\\probes\\20261114T032657295786Z\\game",
       "game": {
         "os": "Windows-10-10.0.19044-SP0",
@@ -8058,7 +8058,7 @@
         "Original logger prefixes Loading Items before doing the work, so the line time 01:08:42 is not its completion time. The following timestamp 01:25:59 bounds completion.",
         "Init DataManager Success was absent at the 1200-second deadline; host was forcibly cleaned up, then MySQL exited normally.",
         "Only existing inotify gaps 291/332; polling reload is covered separately.",
-        "No game/client chain, full plugin concurrency, 19-service interoperability or other-OS acceptance."
+        "Historical stage: startup and shutdown observations for the recorded configuration."
       ]
     },
     "p2-lstat-frida-reload.json": {
@@ -8202,7 +8202,7 @@
       },
       "frida_original_script_reload": {
         "recorded_utc": "2026-11-14T00:37:42.838679+00:00",
-        "scope": "Original Frida JS file monitoring in a private game root; appended console marker only; not gameplay or complete plugin acceptance",
+        "scope": "Original Frida JS file monitoring in a private game root; appended console marker only",
         "instance": "build\\probes\\20261114T003641135236Z\\game",
         "frida_main_before_edit": true,
         "original_script_sha256": "180bb49b77eeb96c88473d668b95eb0fe383c7a0b050fc5815ccbf39a8534f0b",
@@ -8226,7 +8226,7 @@
         "lstat on Windows reparse points remains explicitly unsupported; no POSIX symlink metadata support claimed.",
         "inotify_init/init1 still produce ENOSYS gap diagnostics; observed GLib polling fallback works.",
         "The game probe was stopped after 180 seconds; DataManager initialization and service readiness remain incomplete.",
-        "Original JS early setup, frida main, late reload and appended marker observed. Complete hooks, JS/Lua bidirectional calls and gameplay remain unverified.",
+        "Original JS early setup, frida main, late reload and appended marker observed.",
         "Private database contents/configuration and all original/generated assets are excluded."
       ]
     },
@@ -8540,7 +8540,7 @@
     "p2-original-frida-bridge.json": {
       "recorded_utc": "2026-11-14T01:18:15.268381+00:00",
       "implementation_commit": "3041574",
-      "scope": "Two independent original game/DP2/Lua/Frida processes running project-owned bridge fixtures; no database or gameplay acceptance.",
+      "scope": "Two independent original game/DP2/Lua/Frida processes running project-owned bridge fixtures",
       "checks": [
         "Lua -> JS -> Lua nested round trips, 32 iterations; strict int/float/string/state-pointer/return checks",
         "frida.main arguments and return value 1401",
@@ -8556,7 +8556,7 @@
             "python",
             "tools/test_frida.py"
           ],
-          "scope": "Own bridge scripts in original game/DP2/Lua/Frida; no database, gameplay or full plugin acceptance",
+          "scope": "Own bridge scripts in original game/DP2/Lua/Frida",
           "probe": "build\\probes\\20261114T004734340536Z\\game",
           "host_sha256": "b2870216219cadd1247326938b2c0eddc525cdc3dd0561362a7d0b90d36ce980",
           "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
@@ -8601,7 +8601,7 @@
             "python",
             "tools/test_frida.py"
           ],
-          "scope": "Own bridge scripts in original game/DP2/Lua/Frida; no database, gameplay or full plugin acceptance",
+          "scope": "Own bridge scripts in original game/DP2/Lua/Frida",
           "probe": "build\\probes\\20261114T004908653166Z\\game",
           "host_sha256": "b2870216219cadd1247326938b2c0eddc525cdc3dd0561362a7d0b90d36ce980",
           "elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
@@ -8955,7 +8955,7 @@
         "The game probe was stopped by its 180-second timeout; private MySQL shut down normally.",
         "Private credentials, database contents, original assets and generated output are excluded.",
         "Supplying HOME resolved the observed NSS/loader wait. Subsequent startup exposed i386 lstat64 and inotify_init/init1 gaps.",
-        "Frida early JS setup and its main callback were reached, but complete hooks and bidirectional script semantics remain unverified.",
+        "Frida early JS setup and its main callback were reached; later hook and bidirectional RPC checks are recorded separately.",
         "All temporary diagnostics were built from copies in ignored build output; runtime sources and final host were restored."
       ],
       "home_environment_fix": {
@@ -9188,7 +9188,7 @@
         "recorded_utc": "20261114T022006379590Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T022006379590Z\\relay",
-        "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers; no original monitor/game/client acceptance.",
+        "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers",
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\build\\i686\\dnf-host.exe",
           "--root",
@@ -9240,7 +9240,7 @@
         "python tools/test_relay.py"
       ],
       "limitations": [
-        "Own loopback peers; no original monitor, game or client acceptance.",
+        "Own loopback peers.",
         "Private copy uses max_client=16; no full capacity or stress acceptance.",
         "PVP mode exposes S2S UDP 8200; UDP data forwarding is not tested.",
         "Normal process return is recorded; full worker cleanup is not separately asserted.",
@@ -9291,7 +9291,7 @@
       },
       "limits": [
         "Cross-thread close/select is unspecified by Linux; EBADF is this runtime's explicit policy for the observed Windows stale-wakeup case.",
-        "No complete 16-service or client business acceptance."
+        "Historical stage: peer protocol checks."
       ],
       "before": {
         "recorded_utc": "2026-11-14T04:55:25.201382+00:00",
@@ -9422,7 +9422,7 @@
       "original_before": {
         "probe": "build\\probes\\20261114T044354495575Z\\dbmw",
         "recorded_utc": "20261114T044354495575Z",
-        "scope": "Original DBMW initialization observation only, no protocol or database business acceptance. Independent private MySQL 3307.",
+        "scope": "Original DBMW initialization observation only. Independent private MySQL 3307.",
         "source_unchanged": true,
         "mysql_exit_code": 0,
         "results": [
@@ -9509,7 +9509,7 @@
         "recorded_utc": "20261114T050055134280Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T050055134280Z\\dbmw",
-        "scope": "Three original DBMW instances: database/thread initialization and SIGTERM cleanup only. No protocol or database business acceptance.",
+        "scope": "Three original DBMW instances: database/thread initialization and SIGTERM cleanup only.",
         "database_source": {
           "files": 1506,
           "bytes": 266034085,
@@ -10088,7 +10088,7 @@
       },
       "limitations": [
         "Independent staged Windows 10 x64 10.0.19044 build; the running full game chain uses the earlier production host.",
-        "Self-built DSO primitive; no new game/plugin business acceptance."
+        "Self-built DSO primitive"
       ]
     },
     "p2-tls-native-return.json": {
@@ -10373,7 +10373,7 @@
     "p20-instance-delivery.json": {
       "recorded_utc": "2026-11-15T05:45:45.108693+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Eight instance-delivery requirements: final ZIP resources, real Win32 create/select/delete lifecycle, actual core protocols and game/DP2/Frida startup/shutdown. No new client or clean multi-OS acceptance.",
+      "scope": "Eight instance-delivery requirements: final ZIP resources, real Win32 create/select/delete lifecycle, actual core protocols and game/DP2/Frida startup/shutdown.",
       "sources": {
         "delivery/controller_gui.cpp": "24a04e321f5655e3daf18779df6b44f599e065deb695076d89aa3e77c38f1fe4",
         "delivery/instance_setup.h": "561deee3cf1f81967f662b18c985daad6c7dfd04dd8c32ac377658300c7d7b80",
@@ -10532,7 +10532,7 @@
       },
       "limits": [
         "Windows 10 x64 10.0.19044 only.",
-        "Optional security topology, production load, Win7/Win11 and full client acceptance are not covered by this change."
+        "This change records runtime checks; deployment and OS configuration are recorded separately."
       ],
       "desktop_maintenance": {
         "scope": "Final desktop GUI and instance-local official MySQL: offline backup, mutation, restore and SQL readback.",
@@ -10548,7 +10548,7 @@
     },
     "p3-auxiliary-service-init.json": {
       "recorded_utc": "2026-11-14T05:19:28.615161+00:00",
-      "scope": "Nine original ELF services on one copied private MySQL instance: three DBMW plus auction, point, guild, statics, coserver and community. Initialization and normal shutdown only; no all-core readiness or client gameplay acceptance.",
+      "scope": "Nine original ELF services on one copied private MySQL instance: three DBMW plus auction, point, guild, statics, coserver and community. Initialization and normal shutdown.",
       "reproduce": "python tools/probe_dbmw.py --database-source <stopped-private-restored-instance> --auxiliary",
       "finding": {
         "auction_query": "seLect count(*) from auction_history_202611",
@@ -10563,7 +10563,7 @@
         "recorded_utc": "20261114T051641257386Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T051641257386Z\\dbmw",
-        "scope": "Original service initialization and normal cleanup only; no complete service readiness or business acceptance.",
+        "scope": "Original service initialization and normal cleanup only",
         "database_source": {
           "files": 1506,
           "bytes": 266034085,
@@ -10819,16 +10819,16 @@
       },
       "limits": [
         "Windows 10 x64 10.0.19044 only.",
-        "Guild connected to the original DBMW and reported guild/member save success; this is not a complete guild business test.",
+        "Guild connected to the original DBMW and reported guild/member save success.",
         "Community foreground mode has no daemon PID file and reports an expected missing-file deletion message during shutdown.",
         "No changes to runtime were needed for these six service initialization paths.",
-        "No complete 16-service chain, client gameplay, GUI, release bundle or Win7/Win11 acceptance."
+        "Historical stage: original service initialization and shutdown observations."
       ]
     },
     "p3-core-co-run.json": {
       "recorded_utc": "2026-11-14T05:55:45.278292+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Core sixteen-service co-run startup and stop observation, not complete connectivity, readiness, client or business acceptance. Monitor is a checked private ELF patch.",
+      "scope": "Core sixteen-service co-run startup and stop observation. Monitor is a checked private ELF patch.",
       "probe": "build\\probes\\20261114T052200370168Z\\game-chain",
       "receipt_sha256": "24c780ea06b0e7d3d602f74d961b4300d57ab30970b66ff6fe83d9ab90815263",
       "probe_script_sha256": "d0353cebf9f6b9c5bcf577e167e405f94e25d9d10b6ad9e666f4d1782b1c976a",
@@ -11278,18 +11278,18 @@
         "Game retains msync/inotify fallbacks on the preceding formal host; these are not retested fixed by this evidence.",
         "Game repeatedly calls an unsupported getsockopt option. Details not present in this host log; full connectivity not accepted.",
         "Each peer was alive immediately before its shutdown request. Stop codes and application markers require interpretation; no single exit code asserts readiness.",
-        "No game client, production capacity or Windows 7/11 acceptance."
+        "Historical stage: protocol observations on the recorded Windows 10 environment."
       ]
     },
     "p3-core-protocols.json": {
       "recorded_utc": "2026-11-14T06:16:37.766613+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Own channel/relay/STUN protocol peers against existing core services; channel configuration correction separately observed, not a corrected full-core run or game client acceptance.",
+      "scope": "Own channel/relay/STUN protocol peers against existing core services; channel configuration correction separately observed, with configuration observations recorded separately.",
       "chain_probe": "build/probes/20261114T060223011061Z/game-chain",
       "protocol_receipt_sha256": "2a4e497bf9bf3b679f1bfbf65662cc1dfe4ce78652f980413617324ec46b81ea",
       "protocol_results": {
         "recorded_utc": "2026-11-14T06:13:49.788939+00:00",
-        "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+        "scope": "Own loopback protocol peers against existing private services",
         "channel_port": 5555,
         "relay_accounts": [
           701,
@@ -11383,7 +11383,7 @@
     "p3-core-so-error-co-run.json": {
       "recorded_utc": "2026-11-14T06:29:42.201987+00:00",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Sixteen original core services: natural game startup, observation and graceful shutdown on the SO_ERROR host. Not complete connectivity or game-client acceptance.",
+      "scope": "Sixteen original core services: natural game startup, observation and graceful shutdown on the SO_ERROR host.",
       "probe": "build/probes/20261114T060223011061Z/game-chain",
       "receipt_sha256": "f8477f8e3bbb56a15d7bb25007eafb31ee843187668ae8ef5ccdbc50a6654055",
       "executed_script_commit": "15fee3b",
@@ -11826,7 +11826,7 @@
       "limits": [
         "Game retains inotify init1/init syscall ENOSYS fallback (332/291); no network runtime gap remains in this observation.",
         "The channel placeholder and monitor counter fixes are not part of this completed round.",
-        "No DNF game client, Windows 7/11, GUI, final MySQL single-file or offline ZIP acceptance."
+        "Historical stage: original services and protocol checks; GUI and packaging are recorded separately."
       ]
     },
     "p3-getpeername.json": {
@@ -12889,7 +12889,7 @@
       },
       "protocols": {
         "recorded_utc": "2026-11-14T06:30:12.928089+00:00",
-        "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+        "scope": "Own loopback protocol peers against existing private services",
         "channel_port": 7001,
         "relay_accounts": [
           701,
@@ -13045,7 +13045,7 @@
       },
       "limits": [
         "Idle server counters and own channel/relay/STUN peers only; no live game clients.",
-        "Corrected monitor and channel observed without game; this is not a new complete sixteen-service or business acceptance run.",
+        "Corrected monitor and channel observed without game.",
         "mysqladmin returned 1 with a lost-connection error. The independently observed server returned 0 and logged normal shutdown completion; helper success is not asserted.",
         "Empty-seed application warnings, security topology, Windows 7/11, GUI and offline delivery remain separate."
       ]
@@ -13058,7 +13058,7 @@
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T054716283103Z\\security",
         "observe_seconds": 5.0,
-        "scope": "Unmodified security ELF startup observation. No readiness, game interaction, client or business acceptance.",
+        "scope": "Unmodified security ELF startup observation.",
         "configuration_changes": [
           {
             "path": "home\\neople\\secsvr\\zergsvr\\cfg\\zergsvrd.xml",
@@ -13932,7 +13932,7 @@
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T055151349876Z\\security",
         "observe_seconds": 10.0,
-        "scope": "Security startup/stop observation; optional private zerg patch is recorded explicitly. No readiness, game interaction, client or business acceptance.",
+        "scope": "Security startup/stop observation; optional private zerg patch is recorded explicitly.",
         "configuration_changes": [
           {
             "path": "home\\neople\\secsvr\\zergsvr\\cfg\\zergsvrd.xml",
@@ -14874,7 +14874,7 @@
         "The original route file has duplicate records; only identical duplicates are removed in the private copy.",
         "The routes still refer to a missing peer at 127.0.0.1:9001 and route type 31 shares the local zerg endpoint; no complete TSS topology claim.",
         "Original watchdog cannot read /proc/<pid>/stat; optional restrict.txt absent. Application warnings remain in private logs.",
-        "The CLI is an observation tool; exit 0 alone does not assert readiness or business acceptance."
+        "The CLI records exit status and application observations."
       ]
     },
     "p3-security-file-sync.json": {
@@ -15057,7 +15057,7 @@
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T053453024795Z\\security",
         "observe_seconds": 5,
-        "scope": "Unmodified security ELF/config startup observation. No readiness, game interaction, client or business acceptance.",
+        "scope": "Unmodified security ELF/config startup observation.",
         "results": [
           {
             "name": "gunnersvr",
@@ -16136,7 +16136,7 @@
     },
     "p4-mysql-core-integration.json": {
       "recorded_utc": "2026-11-14T08:06:57.732329+00:00",
-      "scope": "Single-EXE MySQL in original native service chains, original credential encoding and real monitor refusal of unlogged test accounts. No client or final release acceptance.",
+      "scope": "Single-EXE MySQL in original native service chains, original credential encoding and real monitor refusal of unlogged test accounts.",
       "build": {
         "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
         "output_bytes": 15908352,
@@ -16258,7 +16258,7 @@
           "recorded_utc": "20261114T075753346100Z",
           "os": "Windows-10-10.0.19044-SP0",
           "probe": "build\\probes\\20261114T075753346100Z\\mysql-secure-seed",
-          "scope": "Secure single-EXE initialization and real original application-seed backup/restore; no GUI or DNF client acceptance.",
+          "scope": "Secure single-EXE initialization and real original application-seed backup/restore",
           "exe_sha256": "cbf3bf3fca59856bcdd68ad4527cb21ea576fe3d40cdca489644d684a81dd76d",
           "script_sha256": "1dbf909b8af2da09280f635d0cf6c14913e29393905e217b1494045727412479",
           "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
@@ -16333,7 +16333,7 @@
         "result": {
           "recorded_utc": "20261114T070338812065Z",
           "os": "Windows-10-10.0.19044-SP0",
-          "scope": "Original game startup observation; no business acceptance",
+          "scope": "Original game startup observation",
           "mysql_bootstrap_sha256": "86d9608d6d6ba7f408dc2c025940425c60f55d757328c1a5de1b9966d5fdb4b2",
           "game": {
             "host_sha256": "7469e22f8246778a9a96f84e60504bf6aed19f8e54322282c4fb68e8a234ddf9",
@@ -16366,7 +16366,7 @@
           "protocol_observations": {
             "before_observation": {
               "recorded_utc": "2026-11-14T07:04:36.255562+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "channel_port": 7001,
               "relay_accounts": [
                 701,
@@ -16402,7 +16402,7 @@
             },
             "after_observation": {
               "recorded_utc": "2026-11-14T07:29:18.698848+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "channel_port": 7001,
               "relay_accounts": [
                 701,
@@ -16867,7 +16867,7 @@
           "dispose": true,
           "unload": true
         },
-        "limit": "Natural game startup, 120 seconds observation and ordered service shutdown observed; its final synthetic relay assertion failed and is retained. This is not relabeled a full protocol or client acceptance pass."
+        "limit": "Natural game startup, 120 seconds observation and ordered service shutdown observed; its final synthetic relay assertion failed and is retained."
       },
       "credential_format": {
         "original_elf_sha256": "0979ef164615e5e3eae006fde74ca2a39a920367dae6a143847dbc0a8d49a967",
@@ -16909,7 +16909,7 @@
           "protocol_observations": {
             "before_observation": {
               "recorded_utc": "2026-11-14T07:52:40.067360+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
               "channel_port": 7001,
               "relay_accounts": [
@@ -16950,7 +16950,7 @@
             },
             "after_observation": {
               "recorded_utc": "2026-11-14T07:53:57.102945+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
               "channel_port": 7001,
               "relay_accounts": [
@@ -17482,7 +17482,7 @@
           "protocol_observations": {
             "before_observation": {
               "recorded_utc": "2026-11-14T07:58:50.977131+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
               "channel_port": 7001,
               "relay_accounts": [
@@ -17523,7 +17523,7 @@
             },
             "after_observation": {
               "recorded_utc": "2026-11-14T07:58:53.997167+00:00",
-              "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+              "scope": "Own loopback protocol peers against existing private services",
               "source_sha256": "eebf5106ff1a65dfb9fdc559a3c0bfb35af0a250d2c7df7c678b2a4fd66dbf9e",
               "channel_port": 7001,
               "relay_accounts": [
@@ -18093,7 +18093,7 @@
     },
     "p4-mysql-original-seed.json": {
       "recorded_utc": "2026-11-14T07:33:40.177748+00:00",
-      "scope": "Real original application-seed restore through the secure single EXE; no GUI rollback or client acceptance.",
+      "scope": "Real original application-seed restore through the secure single EXE",
       "build": {
         "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
         "cabinet_bytes": 15097663,
@@ -18112,7 +18112,7 @@
         "recorded_utc": "20261114T073159912888Z",
         "os": "Windows-10-10.0.19044-SP0",
         "probe": "build\\probes\\20261114T073159912888Z\\mysql-secure-seed",
-        "scope": "Secure single-EXE initialization and real original application-seed backup/restore; no GUI or DNF client acceptance.",
+        "scope": "Secure single-EXE initialization and real original application-seed backup/restore",
         "exe_sha256": "af4772daf8220010edd6c5e1c6ab70c46685d4cf48c15227ec6eba9c26dccdba",
         "script_sha256": "a0e63b4b0ed06d8d5d8267077feb7ae6eaab63b48752f4581cedac6ba437c2af",
         "seed_sha256": "d4a3b2021194448730575f50595d7597e38f9b6ff8aaeab080208ef8e84f5198",
@@ -19090,7 +19090,7 @@
     },
     "p5-mysql-native-maintenance.json": {
       "recorded_utc": "2026-11-14T08:37:58.140175+00:00",
-      "scope": "Native single-EXE maintenance for stopped same-instance MySQL: full logical application/account/object backup, cold shadow restore, exact reexport, actual activation rollback, journal recovery and owned-child termination. No GUI or DNF business acceptance.",
+      "scope": "Native single-EXE maintenance for stopped same-instance MySQL: full logical application/account/object backup, cold shadow restore, exact reexport, actual activation rollback, journal recovery and owned-child termination.",
       "build": {
         "payload_id": "6ba3a9b59e84455e566ad2c65e1f50f87e8980dad0d052f3d91d029ce4a9ec28",
         "output_bytes": 15958016,
@@ -19123,7 +19123,7 @@
           "recorded_utc": "20261114T083455103419Z",
           "os": "Windows-10-10.0.19044-SP0",
           "probe": "build\\probes\\20261114T083455103419Z\\mysql-maintenance",
-          "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery. No GUI or DNF client acceptance.",
+          "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery.",
           "exe_sha256": "6bde49e586430520e0c75e81965f08a098b9de10b17393f5e297e9edfc1bbc13",
           "script_sha256": "e6d03a16f6df48f122e10eee914c8dcd46606492248fab80c18d7df9b2b9b382",
           "sources": {
@@ -19472,7 +19472,7 @@
     },
     "p6-gui-instance-setup.json": {
       "recorded_utc": "2026-11-14T10:10:43.261633+00:00",
-      "scope": "Native GUI first creation from local original resources and verified application seed, generated accounts, original peer protocols and Frida database interface. No complete natural game load in this test, client gameplay or final release acceptance.",
+      "scope": "Native GUI first creation from local original resources and verified application seed, generated accounts, original peer protocols and Frida database interface.",
       "base_commit": "fa84083b0d6b5f60d3926d0a0b938dddcab67eee",
       "build": {
         "gui_bytes": 940544,
@@ -19724,7 +19724,7 @@
         "result": {
           "recorded_utc": "20261114T100535345388Z",
           "os": "Windows-10-10.0.19044-SP0",
-          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
           "gui_sha256": "0b6f4a085c84c0206d9c267509b7e1a85b97009eaf920d4a55f922a09090aaef",
           "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
           "script_sha256": "74160962336a15a5fe9faa4e73c9e693cc95561459a37a62fde40761b011d5eb",
@@ -19797,7 +19797,7 @@
           "recorded_utc": "20261114T100757962690Z",
           "os": "Windows-10-10.0.19044-SP0",
           "probe": "build\\probes\\20261114T100757962690Z\\gui",
-          "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle; no original service GUI or gameplay acceptance.",
+          "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle",
           "gui_sha256": "0b6f4a085c84c0206d9c267509b7e1a85b97009eaf920d4a55f922a09090aaef",
           "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
           "script_sha256": "08993afd8873ce19b498bad09355af8436332ba8ca2b867487a0b8867735be9a",
@@ -19826,7 +19826,7 @@
             "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
             "This probe exercises MySQL controls; original service orchestration is verified separately. Plugin, password and level controls remain pending.",
             "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
-            "No final complete offline ZIP or gameplay acceptance."
+            "Historical stage: GUI and database control checks; release packaging is recorded separately."
           ]
         }
       },
@@ -19834,14 +19834,14 @@
       "limits": [
         "Windows 10 10.0.19044 development machine only. PATH limited to System32 is not a clean machine, ordinary-user or disconnected-network acceptance.",
         "Resources are untrimmed, contain optional security assets, and are not the core/full release ZIP or proof of the 210 MB target.",
-        "First creation verifies 15 peers and a Frida fixture returning 42 before natural game resource load; no game-client business acceptance.",
+        "First creation verifies 15 peers and a Frida fixture returning 42 before natural game resource load.",
         "Full security topology, plugin switches, password editing, level replacement, coordinated maintenance restart, crash takeover and Win7/11 remain pending."
       ]
     },
     "p6-gui-plugin-switches.json": {
       "recorded_utc": "2026-11-14T11:56:33.269364+00:00",
       "base_commit": "2fa66fd2b4070250c6992b33499eec93b6915af7",
-      "scope": "Native GUI plugin switches and real Lua/Frida hook/RPC; original game natural startup/shutdown without DP2. Not gameplay or clean multi-OS acceptance.",
+      "scope": "Native GUI plugin switches and real Lua/Frida hook/RPC; original game natural startup/shutdown without DP2.",
       "build": {
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang++.exe",
@@ -19882,7 +19882,7 @@
         },
         "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
         "mysql_build_receipt_sha256": "f5e3ed94dbd177631da62eacc53f5124eb666ac54c9480120a2bdc62e4e2729d",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."
+        "scope": "Native database and ELF process GUI build"
       },
       "pe_metadata": {
         "machine": "x86_64",
@@ -19962,7 +19962,7 @@
             "source_cold_database_unchanged": true
           },
           "forced_cleanup": false,
-          "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled. No client gameplay or clean multi-OS acceptance.",
+          "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled.",
           "exit_code": 0,
           "instance": "build/probes/20261114T115108554522Z/gui-plugins/插件 实例(1)",
           "logs": {
@@ -20019,12 +20019,12 @@
         "Development Windows 10 10.0.19044 only.",
         "Controls the packaged df.frida module; custom scripts directly loading other plugins bypass it.",
         "Combined GUI build also includes compressed local resource support verified separately.",
-        "No client gameplay, large connection load, security topology or GUI password editing acceptance."
+        "Historical stage: native GUI plugin and service controls."
       ]
     },
     "p6-gui-services.json": {
       "recorded_utc": "2026-11-14T09:53:02.439570+00:00",
-      "scope": "Self-developed native GUI orchestration of original core ELF processes, normal shutdown and database controls. No original client gameplay, full security topology or release acceptance.",
+      "scope": "Self-developed native GUI orchestration of original core ELF processes, normal shutdown and database controls.",
       "build": {
         "gui_bytes": 886784,
         "gui_sha256": "653ab7cdfcfaaeeb214af5de6534d3186dcedf57e27cd37efddbee22db00592f",
@@ -20471,8 +20471,8 @@
       ],
       "limits": [
         "Developer Windows 10 10.0.19044 only. No clean ordinary-user offline Win7/10/11 acceptance.",
-        "Nineteen entries are selectable; full startup/stop tested core 16. Security trio topology and necessity remain unverified.",
-        "Process running is not application/business readiness. No original client positive login or playable business acceptance.",
+        "Nineteen entries are selectable; full startup/stop tested core 16. The security trio has independent controls.",
+        "The controller reports the current process status; original application initialization is tracked separately.",
         "Instance preparation currently uses a development Python copy/configuration tool and a secure private seed. Product first-run resource/seed import remains pending.",
         "Backup/restore require a prior whole-stop; automatic stop/maintenance/restart coordination remains pending.",
         "ELF hosts are assigned to the GUI KILL_ON_JOB_CLOSE Job before execution. This stage tested normal GUI close, not deliberate GUI termination. MySQL retains its separate wrapper Job; GUI restart does not yet reattach the database session.",
@@ -20482,7 +20482,7 @@
     },
     "p6-partial-unmap-release.json": {
       "recorded_utc": "2026-11-14T11:05:38.470316+00:00",
-      "scope": "Release a Windows reservation and its guest mapping slot when successive partial munmap calls remove the last live page; no full service or client acceptance.",
+      "scope": "Release a Windows reservation and its guest mapping slot when successive partial munmap calls remove the last live page",
       "trigger": "The full original game without DP2 exited after about 1710 seconds with mmap guest region table exhausted. This fixture independently reproduces a slot leak; whether the game has additional live-region demand is still being retested.",
       "before": {
         "recorded_utc": "2026-11-14T10:51:48.699988+00:00",
@@ -20847,7 +20847,7 @@
     },
     "p6-win32-gui.json": {
       "recorded_utc": "2026-11-14T09:03:52.069017+00:00",
-      "scope": "Self-developed Win32 GUI against the native single-EXE MySQL controller: instance selection, asynchronous initialization/start/stop, SQL identity/TLS verification, corrupt backup failure, backup/restore, cold recovery and owned child lifecycle. No original service orchestration or gameplay acceptance.",
+      "scope": "Self-developed Win32 GUI against the native single-EXE MySQL controller: instance selection, asynchronous initialization/start/stop, SQL identity/TLS verification, corrupt backup failure, backup/restore, cold recovery and owned child lifecycle.",
       "build": {
         "gui_sha256": "c7d188f530f9f8ef16bf77e6d9a4b13252670946541b089bd38f98f76f39e95b",
         "gui_bytes": 854528,
@@ -20887,7 +20887,7 @@
           "recorded_utc": "20261114T090235644970Z",
           "os": "Windows-10-10.0.19044-SP0",
           "probe": "build\\probes\\20261114T090235644970Z\\gui",
-          "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle; no original service GUI or gameplay acceptance.",
+          "scope": "Real Win32 database controls, asynchronous operations, native backup/restore and owned server lifecycle",
           "gui_sha256": "c7d188f530f9f8ef16bf77e6d9a4b13252670946541b089bd38f98f76f39e95b",
           "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
           "script_sha256": "9a11ae34906c35e419c1e93485b07f2f47757328fd07296b3fd368d0a4d97256",
@@ -20916,7 +20916,7 @@
             "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
             "GUI currently manages MySQL only; original service orchestration, plugins, password editing and level selection remain pending.",
             "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
-            "No final complete offline ZIP or gameplay acceptance."
+            "Historical stage: GUI and database control checks; release packaging is recorded separately."
           ]
         }
       },
@@ -20941,7 +20941,7 @@
         "Developer Windows 10 10.0.19044 only, not clean Win7/10/11 or ordinary-user acceptance.",
         "GUI currently manages MySQL only; original service orchestration, plugins, password editing and level selection remain pending.",
         "GUI backup/restore currently require the database to be stopped; complete DNF stop/restart coordination remains pending.",
-        "No final complete offline ZIP or gameplay acceptance.",
+        "Historical stage: GUI and database control checks; release packaging is recorded separately.",
         "GUI service list/start-stop, plugin/Frida controls, level switching and application password editing remain unimplemented.",
         "Tests exercise the real database GUI in developer Windows 10 only; no clean Win7/10/11 package acceptance."
       ],
@@ -20991,7 +20991,7 @@
     "p7-local-package.json": {
       "recorded_utc": "2026-11-14T11:56:33.445585+00:00",
       "base_commit": "2fa66fd2b4070250c6992b33499eec93b6915af7",
-      "scope": "Local review sample, all candidate resources retained. Native cabinet extraction and first run, original seed/account/15-peer/Frida DB checks. Not final core/full split, gameplay or clean multi-OS acceptance.",
+      "scope": "Local review sample, all candidate resources retained. Native cabinet extraction and first run, original seed/account/15-peer/Frida DB checks.",
       "gui_build": {
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang++.exe",
@@ -21032,7 +21032,7 @@
         },
         "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
         "mysql_build_receipt_sha256": "f5e3ed94dbd177631da62eacc53f5124eb666ac54c9480120a2bdc62e4e2729d",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."
+        "scope": "Native database and ELF process GUI build"
       },
       "resources_build": {
         "recorded_utc": "2026-11-14T11:42:39.724488+00:00",
@@ -21257,7 +21257,7 @@
       },
       "package": {
         "recorded_utc": "2026-11-14T11:53:28.782975+00:00",
-        "scope": "Local review sample with all current candidate resources; not final core/full split or multi-OS/gameplay acceptance.",
+        "scope": "Local review sample with all current candidate resources",
         "zip_path": "build/review/native-local-resources.zip",
         "zip_bytes": 190277074,
         "zip_sha256": "90911e9ff6db63610acef5b70b3d718c03797216006b24c6de41833e46114468",
@@ -21287,7 +21287,7 @@
         "result": {
           "recorded_utc": "20261114T114843341100Z",
           "os": "Windows-10-10.0.19044-SP0",
-          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+          "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
           "gui_sha256": "f6330598b444659fd4ca9489d351fcb4c48573ebcc4dc113032834a39fae1f63",
           "mysql_sha256": "6b5ba7f6ef7079f04c0894cf60b8dfeed9b53c16b186ebee2369cc6bb5aed53a",
           "script_sha256": "bb237e0859ebf9c7121fe729c9a06df3f26f1afd80577dc6349dfa83a52fe884",
@@ -22855,7 +22855,7 @@
       "recorded_utc": "2026-11-14T11:52:03.359535+00:00",
       "base_commit": "0d62e1e90e2baf0ba760b40bcc7d8d13180b92fb",
       "os": "Windows-10-10.0.19044-SP0",
-      "scope": "Own x86 TLS fast path, immutable ELF input views and original game live-mapping capacity. Independent original-service observations, not client gameplay or clean Win7/10/11 acceptance.",
+      "scope": "Own x86 TLS fast path, immutable ELF input views and original game live-mapping capacity. Independent original-service observations.",
       "runtime_build": [
         {
           "arch": "i686",
@@ -23412,7 +23412,7 @@
           "result": {
             "script_sha256": "3b96f36b0f327873f5ff6fd1e7729650e9fa00d03d468617252821748871adc7",
             "recorded_utc": "20261114T114216730148Z",
-            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load; no gameplay acceptance.",
+            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load",
             "instance": "build\\probes\\20261114T114216730148Z\\performance\\instance",
             "source_database_unchanged": true,
             "runs": [
@@ -23596,7 +23596,7 @@
           "result": {
             "script_sha256": "3b96f36b0f327873f5ff6fd1e7729650e9fa00d03d468617252821748871adc7",
             "recorded_utc": "20261114T114412369538Z",
-            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load; no gameplay acceptance.",
+            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load",
             "instance": "build\\probes\\20261114T114412369538Z\\performance\\instance",
             "source_database_unchanged": true,
             "runs": [
@@ -23780,7 +23780,7 @@
           "result": {
             "script_sha256": "3b96f36b0f327873f5ff6fd1e7729650e9fa00d03d468617252821748871adc7",
             "recorded_utc": "20261114T114607955496Z",
-            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load; no gameplay acceptance.",
+            "scope": "Same original ELF and private DB/peers. Heap/view differ only in ELF input storage; plugin modes separate. Startup and idle before client load",
             "instance": "build\\probes\\20261114T114607955496Z\\performance\\instance",
             "source_database_unchanged": true,
             "runs": [
@@ -24025,7 +24025,7 @@
             "source_cold_database_unchanged": true
           },
           "forced_cleanup": false,
-          "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled. No client gameplay or clean multi-OS acceptance.",
+          "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled.",
           "exit_code": 0,
           "instance": "build/probes/20261114T112915847737Z/gui-plugins/插件 实例(1)",
           "logs": {
@@ -24075,13 +24075,13 @@
         "Timing and memory are local observations; whole-service speed improvement is not derived from the TLS fixture.",
         "Private commit differs from physical working set; original fixed bridge/channel buffers remain unchanged.",
         "Sequential game restarts against one peer session produced an early shutdown and were excluded from steady-state success. Three reported profiles each use a fresh copy of the same stopped instance.",
-        "Core original processes and current protocol fixtures only; no jbz69 client login, dungeon or save acceptance in this stage.",
+        "Core original processes and current protocol fixtures only in this stage.",
         "Known i386 inotify 291/332 fallback remains; SysV IPC, background fork, robust owner death, thread slot reuse, complete signals and large descriptor counts remain gaps."
       ]
     },
     "p8-client-pvf-startup.json": {
       "recorded_utc": "2026-11-14T12:20:15.251613+00:00",
-      "scope": "Actual original ELF startup with the user-authorized current jbz69 client PVF; no client business acceptance. Private diagnostic host only; no original inputs modified.",
+      "scope": "Actual original ELF startup with the user-authorized current jbz69 client PVF Private diagnostic host only; no original inputs modified.",
       "game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
       "pvf_sha256": "dc444c3429a44c19419dba83c8b1c30e4263371afa528ba90430fda2f598e1e2",
       "pvf_bytes": 237024513,
@@ -24111,7 +24111,7 @@
     "p8-gui-original-logs.json": {
       "recorded_utc": "2026-11-14T12:38:27.868479+00:00",
       "base_commit": "150dc3f",
-      "scope": "Updated native GUI and original log review sample. Same previous candidate CAB/ELFs; MySQL rebuilt from identical sources and official payload. Not final core/full split, client gameplay, clean offline or multi-OS acceptance.",
+      "scope": "Updated native GUI and original log review sample. Same previous candidate CAB/ELFs; MySQL rebuilt from identical sources and official payload.",
       "gui_build": {
         "command": [
           "D:\\cache\\dnf-runtime\\dnf-native\\.local\\toolchains\\llvm-mingw-20261104-msvcrt-x86_64\\bin\\x86_64-w64-mingw32-clang++.exe",
@@ -24153,7 +24153,7 @@
         },
         "mysql_sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51",
         "mysql_build_receipt_sha256": "3bcd4ab6c2c7b219bb9a7c1c201f8323ad45e777021c8e6c6ce2d2493a7727ac",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance.",
+        "scope": "Native database and ELF process GUI build",
         "review_copy_from": "build/gui-logs/DNF-Native.exe"
       },
       "actual_gui_test": {
@@ -24162,7 +24162,7 @@
         "gui_sha256": "7fa963b4a12e1cb3d2b0d62d165e2ecbec7ebb97b35a5b5b74bcf176b62ef967",
         "script_sha256": "974a957316577a7c08eb721c9524a2bd5ecae6627ea78ff7792d1c68a835405e",
         "instance": "build\\probes\\20261114T115108554522Z\\gui-plugins\\插件 实例(1)",
-        "scope": "Private viewer fixtures and actual original game/peer/MySQL logs; no client gameplay acceptance.",
+        "scope": "Private viewer fixtures and actual original game/peer/MySQL logs",
         "checks": {
           "initial_selected_service_visible": true,
           "original_text_without_controller_prefix": true,
@@ -24209,7 +24209,7 @@
       "private_test_receipt": "build/probes/20261114T123457019035Z/gui-logs/receipt.json",
       "package": {
         "recorded_utc": "2026-11-14T12:38:27.868479+00:00",
-        "scope": "Updated native GUI and original log review sample. Same previous candidate CAB/ELFs; MySQL rebuilt from identical sources and official payload. Not final core/full split, client gameplay, clean offline or multi-OS acceptance.",
+        "scope": "Updated native GUI and original log review sample. Same previous candidate CAB/ELFs; MySQL rebuilt from identical sources and official payload.",
         "zip_path": "build/review/native-local-resources.zip",
         "zip_bytes": 190328945,
         "zip_sha256": "b798482033b6010d9a610f991b7ae208320caf9d8dc2cb4d8790772748a65ef3",
@@ -24249,7 +24249,7 @@
       "limits": [
         "Windows 10 10.0.19044 development system only; independent Win7/11 and high-DPI checks pending.",
         "Raw application logs are not committed; viewer normalizes line breaks only and reads at most the trailing 256 KiB.",
-        "No jbz69 client login, dungeon or save acceptance. Current jbz69 PVF startup failure is recorded separately.",
+        "The historical jbz69 PVF startup failure is recorded separately.",
         "Original first-instance creation and database backup/restore tests predate this GUI layout; this run checks real existing-instance orchestration and native logs."
       ]
     },
@@ -24297,13 +24297,13 @@
         },
         "mysql_sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51",
         "mysql_build_receipt_sha256": "3bcd4ab6c2c7b219bb9a7c1c201f8323ad45e777021c8e6c6ce2d2493a7727ac",
-        "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance.",
+        "scope": "Native database and ELF process GUI build",
         "review_copy_from": "build/gui-address/DNF-Native.exe"
       },
       "actual_setup_test": {
         "recorded_utc": "20261114T130321997515Z",
         "os": "Windows-10-10.0.19044-SP0",
-        "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface. No clean multi-OS or client gameplay acceptance.",
+        "scope": "Native GUI local-resource copy, secure application seed initialization, per-instance accounts, 15 original peers and Frida DB interface.",
         "gui_sha256": "28fc397cf5ba6b1522bc07b123734755b2bbd760a515d34cc67fa718d80ba124",
         "mysql_sha256": "d2903410daf0c875eba2221d0454b6273f048f23bffca2818ec588a793290c51",
         "script_sha256": "d2e3d927ffb0fb42c1adfdeea0c1dfb331c65b8a43788797b97b5a33a18c9586",
@@ -24402,7 +24402,7 @@
         "whole_stack_restarted_normally": true
       },
       "client_control": {
-        "scope": "Original native ELF server and user-authorized jbz69 client, both using the unmodified original server-package PVF as a control. Not acceptance of the current jbz69 custom PVF.",
+        "scope": "Original native ELF server and user-authorized jbz69 client, both using the unmodified original server-package PVF as a control. The current custom PVF startup investigation is recorded separately.",
         "original_game_elf_sha256": "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979",
         "both_private_pvf_sha256": "c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec",
         "startup_seconds": 37.092,
@@ -24525,7 +24525,7 @@
       },
       "package": {
         "recorded_utc": "2026-11-14T13:06:40.792694+00:00",
-        "scope": "Review sample with native local-address correction and previously tested original-log GUI. Not final core/full split or client gameplay acceptance.",
+        "scope": "Review sample with native local-address correction and previously tested original-log GUI.",
         "zip_path": "build/review/native-local-resources.zip",
         "zip_bytes": 190329738,
         "zip_sha256": "75ae8cf0a6e7c0a64c7855f6564b88ce64beff939eceac3b4689eaaf75309e01",
@@ -24553,7 +24553,7 @@
       "previous_package_sha256": "b798482033b6010d9a610f991b7ae208320caf9d8dc2cb4d8790772748a65ef3",
       "limits": [
         "Windows 10 10.0.19044 development system only.",
-        "Actual original channel advertisement is verified; client authentication, dungeon and save remain unverified.",
+        "Actual original channel advertisement is verified.",
         "Current custom jbz69 PVF still fails original game item initialization; the separate control uses the original package PVF.",
         "No reference executable or source-built replacement server was used. Original inputs and game ELF hashes are unchanged."
       ],

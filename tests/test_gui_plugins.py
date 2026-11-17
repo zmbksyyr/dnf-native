@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import sha256, BUILD
 from runtime_support import tree_identity
 from probe_core_protocols import channel, relay, stun
-from gui_support import user, kernel, windows, wait_for, click, ready, ready_stopped, screenshot
+from gui_support import user, kernel, windows, wait_for, click, ready, ready_stopped, screenshot, log_text
 from gui_support import rows, select_service, service_row
 
 from gui_support import guest_root
@@ -128,7 +128,7 @@ def main():
               "nosegneg": any(value.startswith("LD_LIBRARY_PATH=") and "/lib/i686/nosegneg" in value
                               for value in ini["game"].values()),
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False,
-              "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled. No client gameplay or clean multi-OS acceptance."}
+              "scope": "Native GUI plugin modes, original Lua/Frida hooks and RPC, live ELF mapping checks, natural game startup with DP2 disabled."}
     checks = record["checks"]
     process = None
     window = None
@@ -146,7 +146,8 @@ def main():
             click(window, 230); wait_for(lambda: checked(230) == dp2, "DP2 checkbox")
         if dp2 and checked(231) != frida:
             click(window, 231); wait_for(lambda: checked(231) == frida, "Frida checkbox")
-        click(window, 232); ready(window, "插件设置已保存")
+        base=len(log_text(window))
+        click(window, 232); ready(window, "插件设置已保存",since=base)
         ini.read(manifest, encoding="utf-16")
         assert ini["plugins"]["mode"] == ("off" if not dp2 else "frida" if frida else "lua")
 

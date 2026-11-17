@@ -34,7 +34,7 @@ def main():
                  for p in (instance / "home/neople" / name).glob("df_*_r")}
     record = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
               "script_sha256": sha256(Path(__file__)), "elf_sha256": originals,
-              "scope": "Original network worker shutdown only; no business acceptance.",
+              "scope": "Original network worker shutdown only",
               "forced_cleanup": False, "cycles": []}
     process = subprocess.Popen([str(gui), "--instance", str(instance)], startupinfo=hidden_startup())
     window = None

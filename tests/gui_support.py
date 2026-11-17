@@ -134,14 +134,16 @@ def stopped_text(row):
 
 def ready_stopped(window, name, timeout=180):
     """Wait for a service stop result; the wording differs for requested stops."""
-    wait_for(lambda: any(text in log_text(window) for text in (name + "：已停止", name + "：已退出")),
+    # A second stop must not match the first cycle's append-only log entry.
+    wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window,220)) and stopped_text(service_row(window,name)) and
+             any(text in log_text(window) for text in (name + "：已停止", name + "：已退出")),
              name + " stopped", timeout)
 
 
-def ready(window, expected, timeout=120):
+def ready(window, expected, timeout=120, *, since=None):
     # The log is append-only, so a baseline offset keeps "operation failed" from
     # an earlier run from aborting an unrelated wait.
-    base = len(log_text(window))
+    base = len(log_text(window)) if since is None else since
 
     def check():
         text = log_text(window)[base:]

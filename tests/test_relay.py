@@ -264,7 +264,7 @@ def main():
     gaps = [line for line in stderr.splitlines() if any(word in line for word in
             ["syscall gap", "unsupported", "decode gap", "unhandled exception", "unimplemented guest", "exhausted"])]
     result = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(BUILD)),
-              "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers; no original monitor/game/client acceptance.",
+              "scope": "Original relay PVP-mode TCP forwarding and UDP disconnect control with own loopback peers",
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
               "config_sha256": sha(config), "checks": checks, "error": error, "gaps": gaps,
               "source_sha256": sha(Path(__file__)), "concurrent_clients": args.concurrent_clients,

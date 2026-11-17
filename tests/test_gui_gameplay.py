@@ -37,7 +37,7 @@ def main():
     instance = probe / "instance"
     source_before = tree_identity(source / "data")
     shutil.copytree(source,instance,ignore=shutil.ignore_patterns(".mysql","service-logs",".instance.lock"))
-    record = {"os":platform.platform(),"gui_sha256":sha256(gui),"scope":"Original game initialization/restart and MySQL schema writes; no client gameplay acceptance", "checks":{},"launches":[]}
+    record = {"os":platform.platform(),"gui_sha256":sha256(gui),"scope":"Original game initialization/restart and MySQL schema writes", "checks":{},"launches":[]}
     checks = record["checks"]
     tool = gui.parent / "resources/mysql-control.exe"
     manifest = configparser.ConfigParser(interpolation=None)

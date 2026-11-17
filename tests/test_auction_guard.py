@@ -63,7 +63,7 @@ rpc.exports={init:function() {
     subprocess.run([sys.executable,"-B",str(ROOT/"tests/game_fixture.py"),"--lua-script",str(lua),"--frida-script",str(js)],check=True,cwd=ROOT)
     receipt=json.loads((BUILD/"game-probe.json").read_text());root=Path(receipt["command"][2]);stdout=(root/"stdout.log").read_text(encoding="utf-8",errors="replace")
     assert "DNF_NATIVE_AUCTION_GUARD_PASS" in stdout
-    receipt["scope"]="Exact production guard in original Gadget VM, real packet memory and deterministic SQL/metadata callbacks; no client or SQL business acceptance"
+    receipt["scope"]="Exact production guard in original Gadget VM, real packet memory and deterministic SQL/metadata callbacks; SQL and metadata callbacks are deterministic test fixtures"
     receipt["passed"]=True;(work/"receipt.json").write_text(json.dumps(receipt,indent=2)+"\n",encoding="utf-8")
     print("Auction DP2 guard PASS",work/"receipt.json")
 

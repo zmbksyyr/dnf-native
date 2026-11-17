@@ -53,7 +53,7 @@ def main():
         rows.append({"module":module,"passed":ok,"exit_code":result.returncode,"elf_unchanged":sha(elf)==before})
         print(module,"PASS" if ok else "FAIL",result.stdout.decode(errors="replace"),flush=True)
         if not ok: print(result.stderr.decode(errors="replace"),flush=True)
-    (work/"receipt.json").write_text(json.dumps({"os":platform.platform(),"host_sha256":sha(host),"cases":rows,"scope":"Original functions after actual loader/ctors; no DB or client acceptance"},indent=2)+"\n",encoding="utf-8")
+    (work/"receipt.json").write_text(json.dumps({"os":platform.platform(),"host_sha256":sha(host),"cases":rows,"scope":"Original functions after actual loader/ctors"},indent=2)+"\n",encoding="utf-8")
     assert all(x["passed"] for x in rows)
 
 if __name__ == "__main__": main()

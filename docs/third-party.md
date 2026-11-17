@@ -25,7 +25,7 @@ P9 的嵌套信号和普通私有文件映射独立实现依据为 Linux [sigact
 
 安全组件诊断只读参考了 `rednf/remake/secsvr/README.md`、`source/zergsvr/src/commlib/framework/comm_svrd_config.cpp` 与 `source/zergsvr/src/commsvr/zergsvr/zerg_configure.cpp`，用于发现组件角色和 `cfgfile` 模式线索。原版 ELF 自身的字符串、反汇编和独立运行验证了该模式、重复条目拒绝及后续拓扑缺口；配置变更只用于外部诊断副本，未复制参考代码或配置，未修改固定 ZIP。Frida 热加载回归使用自写 Lua/JS 夹具直接验证原版 Gadget 的轮询行为，没有接入参考监视实现。
 
-P12 客户端测试只读参考了 `rednf/remake/source/DNFServer/GameServer/Game/TaiwanQueries.h`、`TaiwanQueries/decrypt__c2.inc` 和 `Decrypt.inc` 的认证字段线索；UID、用户名、时间戳偏移及复制语义重新从固定原版 ELF 核对。外部测试脚本使用 Windows CAPI 新生成的测试 RSA 配对和合成账号构造 token，未复制参考解密实现、历史私钥或跳过原版认证。客户端实际在图形初始化阶段失败，尚未验证 token 认证；参考线索、原版反汇编和该边界记录于 `P12-20261116-client-business/`。
+P12 客户端测试只读参考了 `rednf/remake/source/DNFServer/GameServer/Game/TaiwanQueries.h`、`TaiwanQueries/decrypt__c2.inc` 和 `Decrypt.inc` 的认证字段线索；UID、用户名、时间戳偏移及复制语义重新从固定原版 ELF 核对。外部测试脚本使用 Windows CAPI 新生成的测试 RSA 配对和合成账号构造 token，未复制参考解密实现、历史私钥或跳过原版认证。该历史尝试在客户端图形初始化阶段失败；参考线索、原版反汇编和故障记录于 `P12-20261116-client-business/`。
 
 P13 长路径处理依据 Microsoft [GetShortPathNameW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getshortpathnamew)、[GetLongPathNameW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getlongpathnamew) 与 [SHGetNameFromIDList](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetnamefromidlist)，以及当前官方 MySQL 5.7.44 的独立副本实测；没有引入参考工程路径实现。
 

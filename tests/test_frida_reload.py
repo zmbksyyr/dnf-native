@@ -82,7 +82,7 @@ def main():
     record = {"recorded_utc": stamp, "os": platform.platform(), "command": command,
               "script_sha256": sha256(Path(__file__)), "host_sha256": sha256(host),
               "elf_sha256": GAME_SHA256, "frida_sha256": FRIDA_SHA256,
-              "scope": "Original Gadget on_change=reload: in-place/atomic saves and new RPC callbacks before game startup; no full inotify or business acceptance.",
+              "scope": "Original Gadget on_change=reload: in-place/atomic saves and new RPC callbacks before game startup; the two tested save methods are recorded separately.",
               "forced_cleanup": False, "reloads": []}
     out, err = probe / "stdout.log", probe / "stderr.log"
     with out.open("wb") as stdout, err.open("wb") as stderr:

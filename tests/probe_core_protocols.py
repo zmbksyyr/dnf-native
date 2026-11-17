@@ -179,7 +179,7 @@ def main():
     args = parser.parse_args()
     output = external_output(args.output)
     receipt = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-               "scope": "Own loopback protocol peers against existing private services; no game client acceptance.",
+               "scope": "Own loopback protocol peers against existing private services",
                "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "channel_port": args.channel_port, "relay_accounts": [701, 702], "results": {}}
     receipt["relay_monitor_auth"] = args.relay_monitor_auth

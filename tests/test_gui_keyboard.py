@@ -78,7 +78,7 @@ def main():
     shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs"))
     record = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False,
-              "scope": "Real Win32 queued keyboard input, focus traversal, modal cancellation and database lifecycle; no physical keyboard, client business or cross-OS acceptance."}
+              "scope": "Real Win32 queued keyboard input, focus traversal, modal cancellation and database lifecycle; input delivered through the Win32 message queue."}
     checks = record["checks"]
     process = subprocess.Popen([str(gui), "--instance", str(instance)])
     window = None

@@ -64,7 +64,7 @@ def main():
         details = service_details(window)
         assert details.startswith("game  ·"), details
         assert "ELF：" in details and "SHA-256：" in details, details
-        assert "接口/协议/业务：未验证" in details and "清单未声明" in details, details
+        assert "就绪层级：未启动" in details and "清单未声明" in details, details
         checks["service_cards_keep_identity_details_and_selection"] = True
         click(window, 223)
         ready(window, "已启动默认服务进程", 90)
@@ -76,8 +76,8 @@ def main():
         select_service(window, "channel")
         details = service_details(window)
         assert "运行时通道已接入" in details, details
-        assert "接口/协议/业务：未验证" in details, details
-        checks["runtime_channel_does_not_claim_protocol_or_business_readiness"] = True
+        assert "就绪层级：运行时通道已接入\r\n" in details, details
+        checks["current_launch_runtime_channel_status"] = True
         checks["direct_stop_disabled_and_both_maintenance_actions_enabled_while_services_run"] = (
             not user.IsWindowEnabled(user.GetDlgItem(window, 112)) and
             user.IsWindowEnabled(user.GetDlgItem(window, 113)) and
@@ -112,8 +112,19 @@ def main():
         time.sleep(1)
         checks["individual_channel_restart_protocol"] = channel(7001)
         print("GUI: ELF hash rejection and restart passed", flush=True)
+        counts=[int(title(user.GetDlgItem(window,213)).split('/')[0])]
+        baseline=len(log_text(window))
         click(window, 224)
-        ready(window, "服务进程已退出，数据库已停止", 120)
+        def whole_stop_finished():
+            counts.append(int(title(user.GetDlgItem(window,213)).split('/')[0]))
+            text=log_text(window)[baseline:]
+            if "操作失败" in text: raise RuntimeError(text[-400:])
+            return "服务进程已退出，数据库已停止" in text
+        wait_for(whole_stop_finished,"whole stop with live count",120)
+        wait_for(lambda:title(user.GetDlgItem(window,213)).startswith('0 /'),"zero running count",5)
+        assert max(counts)==15,counts
+        checks["live_count_updates_before_whole_stop_completes"] = any(0<n<15 for n in counts)
+        receipt["whole_stop_live_counts"] = list(dict.fromkeys(counts))
         receipt["stopped_rows"] = rows(window)
         peers = [name for name in manifest["services"].values() if name in manifest and manifest[name].get("automatic") == "1"]
         assert len(peers) == 15
@@ -127,6 +138,7 @@ def main():
             log = max((instance / "service-logs").glob(name + "-*.stdout.private.log"), key=lambda path: path.stat().st_mtime)
             assert b"Application Stop!" in log.read_bytes(), name + " original stop marker missing"
         checks["reverse_order_whole_stop_completed"] = True
+        screenshot(window,probe/"after-whole-stop.png")
         checks["owned_pid_markers_removed_after_stop"] = not list(guest_root(instance).rglob("*.pid"))
         print("GUI: whole-stop completed", flush=True)
         checks["backup_enabled_after_whole_stop"] = bool(user.IsWindowEnabled(user.GetDlgItem(window, 113)))

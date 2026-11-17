@@ -1,0 +1,130 @@
+{
+  "reviewed_commits": [
+    "502b90c",
+    "8c2ec50"
+  ],
+  "environment": "Windows 10 x64 10.0.19044; LLVM-MinGW 20261104 MSVCRT; MySQL 5.7.44",
+  "business_status": "用户已确认现有业务验证通过。",
+  "tests": [
+    {
+      "test": "instance-workflow",
+      "result": "PASS",
+      "receipt": "probes/20261117T032325249549Z/instance-workflow/receipt.json",
+      "receipt_sha256": "61ba37a4e0de1b3be67f055b2e6a4d4c16134e2118f675d75299d7da21b88474",
+      "gui_sha256": "93ee982927599715c57112fb9530bbb62361f19096acffe471d20b4b7563eb0e",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-layout",
+      "result": "PASS",
+      "receipt": "probes/20261117T040412275080Z/gui-layout/receipt.json",
+      "receipt_sha256": "2d0eb062169fe2abcd9aaebeb39950ccc83487bbec72c639b04ab61f1fc2a45b",
+      "gui_sha256": "fb9eeeac762f90d5b3afdfe454664742cff332bb86e3c1219c41baebb0900973",
+      "final_delivery_binary": true
+    },
+    {
+      "test": "gui-services",
+      "result": "PASS",
+      "receipt": "probes/20261117T035855993909Z/gui-services/receipt.json",
+      "receipt_sha256": "9006c1a63c40f5c3fb3792d92061fdec9fe1b5b3bed8aa53f1c07de8283b1268",
+      "gui_sha256": "fb9eeeac762f90d5b3afdfe454664742cff332bb86e3c1219c41baebb0900973",
+      "final_delivery_binary": true
+    },
+    {
+      "test": "gui-readiness",
+      "result": "PASS",
+      "receipt": "probes/20261117T040135390179Z/gui-readiness/receipt.json",
+      "receipt_sha256": "bc6eec53efa300f81f6ae51a02604cb7eed8d250c4e30bf6592f0689fe79b563",
+      "gui_sha256": "fb9eeeac762f90d5b3afdfe454664742cff332bb86e3c1219c41baebb0900973",
+      "final_delivery_binary": true
+    },
+    {
+      "test": "gui-keyboard",
+      "result": "PASS",
+      "receipt": "probes/20261117T035656590135Z/gui-keyboard/receipt.json",
+      "receipt_sha256": "622db1f593b118007a4eb7e41530397d0343b1c00ea7c05cff703966c9a5bb49",
+      "gui_sha256": "b4837e2d7aca3b7439eb8cfaebdff42fdbd7354b0300370be25fcf6e6a043b03",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-logs",
+      "result": "PASS",
+      "receipt": "probes/20261117T033654589592Z/gui-logs/receipt.json",
+      "receipt_sha256": "1e2e5010d637e8cd039f50ce7b26fdd787e5e35696c84b26ec4a0ad01c5fb7b7",
+      "gui_sha256": "820250392d4b20d93b67dc8c5e67b08f5cf9b042541476385d2811c84be2abae",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-maintenance",
+      "result": "PASS",
+      "receipt": "probes/20261117T034047609610Z/gui-maintenance/receipt.json",
+      "receipt_sha256": "076abca7a75e55a83da61d59451707ae76382a3afa91a5b7dc63171286f1ac4f",
+      "gui_sha256": "820250392d4b20d93b67dc8c5e67b08f5cf9b042541476385d2811c84be2abae",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "service-shutdown",
+      "result": "PASS",
+      "receipt": "probes/20261117T034146332343Z/service-shutdown/receipt.json",
+      "receipt_sha256": "1cba47202001e3726aa29e6490baa58a57fe34a45ea023d2987741c6a1af1584",
+      "gui_sha256": "820250392d4b20d93b67dc8c5e67b08f5cf9b042541476385d2811c84be2abae",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-auction",
+      "result": "PASS",
+      "receipt": "probes/20261117T034233491506Z/gui-auction/receipt.json",
+      "receipt_sha256": "e374eaad8fe7323152b9b2489fb14fad810b6bb264eb133944f9f9b3962ba105",
+      "gui_sha256": "820250392d4b20d93b67dc8c5e67b08f5cf9b042541476385d2811c84be2abae",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-plugins",
+      "result": "PASS",
+      "receipt": "probes/20261117T035443256381Z/gui-plugins/receipt.json",
+      "receipt_sha256": "a6d38e1d503d8b3f523a3e010ef113afff36d281941d89abdd386bc18d516a40",
+      "gui_sha256": "b4837e2d7aca3b7439eb8cfaebdff42fdbd7354b0300370be25fcf6e6a043b03",
+      "final_delivery_binary": false
+    },
+    {
+      "test": "gui-long-path",
+      "result": "PASS",
+      "receipt": "probes/20261117T034955697987Z/gui-long-path/receipt.json",
+      "receipt_sha256": "750ba40a953fecfb707266328076ea6e071ace28b6494f8370681ea0936a692c",
+      "gui_sha256": "820250392d4b20d93b67dc8c5e67b08f5cf9b042541476385d2811c84be2abae",
+      "final_delivery_binary": false
+    }
+  ],
+  "package_files": {
+    "DNF-Native.exe": "fb9eeeac762f90d5b3afdfe454664742cff332bb86e3c1219c41baebb0900973",
+    "resources/dnf-host-x64.exe": "610510c0a14a6d42013576c8f43db9f065290a7a4695c4a4b350d5947c316f57",
+    "resources/dnf-host-x86.exe": "a61f9be066160bda8fdc30a4397cefd616737bdfb66ac8057a42e97f2c9176f6",
+    "resources/DNFLogin.exe": "8b838812f8b04c4fac96ae007be8db88ec802f445bc486d62773ae62727afd98",
+    "resources/mysql-control.exe": "9eccab78e6bbc159e49733e5882b5e2496f2dfbea126b2524fbff89712f3cf73",
+    "resources/mysql.zip": "71e550731f8f47a8872e33e6e543983cc0b7bd198cddf37e97e8661dad35c3bc",
+    "resources/native.zip": "4af9c4b17e1c0ce166e93390d297258c590e3ab39bbfdde661bd13d8284d07b3",
+    "resources/resources.ini": "0af9eb068f4ada341715d67cfe3dfbb7ae5319b7a350caaac28ab4c495a396a3"
+  },
+  "cleanup": {
+    "method": "NTFS compression of old generated test data; deletion rejected by automatic policy",
+    "saved_bytes": 35616489384,
+    "saved_gib": 33.17
+  },
+  "game_initialization_seconds": [
+    36.675,
+    35.544
+  ],
+  "whole_stop_live_counts": [
+    15,
+    14,
+    13,
+    12,
+    11,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0
+  ]
+}

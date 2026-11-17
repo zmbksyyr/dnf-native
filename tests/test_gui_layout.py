@@ -165,20 +165,31 @@ def main():
             area = rect(child, market)
             assert 0 <= area.left < area.right <= market_client.right
             assert 0 <= area.top < area.bottom <= market_client.bottom, (identifier, area.top, area.bottom, market_client.bottom)
-        # Index work and data work are one horizontal row each, stacked in that
-        # order, with the section header above its own row.
-        for row, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
-            tops = {rect(user.GetDlgItem(market, identifier), market).top for identifier in row}
-            assert len(tops) == 1, (row, tops)
-            assert all(rect(user.GetDlgItem(market, a), market).right <=
-                       rect(user.GetDlgItem(market, b), market).left for a, b in zip(row, row[1:]))
-            assert rect(user.GetDlgItem(market, header), market).top < rect(user.GetDlgItem(market, row[0]), market).top
-        assert rect(user.GetDlgItem(market, 310), market).top < rect(user.GetDlgItem(market, 314), market).top
+        for column, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
+            areas=[rect(user.GetDlgItem(market, identifier), market) for identifier in column]
+            assert len({area.left for area in areas}) == 1
+            assert all(a.bottom < b.top for a,b in zip(areas,areas[1:]))
+            assert rect(user.GetDlgItem(market, header), market).bottom <= areas[0].top
+        for left,right in zip([310,311,312,313],[314,315,316,317]):
+            a,b=rect(user.GetDlgItem(market,left),market),rect(user.GetDlgItem(market,right),market)
+            assert a.top==b.top and a.bottom==b.bottom and a.right<b.left
         assert rect(user.GetDlgItem(market, 318), market).top == rect(user.GetDlgItem(market, 319), market).top
         assert user.SendMessageW(user.GetDlgItem(market, 318), 0x00F0, 0, 0) == 1
         assert user.SendMessageW(user.GetDlgItem(market, 319), 0x00F0, 0, 0) == 1
+        click(market,318)
+        wait_for(lambda:user.SendMessageW(user.GetDlgItem(market,318),0xF0,0,0)==0,"gold scope unchecked",5)
+        assert user.SendMessageW(user.GetDlgItem(market,319),0xF0,0,0)==1
+        click(market,319)
+        wait_for(lambda:user.SendMessageW(user.GetDlgItem(market,319),0xF0,0,0)==0,"cera scope unchecked",5)
+        click(market,315)
+        wait_for(lambda:"至少选择一个市场范围" in title(user.GetDlgItem(window,206)),"empty scope rejected in main log",5)
+        assert user.IsWindowEnabled(market)
+        assert not user.GetDlgItem(market,306) and not user.GetDlgItem(window,204)
+        assert not user.GetWindowLongW(user.GetDlgItem(window,206),-16) & 0x00300000
+        screenshot(market,probe/"market-window.png")
         click(market, 307)
-        checks["auction_window_puts_each_action_group_in_one_row"] = True
+        checks["auction_two_columns_four_rows_and_independent_scopes"] = True
+        checks["empty_scope_reported_only_in_main_log_and_no_scrollbars"] = True
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
         record["traceback"] = traceback.format_exc()

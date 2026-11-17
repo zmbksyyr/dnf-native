@@ -112,7 +112,7 @@ def main():
     gaps = [line for line in stderr.splitlines() if any(word in line for word in
             ["syscall gap", "unsupported", "unhandled exception", "unimplemented guest", "exhausted"])]
     result = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(BUILD)),
-              "scope": "Original channel TCP connect protocol only; loopback port 7001, no bridge/database/client business acceptance.",
+              "scope": "Original channel TCP connect protocol only; loopback port 7001.",
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
               "config_sha256": sha(config), "checks": checks, "error": error, "gaps": gaps,
               "exit_code": process.returncode, "sigterm_event_sent": stop_sent, "forced_cleanup": forced,

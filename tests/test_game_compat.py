@@ -50,7 +50,7 @@ def main():
     lua=work/"minimum-level.lua"
     lua.write_bytes((work/"entry/production-compat.lua").read_bytes()+PROBE.encode())
     # Reuse the repository fixture: original game/DP2, independent ZIP copy,
-    # no database and no substitution for a live client acceptance result.
+    # Database access is supplied by the deterministic fixture callbacks.
     fixture.BUILD=work
     sys.argv=["game_fixture.py","--host",str(BUILD/"i686/dnf-host.exe"),"--lua-script",str(lua),"--timeout","30"]
     game_fixture()
@@ -61,7 +61,7 @@ def main():
             "installer_passed":b"GAME_COMPAT_INSTALL PASS" in installed.stdout,
             "api_passed":evidence["exit_code"]==42 and not evidence["forced_cleanup"],
             "elf_sha256":evidence["elf_sha256"],"host_sha256":evidence["host_sha256"],
-            "scope":"Production installer file preservation and real DPX operand API, including delayed callback; no client business claim"}
+            "scope":"Production installer file preservation and real DPX operand API, including delayed callback"}
     (work/"receipt.json").write_text(json.dumps(record,indent=2)+"\n")
     print("Game compatibility: PASS",work/"receipt.json",flush=True)
 

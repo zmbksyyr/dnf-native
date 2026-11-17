@@ -17,7 +17,7 @@ import traceback
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 from bootstrap import BUILD, sha256
 from runtime_support import tree_identity
-from gui_support import user, windows, wait_for, click, ready, ready_stopped, title, hidden_startup, screenshot, select_service
+from gui_support import user, windows, wait_for, click, ready, ready_stopped, title, log_text, hidden_startup, screenshot, select_service
 
 GOLD="taiwan_cain_auction_gold"
 CERA="taiwan_cain_auction_cera"
@@ -40,7 +40,7 @@ def main():
             config[config["services"][name]]["automatic"]="0"
     with (instance/"services.ini").open("w",encoding="utf-16") as f: config.write(f)
     tool=gui.parent/"resources/mysql-control.exe"
-    record={"os":platform.platform(),"gui_sha256":sha256(gui),"scope":"Real Win32 actions and original MySQL5.7 on private copy; original ELF function tests are separate; no client gameplay claim","checks":{}}
+    record={"os":platform.platform(),"gui_sha256":sha256(gui),"scope":"Real Win32 actions and original MySQL5.7 on private copy; original ELF function tests are separate","checks":{}}
     checks=record["checks"]; sql_count=0; process=server=window=market=None
     def sql(text,fail=False):
         nonlocal sql_count
@@ -52,14 +52,16 @@ def main():
     def insert(db,order,item=16400,refine=8):
         sql(f"INSERT INTO {db}.auction_main(auction_id,occ_time,expire_time,owner_id,owner_name,owner_type,owner_nexon_id,buyer_id,buyer_name,price,instant_price,seal_flag,item_id,add_info,upgrade,amplify_option,amplify_value,seal_cnt,endurance,extend_info,black_point,unit_price,random_option,roi_high_key,roi_low_key,seperate_upgrade,item_guid) VALUES({order},NOW(),2147483647,100,'fixture',0,'fixture',0,'',100,200,0,{item},1,0,0,0,0,100,0,0,200,'',0,0,{refine},'');")
     def operation(identifier,scope=2,fail=False):
-        combo=user.GetDlgItem(market,305); user.SendMessageW(combo,0x14E,scope,0)
+        for control,checked in [(318,scope!=1),(319,scope!=0)]:
+            user.SendMessageW(user.GetDlgItem(market,control),0xF1,int(checked),0)
+        base=len(log_text(window))
         # Completion is the actual worker enabling its owned maintenance window.
         click(market,identifier)
         wait_for(lambda:not user.IsWindowEnabled(market),"maintenance begins",10)
         wait_for(lambda:user.IsWindowEnabled(market),"maintenance ends",180)
-        report=title(user.GetDlgItem(market,306))
-        if fail: assert report.startswith("操作失败"),report
-        else: assert not report.startswith("操作失败"),report
+        report=log_text(window)[base:]
+        if fail: assert "操作失败" in report,report
+        else: assert "双拍卖" in report and "操作失败" not in report,report
         return report
     try:
         with (work/"seed-server.private.log").open("wb") as log:

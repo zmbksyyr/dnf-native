@@ -31,7 +31,7 @@ def main():
     elf, ld, host = work / "home/neople/game/df_game_r", work / "lib/ld-2.17.so", BUILD / "i686/dnf-host.exe"
     original = sha256(elf)
     record = {"os":platform.platform(),"host_sha256":sha256(host),"elf_sha256":original,
-              "scope":"Original ELF methods and request parsing; no client, database, or gameplay acceptance", "checks":[]}
+              "scope":"Original ELF methods and request parsing", "checks":[]}
     for level in ([args.level] if args.level else LEVELS):
         (work / "dp2/df_game_r.lua").write_text('local f=require("df.frida")\nassert(f.load("' + str(level) + '",function() return 0 end)==42)\nos.exit(42)\n')
         command = [str(host),"--root",str(work),sha256(ld),"--env","HOME=/home/neople","--env","LD_PRELOAD=/dp2/libdp2pre.so",

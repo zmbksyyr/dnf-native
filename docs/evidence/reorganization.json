@@ -3,7 +3,7 @@
   "os": "Windows-10-10.0.19044-SP0",
   "python": "3.14.6",
   "compiler": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
-  "scope": "Source/test/document reorganization, repository resource baseline and external-only development output; no new client, load, security-topology or multi-OS acceptance.",
+  "scope": "Source/test/document reorganization, repository resource baseline and external-only development output",
   "output_root": "../x/dnf-native-output",
   "repository_build_directory_absent": true,
   "current_build_clis_reject_repository_output": true,

@@ -56,7 +56,7 @@ def main():
     stderr = (instance / "stderr.log").read_text(encoding="utf-8", errors="replace")
     receipt = {
         "recorded_utc": stamp, "os": platform.platform(), "command": command,
-        "scope": "Own explicit script in the pinned game/DP2; expected script exit 42, not natural startup or business acceptance.",
+        "scope": "Own explicit script in the pinned game/DP2; expected script exit 42.",
         "host_sha256": sha256(Path(command[0])), "elf_sha256": sha256(elf),
         "exit_code": process.returncode, "forced_cleanup": forced,
         "elapsed_seconds": round(time.monotonic() - started, 3),

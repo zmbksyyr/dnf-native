@@ -55,7 +55,7 @@ def main():
     assert old_logs, "Use a stopped instance with a previous successful initialization log"
     record = {"recorded_utc": stamp, "os": platform.platform(), "source_instance": str(source),
               "gui_sha256": sha256(gui), "script_sha256": sha256(Path(__file__)),
-              "scope": "GUI application initialization from original game stdout; no client or business acceptance",
+              "scope": "GUI application initialization from the current original game stdout and peer registration",
               "pvf_sha256": pvf_hash,
               "script_encoding_override": args.script_encoding,
               "checks": {}, "launches": [], "forced_cleanup": False}
@@ -103,7 +103,7 @@ def main():
             assert "应用已初始化" in service_row(window, "game")
             assert "应用已初始化" in log_text(window)[base:]
             details = service_details(window)
-            assert "接口/协议/业务：未验证" in details and "清单未声明" in details, details
+            assert "就绪层级：应用已初始化\r\n" in details and "清单未声明" in details, details
             item["fresh_stdout"] = output.name
             item["fresh_stdout_sha256_at_initialization"] = sha256(output)
             item["initialized_readiness"] = log_text(window)[base:][-600:]

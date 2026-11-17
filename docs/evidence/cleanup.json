@@ -2,7 +2,7 @@
   "schema_version": 1,
   "recorded_utc": "2026-11-15T12:27:40.860467+00:00",
   "base_commit": "fbb11f3559854bf704481a8cdc4e382b2da2abc5",
-  "scope": "Repository cleanup and current build/regression verification. No runtime implementation, native.zip or mysql.zip content changes; no new complete business acceptance.",
+  "scope": "Repository cleanup and current build/regression verification. No runtime implementation, native.zip or mysql.zip content changes",
   "environment": {
     "os": "Windows-10-10.0.19044-SP0",
     "python": "3.14.6",

@@ -30,7 +30,7 @@ def main():
     physical.mkdir(parents=True)
     record = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
               "script_sha256": sha256(Path(__file__)), "instance_path_length": len(str(logical)),
-              "scope": "Real GUI long-directory creation, original protocols, natural game initialization and cold backup/restore; existing filesystem short names required, no client business acceptance.",
+              "scope": "Real GUI long-directory creation, original protocols, natural game initialization and cold backup/restore; existing filesystem short names required.",
               "forced_cleanup": False, "checks": {}}
     checks = record["checks"]
     process, window, duplicate = None, None, None

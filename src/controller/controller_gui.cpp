@@ -4,6 +4,7 @@
 #include <uxtheme.h>
 #include <commctrl.h>
 #include <psapi.h>
+#include <tlhelp32.h>
 #include "log_view.h"
 #include <algorithm>
 #include <cwchar>
@@ -192,7 +193,7 @@ static std::wstring service_group(const std::wstring &name) {
 
 static std::wstring service_readiness(const Service &service) {
     if (!service.readiness.empty()) return service.readiness;
-    return service.state == L"未启动" ? L"未启动" : L"未验证";
+    return service.state;
 }
 
 struct App {
@@ -227,6 +228,8 @@ struct App {
     // Selected entry in log_sources. The picker is the log-file menu; the
     // selection is plain state, not a hidden combo box.
     size_t log_selected = 0;
+    std::vector<ULONG_PTR> live_service_pids;
+    std::vector<bool> service_alerts;
     // Input frames are placed once in WM_SIZE and painted from these rects, so
     // the drawn frame and the native EDIT can never drift apart again.
     RECT field_path{}, field_ip{}, field_port{}, field_filter{};
@@ -484,7 +487,7 @@ struct App {
                             L"\r\n停服信号：" + std::to_wstring(service.signal) +
                             (service.automatic ? L" · 整体启动包含此项" : L" · 需手动启动");
         service_readiness_text = L"就绪层级：" + service_readiness(service) +
-                                 L"\r\n接口/协议/业务：未验证  ·  端口/依赖：清单未声明";
+                                 L"\r\n端口/依赖：清单未声明";
         if (!recent.empty()) service_readiness_text += L"\r\n最近日志：" + recent;
         show_maintenance_detail();
     }
@@ -497,9 +500,14 @@ struct App {
         }
         SendMessageW(list, WM_SETREDRAW, FALSE, 0);
         SendMessageW(list, LB_RESETCONTENT, 0, 0);
+        service_alerts.clear();
         for (const auto &service : services) {
             std::wstring item = service.name + (service.automatic ? L"" : L"（可选）") + L"  |  " + service.state;
             if (running(service)) item += L" · PID " + std::to_wstring(service.pid);
+            size_t code=service.state.find(L"代码 ");
+            service_alerts.push_back(service.state.find(L"失败")!=std::wstring::npos ||
+                service.state.find(L"超时")!=std::wstring::npos ||
+                (code!=std::wstring::npos && std::wcstoul(service.state.c_str()+code+3,nullptr,10)!=0 && !service.normal_stop));
             SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
         }
         if (!services.empty()) SendMessageW(list, LB_SETCURSEL,
@@ -513,12 +521,35 @@ struct App {
     }
 
     void update_live_count() {
-        unsigned live=0;
-        for (const auto &service : services)
-            if (service.process && WaitForSingleObject(service.process,0)==WAIT_TIMEOUT) ++live;
+        // The worker closes/replaces Service handles. Query our job instead of
+        // reading that mutable vector concurrently from the UI timer or paint.
+        size_t count=static_cast<size_t>(SendMessageW(GetDlgItem(window,SERVICE_LIST),LB_GETCOUNT,0,0));
+        std::vector<ULONG_PTR> storage(2+std::max<size_t>(count,32));
+        auto *pids=reinterpret_cast<JOBOBJECT_BASIC_PROCESS_ID_LIST *>(storage.data());
+        while(!QueryInformationJobObject(service_job,JobObjectBasicProcessIdList,pids,
+                                         static_cast<DWORD>(storage.size()*sizeof(ULONG_PTR)),nullptr)) {
+            require(GetLastError()==ERROR_MORE_DATA,"Query owned service processes");
+            storage.resize(storage.size()*2);
+            pids=reinterpret_cast<JOBOBJECT_BASIC_PROCESS_ID_LIST *>(storage.data());
+        }
+        live_service_pids.assign(pids->ProcessIdList,pids->ProcessIdList+pids->NumberOfProcessIdsInList);
+        // Windows may put a service's hidden console helper in the same job.
+        // Only the hosts launched directly by this controller are services.
+        File snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0));
+        require(snapshot.handle!=INVALID_HANDLE_VALUE,"Snapshot service process parents");
+        PROCESSENTRY32W entry{}; entry.dwSize=sizeof(entry);
+        std::vector<ULONG_PTR> hosts;
+        if(Process32FirstW(snapshot.handle,&entry)) do {
+            if(entry.th32ParentProcessID==GetCurrentProcessId() &&
+               std::find(live_service_pids.begin(),live_service_pids.end(),entry.th32ProcessID)!=live_service_pids.end())
+                hosts.push_back(entry.th32ProcessID);
+        } while(Process32NextW(snapshot.handle,&entry));
+        live_service_pids=std::move(hosts);
         SetWindowTextW(GetDlgItem(window,213),
-                       (std::to_wstring(live)+L" / "+std::to_wstring(services.size())+L" 运行中").c_str());
+                       (std::to_wstring(live_service_pids.size())+L" / "+std::to_wstring(count)+L" 运行中").c_str());
         InvalidateRect(GetDlgItem(window,213),nullptr,FALSE);
+        InvalidateRect(GetDlgItem(window,BROWSE),nullptr,FALSE);
+        InvalidateRect(GetDlgItem(window,SERVICE_LIST),nullptr,FALSE);
     }
 
     void append(const std::wstring &text) {
@@ -731,7 +762,7 @@ struct App {
                                 PostMessageW(window, PROGRESS_MESSAGE, 0, reinterpret_cast<LPARAM>(message));
                                 start_service(service, instance, service_job);
                             }
-                            result->status = L"已启动默认服务进程（业务未验证）";
+                            result->status = L"已启动默认服务进程";
                         } else {
                             stop_owned_services();
                             if (owned.process) { stop_database(window, tool, instance, owned); result->stopped = true; }
@@ -915,12 +946,10 @@ static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wpar
             size_t split = snapshot.find(L"  |  ");
             std::wstring name = snapshot.substr(0, split), detail = split == std::wstring::npos ? L"" : snapshot.substr(split + 5);
             size_t optional = name.find(L"\uff08"); if (optional != std::wstring::npos) name.resize(optional);
-            bool live = i < static_cast<int>(app->services.size()) && running(app->services[static_cast<size_t>(i)]);
-            size_t code = detail.find(L"代码 ");
-            bool failed = detail.find(L"启动失败") != std::wstring::npos || detail.find(L"启动超时") != std::wstring::npos ||
-                          detail.find(L"停止失败") != std::wstring::npos || detail.find(L"停止超时") != std::wstring::npos ||
-                          detail.find(L"操作失败") != std::wstring::npos ||
-                          (code != std::wstring::npos && code + 3 < detail.size() && detail[code+3] != L'0');
+            size_t pid = detail.find(L"PID ");
+            ULONG_PTR process_id=pid==std::wstring::npos ? 0 : std::wcstoul(detail.c_str()+pid+4,nullptr,10);
+            bool live=std::find(app->live_service_pids.begin(),app->live_service_pids.end(),process_id)!=app->live_service_pids.end();
+            bool failed=static_cast<size_t>(i)<app->service_alerts.size() && app->service_alerts[static_cast<size_t>(i)];
             RECT area = service_tile(window, i);
             bool chosen = i == selected;
             rounded(dc, area, chosen ? RGB(241,246,255) : failed ? RGB(255,247,247) : live ? RGB(255,255,255) : RGB(249,250,253),
@@ -931,8 +960,7 @@ static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wpar
             RECT label = {area.left + app->px(25), area.top, area.right - app->px(live ? 40 : 10), area.bottom};
             text_at(dc, label, name, chosen ? RGB(37,91,239) : failed ? RGB(220,42,49) : live ? RGB(36,51,75) : RGB(130,147,172),
                     chosen ? app->strong_font : app->font);
-            size_t pid = detail.find(L"PID ");
-            if (pid != std::wstring::npos) {
+            if (live) {
                 RECT number = {area.right-app->px(38),area.top,area.right-app->px(8),area.bottom};
                 text_at(dc, number, detail.substr(pid+4), RGB(153,169,192), app->small_font, DT_RIGHT|DT_VCENTER|DT_SINGLELINE);
             }
@@ -1401,7 +1429,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 app->market_report=result->status+L"\r\n"+result->details;
                 if(app->market_window) {
                     EnableWindow(app->market_window,TRUE);
-                    app->append(L"拍卖维护："+app->market_report); market_summary();
+                    market_summary();
                 }
             }
             if (!result->success) {
@@ -1515,7 +1543,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 MessageBoxW(window,text.c_str(),L"服务详情",MB_OK|MB_ICONINFORMATION);return 0;
             }
             if(id==DATABASE_INFO) {
-                app->show_maintenance_detail();
+                if(!app->busy) app->show_maintenance_detail();
                 std::wstring text = L"备份、还原与恢复会先按逆序停止服务和数据库。\n\n" + app->maintenance_detail_text;
                 std::wstring login = app->current + L"\\login.private.cnf";
                 if (!app->current.empty() && present(login)) {

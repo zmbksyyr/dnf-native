@@ -38,7 +38,7 @@ def main():
                         "exit_code": result.returncode, "stderr": log})
         print(arch, "ENOSYS repeats, real fault registers, symbol and frames: PASS")
     (BUILD / "diagnostics-checks.json").write_text(json.dumps({"os": platform.platform(), "results": records,
-        "scope": "Own ELF fixtures; real fault delivery and diagnostic integrity, no service/business claim."}, indent=2) + "\n", encoding="utf-8")
+        "scope": "Own ELF fixtures; real fault delivery and diagnostic integrity."}, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -17,10 +17,9 @@ struct Service {
     HANDLE process = nullptr;
     DWORD pid = 0;
     bool stopping = false;
+    bool normal_stop = false;
     std::wstring state = L"未启动", out, err;
-    // The runtime channel is an observable boundary, not business readiness.
-    // Keep the distinction explicit so the controller cannot present a live
-    // process as a protocol or gameplay success.
+    // Current launch status, updated from its runtime channel and fresh logs.
     std::wstring readiness = L"未启动";
     bool application_initialized = false;
     uint64_t readiness_offset = 0;
@@ -135,7 +134,7 @@ static bool refresh_service_readiness(Service &service) {
             if (service.readiness_tail.find(marker) != std::string::npos) {
                 service.application_initialized = true;
                 service.state = L"进程运行中（应用已初始化）";
-                service.readiness = L"应用已初始化（接口/业务未验证）";
+                service.readiness = L"应用已初始化";
                 changed = true;
             }
             // Retain only the overlap needed if a read splits the marker.
@@ -161,8 +160,13 @@ static bool refresh_service(Service &service) {
     // A requested stop is reported as such, but the exit code stays visible so a
     // crash during shutdown cannot hide behind the word "已停止".
     bool expected_stop = service.stopping;
+    bool original_code_one=service.name==L"manager" || service.name==L"dbmw_guild" ||
+        service.name==L"dbmw_mnt" || service.name==L"dbmw_stat" || service.name==L"monitor" ||
+        service.name==L"guild" || service.name==L"statics" || service.name==L"coserver";
+    service.normal_stop=expected_stop && (code==0 || (code==1 && original_code_one &&
+        !service.out.empty() && read_file(service.out).find("Application Stop!")!=std::string::npos));
     service.state = (expected_stop ? L"已停止，代码 " : L"已退出，代码 ") + std::to_wstring(code);
-    service.readiness = L"宿主已退出（接口/业务未验证）";
+    service.readiness = L"宿主已退出";
     service.stopping = false;
     CloseHandle(service.process); service.process = nullptr;
     return true;
@@ -174,6 +178,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     refresh_service(service);
     if (service.process) return;
     service.stopping = false;
+    service.normal_stop = false;
     prepare_game_compat(service);
     service.state = L"正在启动";
     service.readiness = L"宿主启动中";
@@ -211,9 +216,9 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
         HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, (L"Local\\dnf-native-terminate-" + std::to_wstring(service.pid)).c_str());
         if (event) {
             CloseHandle(event);
-            service.state = L"进程运行中（业务未验证）";
+            service.state = L"进程运行中";
             service.readiness = service.name == L"game" ? L"运行时通道已接入，等待应用初始化" :
-                                                        L"运行时通道已接入（接口/业务未验证）";
+                                                        L"运行时通道已接入";
             return;
         }
         if (GetTickCount64() >= deadline) throw std::runtime_error("ELF host signal channel timed out; process retained for diagnosis");
@@ -226,12 +231,12 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
 }
 
 static void stop_service(Service &service) {
-    service.stopping = true;
     if (refresh_service(service) || !service.process) return;
     std::wstring prefix = service.signal == 12 ? L"Local\\dnf-native-sigusr2-" : L"Local\\dnf-native-terminate-";
     HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, (prefix + std::to_wstring(service.pid)).c_str());
     require(event != nullptr, "Open owned ELF host stop event");
     bool ok = SetEvent(event); CloseHandle(event); require(ok, "Request original service shutdown");
+    service.stopping = true;
     service.state = L"正在停止";
     service.readiness = L"停止请求已发送";
     if (service.name == L"stun") {

@@ -243,7 +243,7 @@ def main():
             server.wait(timeout=30)
             assert server.returncode == 0
     record = {"checks": checks, "passed": all(checks.values()), "launcher_sha256": digest(args.launcher),
-        "os": sys.getwindowsversion()[:], "scope": "Actual independent launcher GUI, key export, optional copied database registration and launch contract; no game-client business claim."}
+        "os": sys.getwindowsversion()[:], "scope": "Actual independent launcher GUI, key export, optional copied database registration and launch contract."}
     (work / "receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print("Launcher checks passed:", work / "receipt.json")
 

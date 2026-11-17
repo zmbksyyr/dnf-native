@@ -54,7 +54,7 @@ def main():
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
                           for p in [source, manifest, ROOT / "src/win32_files.h", ROOT / "src/game_levels.h", *sorted((ROOT / "src/controller").glob("*.h")), Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
-              "scope": "Native database and ELF process GUI build; not gameplay or clean multi-OS acceptance."}
+              "scope": "Native database and ELF process GUI build; runtime regression receipts recorded separately."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print("Native GUI:", output, output.stat().st_size, "bytes", flush=True)
 

@@ -32,7 +32,7 @@ def main():
     result = {key: probe[key] for key in ["os", "host_sha256", "elf_sha256", "exit_code", "forced_cleanup",
                                         "elapsed_seconds", "inputs", "syscall_gaps", "runtime_gaps"]}
     result.update({"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                   "scope": "Own Lua timer in original game/DP2/luv; no Frida, natural game startup or business acceptance",
+                   "scope": "Own Lua timer in original game/DP2/luv",
                    "probe": str(instance.relative_to(BUILD)), "command": command,
                    "markers": [marker for marker in markers if marker in stdout], "passed": passed,
                    "log_sha256": {name: hashlib.sha256((instance / name).read_bytes()).hexdigest()

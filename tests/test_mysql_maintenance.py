@@ -41,7 +41,7 @@ def main():
     for name in ["MYSQL_HOME", "MYSQL_PWD", "MYSQL_TCP_PORT"]:
         env.pop(name, None)
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(probe.relative_to(BUILD)),
-               "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery. No GUI or DNF client acceptance.",
+               "scope": "Native stopped-instance backup, shadow logical restore, failure preservation and journal recovery.",
                "exe_sha256": sha256(exe), "script_sha256": sha256(Path(__file__)),
                "sources": {name: sha256(ROOT / name) for name in
                            ["src/database/mysql_control.cpp", "src/database/mysql_operations.h", "tools/build_mysql.py"]},

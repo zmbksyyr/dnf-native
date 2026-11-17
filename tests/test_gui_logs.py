@@ -42,7 +42,7 @@ def main():
     shutil.copytree(source, instance, ignore=shutil.ignore_patterns('.mysql', 'service-logs'))
     receipt = {'recorded_utc': stamp, 'os': platform.platform(), 'gui_sha256': sha256(gui),
                'script_sha256': sha256(Path(__file__)), 'instance': str(instance.relative_to(BUILD)),
-               'scope': 'Private viewer fixtures and actual original game/peer/MySQL logs; no client gameplay acceptance.',
+               'scope': 'Private viewer fixtures and actual original game/peer/MySQL logs',
                'checks': {}, 'forced_cleanup': False}
     log_dir = guest_root(instance) / 'home/neople/game/log'
     if log_dir.exists():

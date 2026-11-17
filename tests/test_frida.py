@@ -49,7 +49,7 @@ def main():
               "unhandled exception" not in stderr)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "os": platform.platform(), "command": command,
-              "scope": "Own bridge scripts in original game/DP2/Lua/Frida; no database, gameplay or full plugin acceptance",
+              "scope": "Own bridge scripts in original game/DP2/Lua/Frida",
               "probe": str(instance.relative_to(BUILD)), "host_sha256": probe["host_sha256"],
               "elf_sha256": probe["elf_sha256"], "exit_code": probe["exit_code"],
               "forced_cleanup": probe["forced_cleanup"], "elapsed_seconds": probe["elapsed_seconds"],

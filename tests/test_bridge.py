@@ -175,7 +175,7 @@ def main():
     gaps = [line for line in stderr.splitlines() if any(word in line for word in
             ["syscall gap", "unsupported", "unhandled exception", "decode gap", "unimplemented guest", "exhausted"])]
     result = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(BUILD)),
-              "scope": "Original bridge DB version checks and exact channel-script responses on loopback; no game/client acceptance.",
+              "scope": "Original bridge DB version checks and exact channel-script responses on loopback",
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
               "service_port": args.port, "checks": checks, "script_bytes": len(expected_script),
               "game_proxy": game_proxy,
