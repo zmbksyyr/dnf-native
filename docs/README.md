@@ -68,6 +68,7 @@ python -B tools/build.py
 python -B tools/build_mysql.py
 python -B tools/build_gui.py
 python -B tools/build_login.py
+python -B tools/build_robot.py  # 从同级 dnf-robot 分支构建可选 Windows Robot
 python -B tools/build_instance_package.py --output ../x/dnf-native-output/package
 ```
 
@@ -85,6 +86,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 | `build.py` | 双架构 ELF 宿主 |
 | `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
 | `build_login.py` | 独立登录器与默认密钥配对核验 |
+| `build_robot.py` | 从同级 dnf-robot 分支构建可选 Windows Robot |
 | `build_gui.py` | Win32 GUI 与 ZIP 解压组件 |
 | `build_instance_package.py` | 核对资源、源码和构建收据，生成当前产品包 |
 | `build_all.py` | 按顺序调用上述构建步骤 |

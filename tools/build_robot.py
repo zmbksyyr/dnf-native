@@ -31,12 +31,21 @@ def main():
     env["GOARCH"] = "amd64"
     env["GOMODCACHE"] = str((BUILD / ".go-mod").resolve())
     env["GOCACHE"] = str((BUILD / ".go-cache").resolve())
+    temporary = BUILD / "tmp"
+    temporary.mkdir(parents=True, exist_ok=True)
+    env["TMP"] = env["TEMP"] = str(temporary.resolve())
     command = ["go", "build", "-trimpath", "-ldflags=-s -w", "-o", str(binary), "./cmd/robot"]
     subprocess.run(command, cwd=source, env=env, check=True)
+    names = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=source, text=True).splitlines()
+    sources = {name: sha256(source / name) for name in names
+               if (source / name).is_file() and (name.endswith(".go") or name in ("go.mod", "go.sum"))}
     receipt = {
         "source": str(source), "command": command, "goos": "windows", "goarch": "amd64",
         "cgo": False, "output_sha256": sha256(binary), "output_bytes": binary.stat().st_size,
-        "scope": "Native Windows Robot module; Linux market memory and shell operations remain explicit unsupported paths."
+        "sources": sources,
+        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip(),
+        "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=source, text=True).strip()),
+        "scope": "Standalone Windows Robot build with profile-based service and memory adapters; runtime validation recorded separately."
     }
     (output / "build-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print("Robot:", binary, binary.stat().st_size, "bytes", flush=True)

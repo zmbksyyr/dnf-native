@@ -248,6 +248,7 @@ struct App {
     // selection is plain state, not a hidden combo box.
     size_t log_selected = 0;
     std::vector<ULONG_PTR> live_service_pids;
+    std::vector<std::wstring> service_host_names;
     std::vector<bool> service_alerts;
     // Input frames are placed once in WM_SIZE and painted from these rects, so
     // the drawn frame and the native EDIT can never drift apart again.
@@ -445,7 +446,7 @@ struct App {
         int selected = selected_service_index();
         if (selected >= 0 && static_cast<size_t>(selected) < services.size()) {
             const Service &service = services[static_cast<size_t>(selected)];
-            application_logs(service.root + service.cwd + L"\\log", L"", sources);
+            application_logs(service.external ? service.config_dir+L"\\logs" : service.root + service.cwd + L"\\log", L"", sources);
             std::sort(sources.begin(), sources.end(), [](const LogSource &a, const LogSource &b) {
                 if (a.preferred != b.preferred) return a.preferred;
                 return a.modified != b.modified ? a.modified > b.modified : a.path < b.path;
@@ -489,6 +490,10 @@ struct App {
     Service *game_service() {
         auto found = std::find_if(services.begin(), services.end(), [](const Service &service) { return service.name == L"game"; });
         return found == services.end() ? nullptr : &*found;
+    }
+    std::wstring robot_logs() const {
+        for(const auto &service:services) if(service.external) return service.config_dir+L"\\logs";
+        return current+L"\\robot\\logs";
     }
     void show_plugins() {
         const Service *game = game_service();
@@ -565,7 +570,7 @@ struct App {
         }
         const Service &service = services[static_cast<size_t>(selected)];
         SetWindowTextW(GetDlgItem(window,LOG_SERVICE_TAB),service.name.c_str());
-        std::wstring architecture = service.host.find(L"x64") != std::wstring::npos ? L"x86_64" : L"i386";
+        std::wstring architecture = service.external || service.host.find(L"x64") != std::wstring::npos ? L"x86_64" : L"i386";
         service_detail_text = service.name + L"  ·  " + service_group(service.name) + L"  ·  " + architecture;
         std::wstring recent = !service.err.empty() ? service.err : service.out;
         if (recent.empty()) recent = latest_log(service.root + service.cwd + L"\\log", L"*");
@@ -573,6 +578,7 @@ struct App {
                             L"\r\nELF：" + service.elf + L"\r\nSHA-256：" + service.elf_hash +
                             L"\r\n停服信号：" + std::to_wstring(service.signal) +
                             (service.automatic ? L" · 整体启动包含此项" : L" · 需手动启动");
+        if(service.external) service_meta_text=L"程序："+service.executable+L"\r\n配置目录："+service.config_dir+L"\r\n独立 Windows 模块 · 整体启动包含此项";
         service_readiness_text = L"就绪层级：" + service_readiness(service) +
                                  L"\r\n端口/依赖：清单未声明";
         if (!recent.empty()) service_readiness_text += L"\r\n最近日志：" + recent;
@@ -588,7 +594,9 @@ struct App {
         SendMessageW(list, WM_SETREDRAW, FALSE, 0);
         SendMessageW(list, LB_RESETCONTENT, 0, 0);
         service_alerts.clear();
+        service_host_names.clear();
         for (const auto &service : services) {
+            if(!service.external) service_host_names.push_back(service.host.substr(service.host.find_last_of(L"\\/")+1));
             std::wstring item = service.name + (service.automatic ? L"" : L"（可选）") + L"  |  " + service.state;
             if (running(service)) item += L" · PID " + std::to_wstring(service.pid);
             size_t code=service.state.find(L"代码 ");
@@ -622,13 +630,16 @@ struct App {
         }
         live_service_pids.assign(pids->ProcessIdList,pids->ProcessIdList+pids->NumberOfProcessIdsInList);
         // Windows may put a service's hidden console helper in the same job.
-        // Only the hosts launched directly by this controller are services.
+        // Robot can restart an ELF host as its own child. Count those hosts,
+        // while excluding console helpers and Robot's separate Web worker.
         File snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0));
         require(snapshot.handle!=INVALID_HANDLE_VALUE,"Snapshot service process parents");
         PROCESSENTRY32W entry{}; entry.dwSize=sizeof(entry);
         std::vector<ULONG_PTR> hosts;
         if(Process32FirstW(snapshot.handle,&entry)) do {
-            if(entry.th32ParentProcessID==GetCurrentProcessId() &&
+            bool elf_host=std::any_of(service_host_names.begin(),service_host_names.end(),
+                [&](const std::wstring &name) {return !_wcsicmp(name.c_str(),entry.szExeFile);});
+            if((entry.th32ParentProcessID==GetCurrentProcessId() || elf_host) &&
                std::find(live_service_pids.begin(),live_service_pids.end(),entry.th32ProcessID)!=live_service_pids.end())
                 hosts.push_back(entry.th32ProcessID);
         } while(Process32NextW(snapshot.handle,&entry));
@@ -725,8 +736,15 @@ struct App {
         }
         bool configured_robot = !current.empty() && GetPrivateProfileIntW(L"robot", L"enabled", 0, (current + L"\\services.ini").c_str()) == 1;
         bool selected_robot = SendMessageW(GetDlgItem(market_window, ROBOT_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED;
-        different = different || configured_robot != selected_robot;
-        EnableWindow(GetDlgItem(market_window, LEVEL_APPLY), different && !pending && (!running(*game) || session.process));
+        bool robot_active = configured_robot || selected_robot;
+        for (int id : {MARKET_LEVELS, MARKET_REFINE, MARKET_DP2, MARKET_AUTO})
+            EnableWindow(GetDlgItem(market_window, id), editable && !robot_active);
+        bool frida=setting(current+L"\\services.ini",L"plugins",L"mode")==L"frida";
+        EnableWindow(GetDlgItem(market_window,MARKET_DP2),editable && !robot_active &&
+            ((frida && market_guard_supported) || market::options(current).dp2));
+        for (int id = market::Check; id <= market::Reset; ++id)
+            EnableWindow(GetDlgItem(market_window, id), session.process && !pending && !robot_active);
+        EnableWindow(GetDlgItem(market_window, LEVEL_APPLY), game && different && !pending && (!running(*game) || session.process));
     }
     void load() {
         if (busy || session.process || services_running()) return;
@@ -764,7 +782,8 @@ struct App {
         const Session owned = session;
         bool dp2=id==LEVEL_APPLY && SendMessageW(GetDlgItem(market_window,DP2_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
         bool frida=dp2 && SendMessageW(GetDlgItem(market_window,FRIDA_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
-        bool robot_enabled=id==LEVEL_APPLY && SendMessageW(GetDlgItem(market_window,ROBOT_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
+        bool robot_enabled=(id==ROBOT_ENABLE || id==LEVEL_APPLY) &&
+            SendMessageW(GetDlgItem(market_window,ROBOT_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
         market::Options market_options=market::options(instance);
         if(market_window && id>=market::Check && id<=market::Reset) {
             market_options={SendMessageW(GetDlgItem(market_window,MARKET_LEVELS),BM_GETCHECK,0,0)==BST_CHECKED,
@@ -784,6 +803,8 @@ struct App {
             auto result = std::make_unique<Result>();
             auto stop_owned_services = [&] {
                 for (auto item = services.rbegin(); item != services.rend(); ++item) {
+                    refresh_service(*item);
+                    adopt_robot_service(*item,service_job,robot_logs());
                     if (running(*item)) {
                         auto message = new std::wstring(L"正在停止服务：" + item->name);
                         PostMessageW(window, PROGRESS_MESSAGE, 0, reinterpret_cast<LPARAM>(message));
@@ -797,7 +818,7 @@ struct App {
                     if(!s.process || !owns_response(sql(tool,instance,identity_query),s)) throw std::runtime_error("Auction maintenance requires this controller's own database session");
                 };
                 auto prepare_market=[&] {
-                    if(services.empty() || !market::options(instance).automatic) return;
+                    if(services.empty() || GetPrivateProfileIntW(L"robot",L"enabled",0,(instance+L"\\services.ini").c_str())==1 || !market::options(instance).automatic) return;
                     auto pvf=market::game_pvf(services);
                     if(market::index_matches(instance,market::indexes(services),file_sha256(pvf))) return;
                     result->details+=market::maintain(tool,instance,assets,services,service_job,market::Sync,2,market::options(instance),market_identity)+L"\r\n";
@@ -808,7 +829,31 @@ struct App {
                     });
                     result->details += monthly_prepare(tool,instance,repair) + L"\r\n";
                 };
+                auto start_module = [&](Service &service) {
+                    if(service.external) {
+                        const auto config=service.config_dir+L"\\conf\\config.ini";
+                        const auto user=setting(config,L"db",L"db_user_name");
+                        const auto host=setting(config,L"db",L"db_host");
+                        if((user.empty() || user==L"game") && (host.empty() || host==L"127.0.0.1")) {
+                            // The public game account is limited to application
+                            // schemas. Grant only Robot's own schema; Robot
+                            // creates and migrates its tables itself.
+                            auto grants=sql(tool,instance,L"SELECT COUNT(*) FROM mysql.db WHERE User='game' AND Host='%' AND Db='d_starsky' AND Select_priv='Y' AND Insert_priv='Y' AND Update_priv='Y' AND Delete_priv='Y' AND Create_priv='Y' AND Alter_priv='Y';");
+                            if(grants.code) throw std::runtime_error("Read Robot database grant");
+                            if(grants.output.find("1")==std::string::npos) {
+                                auto before=sql(tool,instance,L"SHOW GRANTS FOR 'game'@'%';");
+                                if(before.code) throw std::runtime_error("Read game database permissions");
+                                write_private(instance+L"\\.mysql\\"+unique_name()+L"-before-robot-grants.private.txt",before.output);
+                                if(sql(tool,instance,L"GRANT ALL ON d_starsky.* TO 'game'@'%';").code)
+                                    throw std::runtime_error("Prepare Robot database permission");
+                            }
+                        }
+                    }
+                    start_service(service,instance,service_job);
+                };
                 if(id>=market::Check && id<=market::Reset) {
+                    if(GetPrivateProfileIntW(L"robot",L"enabled",0,(instance+L"\\services.ini").c_str())==1)
+                        throw std::runtime_error("Robot owns market maintenance; use Robot controls");
                     result->details=market::maintain(tool,instance,assets,services,service_job,id,selected<0?2:selected,market_options,market_identity);
                     result->status=id==market::Check?L"双拍卖兼容性检查完成":L"双拍卖维护完成";
                 } else if (id == DELETE_INSTANCE) {
@@ -830,6 +875,42 @@ struct App {
                     unsigned changed = update_service_ip(services, instance, target);
                     result->status = L"服务 IP 已更新";
                     result->details = changed ? L"已更新 " + std::to_wstring(changed) + L" 个服务配置文件；原配置已备份，下次启动生效。" : L"服务配置已使用此 IP，无需修改。";
+                } else if (id == ROBOT_ENABLE) {
+                    const std::wstring config=instance+L"\\services.ini";
+                    auto robot=std::find_if(services.begin(),services.end(),[](const Service &s){return s.external;});
+                    if(robot_enabled && robot==services.end()) {
+                        // Load only the new module. Reloading the vector here
+                        // would discard the handles of already running peers.
+                        std::string before=read_file(config);
+                        require(WritePrivateProfileStringW(L"robot",L"enabled",L"1",config.c_str()),"Save Robot setting");
+                        try {
+                            auto fresh=load_services(instance,runtime);
+                            auto added=std::find_if(fresh.begin(),fresh.end(),[](const Service &s){return s.external;});
+                            if(added==fresh.end()) throw std::runtime_error("Robot service is missing");
+                            prepare_robot_game_keys(*added,instance);
+                            services.push_back(*added);
+                        } catch(...) {market::replace_file(config,before);throw;}
+                    } else if(!robot_enabled && robot!=services.end()) {
+                        stop_service(*robot);
+                        require(WritePrivateProfileStringW(L"robot",L"enabled",L"0",config.c_str()),"Save Robot setting");
+                        services.erase(robot);
+                    }
+                    // The host's bank capacity and input encoding are launch
+                    // settings. Refresh only these two modules, retaining all
+                    // unrelated service handles and Robot-owned configuration.
+                    auto fresh=load_services(instance,runtime);
+                    for(auto &peer:services) if(peer.name==L"auction" || peer.name==L"point") {
+                        auto next=std::find_if(fresh.begin(),fresh.end(),[&](const Service &s){return s.name==peer.name;});
+                        if(next!=fresh.end() && peer.environment!=next->environment) {
+                            bool restart=running(peer);stop_service(peer);peer.environment=next->environment;
+                            if(restart) start_service(peer,instance,service_job);
+                        }
+                    }
+                    auto game=std::find_if(services.begin(),services.end(),[](const Service &s){return s.name==L"game";});
+                    auto module=std::find_if(services.begin(),services.end(),[](const Service &s){return s.external;});
+                    if(robot_enabled && module!=services.end() && game!=services.end() && running(*game)) start_module(*module);
+                    result->status=robot_enabled?L"Robot 已启用":L"Robot 已停用";
+                    result->details=robot_enabled?L"设置已保存，Robot 已加入服务列表；拍卖维护由 Robot 控制。":L"设置已保存，Native 拍卖维护已恢复。";
                 } else if (id == LEVEL_APPLY) {
                     auto game = std::find_if(services.begin(),services.end(),[](const Service &s) {return s.name==L"game";});
                     if (game == services.end()) throw std::runtime_error("Game service is missing");
@@ -840,8 +921,6 @@ struct App {
                     // stopping the game; settings and script share one backup.
                     const std::wstring config=instance+L"\\services.ini",module=game->root+L"\\dp2\\lua\\df\\frida.lua";
                     std::string before_config=read_file(config),before_module,after_module;
-                    bool previous_robot=GetPrivateProfileIntW(L"robot",L"enabled",0,config.c_str())==1;
-                    auto old_robot=std::find_if(services.begin(),services.end(),[](const Service &s){return s.external;});
                     if(dp2 && !frida) {
                         before_module=read_file(module); after_module=before_module;
                         const std::string guard="\n    if os.getenv(\"DNF_NATIVE_FRIDA\") == \"0\" then\n"
@@ -859,7 +938,6 @@ struct App {
                     directory(backup); write_private(backup+L"\\services.ini",before_config);
                     if(edit_module) write_private(backup+L"\\frida.lua",before_module);
                     bool restart=running(*game);
-                    if (previous_robot && !robot_enabled && old_robot!=services.end()) stop_service(*old_robot);
                     stop_service(*game);
                     auto reload=[&] {
                         for(const auto &fresh:load_services(instance,runtime)) if(fresh.name==L"game") {
@@ -875,7 +953,6 @@ struct App {
                         const wchar_t *mode=!dp2?L"off":frida?L"frida":L"lua";
                         require(WritePrivateProfileStringW(L"plugins",L"mode",mode,config.c_str()),"Save game plugin mode");
                         require(WritePrivateProfileStringW(L"gameplay",L"max_level",target.c_str(),config.c_str()),"Save game maximum level");
-                        require(WritePrivateProfileStringW(L"robot",L"enabled",robot_enabled?L"1":L"0",config.c_str()),"Save Robot setting");
                         reload();
                     } catch(...) {
                         market::replace_file(config,before_config);
@@ -883,13 +960,7 @@ struct App {
                         reload();throw;
                     }
                     if(restart) start_service(*game,instance,service_job);
-                    if (previous_robot != robot_enabled) {
-                        services = load_services(instance, runtime);
-                        auto fresh_robot=std::find_if(services.begin(),services.end(),[](const Service &s){return s.external;});
-                        if (robot_enabled && fresh_robot != services.end()) start_service(*fresh_robot,instance,service_job);
-                    }
                     result->status=L"运行设置已应用：等级上限 " + target + (restart?L"，game 已重新拉起":L"，下次启动 game 生效");
-                    if (previous_robot != robot_enabled) result->status += robot_enabled ? L"，Robot 已启用" : L"，Robot 已停用";
                     result->details=result->status+L"\r\n"+(!dp2?L"DP2/Lua 已关闭，Frida 已关闭":frida?L"DP2/Lua 已启用，Frida 已启用":L"DP2/Lua 已启用，Frida 已关闭")+L"\r\n配置备份："+backup;
                 } else if (id == MONTHLY_PREPARE) {
                     if (!owned.process || !owns_response(sql(tool,instance,identity_query),owned)) throw std::runtime_error("Monthly maintenance instance identity differs");
@@ -907,7 +978,7 @@ struct App {
                             for (auto &service : services) if (service.automatic) {
                                 auto message = new std::wstring(L"正在启动服务：" + service.name);
                                 PostMessageW(window, PROGRESS_MESSAGE, 0, reinterpret_cast<LPARAM>(message));
-                                start_service(service, instance, service_job);
+                                start_module(service);
                             }
                             result->status = L"已启动默认服务进程";
                         } else {
@@ -917,7 +988,7 @@ struct App {
                         }
                     } else {
                         if (selected < 0 || static_cast<size_t>(selected) >= services.size()) throw std::runtime_error("Choose a service first");
-                        if (id == ELF_START) start_service(services[selected], instance, service_job);
+                        if (id == ELF_START) start_module(services[selected]);
                         else stop_service(services[selected]);
                         result->status = services[selected].name + L"：" + services[selected].state;
                         // The readiness level is a separate fact from the process
@@ -1622,6 +1693,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             }
             if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); app->show_robot(); app->remember_instance(); }
             if(app->operation==LEVEL_APPLY) app->show_plugins();
+            if(app->operation==ROBOT_ENABLE) app->show_robot();
             app->show_level();
             if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
@@ -1656,6 +1728,9 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                                     L"\r\n诊断日志：" + service.err); changed = true;
                     } else if (refresh_service_readiness(service)) {
                         app->append(service.name + L"：" + service.readiness); changed = true;
+                    }
+                    if(adopt_robot_service(service,app->service_job,app->robot_logs())) {
+                        app->append(service.name+L"：Robot 已重新拉起，模块控制已接入");changed=true;
                     }
                 }
                 if (changed) { app->show_services(); app->controls(); }
@@ -1802,6 +1877,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     SendMessageW(GetDlgItem(app->market_window, FRIDA_ENABLE), BM_SETCHECK, BST_UNCHECKED, 0);
                 app->controls();
             } else if (id == FRIDA_ENABLE) app->controls();
+            else if(id==ROBOT_ENABLE) app->action(ROBOT_ENABLE);
             else if (id == LEVEL_APPLY) {
                 LRESULT choice=SendMessageW(GetDlgItem(app->market_window,LEVEL_CAP),CB_GETCURSEL,0,0);
                 if (choice>=0 && static_cast<size_t>(choice)<sizeof(game_level_choices)/sizeof(*game_level_choices))

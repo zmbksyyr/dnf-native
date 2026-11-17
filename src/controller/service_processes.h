@@ -10,7 +10,7 @@ static const wchar_t *dp2_preload = L"LD_PRELOAD=/dp2/libdp2pre.so";
 
 struct Service {
     std::wstring name, host, root, cwd, elf, loader_hash, elf_hash, pid_file;
-    std::wstring executable, config_dir, stop_event;
+    std::wstring executable, config_dir, stop_event, robot_pid_file;
     std::vector<std::wstring> arguments, environment;
     bool automatic = false, external = false;
     unsigned max_level = 70;
@@ -61,6 +61,51 @@ static std::string json_escape(const std::string &value) {
     return result;
 }
 
+// The launcher key pair is consumed by the original game process. Robot reads
+// that pair from the game directory during its own initialization, so the
+// controller only fills missing files there and never writes Robot-owned keys.
+static void prepare_robot_game_keys(const Service &robot, const std::wstring &instance) {
+    const auto manifest=instance+L"\\services.ini";
+    const std::wstring binary=instance+L"\\"+setting(manifest,L"game",L"root")+setting(manifest,L"game",L"elf");
+    const std::wstring game_dir=binary.substr(0,binary.find_last_of(L"\\/"));
+    const std::wstring target_private = game_dir + L"\\privatekey.pem";
+    const std::wstring target_public = game_dir + L"\\publickey.pem";
+    bool added_private=GetFileAttributesW(target_private.c_str())==INVALID_FILE_ATTRIBUTES;
+    bool added_public=GetFileAttributesW(target_public.c_str())==INVALID_FILE_ATTRIBUTES;
+    directory(game_dir);
+    if(added_private) {
+        HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(201), RT_RCDATA);
+        require(resource != nullptr, "Find default Robot game key");
+        HGLOBAL loaded = LoadResource(nullptr, resource);
+        require(loaded != nullptr, "Load default Robot game key");
+        const char *bytes = static_cast<const char *>(LockResource(loaded));
+        require(bytes != nullptr, "Read default Robot game key");
+        write_private(target_private, std::string(bytes, SizeofResource(nullptr, resource)));
+    }
+    directory(instance+L"\\.mysql");
+    File log=private_file(instance+L"\\.mysql\\robot-key-check.private.log",CREATE_ALWAYS);
+    SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};
+    File input(CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,0,nullptr));
+    STARTUPINFOW startup{}; startup.cb=sizeof(startup); startup.dwFlags=STARTF_USESTDHANDLES;
+    startup.hStdInput=input.handle; startup.hStdOutput=startup.hStdError=log.handle;
+    PROCESS_INFORMATION child{};
+    std::wstring command=quote(robot.executable)+L" --check-game-keypair "+quote(binary);
+    bool created=CreateProcessW(robot.executable.c_str(),command.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,instance.c_str(),&startup,&child)!=FALSE;
+    bool valid=false;
+    if(created) {
+        CloseHandle(child.hThread);
+        DWORD waited=WaitForSingleObject(child.hProcess,10000),code=1;
+        if(waited!=WAIT_OBJECT_0) {TerminateProcess(child.hProcess,1);WaitForSingleObject(child.hProcess,10000);}
+        else GetExitCodeProcess(child.hProcess,&code);
+        valid=code==0;CloseHandle(child.hProcess);
+    }
+    if(!valid) {
+        if(added_private) DeleteFileW(target_private.c_str());
+        if(added_public) DeleteFileW(target_public.c_str());
+        throw std::runtime_error("Game RSA pair is invalid or Robot key check failed; existing keys preserved; inspect robot-key-check.private.log");
+    }
+}
+
 static std::vector<Service> load_services(const std::wstring &instance, const std::wstring &runtime) {
     std::wstring file = instance + L"\\services.ini";
     std::vector<Service> services;
@@ -90,6 +135,8 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
         service.elf_hash = get(L"elf_sha256"); service.loader_hash = get(L"loader_sha256");
         auto pid = get(L"pid_file");
         if (!pid.empty()) service.pid_file = service.root + pid;
+        if (service.name == L"game" || service.name == L"auction" || service.name == L"point")
+            service.robot_pid_file = instance + L"\\robot\\state\\pids\\" + service.name + L".pid";
         if (service.cwd.empty() || service.elf_hash.size() != 64 || service.loader_hash.size() != 64)
             throw std::runtime_error("Service paths or ELF identities are missing");
         service.automatic = get(L"automatic") == L"1";
@@ -126,11 +173,13 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
             env.erase(std::remove_if(env.begin(),env.end(),[](const std::wstring &s) {return s.rfind(L"DNF_NATIVE_AUCTION_",0)==0;}),env.end());
             unsigned level=GetPrivateProfileIntW(L"auction",L"level_limit",70,file.c_str());
             unsigned refine=GetPrivateProfileIntW(L"auction",L"refine_limit",7,file.c_str());
+            if(GetPrivateProfileIntW(L"robot",L"enabled",0,file.c_str())==1) {level=127;refine=31;}
             if(!level || level>127 || refine>31) throw std::runtime_error("Invalid auction runtime limits");
             env.push_back(L"DNF_NATIVE_AUCTION_LEVEL="+std::to_wstring(level));
             env.push_back(L"DNF_NATIVE_AUCTION_REFINE="+std::to_wstring(refine));
-            if(setting(instance+L"\\.mysql\\market-index.ini",L"index",L"encoding")==L"UTF8")
-                env.push_back(L"DNF_NATIVE_AUCTION_ENCODING=UTF8");
+            // Inspect the consumed index in the host at every launch, including
+            // launches made directly by Robot after rebuilding its Big5 index.
+            env.push_back(L"DNF_NATIVE_AUCTION_ENCODING=AUTO");
             if(setting(file,L"auction",L"price_keys")==L"1" || setting(file,L"auction",L"price_keys_"+service.name)==L"1") env.push_back(L"DNF_NATIVE_AUCTION_PRICE_KEYS=1");
         }
         services.push_back(service);
@@ -149,6 +198,10 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
         if (robot.config_dir.find(L':') == std::wstring::npos && robot.config_dir.rfind(L"\\", 0) != 0)
             robot.config_dir = instance + L"\\" + robot.config_dir;
         robot.cwd = instance;
+        // Keep the runtime root on the service object so the profile writer
+        // can reconstruct the complete Native launch contract when Robot is
+        // started before any market service.
+        robot.host = runtime;
         robot.state = L"未启动";
         robot.readiness = L"未启动";
         services.push_back(robot);
@@ -158,6 +211,52 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
 
 static bool running(const Service &service) {
     return service.process && WaitForSingleObject(service.process, 0) == WAIT_TIMEOUT;
+}
+
+static std::string robot_profile_string(const std::wstring &value) {
+    return "\"" + json_escape(utf8_path(value)) + "\"";
+}
+
+static std::vector<std::wstring> service_start_arguments(const Service &service) {
+    std::vector<std::wstring> args{service.host, L"--root", service.root, service.loader_hash};
+    for (const auto &env : service.environment) { args.push_back(L"--env"); args.push_back(env); }
+    args.push_back(L"--cwd"); args.push_back(service.cwd);
+    args.push_back(L"--run"); args.push_back(service.elf); args.push_back(service.elf_hash);
+    args.insert(args.end(), service.arguments.begin(), service.arguments.end());
+    return args;
+}
+
+static std::string robot_profile_service_json(const Service &service) {
+    std::string result = "{\"executable\":" + robot_profile_string(service.host) +
+        ",\"image\":" + robot_profile_string(service.elf) +
+        ",\"image_sha256\":" + robot_profile_string(service.elf_hash) +
+        ",\"pid_file\":" + robot_profile_string(service.robot_pid_file) +
+        ",\"directory\":" + robot_profile_string(service.root + service.cwd) +
+        ",\"stop_event\":\"Local\\\\dnf-native-" + std::string(service.signal==12?"sigusr2":"terminate") + "-{pid}\",\"start\":[";
+    bool first = true;
+    for (const auto &arg : service_start_arguments(service)) {
+        if (!first) result += ',';
+        first = false;
+        result += robot_profile_string(arg);
+    }
+    return result + "]}";
+}
+
+static void write_robot_profile(const Service &robot, const std::wstring &instance) {
+    // This file describes the launcher-owned host contract. Robot owns its
+    // other configuration and runtime data; Native refreshes only this file.
+    std::string json = "{\n  \"version\":1,\"adapter\":\"dnf-native-windows\",\n"
+        "  \"market_owner\":\"robot\",\"memory_model\":\"refine-banks-31\",\n"
+        "  \"service_root\":" + robot_profile_string(instance + L"\\home\\neople") +
+        ",\n  \"capabilities\":{\"auction\":true,\"point\":true,\"memory_patch\":true},\n  \"services\":{\n";
+    bool first = true;
+    for (const auto &service : load_services(instance, robot.host)) {
+        if (service.name != L"game" && service.name != L"auction" && service.name != L"point") continue;
+        if (!first) json += ",\n";
+        first = false;
+        json += "    " + robot_profile_string(service.name) + ":" + robot_profile_service_json(service);
+    }
+    write_private(robot.config_dir + L"\\conf\\host-profile.json", json + "\n  }\n}\n",CREATE_ALWAYS);
 }
 
 static bool refresh_service_readiness(Service &service) {
@@ -203,6 +302,10 @@ static bool refresh_service(Service &service) {
         while (!text.empty() && std::strchr("\r\n \t", text.back())) text.pop_back();
         if (text == std::to_string(service.pid)) require(DeleteFileW(service.pid_file.c_str()), "Remove exited owned service PID marker");
     }
+    if (!service.robot_pid_file.empty() && GetFileAttributesW(service.robot_pid_file.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        std::string marker=read_file(service.robot_pid_file);
+        if(marker==std::to_string(service.pid)) require(DeleteFileW(service.robot_pid_file.c_str()), "Remove Robot host PID marker");
+    }
     // A requested stop is reported as such, but the exit code stays visible so a
     // crash during shutdown cannot hide behind the word "已停止".
     bool expected_stop = service.stopping;
@@ -219,6 +322,30 @@ static bool refresh_service(Service &service) {
     return true;
 }
 
+// Robot may restart a market host. Its children inherit our job, and its PID
+// marker lets the controller reconnect normal process/log/resource controls.
+static bool adopt_robot_service(Service &service, HANDLE job, const std::wstring &robot_logs) {
+    if(running(service) || service.robot_pid_file.empty() ||
+       GetFileAttributesW(service.robot_pid_file.c_str())==INVALID_FILE_ATTRIBUTES) return false;
+    std::string text=read_file(service.robot_pid_file);
+    if(text.empty() || text.size()>10 || text.find_first_not_of("0123456789")!=std::string::npos) return false;
+    DWORD pid=static_cast<DWORD>(std::stoul(text));
+    HANDLE process=OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,pid);
+    if(!process) return false;
+    BOOL owned=FALSE;wchar_t image[32768];DWORD size=32768;
+    bool valid=IsProcessInJob(process,job,&owned) && owned &&
+        QueryFullProcessImageNameW(process,0,image,&size) &&
+        !_wcsicmp(instance_directory(image).c_str(),instance_directory(service.host).c_str()) &&
+        WaitForSingleObject(process,0)==WAIT_TIMEOUT;
+    if(!valid) {CloseHandle(process);return false;}
+    if(service.process) CloseHandle(service.process);
+    service.process=process;service.pid=pid;service.stopping=false;service.normal_stop=false;
+    service.state=L"进程运行中";service.readiness=L"Robot 已重新拉起宿主";
+    service.application_initialized=false;service.readiness_offset=0;service.readiness_tail.clear();
+    service.out=robot_logs+L"\\"+service.name+L"-host.log";service.err=service.out;
+    return true;
+}
+
 #include "game_compat.h"
 
 static void start_service(Service &service, const std::wstring &instance, HANDLE job) try {
@@ -227,6 +354,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     service.stopping = false;
     service.normal_stop = false;
     if (service.external) {
+        prepare_robot_game_keys(service, instance);
         directory(service.config_dir + L"\\conf");
         const std::wstring config = service.config_dir + L"\\conf\\config.ini";
         if (GetFileAttributesW(config.c_str()) == INVALID_FILE_ATTRIBUTES) {
@@ -234,11 +362,10 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
             write_private(config, text);
         }
         const std::wstring profile = service.config_dir + L"\\conf\\host-profile.json";
-        if (GetFileAttributesW(profile.c_str()) == INVALID_FILE_ATTRIBUTES) {
-            std::string root = json_escape(utf8_path(instance + L"\\home\\neople"));
-            std::string json = "{\n  \"version\": 1,\n  \"adapter\": \"dnf-native-windows\",\n  \"service_root\": \"" + root + "\",\n  \"market_owner\": \"controller\",\n  \"services\": {\n    \"game\": {\"command_line_contains\": \"df_game_r\"},\n    \"auction\": {\"command_line_contains\": \"df_auction_r\"},\n    \"point\": {\"command_line_contains\": \"df_point_r\"}\n  },\n  \"capabilities\": {\"auction\": false, \"point\": false, \"memory_patch\": false}\n}\n";
-            write_private(profile, json);
-        }
+        if (GetFileAttributesW(profile.c_str()) == INVALID_FILE_ATTRIBUTES ||
+            read_file(profile).find("\"adapter\":\"dnf-native-windows\"") != std::string::npos ||
+            read_file(profile).find("\"adapter\": \"dnf-native-windows\"") != std::string::npos)
+            write_robot_profile(service, instance);
         service.state = L"正在启动"; service.readiness = L"Robot 启动中";
     } else {
         prepare_game_compat(service);
@@ -255,20 +382,19 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     File output = private_file(service.out), error = private_file(service.err);
     SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
     File input(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &security, OPEN_EXISTING, 0, nullptr));
-    std::wstring command;
+    std::wstring command, ready_name;
     if (service.external) {
         service.stop_event = L"Local\\dnf-native-robot-stop-" + std::to_wstring(GetTickCount64());
         service.stop_handle = CreateEventW(nullptr, TRUE, FALSE, service.stop_event.c_str());
         require(service.stop_handle != nullptr, "Create Robot stop event");
         command = quote(service.executable) + L" --config-dir " + quote(service.config_dir) + L" --stop-event " + quote(service.stop_event);
-    } else {
-        command = quote(service.host) + L" --root " + quote(service.root) + L" " + quote(service.loader_hash);
+        ready_name=service.stop_event+L"-ready";
+    } else for(const auto &arg:service_start_arguments(service)) {
+        if(!command.empty()) command+=L" ";
+        command+=quote(arg);
     }
-    if (!service.external) {
-        for (const auto &env : service.environment) command += L" --env " + quote(env);
-        command += L" --cwd " + quote(service.cwd) + L" --run " + quote(service.elf) + L" " + quote(service.elf_hash);
-        for (const auto &arg : service.arguments) command += L" " + quote(arg);
-    }
+    File ready_event(CreateEventW(nullptr,TRUE,FALSE,ready_name.empty()?nullptr:ready_name.c_str()));
+    if (service.external) command+=L" --ready-event "+quote(ready_name);
     STARTUPINFOW startup = {}; startup.cb = sizeof(startup); startup.dwFlags = STARTF_USESTDHANDLES;
     startup.hStdInput = input.handle; startup.hStdOutput = output.handle; startup.hStdError = error.handle;
     PROCESS_INFORMATION child = {};
@@ -282,12 +408,17 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
         require(false, "Own ELF host before execution");
     }
     CloseHandle(child.hThread); service.process = child.hProcess; service.pid = child.dwProcessId;
+    if (!service.external && (service.name==L"game" || service.name==L"auction" || service.name==L"point")) {
+        service.robot_pid_file=instance+L"\\robot\\state\\pids\\"+service.name+L".pid";
+        directory(instance+L"\\robot\\state\\pids");
+        write_private(service.robot_pid_file,std::to_string(service.pid),CREATE_ALWAYS);
+    }
     if (service.external) {
-        ULONGLONG deadline = GetTickCount64() + 15000;
+        ULONGLONG deadline = GetTickCount64() + 120000;
         for (;;) {
             if (refresh_service(service)) throw std::runtime_error("Robot exited during startup; inspect service logs");
-            std::string log = read_file(service.out);
-            if (log.find("robot started") != std::string::npos) {
+            if (WaitForSingleObject(ready_event.handle,0)==WAIT_OBJECT_0) {
+                service.application_initialized=true;
                 service.state = L"进程运行中"; service.readiness = L"Robot 已初始化"; return;
             }
             if (GetTickCount64() >= deadline) throw std::runtime_error("Robot startup was not confirmed; inspect service logs");

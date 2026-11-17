@@ -43,9 +43,9 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 SendMessageW(level,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
             }
             SendMessageW(level,CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
-            add(L"BUTTON",L"DP2",BS_AUTOCHECKBOX|WS_TABSTOP,DP2_ENABLE,264,108,80,30);
-            add(L"BUTTON",L"Frida",BS_AUTOCHECKBOX|WS_TABSTOP,FRIDA_ENABLE,452,108,84,30);
-            add(L"BUTTON",L"Robot",BS_AUTOCHECKBOX|WS_TABSTOP,ROBOT_ENABLE,554,108,90,30);
+            add(L"BUTTON",L"DP2",BS_AUTOCHECKBOX|WS_TABSTOP,DP2_ENABLE,238,108,80,30);
+            add(L"BUTTON",L"Frida",BS_AUTOCHECKBOX|WS_TABSTOP,FRIDA_ENABLE,342,108,84,30);
+            add(L"BUTTON",L"Robot",BS_AUTOCHECKBOX|WS_TABSTOP,ROBOT_ENABLE,450,108,90,30);
             add(L"BUTTON",L"应用并重启",BS_OWNERDRAW|WS_TABSTOP,LEVEL_APPLY,674,108,174,30);
             add(L"STATIC",L"兼容设置",SS_CENTERIMAGE,322,32,170,96,22);
             add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,32,198,396,30);

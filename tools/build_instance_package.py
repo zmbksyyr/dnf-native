@@ -74,6 +74,9 @@ def main():
         raise ValueError("Database helper differs from the GUI build receipt")
     robot = args.robot_dir.resolve(strict=True)
     robot_receipt = json.loads((robot / "build-receipt.json").read_text(encoding="utf-8"))
+    for name, expected in robot_receipt["sources"].items():
+        if sha256(Path(robot_receipt["source"]) / name) != expected:
+            raise ValueError("Robot sources changed; rebuild before packaging: " + name)
     if sha256(robot / "robot.exe") != robot_receipt["output_sha256"]:
         raise ValueError("Robot differs from its build receipt")
     host_receipts = json.loads((hosts / "build-receipt.json").read_text(encoding="utf-8"))

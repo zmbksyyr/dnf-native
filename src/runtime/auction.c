@@ -18,6 +18,22 @@ static Get original_get;
 static Visit original_destroy, original_update;
 static Constraint original_constraint;
 static unsigned refine_limit = 7;
+static int index_encoding(NrRun *run,int *utf8) {
+    wchar_t path[32768];
+    if(nr_path(run,"iteminfo.dat",path)) return 0;
+    HANDLE file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,0,NULL);
+    if(file==INVALID_HANDLE_VALUE) return 0;
+    LARGE_INTEGER size;
+    if(!GetFileSizeEx(file,&size) || size.QuadPart<=0 || size.QuadPart>INT32_MAX) {CloseHandle(file);return 0;}
+    HANDLE mapping=CreateFileMappingW(file,NULL,PAGE_READONLY,0,0,NULL);CloseHandle(file);
+    if(!mapping) return 0;
+    const char *data=(const char *)MapViewOfFile(mapping,FILE_MAP_READ,0,0,0);
+    if(!data) {CloseHandle(mapping);return 0;}
+    *utf8=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,data,(int)size.QuadPart,NULL,0)>0;
+    UnmapViewOfFile(data);CloseHandle(mapping);
+    fprintf(stderr,"auction iteminfo encoding auto selected=%s\n",*utf8?"UTF8":"BIG5");
+    return 1;
+}
 static void *original_utf8_conversion;
 static void *original_tokenizer;
 static char utf8_token[1024];
@@ -166,6 +182,7 @@ int nr_auction_configure(NrRun *run,const char **error) {
     for(int i=0;i<run->environment_count;++i) {
         const char *s=run->environment[i]; unsigned *target=NULL;
         if(!strcmp(s,"DNF_NATIVE_AUCTION_ENCODING=UTF8")) { utf8_index=1; requested=1; continue; }
+        if(!strcmp(s,"DNF_NATIVE_AUCTION_ENCODING=AUTO")) { utf8_index=-1; requested=1; continue; }
         if(!strcmp(s,"DNF_NATIVE_AUCTION_PRICE_KEYS=1")) { price_keys=1; requested=1; continue; }
         if(!strncmp(s,"DNF_NATIVE_AUCTION_LEVEL=",25)) { target=&level; s+=25; }
         else if(!strncmp(s,"DNF_NATIVE_AUCTION_REFINE=",26)) { target=&refine; s+=26; }
@@ -184,6 +201,7 @@ int nr_auction_configure(NrRun *run,const char **error) {
     *error="auction compatibility requires the i386 host"; return 0;
 #else
     if(e->bias || !level || level>127 || refine>31) { *error="auction limits exceed original protocol/instruction representation"; return 0; }
+    if(utf8_index<0 && !index_encoding(run,&utf8_index)) { *error="cannot inspect auction iteminfo encoding";return 0; }
     Hook hooks[]={
         {0x08063a36,"\x55\x89\xe5\x81\xec\x98\0\0\0",9,make_price,(void **)&original_make},
         {0x08063c7a,"\x55\x89\xe5\x57\x56\x53\x81\xec\xcc\0\0\0",12,add_price,(void **)&original_add},
