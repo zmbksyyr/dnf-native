@@ -14,7 +14,7 @@
 
 enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS,
        SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS,
-       DP2_ENABLE = 230, FRIDA_ENABLE, PLUGINS_SAVE, LEVEL_CAP, LEVEL_APPLY, LEVEL_LABEL, MONTHLY_PREPARE,
+       DP2_ENABLE = 230, FRIDA_ENABLE, LEVEL_CAP = 233, LEVEL_APPLY, LEVEL_LABEL, MONTHLY_PREPARE,
        LOG_ENCODING = 241, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
        SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES };
 enum { INSTANCE_MORE = 280, DATABASE_INFO = 282, LOG_FILTER,
@@ -26,8 +26,7 @@ enum { LOG_FILE_COMMAND = 1000, LOG_FILE_SLOTS = 64 };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 enum { MARKET_OPEN=300, MARKET_LEVELS=301, MARKET_REFINE, MARKET_DP2, MARKET_AUTO,
        MARKET_SUMMARY=308, MARKET_STATUS=309,
-       MARKET_INDEX_LABEL=320, MARKET_DATA_LABEL=321,
-       MARKET_WARNING=324 };
+       MARKET_INDEX_LABEL=320, MARKET_DATA_LABEL=321 };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
@@ -190,6 +189,25 @@ static std::wstring service_group(const std::wstring &name) {
     return L"其他";
 }
 
+static std::wstring plugin_mode(const Service &game) {
+    bool dp2=std::find(game.environment.begin(),game.environment.end(),dp2_preload)!=game.environment.end();
+    bool frida=dp2 && std::find(game.environment.begin(),game.environment.end(),L"DNF_NATIVE_FRIDA=0")==game.environment.end();
+    return !dp2?L"off":frida?L"frida":L"lua";
+}
+
+static const wchar_t *service_purpose(const std::wstring &name) {
+    for(const auto &entry:std::initializer_list<std::pair<const wchar_t *,const wchar_t *>>{
+        {L"bridge",L"登录验证桥接"},{L"manager",L"服务协调管理"},
+        {L"dbmw_guild",L"公会数据库代理"},{L"dbmw_mnt",L"维护数据库代理"},{L"dbmw_stat",L"统计数据库代理"},
+        {L"monitor",L"服务监控"},{L"guild",L"公会服务"},{L"statics",L"数据统计"},
+        {L"coserver",L"服务间协作"},{L"community",L"社交服务"},{L"auction",L"拍卖行"},
+        {L"point",L"金币寄售"},{L"channel",L"频道列表与连接引导"},{L"relay",L"组队数据转发"},
+        {L"stun",L"网络连通辅助"},{L"game",L"游戏主服务"},{L"zergsvr",L"安全通信服务"},
+        {L"secagent",L"游戏安全代理"},{L"gunnersvr",L"安全校验服务"}})
+        if(name==entry.first) return entry.second;
+    return L"服务模块";
+}
+
 static std::wstring service_readiness(const Service &service) {
     if (!service.readiness.empty()) return service.readiness;
     return service.state;
@@ -197,7 +215,8 @@ static std::wstring service_readiness(const Service &service) {
 
 struct App {
     HWND window = nullptr, path = nullptr, port = nullptr, service_ip = nullptr, output = nullptr;
-    HWND market_window = nullptr, market_tooltip = nullptr;
+    HWND market_window = nullptr, market_tooltip = nullptr, service_tooltip = nullptr;
+    std::wstring service_tip_text;
     bool market_guard_supported = false;
     std::wstring market_pvf_text;
     std::wstring market_report = L"点击“检查兼容性”读取当前 PVF 与存量订单。";
@@ -426,38 +445,6 @@ struct App {
         SendMessageW(GetDlgItem(market_window, DP2_ENABLE), BM_SETCHECK, dp2 ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessageW(GetDlgItem(market_window, FRIDA_ENABLE), BM_SETCHECK, frida ? BST_CHECKED : BST_UNCHECKED, 0);
     }
-    void save_plugins() {
-        Service *game = game_service();
-        if (!game || running(*game)) throw std::runtime_error("Stop game before changing plugin settings");
-        bool dp2 = SendMessageW(GetDlgItem(market_window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED;
-        bool frida = dp2 && SendMessageW(GetDlgItem(market_window, FRIDA_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED;
-        if (dp2 && !frida) {
-            // Keep the original module and its documented -1000 load failure
-            // result. The explicit off setting prevents Gadget loading while
-            // allowing the default Lua entry script to continue running.
-            const std::string guard = "\n    if os.getenv(\"DNF_NATIVE_FRIDA\") == \"0\" then\n"
-                "        logger.info(\"Frida disabled by instance configuration\")\n        return -1000\n    end\n";
-            std::wstring module = game->root + L"\\dp2\\lua\\df\\frida.lua";
-            std::string source = read_file(module);
-            if (source.find(guard) == std::string::npos) {
-                const std::string entry = "function M.load(args, hproc)";
-                size_t at = source.find(entry);
-                if (at == std::string::npos || source.find(entry, at + entry.size()) != std::string::npos)
-                    throw std::runtime_error("Frida module entry differs; plugin settings were not changed");
-                require(CopyFileW(module.c_str(), (module + L".before-native-switch").c_str(), TRUE), "Preserve original instance Frida module");
-                source.insert(at + entry.size(), guard);
-                std::wstring temporary = module + L".native-tmp";
-                write_private(temporary, source);
-                require(MoveFileExW(temporary.c_str(), module.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH), "Save instance Frida switch");
-            }
-        }
-        const wchar_t *mode = !dp2 ? L"off" : frida ? L"frida" : L"lua";
-        require(WritePrivateProfileStringW(L"plugins", L"mode", mode, (current + L"\\services.ini").c_str()), "Save game plugin mode");
-        for (const auto &service : load_services(current, runtime)) if (service.name == L"game") game->environment = service.environment;
-        show_plugins(); controls();
-        notice(L"插件设置已保存，下次启动 game 生效");
-        append(!dp2 ? L"DP2/Lua 已关闭，Frida 已关闭" : frida ? L"DP2/Lua 已启用，Frida 已启用" : L"DP2/Lua 已启用，Frida 已关闭");
-    }
     void show_level() {
         Service *game = game_service();
         unsigned level = game ? game->max_level : 70;
@@ -558,6 +545,7 @@ struct App {
             selected >= 0 && static_cast<size_t>(selected) < services.size() ? selected : 0, 0);
         SendMessageW(list, WM_SETREDRAW, TRUE, 0);
         InvalidateRect(list, nullptr, TRUE);
+        SendMessageW(list,WM_SIZE,0,0); // Refresh card tooltip rectangles after list changes.
         update_live_count();
         InvalidateRect(GetDlgItem(window, BROWSE), nullptr, TRUE);
         show_service_detail();
@@ -666,14 +654,18 @@ struct App {
         }
         for(int id=market::Check;id<=market::Reset;++id)
             EnableWindow(GetDlgItem(market_window,id),session.process && !pending);
-        bool editable = game && !running(*game) && !pending;
+        bool editable = game && !pending;
         EnableWindow(GetDlgItem(market_window, DP2_ENABLE), editable);
         EnableWindow(GetDlgItem(market_window, FRIDA_ENABLE), editable && SendMessageW(GetDlgItem(market_window, DP2_ENABLE), BM_GETCHECK, 0, 0) == BST_CHECKED);
-        EnableWindow(GetDlgItem(market_window, PLUGINS_SAVE), editable);
         EnableWindow(GetDlgItem(market_window, LEVEL_CAP), game && !pending);
         LRESULT choice = SendMessageW(GetDlgItem(market_window,LEVEL_CAP),CB_GETCURSEL,0,0);
-        bool different = game && choice >= 0 && static_cast<size_t>(choice) < sizeof(game_level_choices)/sizeof(*game_level_choices) &&
-                         game_level_choices[choice] != game->max_level;
+        bool different=false;
+        if(game && choice>=0 && static_cast<size_t>(choice)<sizeof(game_level_choices)/sizeof(*game_level_choices)) {
+            bool dp2=SendMessageW(GetDlgItem(market_window,DP2_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
+            bool frida=dp2 && SendMessageW(GetDlgItem(market_window,FRIDA_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
+            different=game_level_choices[choice]!=game->max_level ||
+                plugin_mode(*game)!=(!dp2?L"off":frida?L"frida":L"lua");
+        }
         EnableWindow(GetDlgItem(market_window, LEVEL_APPLY), different && !pending && (!running(*game) || session.process));
     }
     void load() {
@@ -710,6 +702,8 @@ struct App {
         current = full_path(window_text(path));
         const std::wstring instance = current, tool = exe, port_text = window_text(port), assets = resources;
         const Session owned = session;
+        bool dp2=id==LEVEL_APPLY && SendMessageW(GetDlgItem(market_window,DP2_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
+        bool frida=dp2 && SendMessageW(GetDlgItem(market_window,FRIDA_ENABLE),BM_GETCHECK,0,0)==BST_CHECKED;
         market::Options market_options=market::options(instance);
         if(market_window && id>=market::Check && id<=market::Reset) {
             market_options={SendMessageW(GetDlgItem(market_window,MARKET_LEVELS),BM_GETCHECK,0,0)==BST_CHECKED,
@@ -725,7 +719,7 @@ struct App {
                    L"\r\n逆序停服：" + stop_plan(false));
         }
         operation = id; busy = true; controls();
-        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets,market_options] {
+        worker = std::thread([this, id, instance, tool, target, port_text, owned, selected, assets,market_options,dp2,frida] {
             auto result = std::make_unique<Result>();
             auto stop_owned_services = [&] {
                 for (auto item = services.rbegin(); item != services.rend(); ++item) {
@@ -781,15 +775,51 @@ struct App {
                     unsigned level = std::stoul(target);
                     if (!game_level_valid(level) || file_sha256(game->elf) != "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979")
                         throw std::runtime_error("Level switch requires a supported level and the unchanged pinned game ELF");
-                    bool restart = running(*game);
-                    stop_service(*game);
-                    require(WritePrivateProfileStringW(L"gameplay",L"max_level",target.c_str(),(instance+L"\\services.ini").c_str()),"Save game maximum level");
-                    for (const auto &fresh : load_services(instance,runtime)) if (fresh.name==L"game") {
-                        game->environment=fresh.environment; game->max_level=fresh.max_level;
+                    // Prepare and validate the only optional script edit before
+                    // stopping the game; settings and script share one backup.
+                    const std::wstring config=instance+L"\\services.ini",module=game->root+L"\\dp2\\lua\\df\\frida.lua";
+                    std::string before_config=read_file(config),before_module,after_module;
+                    if(dp2 && !frida) {
+                        before_module=read_file(module); after_module=before_module;
+                        const std::string guard="\n    if os.getenv(\"DNF_NATIVE_FRIDA\") == \"0\" then\n"
+                            "        logger.info(\"Frida disabled by instance configuration\")\n        return -1000\n    end\n";
+                        if(after_module.find(guard)==std::string::npos) {
+                            const std::string entry="function M.load(args, hproc)";
+                            size_t at=after_module.find(entry);
+                            if(at==std::string::npos || after_module.find(entry,at+entry.size())!=std::string::npos)
+                                throw std::runtime_error("Frida module entry differs; runtime settings were not changed");
+                            after_module.insert(at+entry.size(),guard);
+                        }
                     }
-                    if (restart) start_service(*game,instance,service_job);
-                    result->status=L"等级上限已切换为 " + target + (restart ? L"，game 已重新拉起" : L"，下次启动 game 生效");
-                    result->details=result->status+L"；仅修改宿主执行内存，角色等级与经验未改写。";
+                    bool edit_module=before_module!=after_module;
+                    std::wstring backup=instance+L"\\.mysql\\runtime-settings-"+unique_name();
+                    directory(backup); write_private(backup+L"\\services.ini",before_config);
+                    if(edit_module) write_private(backup+L"\\frida.lua",before_module);
+                    bool restart=running(*game);
+                    stop_service(*game);
+                    auto reload=[&] {
+                        for(const auto &fresh:load_services(instance,runtime)) if(fresh.name==L"game") {
+                            game->environment=fresh.environment;game->max_level=fresh.max_level;
+                        }
+                    };
+                    try {
+                        if(edit_module) {
+                            if(!present(module+L".before-native-switch"))
+                                write_private(module+L".before-native-switch",before_module);
+                            market::replace_file(module,after_module);
+                        }
+                        const wchar_t *mode=!dp2?L"off":frida?L"frida":L"lua";
+                        require(WritePrivateProfileStringW(L"plugins",L"mode",mode,config.c_str()),"Save game plugin mode");
+                        require(WritePrivateProfileStringW(L"gameplay",L"max_level",target.c_str(),config.c_str()),"Save game maximum level");
+                        reload();
+                    } catch(...) {
+                        market::replace_file(config,before_config);
+                        if(edit_module) market::replace_file(module,before_module);
+                        reload();throw;
+                    }
+                    if(restart) start_service(*game,instance,service_job);
+                    result->status=L"运行设置已应用：等级上限 " + target + (restart?L"，game 已重新拉起":L"，下次启动 game 生效");
+                    result->details=result->status+L"\r\n"+(!dp2?L"DP2/Lua 已关闭，Frida 已关闭":frida?L"DP2/Lua 已启用，Frida 已启用":L"DP2/Lua 已启用，Frida 已关闭")+L"\r\n配置备份："+backup;
                 } else if (id == MONTHLY_PREPARE) {
                     if (!owned.process || !owns_response(sql(tool,instance,identity_query),owned)) throw std::runtime_error("Monthly maintenance instance identity differs");
                     prepare_months();
@@ -936,6 +966,30 @@ static RECT service_tile(HWND window, int index) {
 static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
                                          UINT_PTR, DWORD_PTR) {
     if (message == WM_ERASEBKGND) return TRUE;
+    if(message==WM_SIZE && app->service_tooltip) {
+        int count=static_cast<int>(SendMessageW(window,LB_GETCOUNT,0,0));
+        SendMessageW(app->service_tooltip,TTM_POP,0,0);
+        for(int i=0;i<19;++i) {
+            TOOLINFOW info{};info.cbSize=sizeof(info);info.hwnd=window;info.uId=i+1;
+            bool exists=SendMessageW(app->service_tooltip,TTM_GETTOOLINFOW,0,reinterpret_cast<LPARAM>(&info))!=0;
+            if(i>=count) {if(exists) SendMessageW(app->service_tooltip,TTM_DELTOOLW,0,reinterpret_cast<LPARAM>(&info));continue;}
+            info.rect=service_tile(window,i);
+            if(exists) SendMessageW(app->service_tooltip,TTM_NEWTOOLRECTW,0,reinterpret_cast<LPARAM>(&info));
+            else {
+                info.uFlags=TTF_SUBCLASS;info.lpszText=LPSTR_TEXTCALLBACKW;
+                SendMessageW(app->service_tooltip,TTM_ADDTOOLW,0,reinterpret_cast<LPARAM>(&info));
+            }
+        }
+    }
+    if(message==WM_NOTIFY && reinterpret_cast<NMHDR *>(lparam)->code==TTN_GETDISPINFOW) {
+        auto *info=reinterpret_cast<NMTTDISPINFOW *>(lparam);
+        int index=static_cast<int>(info->hdr.idFrom)-1;
+        std::wstring name=list_text(window,index);
+        name=name.substr(0,name.find(L"  |  "));
+        size_t optional=name.find(L"（");if(optional!=std::wstring::npos) name.resize(optional);
+        app->service_tip_text=name+L"（"+service_purpose(name)+L"）";
+        info->lpszText=app->service_tip_text.data();return 0;
+    }
     if (message == LB_GETITEMRECT) {
         if (wparam >= static_cast<WPARAM>(SendMessageW(window, LB_GETCOUNT, 0, 0))) return LB_ERR;
         *reinterpret_cast<RECT *>(lparam) = service_tile(window, static_cast<int>(wparam)); return 0;
@@ -1046,7 +1100,7 @@ static void draw_item(const DRAWITEMSTRUCT &item) {
         area.left+=app->px(10); text_at(dc,area,value,ink,app->font); return;
     }
     if (disabled) { fill=RGB(247,249,252); ink=RGB(181,192,211); border=RGB(233,237,246); }
-    else if (item.CtlID==ALL_START) {fill=pressed?RGB(28,77,201):hover?RGB(57,112,255):RGB(43,96,239); ink=RGB(255,255,255);border=fill;}
+    else if (item.CtlID==ALL_START || item.CtlID==LEVEL_APPLY) {fill=pressed?RGB(28,77,201):hover?RGB(57,112,255):RGB(43,96,239); ink=RGB(255,255,255);border=fill;}
     else if (item.CtlID==ALL_STOP) {ink=RGB(215,54,57);border=RGB(252,205,205);fill=pressed?RGB(255,235,235):RGB(255,255,255);}
     else if(item.CtlID>=market::CleanInvalid && item.CtlID<=market::Reset) {ink=RGB(200,40,48);border=RGB(247,205,207);fill=pressed?RGB(255,234,235):RGB(255,255,255);}
     else if (pressed || hover) {fill=RGB(242,247,255);ink=RGB(37,91,239);border=RGB(181,205,255);}
@@ -1070,7 +1124,7 @@ static void draw_item(const DRAWITEMSTRUCT &item) {
         text_at(dc,label,window_text(GetDlgItem(app->window,213))+L" \u00b7 MySQL "+app->mysql_state,RGB(139,157,184),app->small_font);
         label={area.right-app->px(20),area.top,area.right-app->px(6),area.bottom};text_at(dc,label,L"\u2304",RGB(139,157,184),app->font);
     } else {
-        bool ghost=item.CtlID==CHECK_RESOURCES||item.CtlID==FOLDER||item.CtlID==INSTANCE_MORE||item.CtlID==RECOVER||item.CtlID==PLUGINS_SAVE||item.CtlID==DATABASE_INFO||item.CtlID==LOG_REFRESH;
+        bool ghost=item.CtlID==CHECK_RESOURCES||item.CtlID==FOLDER||item.CtlID==INSTANCE_MORE||item.CtlID==RECOVER||item.CtlID==DATABASE_INFO||item.CtlID==LOG_REFRESH;
         if(ghost && !pressed && !hover) {fill=RGB(255,255,255);border=fill;}
         InflateRect(&area,-1,-1);rounded(dc,area,fill,border,app->px(8));
         std::wstring label=window_text(item.hwndItem);
@@ -1330,6 +1384,10 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             control(L"BUTTON", L"应用", WS_TABSTOP, IP_APPLY);
             control(L"LISTBOX", L"", LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_TABSTOP, SERVICE_LIST);
             SetWindowSubclass(GetDlgItem(window, SERVICE_LIST), service_grid_proc, 1, 0);
+            app->service_tooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
+                CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,GetDlgItem(window,SERVICE_LIST),nullptr,nullptr,nullptr);
+            require(app->service_tooltip!=nullptr,"Create service card tooltips");
+            SendMessageW(app->service_tooltip,TTM_SETMAXTIPWIDTH,0,app->px(360));
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{ALL_START,L"整体启动"},{ALL_STOP,L"整体停止"}})
                 control(L"BUTTON", button.second, WS_TABSTOP | ((button.first == ALL_START || button.first == ALL_STOP) ? BS_OWNERDRAW : 0), button.first);
             control(L"STATIC", L"", SS_PATHELLIPSIS | SS_NOPREFIX, 210);
@@ -1355,7 +1413,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             SendMessageW(GetDlgItem(window,210),WM_SETFONT,reinterpret_cast<WPARAM>(app->small_font),FALSE);
             HWND tooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP,
                                         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,nullptr,nullptr);
-            for(auto tip:{std::pair<int,const wchar_t *>{BROWSE,L"选择或切换本地实例目录"},{CREATE_INSTANCE,L"在空目录创建新实例"},{FOLDER,L"打开实例根目录"},{CHECK_RESOURCES,L"检查资源并将所选服务信息写入主日志"},{INSTANCE_MORE,L"初始化、删除实例及维护日志"},{SERVICE_LIST,L"单击选择 · 双击日志 · 右键操作"},{LOG_FILES,L"选择应用日志、标准输出或宿主诊断"}}) {
+            for(auto tip:{std::pair<int,const wchar_t *>{BROWSE,L"选择或切换本地实例目录"},{CREATE_INSTANCE,L"在空目录创建新实例"},{FOLDER,L"打开实例根目录"},{CHECK_RESOURCES,L"检查资源并将所选服务信息写入主日志"},{INSTANCE_MORE,L"初始化、删除实例及维护日志"},{LOG_FILES,L"选择应用日志、标准输出或宿主诊断"}}) {
                 TOOLINFOW info={};info.cbSize=sizeof(info);info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
                 info.hwnd=window;info.uId=reinterpret_cast<UINT_PTR>(GetDlgItem(window,tip.first));info.lpszText=const_cast<wchar_t *>(tip.second);
                 SendMessageW(tooltip,TTM_ADDTOOLW,0,reinterpret_cast<LPARAM>(&info));
@@ -1492,6 +1550,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 SetWindowTextW(app->path, L""); app->show_plugins(); app->show_level();
             }
             if (result->created) { app->services = load_services(app->current, app->runtime); app->show_plugins(); app->remember_instance(); }
+            if(app->operation==LEVEL_APPLY) app->show_plugins();
             app->show_level();
             if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
@@ -1673,7 +1732,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     SendMessageW(GetDlgItem(app->market_window, FRIDA_ENABLE), BM_SETCHECK, BST_UNCHECKED, 0);
                 app->controls();
             } else if (id == FRIDA_ENABLE) app->controls();
-            else if (id == PLUGINS_SAVE) app->save_plugins();
             else if (id == LEVEL_APPLY) {
                 LRESULT choice=SendMessageW(GetDlgItem(app->market_window,LEVEL_CAP),CB_GETCURSEL,0,0);
                 if (choice>=0 && static_cast<size_t>(choice)<sizeof(game_level_choices)/sizeof(*game_level_choices))

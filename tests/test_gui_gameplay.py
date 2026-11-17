@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bootstrap import BUILD, sha256
 from runtime_support import tree_identity, runtime_diagnostics
 from gui_support import (user, kernel, windows, wait_for, click, ready, title, hidden_startup,
-                         select_service, service_row, screenshot, guest_root, open_features, close_features)
+                         select_service, service_row, screenshot, guest_root, open_features, close_features, log_text)
 
 LEVELS = [50,55,60,65,70,75,80,85,86,90,95,99,100]
 
@@ -44,6 +44,7 @@ def main():
     manifest.read(instance / "services.ini",encoding="utf-16")
     manifest["game"]["automatic"] = "0"
     manifest["gameplay"] = {"max_level":"70"}
+    manifest["plugins"] = {"mode":"frida"}
     with (instance / "services.ini").open("w",encoding="utf-16") as out:
         manifest.write(out)
     game = guest_root(instance) / "home/neople/game/df_game_r"
@@ -150,7 +151,31 @@ def main():
                 combo=user.GetDlgItem(feature,233)
                 user.SendMessageW(combo,0x14E,LEVELS.index(level),0)
                 user.SendMessageW(feature,0x111,233 | (1<<16),combo)
-                click(feature,234); ready(window,"等级上限已切换为 "+str(level),210)
+                click(feature,231)  # 85: Lua only; 70: restore Frida in the same apply.
+                if level == 85:
+                    # Reject an unknown module before disrupting the running game.
+                    module = guest_root(instance) / "dp2/lua/df/frida.lua"
+                    module_bytes = module.read_bytes()
+                    config_bytes = (instance / "services.ini").read_bytes()
+                    module.write_bytes(b"-- unsupported private test module\n")
+                    base = len(log_text(window))
+                    try:
+                        click(feature,234)
+                        wait_for(lambda: "Frida module entry differs" in log_text(window)[base:], "module preflight rejection", 10)
+                        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(feature,233)), "operation completed")
+                        assert (instance / "services.ini").read_bytes() == config_bytes
+                        assert pids() == prior
+                        assert len(list((instance / "service-logs").glob("game-*.stdout.private.log"))) == 1
+                    finally:
+                        module.write_bytes(module_bytes)
+                    # Failed operations reset controls to the saved values.
+                    user.SendMessageW(combo,0x14E,LEVELS.index(level),0)
+                    user.SendMessageW(feature,0x111,233 | (1<<16),combo)
+                    if user.SendMessageW(user.GetDlgItem(feature,231),0xF0,0,0): click(feature,231)
+                    checks["unknown_lua_module_rejected_before_game_stop_or_config_write"] = True
+                base = len(log_text(window))
+                click(feature,234); ready(window,"运行设置已应用：等级上限 "+str(level),210,since=base)
+                assert not user.IsWindowEnabled(user.GetDlgItem(feature,234))
                 close_features(feature)
             started = time.monotonic()
             wait_for(lambda: "应用已初始化" in service_row(window,"game"),"original game initialized at "+str(level),180)
@@ -168,11 +193,23 @@ def main():
                 kernel.CloseHandle(process_handle)
             manifest.read(instance / "services.ini",encoding="utf-16")
             assert manifest.getint("gameplay","max_level")==level and sha256(game)==original
+            expected_mode = "lua" if level == 85 else "frida"
+            assert manifest["plugins"]["mode"] == expected_mode
+            from test_gui_plugins import loaded_plugins
+            assert loaded_plugins(current["game"],instance) == {"dp2":True,"frida":expected_mode=="frida"}
             record["launches"].append({"level":level,"pids":current,"initialized_wait_seconds":round(time.monotonic()-started,3)})
             screenshot(window,probe / ("level-"+str(len(record["launches"]))+".png"))
             print("GUI game maximum",level,"PASS",flush=True)
             prior=current
-        checks["game_restarts_70_85_70_and_peers_keep_their_pids"] = True
+        checks["combined_level_and_plugin_apply_restarts_game_once_and_preserves_peer_pids"] = True
+        backups = list((instance / ".mysql").glob("runtime-settings-*"))
+        assert len(backups) == 2
+        for backup,old_level,old_mode in zip(sorted(backups),[70,85],["frida","lua"]):
+            prior_config = configparser.ConfigParser(interpolation=None)
+            prior_config.read(backup / "services.ini",encoding="utf-16")
+            assert prior_config.getint("gameplay","max_level") == old_level
+            assert prior_config["plugins"]["mode"] == old_mode
+        checks["unified_settings_backups_preserve_previous_levels_and_plugin_modes"] = True
         checks["live_bytes_and_saved_level_match_and_disk_elf_unchanged"] = True
         click(window,224); ready(window,"服务进程已退出，数据库已停止",210)
         outputs = list((instance / "service-logs").glob("game-*.stdout.private.log"))

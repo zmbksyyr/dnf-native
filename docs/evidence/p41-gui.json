@@ -1,0 +1,133 @@
+{
+  "environment": "Windows 10 x64 10.0.19044; LLVM-MinGW 20261104 MSVCRT; MySQL 5.7.44",
+  "scope": "Vertically arranged unified level/plugin apply, one game restart, Lua/Frida modes and per-card service-purpose tooltips. Service/database operations use independent copies; profiles are isolated.",
+  "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+  "tests": [
+    {
+      "test": "gui-layout",
+      "result": "PASS",
+      "receipt": "probes/20261117T055633068826Z/gui-layout/receipt.json",
+      "receipt_sha256": "45ce803dbd7673938af57e1515f2ccd1235a5f61cc646cd0294faa1d764e0816",
+      "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+      "checks": [
+        "title_bar_shows_live_cpu_and_memory",
+        "all_cards_and_controls_fit_at_default_minimum_and_125_percent_layout",
+        "all_19_mouse_hit_rectangles_match_visual_and_detail_selection",
+        "log_filter_and_clear_use_actual_console_text",
+        "vertical_level_dp2_frida_single_apply_without_extra_save_or_explanations",
+        "feature_settings_and_auction_two_rows_four_columns",
+        "both_market_scope_is_fixed_and_logs_have_no_scrollbars",
+        "source_database_unchanged"
+      ]
+    },
+    {
+      "test": "gui-interactions",
+      "result": "PASS",
+      "receipt": "probes/20261117T055635116732Z/gui-interactions/receipt.json",
+      "receipt_sha256": "29d1472c0a6dbffada400872e22f108dc393b634d5b5e079c28e75aaf596ab8f",
+      "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+      "checks": [
+        "all_19_cards_show_service_purpose_on_real_mouse_hover_and_blank_area_has_none",
+        "repeated_selected_card_has_no_native_blue_row_or_log_reload",
+        "mouse_hides_focus_ring_and_tab_restores_keyboard_cue",
+        "repeated_minimum_default_resize_remains_responsive",
+        "service_tooltip_rectangles_follow_window_resize",
+        "market_escape_closes_and_restores_main_window",
+        "service_context_inspection_uses_main_log_without_dialog",
+        "service_tooltips_refresh_after_remembered_instance_change",
+        "selection_only_saves_both_instances_and_restores_last_across_restarts"
+      ]
+    },
+    {
+      "test": "gui-keyboard",
+      "result": "PASS",
+      "receipt": "probes/20261117T055649788261Z/gui-keyboard/receipt.json",
+      "receipt_sha256": "75ab5f1e00af0fb754ab5ef9efda51dbc659babc97599a1e4cdc1803de591ce5",
+      "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+      "checks": [
+        "tab_traverses_enabled_visible_controls",
+        "enter_activates_focused_button_and_escape_cancels_picker",
+        "selector_switches_between_real_instances_and_retains_private_test_target",
+        "grid_arrows_update_selection_and_details_without_losing_services",
+        "native_encoding_arrows_and_escape",
+        "space_toggles_native_checkbox",
+        "delete_restore_default_to_cancel_and_enter_escape_preserve_cold_data",
+        "enter_runs_database_identity_tls_start_and_normal_stop",
+        "keyboard_preserves_owner_draw_and_checkbox_rendering_types",
+        "source_data_unchanged"
+      ]
+    },
+    {
+      "test": "gui-gameplay",
+      "result": "PASS",
+      "receipt": "probes/20261117T055659299135Z/gui-gameplay/receipt.json",
+      "receipt_sha256": "a87e3bd9f6d3bbb0566c39ed37a7cd841256d4b40af45cdb2174f357f9f9ff03",
+      "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+      "checks": [
+        "both_months_and_both_auction_databases_accept_original_column_lists",
+        "legacy_rows_and_verified_official_backups_retained",
+        "generated_rollback_restores_legacy_schema_and_rows",
+        "maintenance_is_idempotent",
+        "unknown_lua_module_rejected_before_game_stop_or_config_write",
+        "combined_level_and_plugin_apply_restarts_game_once_and_preserves_peer_pids",
+        "unified_settings_backups_preserve_previous_levels_and_plugin_modes",
+        "live_bytes_and_saved_level_match_and_disk_elf_unchanged",
+        "three_games_exit_normally",
+        "source_data_unchanged"
+      ]
+    },
+    {
+      "test": "gui-plugins",
+      "result": "PASS",
+      "receipt": "probes/20261117T055940946509Z/gui-plugins/receipt.json",
+      "receipt_sha256": "17a718447cb913a97dd9c80c01e499cc7b0779ce03afa6929b38cf7b8fec67f6",
+      "gui_sha256": "91bffb80339b675fd656bffcdb6413eb7bf16d0dc27c955c50ac9b7901745bc2",
+      "checks": [
+        "original_module_backup_matches_before_save",
+        "unchanged_settings_disable_apply_and_preserve_module_bytes",
+        "saved_lua_only_mode_survives_gui_restart",
+        "lua_running_without_frida_mapped",
+        "frida_reenabled_real_hook_and_bidirectional_rpc",
+        "frida_disabled_again_without_stopping_peers",
+        "dp2_off_also_disables_frida",
+        "dp2_off_live_modules",
+        "dp2_off_natural_game_startup_seconds",
+        "protocols_with_dp2_disabled",
+        "dp2_off_game_stop_code_zero",
+        "plugins_editable_again_after_natural_game_stop",
+        "close_normally_stops_remaining_peers_and_database",
+        "source_cold_database_unchanged"
+      ]
+    }
+  ],
+  "runtime_diagnostics": {
+    "faults": [],
+    "retained_existing_syscall_gaps": [
+      291,
+      332
+    ],
+    "source": "probes/20261117T055659299135Z/gui-gameplay/receipt.json"
+  },
+  "retries": [
+    {
+      "receipt": "probes/20261117T055606129570Z/gui-layout/receipt.json",
+      "reason": "Native combo box height includes its fixed frame. Corrected the layout assertion to verify aligned top and separation from DP2 rather than equal label/combo heights; reran successfully."
+    }
+  ],
+  "build_receipt": {
+    "path": "P41-unified-settings/gui/build-receipt.json",
+    "sha256": "9bd7aefb933240a3f31826f4f26724c59c538c124e224a63c129a19383a31b22"
+  },
+  "delivery": {
+    "directory": "../DNF-Native-3.0",
+    "all_eight_files_match_package": true,
+    "receipt": "P41-unified-settings/delivery-receipt.json",
+    "receipt_sha256": "7cbfbf8061c24d24a2c2a786e46d64e76f47c62da9ae06f595810b8511e7ff0c",
+    "package_receipt": "P41-unified-settings/package-receipt.json",
+    "package_receipt_sha256": "137c18353926634d019fbe05ad21053f13b8ab3292bc755ac72b5f484527d462",
+    "changed_files": [
+      "DNF-Native.exe"
+    ],
+    "previous_running_gui_retained": false
+  }
+}

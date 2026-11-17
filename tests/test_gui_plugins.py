@@ -154,7 +154,7 @@ def main():
         if dp2 and checked(231) != frida:
             click(panel(), 231); wait_for(lambda: checked(231) == frida, "Frida checkbox")
         base=len(log_text(window))
-        click(panel(), 232); ready(window, "插件设置已保存",since=base)
+        click(panel(), 234); ready(window, "运行设置已应用",since=base)
         close_panel()
         ini.read(manifest, encoding="utf-16")
         assert ini["plugins"]["mode"] == ("off" if not dp2 else "frida" if frida else "lua")
@@ -168,13 +168,14 @@ def main():
         log = wait_for(lambda: next(iter(set((instance / "service-logs").glob("game-*.stdout.private.log")) - previous), None), "new game log")
         marker = b"dnf-native-plugin-probe-hold"
         wait_for(lambda: marker in log.read_bytes(), "actual Lua/Frida fixture", 90)
-        assert all(not user.IsWindowEnabled(user.GetDlgItem(panel(), key)) for key in [230, 231, 232])
+        assert all(user.IsWindowEnabled(user.GetDlgItem(panel(), key)) for key in [230, 231, 233])
+        assert not user.IsWindowEnabled(user.GetDlgItem(panel(), 234))
         close_panel()
         pid = int(service_row(window, "game").rsplit("PID ", 1)[1])
         observed = loaded_plugins(pid, instance)
         assert observed == {"dp2": True, "frida": frida}, observed
         wait_for(lambda: "已退出，代码 42" in service_row(window, "game"), "intentional fixture exit", 30)
-        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(panel(), 232)), "plugin editing after game exit")
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(panel(), 230)), "plugin editing after game exit")
         close_panel()
         output = log.read_bytes()
         if frida:
@@ -190,8 +191,9 @@ def main():
         save(True, False)
         checks["original_module_backup_matches_before_save"] = (Path(str(module) + ".before-native-switch")).read_bytes() == module_before
         first_module = module.read_bytes()
-        save(True, False)
-        checks["repeated_save_preserves_module_bytes"] = module.read_bytes() == first_module
+        assert not user.IsWindowEnabled(user.GetDlgItem(panel(),234))
+        checks["unchanged_settings_disable_apply_and_preserve_module_bytes"] = module.read_bytes() == first_module
+        close_panel()
         user.PostMessageW(window, 0x10, 0, 0); process.wait(timeout=30)
         launch()
         checks["saved_lua_only_mode_survives_gui_restart"] = checked(230) and not checked(231)

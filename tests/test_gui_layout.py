@@ -159,7 +159,7 @@ def main():
         market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market maintenance window", 5)
         market_client = w.RECT()
         user.GetClientRect(market, c.byref(market_client))
-        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 320, 321, 324, 325, 326, 230, 231, 232, 233, 234, 235]
+        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 320, 321, 325, 230, 231, 233, 234, 235]
         for identifier in market_controls:
             child = user.GetDlgItem(market, identifier)
             assert child and user.IsWindowVisible(child), (identifier, "market control missing")
@@ -174,16 +174,22 @@ def main():
         for top,bottom in zip([310,311,312,313],[314,315,316,317]):
             a,b=rect(user.GetDlgItem(market,top),market),rect(user.GetDlgItem(market,bottom),market)
             assert a.left==b.left and a.right==b.right and a.bottom<b.top
-        for identifier in [318,319,323,307]:
+        for identifier in [318,319,323,307,232,324,326]:
             assert not user.GetDlgItem(market,identifier)
         for identifier in [230,231,301,302,303,304]:
             area=rect(user.GetDlgItem(market,identifier),market)
             needed=text_width(title(user.GetDlgItem(market,identifier)),120)+round(SWITCH_CHROME*120/96)
             assert area.right-area.left>=needed, (identifier,"clipped switch text")
-        for identifiers in [[235,233,234,230,231,232],[301,302],[303,304]]:
+        for identifiers in [[235,233],[301,302],[303,304]]:
             for left,right in zip(identifiers,identifiers[1:]):
                 assert rect(user.GetDlgItem(market,left),market).right < rect(user.GetDlgItem(market,right),market).left
-        assert not user.GetDlgItem(market,307)
+        level_label, level, dp2, frida, apply = [rect(user.GetDlgItem(market,i),market) for i in [235,233,230,231,234]]
+        assert level_label.top == level.top and level_label.bottom <= level.bottom < dp2.top
+        assert level.bottom < dp2.top < dp2.bottom < frida.top < frida.bottom < apply.top
+        assert level_label.left == dp2.left == frida.left == apply.left
+        assert level.right == dp2.right == frida.right == apply.right
+        assert title(user.GetDlgItem(market,234)) == "应用并重启"
+        checks["vertical_level_dp2_frida_single_apply_without_extra_save_or_explanations"] = True
         summary=rect(user.GetDlgItem(market,308),market)
         state=rect(user.GetDlgItem(market,309),market)
         assert summary.bottom<=state.top and state.bottom-summary.top<=round(40*120/96)

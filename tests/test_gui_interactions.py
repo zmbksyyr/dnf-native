@@ -26,6 +26,10 @@ user.ReleaseDC.argtypes = [w.HWND, w.HDC]
 user.ClientToScreen.argtypes = [w.HWND, c.POINTER(w.POINT)]
 user.MoveWindow.argtypes = [w.HWND, c.c_int, c.c_int, c.c_int, c.c_int, w.BOOL]
 user.GetSysColor.argtypes, user.GetSysColor.restype = [c.c_int], w.DWORD
+user.GetCursorPos.argtypes = [c.POINTER(w.POINT)]
+user.SetCursorPos.argtypes = [c.c_int, c.c_int]
+user.SetForegroundWindow.argtypes = [w.HWND]
+user.IsWindowVisible.argtypes = [w.HWND]
 gdi = c.WinDLL("gdi32", use_last_error=True)
 gdi.CreateCompatibleDC.argtypes, gdi.CreateCompatibleDC.restype = [w.HDC], w.HDC
 gdi.CreateDIBSection.argtypes, gdi.CreateDIBSection.restype = [w.HDC, c.c_void_p, w.UINT, c.POINTER(c.c_void_p), w.HANDLE, w.DWORD], w.HBITMAP
@@ -88,6 +92,34 @@ def main():
     record = {"os": platform.platform(), "gui_sha256": sha256(gui), "checks": {}, "scope": "Interactive rendering and metadata-only instance selection; no service operations."}
     checks = record["checks"]
     process, window = None, None
+    cursor = w.POINT()
+    user.GetCursorPos(c.byref(cursor))
+
+    def hover_cards(expected):
+        user.SetForegroundWindow(window)
+        grid = user.GetDlgItem(window,220)
+        origin = w.POINT()
+        user.ClientToScreen(grid,c.byref(origin))
+        results = []
+        for index,row in enumerate(rows(window)):
+            name=row.split("  |  ",1)[0].removesuffix("（可选）")
+            area=w.RECT()
+            user.SendMessageW(grid,0x198,index,c.addressof(area))
+            user.SetCursorPos(origin.x+(area.left+area.right)//2,origin.y+(area.top+area.bottom)//2)
+            tip=wait_for(lambda: next((tip for tip in windows(process.pid,"tooltips_class32")
+                                      if user.IsWindowVisible(tip) and title(tip).startswith(name+"（")),None),
+                         name+" real mouse hover",5)
+            text=title(tip)
+            assert "单击选择" not in text
+            if name in expected: assert text == name+"（"+expected[name]+"）", text
+            results.append(text)
+        # The empty area after the final card is not a service tool.
+        last=w.RECT();user.SendMessageW(grid,0x198,18,c.addressof(last))
+        client=w.RECT();user.GetClientRect(grid,c.byref(client))
+        user.SetCursorPos(origin.x+client.right-2,origin.y+(last.top+last.bottom)//2)
+        wait_for(lambda: not any(user.IsWindowVisible(tip) for tip in windows(process.pid,"tooltips_class32")),
+                 "blank card area has no tooltip",5)
+        return results
 
     def launch(initial=None):
         nonlocal process, window
@@ -104,6 +136,9 @@ def main():
     try:
         launch(fixtures[0])
         grid = user.GetDlgItem(window, 220)
+        purposes={"game":"游戏主服务","auction":"拍卖行","point":"金币寄售"}
+        record["service_tooltips"] = hover_cards(purposes)
+        checks["all_19_cards_show_service_purpose_on_real_mouse_hover_and_blank_area_has_none"] = True
         rect = w.RECT()
         user.SendMessageW(grid, 0x198, 9, c.addressof(rect))
         point = ((rect.left + rect.right) // 2) | ((rect.top + rect.bottom) // 2 << 16)
@@ -168,6 +203,8 @@ def main():
             user.SendMessageW(window, 0, 0, 0)
         screenshot(window, probe / "after-resize.png")
         checks["repeated_minimum_default_resize_remains_responsive"] = True
+        assert hover_cards(purposes) == record["service_tooltips"]
+        checks["service_tooltip_rectangles_follow_window_resize"] = True
 
         click(window, 300)
         market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market")
@@ -203,6 +240,8 @@ def main():
         close()
         launch()
         assert title(user.GetDlgItem(window, 101)) == str(fixtures[1])
+        assert hover_cards(purposes) == record["service_tooltips"]
+        checks["service_tooltips_refresh_after_remembered_instance_change"] = True
         focus(window, user.GetDlgItem(window, 102))
         key(window, 13)
         wait_for(lambda: menu_open(window), "remembered selector menu")
@@ -221,6 +260,7 @@ def main():
         record["error"] = str(error)
         record["traceback"] = traceback.format_exc()
     finally:
+        user.SetCursorPos(cursor.x,cursor.y)
         if window and user.IsWindow(window):
             close()
         record["passed"] = not record.get("error") and all(checks.values())
