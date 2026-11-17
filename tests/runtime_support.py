@@ -42,6 +42,32 @@ def tree_identity(directory):
     return {"files": count, "bytes": size, "tree_sha256": digest.hexdigest()}
 
 
+def process_memory(pid):
+    """Read current resident and private committed bytes without trimming pages."""
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+
+    class Counters(ctypes.Structure):
+        _fields_ = [("size", w.DWORD), ("faults", w.DWORD)] + [(name, ctypes.c_size_t) for name in
+                    ("peak", "working", "peak_paged", "paged", "peak_nonpaged", "nonpaged",
+                     "pagefile", "peak_pagefile", "private")]
+
+    kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [w.DWORD, w.BOOL, w.DWORD], w.HANDLE
+    kernel.CloseHandle.argtypes = [w.HANDLE]
+    psapi.GetProcessMemoryInfo.argtypes = [w.HANDLE, ctypes.c_void_p, w.DWORD]
+    handle = kernel.OpenProcess(0x410, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        counters = Counters()
+        counters.size = ctypes.sizeof(counters)
+        if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.size):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return {"working_bytes": counters.working, "private_committed_bytes": counters.private}
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def runtime_diagnostics(instance):
     faults, gaps = [], []
     for path in sorted((Path(instance) / "service-logs").glob("*.stderr.private.log")):

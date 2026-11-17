@@ -165,6 +165,8 @@ def main():
         database = record["measurements"]["database_only"] = measure(window, process.pid)
         assert "mysqld.exe" in database["processes"].values()
         assert "mysql-control.exe" in database["processes"].values()
+        assert "conhost.exe" not in database["processes"].values()
+        record["checks"]["database_does_not_create_hidden_console_helpers"] = True
         assert database["displayed_memory_mb"] > record["measurements"]["gui_only"]["displayed_memory_mb"] + 20
         record["checks"]["gui_wrapper_and_nested_mysqld_included"] = True
         print("GUI and nested MySQL counters matched", flush=True)
@@ -176,6 +178,8 @@ def main():
         both = record["measurements"]["two_architectures"] = measure(window, process.pid)
         assert both["displayed_memory_mb"] > database["displayed_memory_mb"] + 80
         assert both["windows_cpu"] > database["windows_cpu"] + 1
+        assert "conhost.exe" not in both["processes"].values()
+        record["checks"]["service_hosts_do_not_create_hidden_console_helpers"] = True
         record["checks"]["both_service_working_sets_and_cpu_included"] = True
         print("x86/x64 service CPU and working sets matched", flush=True)
         out, err = (probe / "unrelated.out").open("wb"), (probe / "unrelated.err").open("wb")

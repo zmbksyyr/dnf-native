@@ -107,6 +107,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
 unsigned nr_fd_reserve(NrRun *run);
 uint64_t nr_file_inode(HANDLE file);
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+int nr_zero_fill(NrRun *run, CONTEXT *context);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_deliver_signal(NrRun *run, CONTEXT *context);

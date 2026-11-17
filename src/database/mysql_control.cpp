@@ -111,7 +111,10 @@ static Child launch(const std::wstring &root, const std::wstring &instance, cons
     startup.hStdOutput = output;
     startup.hStdError = error;
     PROCESS_INFORMATION process = {};
-    require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED,
+    // The persistent server needs no console. CLI clients use GetConsoleCP()
+    // for charset=auto, so retain their short-lived hidden console behavior.
+    DWORD console=tool==L"mysqld"?DETACHED_PROCESS:CREATE_NO_WINDOW;
+    require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, console | CREATE_SUSPENDED,
                            nullptr, instance.c_str(), &startup, &process), "Start official MySQL tool");
     // Assign the suspended process before it can write data. Closing this
     // wrapper, including an interrupted restore, then also stops its child.

@@ -76,7 +76,7 @@ static HANDLE launch_tool(const std::wstring &exe, const std::wstring &instance,
     startup.hStdInput = input.handle;
     startup.hStdOutput = startup.hStdError = output.handle;
     PROCESS_INFORMATION process = {};
-    require(CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+    require(CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, TRUE, DETACHED_PROCESS,
                            nullptr, instance.c_str(), &startup, &process), "Start native database operation");
     CloseHandle(process.hThread);
     return process.hProcess;

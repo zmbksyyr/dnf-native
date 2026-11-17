@@ -15,7 +15,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from probe_core_protocols import receive
-from runtime_support import request_stop, unpack_runtime
+from runtime_support import request_stop, unpack_runtime, process_memory
 
 from bootstrap import BUILD
 
@@ -93,7 +93,7 @@ def main():
                "/home/neople/bridge/df_bridge_r", "bridge", "run"]
     checks = {"different_version": False, "same_version": False, "fragmented_version": False,
               "coalesced_requests": False, "script_responses": 0}
-    error, forced, stop_sent, game_proxy = None, False, False, None
+    error, forced, stop_sent, game_proxy, memory = None, False, False, None, None
     with (instance / "stdout.private.log").open("wb") as out, (instance / "stderr.log").open("wb") as err:
         process = subprocess.Popen(command, stdout=out, stderr=err)
         try:
@@ -140,6 +140,7 @@ def main():
                     raise RuntimeError("Bridge coalesced script response differs")
                 checks["script_responses"] += 1
                 checks["coalesced_requests"] = True
+            memory = process_memory(process.pid)
             if args.game_proxy:
                 subprocess.run([sys.executable, "-B", str(ROOT / "tests/game_fixture.py"), "--timeout", "40",
                                 "--lua-script", str(ROOT / "tests/channel_proxy.lua"),
@@ -177,7 +178,7 @@ def main():
     result = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(BUILD)),
               "scope": "Original bridge DB version checks and exact channel-script responses on loopback",
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
-              "service_port": args.port, "checks": checks, "script_bytes": len(expected_script),
+               "service_port": args.port, "checks": checks, "script_bytes": len(expected_script), "memory": memory,
               "game_proxy": game_proxy,
               "script_sha256": hashlib.sha256(expected_script).hexdigest(), "error": error, "gaps": gaps,
               "exit_code": process.returncode, "sigterm_event_sent": stop_sent, "forced_cleanup": forced,

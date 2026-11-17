@@ -370,6 +370,14 @@ static intptr_t syscall_result(uintptr_t number, const uintptr_t args[6], CONTEX
 static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     if (!nr_current()) return EXCEPTION_CONTINUE_SEARCH;
     CONTEXT *c = exception->ContextRecord;
+    if(exception->ExceptionRecord->ExceptionCode==EXCEPTION_ILLEGAL_INSTRUCTION) {
+        int zero=nr_zero_fill(active,c);
+        if(zero<0) {fflush(NULL);ExitProcess(126);}
+        if(zero) {
+            if(!nr_deliver_signal(active,c)) ExitProcess(124);
+            return EXCEPTION_CONTINUE_EXECUTION;
+        }
+    }
     if (exception->ExceptionRecord->ExceptionCode == 0xe0444e46u) {
         *c = nr_current()->initial_context;
         return EXCEPTION_CONTINUE_EXECUTION;

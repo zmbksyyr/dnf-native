@@ -65,6 +65,7 @@ typedef struct {
     size_t trap_count;
     NrCodePage *tls_pages;
     uintptr_t service_stop_pc; /* Verified original CApplication::Free site, if applicable. */
+    uintptr_t zero_pc, zero_got; /* Verified memset PLT jump; fallback still uses its original GOT. */
 } NrElf;
 
 int nr_elf_open(NrElf *elf, const wchar_t *path, const char *expected_hash, int require_entry, const char **error);
@@ -73,6 +74,7 @@ void nr_elf_close(NrElf *elf);
 int nr_adapt(NrElf *elf, const char **error);
 int nr_service_adapt(NrElf *elf, const char **error);
 int nr_pvf_adapt(NrElf *elf, const char **error);
+int nr_zero_adapt(NrElf *elf, const char **error);
 const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc);
 
 #endif

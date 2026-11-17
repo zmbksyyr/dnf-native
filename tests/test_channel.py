@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import BUILD
 from probe_core_protocols import encrypt, receive
-from runtime_support import request_stop, unpack_runtime
+from runtime_support import request_stop, unpack_runtime, process_memory
 
 ROOT = Path(__file__).resolve().parents[1]
 CHANNEL_SHA256 = "7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd"
@@ -30,6 +30,7 @@ def sha(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", type=Path, default=BUILD / "i686/dnf-host.exe")
+    parser.add_argument("--port", type=int, default=7001, help="Private loopback TCP/UDP port")
     options = parser.parse_args()
     host = options.host.resolve()
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -42,6 +43,7 @@ def main():
     config = guest / "cfg/channel.cfg"
     text = config.read_text(encoding="utf-8")
     text = re.sub(r"(?m)^this_ip\s*=.*$", "this_ip = 127.0.0.1", text)
+    text = re.sub(r"(?m)^this_(tcp|udp)_port\s*=.*$", lambda m: "this_" + m[1] + "_port = " + str(options.port), text)
     config.write_text(text, encoding="utf-8", newline="\n")
     elf, ld = guest / "df_channel_r", instance / "lib/ld-2.17.so"
     if sha(elf) != CHANNEL_SHA256:
@@ -49,7 +51,7 @@ def main():
     command = [str(host), "--root", str(instance), sha(ld), "--env", "HOME=/home/neople",
                "--cwd", "/home/neople/channel", "--run", str(elf), sha(elf),
                "/home/neople/channel/df_channel_r", "channel", "run"]
-    forced, error, stop_sent = False, None, False
+    forced, error, stop_sent, memory = False, None, False, None
     checks = {"negative_handshake": False, "positive_responses": 0, "fragmented_request": False,
               "coalesced_requests": False}
     with (instance / "stdout.log").open("wb") as out, (instance / "stderr.log").open("wb") as err:
@@ -60,7 +62,7 @@ def main():
                 if process.poll() is not None:
                     raise RuntimeError("Channel exited during startup")
                 try:
-                    peer = socket.create_connection(("127.0.0.1", 7001), timeout=0.2)
+                    peer = socket.create_connection(("127.0.0.1", options.port), timeout=0.2)
                     break
                 except OSError:
                     if time.monotonic() >= deadline:
@@ -96,6 +98,7 @@ def main():
                     raise RuntimeError("Channel coalesced requests differ")
                 checks["positive_responses"] += 2
                 checks["coalesced_requests"] = True
+            memory = process_memory(process.pid)
         except Exception as failure:
             error = str(failure)
         finally:
@@ -112,7 +115,8 @@ def main():
     gaps = [line for line in stderr.splitlines() if any(word in line for word in
             ["syscall gap", "unsupported", "unhandled exception", "unimplemented guest", "exhausted"])]
     result = {"recorded_utc": stamp, "os": platform.platform(), "probe": str(instance.relative_to(BUILD)),
-              "scope": "Original channel TCP connect protocol only; loopback port 7001.",
+               "scope": "Original channel TCP connect protocol only; private loopback port.",
+               "service_port": options.port, "memory": memory,
               "command": command, "host_sha256": sha(host), "elf_sha256": sha(elf), "ld_sha256": sha(ld),
               "config_sha256": sha(config), "checks": checks, "error": error, "gaps": gaps,
               "exit_code": process.returncode, "sigterm_event_sent": stop_sent, "forced_cleanup": forced,

@@ -2,6 +2,34 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## P48 大块清零与常驻控制台内存优化（2026-11-17）
+
+P47 对用户正在运行的实例作只读采样，工作集总计 4859.2 MiB，bridge 1335.7、channel 1303.1、game 920.2 MiB；18 个隐藏 conhost 合计 187.3 MiB。完整采样与各进程大块分配保留在外部 `../x/dnf-native-output/P47-memory-profile/receipt.json`。固定原 ELF 反汇编确认 bridge、channel 的 `TMemoryPoolStatic<TCPUser,1000>::startup` 各分配 0x4e217704 字节并构造 1000 个对象；每个对象有两块 655360 字节的环形队列，构造时调用原 `memset` 清零。并非先前怀疑的匿名 mmap 分配器主动触碰所有页面。
+
+本轮按 C 清零语义独立实现私有匿名零页重置，未缩小池容量、改变协议或修改输入 ELF。Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT、基底 glibc 2.17、MySQL 5.7.44 下，固定原 ELF 与相同配置的前后协议测试实测：
+
+| 模块 | 原工作集 | 优化后工作集 | 减少 | 实际检查 |
+| --- | ---: | ---: | ---: | --- |
+| bridge | 1335.4 MiB | 92.5 MiB | 1242.9 MiB | 数据库版本差异/一致响应、分片及合并请求、四次脚本原文响应、自然退出 |
+| channel | 1303.0 MiB | 59.8 MiB | 1243.2 MiB | 负握手、32 次正响应、分片及合并请求、自然退出 |
+
+两项合计减少 2486.0 MiB（2.43 GiB）物理驻留；私有提交量基本保持原值。bridge 使用私有种子数据库副本 `127.0.0.2:3306`，channel 使用独立端口 47101，没有操作用户的 `127.0.0.1:3306` 或占用其服务端口。对比收据为外部 `P48-memory-optimize/bridge-baseline.json`、`bridge-optimized.json`、`bridge-comparison.json`、`channel-baseline.json` 及 `channel-optimized.json`。本轮未重启用户实例，不能把这两项相加推算记录为新版整套实例启动实测。
+
+其他最终检查的收据路径相对 `../x/dnf-native-output/`：
+
+| 检查 | 结果与范围 | 收据 |
+| --- | --- | --- |
+| 零页语义 | 双架构真实 glibc；48 MiB 脏匿名区减少 50327552 字节驻留，逐字节确认清零；未对齐边界、返回指针、低字节转换、重复及非零填充、可执行页回退、共享别名、文件 COW 与预加载拦截保留 | `probes/20261117T073739733495Z/zero-pages/receipt.json` |
+| GUI 进程树与启停 | 真实 MySQL、x86/x64 自建负载；无常驻 conhost，CPU/内存与 Windows 计数器一致；停服、重启、正常退出及无关进程排除 | `probes/20261117T073225996214Z/gui-metrics/receipt.json` |
+| 数据库 | 初始化、TLS、日志时间、读写、备份恢复及正常关闭，无强制清理 | `probes/20261117T073223300395Z/mysql-tools/receipt.json` |
+| 原版 game/DP2 | 独立 Lua 时间脚本正常执行并按脚本退出 42，预加载路径保留；无 syscall/runtime 缺口 | `probes/20261117T073624850488Z/game-fixture/receipt.json` |
+| 内存及文件接口 | 双架构匿名 VM、并发映射、文件映射/生命周期、rename、msync、ELF 入口/TLS 拒绝及原版 ld 加载器路径通过 | `P48-memory-optimize/` 下各专项收据 |
+| GUI 布局 | 默认、最小及 125% 布局通过 | `probes/20261117T073433387080Z/gui-layout/receipt.json` |
+
+初次零页夹具的 i686 `ftruncate` 调用遇到既有未支持 syscall 93，改用已支持的文件写入建立共享映射后完整重跑；原失败保留在 `probes/20261117T072956574488Z/zero-pages/receipt.json`。首次把短期 MySQL 客户端也设为分离进程时，其自动字符集探测产生 cp0 警告并污染 SQL 输出，GUI 专项明确失败，收据保留在 `probes/20261117T073031190713Z/gui-metrics/receipt.json`；最终仅让常驻 mysqld 分离，短期客户端保留隐藏控制台，完整专项重跑通过。
+
+正式 3.0 目录随本轮更新；执行文件、原文件备份、包校验和交付记录在外部 `P48-memory-optimize/`，运行中的用户实例保持不动。重新启动控制台及服务使用新版。
+
 ## P46 控制台及全部子进程资源汇总（2026-11-17）
 
 标题栏此前只采样 GUI 自身，现按用户最终要求包含当前控制台、全部服务宿主、MySQL 包装器、mysqld 及临时数据库工具。每 500ms 采样进程树，以 PID 加创建时间保留 CPU 基线，按整机逻辑处理器算力折算；内存为当前工作集之和，共享驻留页可能重复计入。退出进程移除，新进程第二次采样开始计算 CPU。其他控制台实例与无关进程不计入。

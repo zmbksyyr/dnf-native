@@ -200,7 +200,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     startup.hStdInput = input.handle; startup.hStdOutput = output.handle; startup.hStdError = error.handle;
     PROCESS_INFORMATION child = {};
     require(CreateProcessW(service.host.c_str(), command.data(), nullptr, nullptr, TRUE,
-                           CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, instance.c_str(), &startup, &child), "Start ELF host");
+                           DETACHED_PROCESS | CREATE_SUSPENDED, nullptr, instance.c_str(), &startup, &child), "Start ELF host");
     if (!AssignProcessToJobObject(job, child.hProcess) || ResumeThread(child.hThread) == static_cast<DWORD>(-1)) {
         DWORD error_code = GetLastError();
         TerminateProcess(child.hProcess, 1); WaitForSingleObject(child.hProcess, 10000);

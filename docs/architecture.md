@@ -24,6 +24,8 @@ flowchart TD
 
 `elf.c` 以只读文件视图保留输入，再为执行副本映射 PT_LOAD、零填充 BSS 并设置页权限。ET_EXEC 按原地址映射；ET_DYN 分配独立区域。原磁盘 ELF 不因加载和适配被改写。`run.c` 构造 argc/argv、环境、auxv 和初始栈，再经 `entry.S` 进入原动态加载器或程序入口。
 
+`zero.c` 从主 ELF 的动态符号、JUMP_SLOT 重定位及标准 PLT 推导 `memset` 跳转位置，核对原文件与执行副本的完整跳转指令，再仅在执行内存接入；日志记录 ELF 哈希、地址、原字节与恢复来源，不修改原 ELF。首调用及非优化路径执行原 GOT 跳转，保留惰性符号解析；仅在目标已解析到 libc、填充值低字节为零、长度至少 64 KiB 且整个目标属于可写私有匿名映射时，对内部完整页使用 `MEM_DECOMMIT` 后 `MEM_COMMIT`，由 Windows 保证后续读取得到零，边界不足一页的部分实际清零。映射锁覆盖检查与重置，任何失败明确终止并记录；不使用无法保证内容清零的 `MEM_RESET`，不清理工作集来制造短暂下降。共享页、文件 COW、可执行页及其他填充值仍由原 libc 处理；有 `LD_PRELOAD` 的程序完全保留预加载路径，避免绕过插件对 libc 的插桩。没有标准 PLT 的 ELF 正常沿用原路径。该优化降低常驻物理内存，不缩小连接池、虚拟地址范围或提交量。页语义依据 [VirtualFree / MEM_DECOMMIT](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree) 和 [VirtualAlloc / MEM_COMMIT](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc) 独立实现。
+
 `time`、`gettimeofday` 和 `CLOCK_REALTIME` 继续从 Windows 实时时钟取得 Unix UTC 时间戳；单调时钟继续使用性能计数器，不将本地时区偏移加到时间戳。`run.c` 启动 ELF 时，若没有显式 `TZ`，通过 `GetTimeZoneInformation` 读取本机规则，并由 `timezone.h` 转为 POSIX `TZ` 交给原版 glibc；固定偏移、分数小时、南北半球周期夏令时均保留。该默认值不占用原有 32 项显式环境槽。显式 `--env TZ=...` 优先；按绝对年份指定的转换规则明确报错，当前实现不生成历史时区数据库。时区规则在服务启动时读取，更改 Windows 时区后需重新拉起服务。MySQL 包装器的所有 mysqld 启动路径统一追加 `--default-time-zone=SYSTEM --log-timestamps=SYSTEM`，新实例配置也写入这两项；既有实例无需改配置。GUI 日志原本已使用 `GetLocalTime`。旧日志与已存数据不回写。规则依据 [Windows TIME_ZONE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information) 和 [POSIX TZ 环境变量](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html) 独立实现。
 
 `adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取可经每线程 Windows TLS 槽和同义 CPU 指令直接执行，保留寄存器与标志。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
@@ -152,6 +154,8 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 维护窗口摘要由两条单行 STATIC 组成：PVF 路径采用路径省略并提供完整路径提示，第二行显示 auction／point 状态。下方为运行设置、兼容设置及一个合并维护面板；运行设置按等级下拉框、DP2、Frida 从左到右横排一行，应用并重启按钮靠右对齐，不再创建独立插件保存按钮及说明文字。一次工作线程快照同时保存等级与插件模式；game 运行时只停、启一次，其他服务不重启；停服时保存供下次启动使用。无变化时禁用应用按钮。写入前核对固定 ELF 哈希与 Lua 入口，先在实例 `.mysql/runtime-settings-*` 保留配置和需要修改的模块；写配置失败恢复原文，错误写入主日志。八个维护动作按两行四列布置，第一行索引、第二行红字数据操作。UI 不再创建市场范围控件，所有维护动作固定以范围 2 同时处理两个拍卖库，仍沿用备份及失败回滚。没有底部关闭按钮，标题栏与 Esc 使用同一正常关闭路径。执行结果与详情统一写入主窗口日志，不再单设报告区；摘要与所在横条使用同一底色。所有动作使用同一行高和列边界；主窗口与维护窗口的开关由自绘控件处理悬停、禁用、焦点和开启状态，轨道及圆形滑块先按 4 倍分辨率绘制，再以 HALFTONE 缩小，文字保持原生 DPI；鼠标点击隐藏整圈焦点框，键盘 Tab 导航时按 Win32 UI 状态显示焦点提示。
 
 主窗口标题栏每 500ms 通过 Toolhelp 进程快照，从控制台 PID 递归查找全部子进程，包含控制台、ELF 服务、数据库包装器、mysqld 和临时数据库工具。逐进程只读打开句柄，汇总 `GetProcessTimes` 的内核与用户 CPU 时间差和 `GetProcessMemoryInfo` 的当前工作集。CPU 按 `GetTickCount64` 采样间隔及全部逻辑处理器数量归一化，内存为工作集之和（共享驻留页可能重复计入）。PID 加创建时间识别进程，首次采样建立基线，退出后移除；读取失败显示 `--`，不沿用旧值。独立采样句柄避免读取后台线程关闭或替换的服务句柄；不统计其他控制台实例或无关进程，不作为服务就绪或业务成功信号。
+
+控制台创建服务宿主与数据库包装器、包装器创建 mysqld 时使用 `DETACHED_PROCESS` 并继续显式传递日志与输入句柄，省去各常驻进程的隐藏 conhost。短期 MySQL 命令行客户端保留 `CREATE_NO_WINDOW`：其字符集 `auto` 依赖 `GetConsoleCP()`，直接分离会返回 cp0 并把警告混入 SQL 输出。该保留不会产生随服务器长期运行的控制台辅助进程。
 
 固定 ELF 身份分别为 auction `b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c`、point `0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256`。每个站点先核对文件与执行映射的完整旧指令，再写执行内存，并记录旧新字节；不修改磁盘 ELF，退出后恢复。具体站点与预期字节集中在 `auction.c`，拒绝其他 ELF 身份。
 

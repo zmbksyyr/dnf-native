@@ -90,7 +90,12 @@ int wmain(int argc, wchar_t **argv) {
                 break;
             }
         }
-        if (!nr_adapt(elf, &error)) {
+        int preloaded=0;
+        for(int i=0;i<run.environment_count;++i)
+            if(!strncmp(run.environment[i],"LD_PRELOAD=",11) && run.environment[i][11]) preloaded=1;
+        /* Preloaded instrumentation may detour libc in place. Preserve that
+           path in full; zero-page optimization is for uninstrumented imports. */
+        if (!nr_adapt(elf, &error) || (!preloaded && !nr_zero_adapt(elf, &error))) {
             fprintf(stderr, "adaptation failed: %s\n", error ? error : "Windows memory operation failed");
             nr_elf_close(elf);
             return 1;
