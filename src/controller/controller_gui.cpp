@@ -987,7 +987,7 @@ static LRESULT CALLBACK service_grid_proc(HWND window, UINT message, WPARAM wpar
         std::wstring name=list_text(window,index);
         name=name.substr(0,name.find(L"  |  "));
         size_t optional=name.find(L"（");if(optional!=std::wstring::npos) name.resize(optional);
-        app->service_tip_text=name+L"（"+service_purpose(name)+L"）";
+        app->service_tip_text=service_purpose(name);
         info->lpszText=app->service_tip_text.data();return 0;
     }
     if (message == LB_GETITEMRECT) {

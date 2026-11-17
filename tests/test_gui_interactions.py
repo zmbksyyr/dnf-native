@@ -103,15 +103,21 @@ def main():
         results = []
         for index,row in enumerate(rows(window)):
             name=row.split("  |  ",1)[0].removesuffix("（可选）")
+            # Leave the previous tool before entering the next card so that
+            # visible text always belongs to the new mouse-hover event.
+            blank=w.RECT();user.GetClientRect(grid,c.byref(blank))
+            user.SetCursorPos(origin.x+blank.right-2,origin.y+blank.bottom-2)
+            wait_for(lambda: not any(user.IsWindowVisible(tip) for tip in windows(process.pid,"tooltips_class32")),
+                     "previous tooltip hidden",5)
             area=w.RECT()
             user.SendMessageW(grid,0x198,index,c.addressof(area))
             user.SetCursorPos(origin.x+(area.left+area.right)//2,origin.y+(area.top+area.bottom)//2)
             tip=wait_for(lambda: next((tip for tip in windows(process.pid,"tooltips_class32")
-                                      if user.IsWindowVisible(tip) and title(tip).startswith(name+"（")),None),
+                                      if user.IsWindowVisible(tip) and title(tip)),None),
                          name+" real mouse hover",5)
             text=title(tip)
-            assert "单击选择" not in text
-            if name in expected: assert text == name+"（"+expected[name]+"）", text
+            assert "单击选择" not in text and name not in text and "（" not in text and "）" not in text, text
+            if name in expected: assert text == expected[name], text
             results.append(text)
         # The empty area after the final card is not a service tool.
         last=w.RECT();user.SendMessageW(grid,0x198,18,c.addressof(last))
