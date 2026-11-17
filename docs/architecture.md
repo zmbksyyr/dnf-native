@@ -147,6 +147,8 @@ MySQL 的 NTFS 配置使用 `lower_case_table_names=1`。历史原库导入和�
 
 `controller/auction_window.h` 提供维护窗口，复用主窗口按钮、开关和单一后台线程；`auction_maintenance.h` 管理检查、备份、迁移与恢复；`auction_pvf.h` 独立读取 PVF；`runtime/auction.c` 适配固定原版 i386 auction／point。功能与作用域见[使用说明](README.md)。配置保存到已有 `services.ini [auction]`，保留原服务入口等字段；`extend_levels/extend_refine/dp2_guard/auto_check` 是选项，`level_limit/refine_limit` 是应用后的数值。宿主环境由控制台生成。
 
+维护窗口按兼容设置、索引维护、数据维护和底部报告四个区域布置，所有动作使用同一行高和列边界；主窗口与维护窗口的开关由自绘控件处理悬停、禁用、焦点和开启状态，避免系统默认黑色内框。主窗口标题栏的 CPU／内存摘要来自控制器自身的 `GetProcessTimes` 和工作集采样，不作为服务就绪或业务成功信号。
+
 固定 ELF 身份分别为 auction `b31eafd5068b450929133365f071fc2d0dedc7a8a5b80f9c81da44ce4008290c`、point `0339aa6cc51f32c4b50fe9e55f3fd8b00d4b495fcad46871c59a5eda345c9256`。每个站点先核对文件与执行映射的完整旧指令，再写执行内存，并记录旧新字节；不修改磁盘 ELF，退出后恢复。具体站点与预期字节集中在 `auction.c`，拒绝其他 ELF 身份。
 
 搜索原本用动态 map 保存锻造维度，但请求校验只接受 0～7；`0x0808281c` 只调整该上限，等级在 `0x080811d5/0x0808292b/0x08083471/0x0808347c` 调整。范围取当前 PVF；等级受原指令表示限制到 127，锻造受 `UpgradeSeparateInfo::GetUpgradeSeparate` 的五位物品协议限制到 31，超限明确拒绝。不会把 PVF 压回 70／7，也不把请求改成任意 127。

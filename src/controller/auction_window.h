@@ -19,14 +19,18 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 if(!wcscmp(type,L"BUTTON") && (style&BS_TYPEMASK)==BS_OWNERDRAW) SetWindowSubclass(c,button_proc,1,0);
                 if(!wcscmp(type,L"BUTTON") && (style&BS_TYPEMASK)==BS_AUTOCHECKBOX)
                     SetWindowLongPtrW(c,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(switch_proc));
+                if(!wcscmp(type,L"COMBOBOX")) {
+                    SetWindowTheme(c,L"",L""); SetWindowSubclass(c,combo_proc,1,0);
+                    SendMessageW(c,CB_SETITEMHEIGHT,0,app->px(30));
+                }
                 return c;
             };
-            add(L"EDIT",L"",ES_MULTILINE|ES_READONLY|ES_AUTOHSCROLL,MARKET_SUMMARY,24,20,812,65);
-            add(L"STATIC",L"兼容设置",0,320,24,101,800,23);
-            add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,24,133,390,30);
-            add(L"BUTTON",L"锻造兼容 · 同时处理搜索和均价",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_REFINE,434,133,402,30);
-            add(L"BUTTON",L"DP2 搜索保护 · 仅有效孔／宝石记录覆盖",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_DP2,24,170,400,30);
-            add(L"BUTTON",L"PVF 变化时自动检查索引与存量订单",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_AUTO,434,170,402,30);
+            add(L"EDIT",L"",ES_MULTILINE|ES_READONLY|ES_AUTOHSCROLL,MARKET_SUMMARY,24,20,812,58);
+            add(L"STATIC",L"兼容设置",SS_CENTERIMAGE,320,32,96,800,22);
+            add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,32,64,382,30);
+            add(L"BUTTON",L"锻造兼容 · 同时处理搜索和均价",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_REFINE,446,64,382,30);
+            add(L"BUTTON",L"DP2 搜索保护 · 仅有效孔／宝石记录覆盖",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_DP2,32,100,382,30);
+            add(L"BUTTON",L"PVF 变化时自动检查索引与存量订单",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_AUTO,446,100,382,30);
             auto o=market::options(app->current);
             for(auto p:{std::pair<int,bool>{MARKET_LEVELS,o.levels},{MARKET_REFINE,o.refine},{MARKET_DP2,o.dp2},{MARKET_AUTO,o.automatic}}) SendMessageW(GetDlgItem(w,p.first),BM_SETCHECK,p.second?BST_CHECKED:BST_UNCHECKED,0);
             bool frida=setting(app->current+L"\\services.ini",L"plugins",L"mode")==L"frida";
@@ -35,24 +39,46 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             catch(const std::exception &e) {compatible=false;app->market_report=L"DP2 搜索保护不可用："+decode(e.what());}
             // Exact script compatibility is also checked before writing.
             EnableWindow(GetDlgItem(w,MARKET_DP2),(frida && compatible) || o.dp2);
-            add(L"STATIC",L"索引维护 · 自动备份；存在冲突时保留订单并说明原因；双月表由程序自动维护。",0,321,24,218,812,25);
-            add(L"BUTTON",L"检查兼容性",BS_OWNERDRAW|WS_TABSTOP,market::Check,24,252,176,34);
-            add(L"BUTTON",L"重建并同步 iteminfo",BS_OWNERDRAW|WS_TABSTOP,market::Sync,212,252,210,34);
-            add(L"BUTTON",L"恢复上一版索引",BS_OWNERDRAW|WS_TABSTOP,market::RestoreIndex,434,252,182,34);
-            HWND report=add(L"EDIT",app->market_report.c_str(),ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL|WS_VSCROLL|WS_TABSTOP,MARKET_REPORT,24,304,812,185);
-            SendMessageW(report,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(app->px(8),app->px(8)));
-            add(L"STATIC",L"数据维护",SS_CENTERIMAGE,322,24,507,100,30);
-            HWND scope=add(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_TABSTOP,MARKET_SCOPE,136,507,300,160);
+            add(L"STATIC",L"索引维护",SS_CENTERIMAGE,321,32,144,800,22);
+            add(L"STATIC",L"自动备份；存在冲突时保留订单并说明原因；双月表由程序自动维护。",SS_CENTERIMAGE,325,144,144,680,22);
+            add(L"BUTTON",L"检查兼容性",BS_OWNERDRAW|WS_TABSTOP,market::Check,32,172,246,36);
+            add(L"BUTTON",L"重建并同步 iteminfo",BS_OWNERDRAW|WS_TABSTOP,market::Sync,294,172,246,36);
+            add(L"BUTTON",L"恢复上一版索引",BS_OWNERDRAW|WS_TABSTOP,market::RestoreIndex,556,172,272,36);
+            add(L"STATIC",L"数据维护",SS_CENTERIMAGE,322,32,244,800,22);
+            add(L"STATIC",L"市场范围",SS_CENTERIMAGE,MARKET_SCOPE_LABEL,32,272,78,32);
+            HWND scope=add(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_TABSTOP,MARKET_SCOPE,120,272,190,32);
             for(auto label:{L"金币拍卖",L"点券拍卖（金币寄售）",L"两者"}) SendMessageW(scope,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
             SendMessageW(scope,CB_SETCURSEL,2,0);
-            add(L"STATIC",L"红字动作直接删除所选数据，不返还物品或货币；先自动备份并停相关服务。",SS_CENTERIMAGE,323,24,546,812,25);
-            add(L"BUTTON",L"清理不兼容订单",BS_OWNERDRAW|WS_TABSTOP,market::CleanInvalid,24,582,192,36);
-            add(L"BUTTON",L"清空在售订单",BS_OWNERDRAW|WS_TABSTOP,market::ClearOrders,228,582,192,36);
-            add(L"BUTTON",L"清空均价数据",BS_OWNERDRAW|WS_TABSTOP,market::ClearPrices,432,582,192,36);
-            add(L"BUTTON",L"重置拍卖库",BS_OWNERDRAW|WS_TABSTOP,market::Reset,636,582,200,36);
-            add(L"BUTTON",L"应用并重启相关服务",BS_OWNERDRAW|WS_TABSTOP,market::Apply,568,644,268,38);
-            add(L"BUTTON",L"关闭",BS_OWNERDRAW|WS_TABSTOP,MARKET_CLOSE,24,644,100,38);
+            add(L"STATIC",L"红字动作会删除所选数据，不返还物品或货币；执行前自动备份并停止相关服务。",SS_CENTERIMAGE,323,328,272,500,22);
+            add(L"BUTTON",L"清理不兼容订单",BS_OWNERDRAW|WS_TABSTOP,market::CleanInvalid,32,308,194,36);
+            add(L"BUTTON",L"清空在售订单",BS_OWNERDRAW|WS_TABSTOP,market::ClearOrders,238,308,194,36);
+            add(L"BUTTON",L"清空均价数据",BS_OWNERDRAW|WS_TABSTOP,market::ClearPrices,444,308,194,36);
+            add(L"BUTTON",L"重置拍卖库",BS_OWNERDRAW|WS_TABSTOP,market::Reset,650,308,178,36);
+            add(L"BUTTON",L"应用并重启相关服务",BS_OWNERDRAW|WS_TABSTOP,market::Apply,650,360,178,38);
+            add(L"STATIC",L"操作日志与兼容报告",SS_CENTERIMAGE,MARKET_LOG_LABEL,32,416,812,22);
+            HWND report=add(L"EDIT",app->market_report.c_str(),ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL|WS_VSCROLL|WS_TABSTOP,MARKET_REPORT,32,444,796,195);
+            SendMessageW(report,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(app->px(10),app->px(10)));
+            add(L"BUTTON",L"关闭",BS_OWNERDRAW|WS_TABSTOP,MARKET_CLOSE,32,650,100,38);
+            SendMessageW(GetDlgItem(w,320),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
+            SendMessageW(GetDlgItem(w,321),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
+            SendMessageW(GetDlgItem(w,322),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
+            SendMessageW(GetDlgItem(w,MARKET_LOG_LABEL),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
+            SendMessageW(GetDlgItem(w,MARKET_REPORT),WM_SETFONT,reinterpret_cast<WPARAM>(app->log_font),TRUE);
             market_summary(); return 0;
+        }
+        case WM_PAINT: {
+            PAINTSTRUCT paint{}; HDC dc=BeginPaint(w,&paint); RECT area; GetClientRect(w,&area);
+            FillRect(dc,&area,app->background);
+            auto panel=[&](int left,int top,int right,int bottom,COLORREF fill,COLORREF border) {
+                RECT r={app->px(left),app->px(top),app->px(right),app->px(bottom)};
+                rounded(dc,r,fill,border,app->px(12));
+            };
+            panel(16,12,844,86,RGB(247,250,255),RGB(222,231,245));
+            panel(16,92,844,146,RGB(255,255,255),RGB(228,234,245));
+            panel(16,156,844,224,RGB(255,255,255),RGB(228,234,245));
+            panel(16,234,844,408,RGB(255,255,255),RGB(228,234,245));
+            panel(16,410,844,668,RGB(255,255,255),RGB(228,234,245));
+            EndPaint(w,&paint); return 0;
         }
         case WM_CTLCOLORSTATIC: case WM_CTLCOLOREDIT:
             SetBkColor(reinterpret_cast<HDC>(wp),RGB(255,255,255)); SetTextColor(reinterpret_cast<HDC>(wp),RGB(54,77,112)); return reinterpret_cast<LRESULT>(app->surface);
@@ -81,9 +107,9 @@ static void open_market_window() {
     if(app->market_window) { SetForegroundWindow(app->market_window); return; }
     WNDCLASSW cls{}; cls.lpfnWndProc=market_proc; cls.hInstance=GetModuleHandleW(nullptr); cls.hCursor=LoadCursorW(nullptr,IDC_ARROW); cls.lpszClassName=L"DnfNativeMarketMaintenance";
     if(!RegisterClassW(&cls) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) require(false,"Register market maintenance window");
-    RECT size{0,0,app->px(860),app->px(706)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
+    RECT size{0,0,app->px(860),app->px(760)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
     RECT owner;GetWindowRect(app->window,&owner);
     HWND w=CreateWindowExW(WS_EX_CONTROLPARENT,cls.lpszClassName,L"双拍卖维护",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,
-        std::max(0L,owner.left+(owner.right-owner.left-(size.right-size.left))/2),std::max(0L,owner.top+16),size.right-size.left,size.bottom-size.top,app->window,nullptr,cls.hInstance,nullptr);
+        std::max(0L,owner.left+(owner.right-owner.left-(size.right-size.left))/2),std::max(0L,owner.top),size.right-size.left,size.bottom-size.top,app->window,nullptr,cls.hInstance,nullptr);
     require(w!=nullptr,"Open market maintenance window"); EnableWindow(app->window,FALSE); ShowWindow(w,SW_SHOW);
 }

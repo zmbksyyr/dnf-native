@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>
 #include <uxtheme.h>
 #include <commctrl.h>
+#include <psapi.h>
 #include "log_view.h"
 #include <algorithm>
 #include <cwchar>
@@ -20,7 +21,8 @@ enum { INSTANCE_MORE = 280, SERVICE_INFO, DATABASE_INFO, LOG_FILTER,
        LOG_CONSOLE_TAB, LOG_SERVICE_TAB, LOG_ERROR_TAB, LOG_MYSQL_TAB, LOG_FILES };
 enum { STATUS_MESSAGE = WM_APP + 1, DONE_MESSAGE, PROGRESS_MESSAGE };
 enum { MARKET_OPEN=300, MARKET_LEVELS=301, MARKET_REFINE, MARKET_DP2, MARKET_AUTO,
-       MARKET_SCOPE, MARKET_REPORT, MARKET_CLOSE, MARKET_SUMMARY };
+       MARKET_SCOPE, MARKET_REPORT, MARKET_CLOSE, MARKET_SUMMARY,
+       MARKET_LOG_LABEL=318, MARKET_SCOPE_LABEL=319 };
 
 static bool present(const std::wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
@@ -212,6 +214,31 @@ struct App {
     int dpi = 96;
     int px(int value) const { return MulDiv(value, dpi, 96); }
     bool resources_ready = false;
+    ULONGLONG metrics_tick = 0, metrics_process = 0;
+    bool metrics_ready = false;
+    void update_title_metrics() {
+        FILETIME creation{}, exit{}, kernel{}, user{};
+        if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) return;
+        auto ticks=[](const FILETIME &value) -> ULONGLONG {
+            return (static_cast<ULONGLONG>(value.dwHighDateTime)<<32) | value.dwLowDateTime;
+        };
+        ULONGLONG now=GetTickCount64(), process=ticks(kernel)+ticks(user);
+        PROCESS_MEMORY_COUNTERS memory{}; memory.cb=sizeof(memory);
+        SIZE_T working=0; if (GetProcessMemoryInfo(GetCurrentProcess(),&memory,sizeof(memory))) working=memory.WorkingSetSize;
+        double cpu=0.0;
+        if (metrics_ready && now>metrics_tick && process>=metrics_process) {
+            SYSTEM_INFO system{}; GetSystemInfo(&system);
+            unsigned processors=std::max(1u,static_cast<unsigned>(system.dwNumberOfProcessors));
+            cpu=(static_cast<double>(process-metrics_process)/10000.0*100.0)/
+                (static_cast<double>(now-metrics_tick)*processors);
+        }
+        metrics_tick=now; metrics_process=process; metrics_ready=true;
+        wchar_t title[160];
+        if (working) std::swprintf(title,160,L"DNF Native 控制台  ·  CPU %.1f%%  ·  内存 %.1f MB",cpu,
+                                   static_cast<double>(working)/(1024.0*1024.0));
+        else std::swprintf(title,160,L"DNF Native 控制台  ·  CPU %.1f%%",cpu);
+        SetWindowTextW(window,title);
+    }
     void check_resources() {
         std::wstring missing = missing_resources(resources);
         resources_ready = missing.empty();
@@ -1018,20 +1045,31 @@ static LRESULT CALLBACK combo_proc(HWND window, UINT message, WPARAM wparam, LPA
 static WNDPROC checkbox_proc;
 static LRESULT CALLBACK switch_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     if (message == WM_ERASEBKGND) return TRUE;
+    if (message == WM_MOUSEMOVE && !GetPropW(window,L"hover")) {
+        SetPropW(window,L"hover",reinterpret_cast<HANDLE>(1));
+        TRACKMOUSEEVENT track={sizeof(track),TME_LEAVE,window,0}; TrackMouseEvent(&track);
+        InvalidateRect(window,nullptr,FALSE);
+    }
+    if (message == WM_MOUSELEAVE) { RemovePropW(window,L"hover"); InvalidateRect(window,nullptr,FALSE); }
     if (message == WM_PAINT) {
         PAINTSTRUCT paint; HDC dc = BeginPaint(window, &paint);
         RECT area; GetClientRect(window, &area); FillRect(dc, &area, app->surface);
+        RECT client=area;
         bool on = SendMessageW(window, BM_GETCHECK, 0, 0) == BST_CHECKED, enabled = IsWindowEnabled(window);
-        RECT track = {area.right-app->px(34), (area.bottom-app->px(18))/2, area.right, (area.bottom+app->px(18))/2};
-        COLORREF color = on && enabled ? RGB(43,108,246) : RGB(219,226,238);
-        rounded(dc, track, color, color, app->px(18));
+        bool hover=GetPropW(window,L"hover")!=nullptr;
+        int track_width=app->px(38), track_height=app->px(22), right=area.right-app->px(4);
+        RECT track={right-track_width,(area.bottom-track_height)/2,right,(area.bottom+track_height)/2};
+        COLORREF color=on && enabled ? (hover?RGB(35,91,226):RGB(43,108,246)) :
+                       enabled ? (hover?RGB(205,216,233):RGB(224,231,241)) : RGB(237,241,247);
+        COLORREF border=on && enabled ? color : enabled ? RGB(190,202,220) : RGB(220,227,238);
+        rounded(dc, track, color, border, app->px(12));
         RECT thumb = track; InflateRect(&thumb, -app->px(3), -app->px(3));
-        if (on) thumb.left = thumb.right - app->px(12); else thumb.right = thumb.left + app->px(12);
-        rounded(dc, thumb, RGB(255,255,255), RGB(255,255,255), app->px(12));
-        area.right = track.left-app->px(6); SelectObject(dc, app->font); SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, enabled ? RGB(88,107,133) : RGB(172,184,202));
+        if (on) thumb.left = thumb.right - app->px(16); else thumb.right = thumb.left + app->px(16);
+        rounded(dc, thumb, RGB(255,255,255), RGB(255,255,255), app->px(10));
+        area.right = track.left-app->px(10); SelectObject(dc, app->font); SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, enabled ? RGB(67,86,114) : RGB(172,184,202));
         std::wstring text = window_text(window); DrawTextW(dc, text.c_str(), -1, &area, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        if (GetFocus() == window) focus_ring(dc, area, app->px(2));
+        if (GetFocus() == window) focus_ring(dc, client, app->px(2));
         EndPaint(window, &paint); return 0;
     }
     LRESULT result = CallWindowProcW(checkbox_proc, window, message, wparam, lparam);
@@ -1354,6 +1392,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             return 0;
         }
         case WM_TIMER:
+            app->update_title_metrics();
             if (!app->busy) {
                 bool changed = false;
                 for (auto &service : app->services) {

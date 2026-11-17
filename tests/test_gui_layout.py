@@ -55,6 +55,8 @@ def main():
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
         wait_for(lambda: len(rows(window)) == 19, "19 service cards")
+        wait_for(lambda: "CPU" in title(window) and "内存" in title(window), "title bar process metrics", 5)
+        checks["title_bar_shows_live_cpu_and_memory"] = True
         grid = user.GetDlgItem(window, 220)
         scales = [(96, 1440, 940), (96, 1180, 760), (120, 1475, 950)]
         for dpi, width, height in scales:
@@ -120,6 +122,22 @@ def main():
         assert not title(user.GetDlgItem(window, 206))
         set_text(edit, "")
         checks["log_filter_and_clear_use_actual_console_text"] = True
+        click(window, 300)
+        market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market maintenance window", 5)
+        market_client = w.RECT()
+        user.GetClientRect(market, c.byref(market_client))
+        market_controls = [301, 302, 303, 304, 305, 306, 307, 308, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319]
+        for identifier in market_controls:
+            child = user.GetDlgItem(market, identifier)
+            assert child and user.IsWindowVisible(child), (identifier, "market control missing")
+            area = rect(child, market)
+            assert 0 <= area.left < area.right <= market_client.right
+            assert 0 <= area.top < area.bottom <= market_client.bottom, (identifier, area.top, area.bottom, market_client.bottom)
+        assert rect(user.GetDlgItem(market, 310), market).top == rect(user.GetDlgItem(market, 311), market).top == rect(user.GetDlgItem(market, 312), market).top
+        assert rect(user.GetDlgItem(market, 314), market).top == rect(user.GetDlgItem(market, 315), market).top == rect(user.GetDlgItem(market, 316), market).top == rect(user.GetDlgItem(market, 317), market).top
+        assert rect(user.GetDlgItem(market, 306), market).top > rect(user.GetDlgItem(market, 314), market).bottom
+        click(market, 307)
+        checks["auction_window_groups_actions_and_keeps_report_at_bottom"] = True
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
         record["traceback"] = traceback.format_exc()

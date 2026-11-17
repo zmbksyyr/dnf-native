@@ -44,7 +44,7 @@ def main():
         zip_objects.append(str(target))
     command = [str(BIN / "x86_64-w64-mingw32-clang++.exe"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
                "-O2", "-static", "-municode", "-mwindows", "-DUNICODE", "-D_UNICODE", "-D_WIN32_WINNT=0x0601",
-               str(source), str(obj), *zip_objects, *zip_defines, "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-luxtheme", "-lcomctl32", "-o", str(output)]
+               str(source), str(obj), *zip_objects, *zip_defines, "-luser32", "-lgdi32", "-lshell32", "-lole32", "-ladvapi32", "-lws2_32", "-lbcrypt", "-luxtheme", "-lcomctl32", "-lpsapi", "-o", str(output)]
     subprocess.run(command, check=True, cwd=ROOT)
     for name in ["mysql", "runtime"]:
         if (mysql_dir / name).resolve() != (work / name).resolve():
