@@ -20,6 +20,34 @@ user.GetWindowRect.argtypes = [w.HWND, c.POINTER(w.RECT)]
 user.MapWindowPoints.argtypes = [w.HWND, w.HWND, c.c_void_p, w.UINT]
 user.MoveWindow.argtypes = [w.HWND, c.c_int, c.c_int, c.c_int, c.c_int, w.BOOL]
 user.IsWindowVisible.argtypes = [w.HWND]
+user.GetDC.argtypes, user.GetDC.restype = [w.HWND], w.HDC
+user.ReleaseDC.argtypes, user.ReleaseDC.restype = [w.HWND, w.HDC], c.c_int
+gdi = c.WinDLL("gdi32", use_last_error=True)
+gdi.SelectObject.argtypes, gdi.SelectObject.restype = [w.HDC, w.HGDIOBJ], w.HGDIOBJ
+gdi.DeleteObject.argtypes = [w.HGDIOBJ]
+gdi.CreateFontW.restype = w.HGDIOBJ
+gdi.CreateFontW.argtypes = [c.c_int] * 5 + [w.DWORD] * 8 + [w.LPCWSTR]
+gdi.GetTextExtentPoint32W.argtypes = [w.HDC, w.LPCWSTR, c.c_int, c.POINTER(w.SIZE)]
+
+
+# A switch paints a 38px track, keeps 4px to the right edge and leaves 10px
+# between the label and the track; anything narrower clips its label.
+SWITCH_CHROME = 52
+
+
+def text_width(text, dpi):
+    # GDI handles do not cross processes, so the label is measured with the same
+    # face and pixel height the controller creates for the current DPI.
+    dc = user.GetDC(None)
+    font = gdi.CreateFontW(-round(12 * dpi / 96), 0, 0, 0, 400, False, False, False,
+                           1, 0, 0, 5, 0, "Microsoft YaHei UI")
+    previous = gdi.SelectObject(dc, font)
+    extent = w.SIZE()
+    gdi.GetTextExtentPoint32W(dc, text, len(text), c.byref(extent))
+    gdi.SelectObject(dc, previous)
+    user.ReleaseDC(None, dc)
+    gdi.DeleteObject(font)
+    return extent.cx
 
 
 def rect(window, parent=None):
@@ -94,6 +122,10 @@ def main():
             assert tiles[0][1] == tiles[6][1] < tiles[7][1] == tiles[13][1] < tiles[14][1] == tiles[18][1]
             for identifier in [102, 223, 224, 220, 202, 111, 113, 114, 206, 283, 284, 285, 286, 287]:
                 assert identifier in visible
+            for identifier in [230, 231]:
+                area = visible[identifier]
+                needed = text_width(title(user.GetDlgItem(window, identifier)), dpi) + round(SWITCH_CHROME * dpi / 96)
+                assert area[2] - area[0] >= needed, (identifier, "switch label is clipped", area[2] - area[0], needed)
             assert visible[102][3] < visible[220][1] < visible[202][1] < visible[206][1]
             for identifiers in [[102, 260, 101, 250, 251, 262, 116, 280, 224, 223],
                                 [235, 233, 234, 300, 230, 231, 232, 281, 221, 222, 225],
@@ -133,16 +165,20 @@ def main():
             area = rect(child, market)
             assert 0 <= area.left < area.right <= market_client.right
             assert 0 <= area.top < area.bottom <= market_client.bottom, (identifier, area.top, area.bottom, market_client.bottom)
-        assert rect(user.GetDlgItem(market, 310), market).top == rect(user.GetDlgItem(market, 314), market).top
-        assert rect(user.GetDlgItem(market, 311), market).top == rect(user.GetDlgItem(market, 315), market).top
-        assert rect(user.GetDlgItem(market, 312), market).top == rect(user.GetDlgItem(market, 316), market).top
-        assert rect(user.GetDlgItem(market, 313), market).top == rect(user.GetDlgItem(market, 317), market).top
-        assert rect(user.GetDlgItem(market, 310), market).left < rect(user.GetDlgItem(market, 314), market).left
+        # Index work and data work are one horizontal row each, stacked in that
+        # order, with the section header above its own row.
+        for row, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
+            tops = {rect(user.GetDlgItem(market, identifier), market).top for identifier in row}
+            assert len(tops) == 1, (row, tops)
+            assert all(rect(user.GetDlgItem(market, a), market).right <=
+                       rect(user.GetDlgItem(market, b), market).left for a, b in zip(row, row[1:]))
+            assert rect(user.GetDlgItem(market, header), market).top < rect(user.GetDlgItem(market, row[0]), market).top
+        assert rect(user.GetDlgItem(market, 310), market).top < rect(user.GetDlgItem(market, 314), market).top
         assert rect(user.GetDlgItem(market, 318), market).top == rect(user.GetDlgItem(market, 319), market).top
         assert user.SendMessageW(user.GetDlgItem(market, 318), 0x00F0, 0, 0) == 1
         assert user.SendMessageW(user.GetDlgItem(market, 319), 0x00F0, 0, 0) == 1
         click(market, 307)
-        checks["auction_window_groups_actions_and_uses_market_checkboxes"] = True
+        checks["auction_window_puts_each_action_group_in_one_row"] = True
     except Exception as error:
         record["error"] = type(error).__name__ + ": " + str(error)
         record["traceback"] = traceback.format_exc()

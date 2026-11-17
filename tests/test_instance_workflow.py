@@ -70,7 +70,10 @@ def main():
         return path
 
     def confirm_delete(yes):
-        click(window, 261)
+        # The delete action now lives only in the instance menu, so drive the
+        # same command id the menu item posts instead of a hidden button.
+        wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 280)), "instance menu available", 5)
+        user.PostMessageW(window, 0x111, 261, 0)
         dialog = wait_for(lambda: next((w for w in windows(process.pid, "#32770") if title(w) == "删除实例"), None), "delete confirmation")
         click(dialog, 1 if yes else 2)
 
