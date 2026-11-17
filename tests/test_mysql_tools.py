@@ -137,6 +137,19 @@ ConvertTo-Json -InputObject @($results) -Compress
         query = "SELECT id,HEX(body) FROM native_probe.sample ORDER BY id;"
         if sql(query).replace(b"\r\n", b"\n") != expected:
             raise RuntimeError("Database row bytes differ")
+        before = time.time()
+        values = sql("SELECT UNIX_TIMESTAMP(),DATE_FORMAT(NOW(),'%Y-%m-%dT%H:%i:%s'),@@time_zone,@@log_timestamps;").decode("ascii").strip().split("\t")
+        after = time.time()
+        assert int(before) <= int(values[0]) <= int(after), values
+        assert int(datetime.datetime.fromisoformat(values[1]).timestamp()) == int(values[0]), values
+        assert values[2:] == ["SYSTEM", "SYSTEM"], values
+        line = next(line for line in (probe / "server.private.log").read_bytes().splitlines() if b"ready for connections" in line)
+        stamp_text = line.split()[0].decode("ascii")
+        logged = datetime.datetime.fromisoformat(stamp_text)
+        assert logged.utcoffset() == datetime.datetime.now().astimezone().utcoffset(), stamp_text
+        assert 0 <= after - logged.timestamp() < 60, stamp_text
+        receipt["clock_observation"] = {"sql_local":values[1], "epoch":int(values[0]), "log_ready":stamp_text}
+        checks["sql_and_error_log_follow_windows_local_time"] = True
         receipt["database_identity"] = sql("SELECT VERSION(),@@server_uuid;").decode("ascii").strip()
         tls = sql("SHOW SESSION STATUS LIKE 'Ssl_cipher';").decode("ascii").strip().split("\t")
         if len(tls) != 2 or not tls[1]:
@@ -216,7 +229,7 @@ ConvertTo-Json -InputObject @($result) -Compress
         checks["official_exes_run_directly_without_unpacking"] = True
         checks["fixed_default_root_credential"] = True
     except Exception as failure:
-        receipt["error"] = str(failure)
+        receipt["error"] = type(failure).__name__ + ": " + str(failure)
     finally:
         if server and server.poll() is None:
             try:
@@ -232,7 +245,7 @@ ConvertTo-Json -InputObject @($result) -Compress
                              "No GUI backup/rollback workflow or final complete offline package acceptance."]
         (probe / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(receipt, ensure_ascii=True))
-    if receipt.get("error") or receipt["forced_cleanup"]:
+    if "error" in receipt or receipt["forced_cleanup"]:
         raise SystemExit(1)
 
 

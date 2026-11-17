@@ -1,4 +1,5 @@
 #include "run.h"
+#include "timezone.h"
 #include <bcrypt.h>
 #include <malloc.h>
 #include <stdio.h>
@@ -483,6 +484,18 @@ static uintptr_t push_string(uintptr_t *cursor, const char *text) {
 static DWORD WINAPI start_guest(void *argument) {
     NrRun *run = argument;
     nr_thread_attach(&run->threads[0]);
+    int has_timezone = 0;
+    for (int i = 0; i < run->environment_count; ++i)
+        if (!strncmp(run->environment[i], "TZ=", 3)) has_timezone = 1;
+    char timezone[160];
+    if (!has_timezone) {
+        TIME_ZONE_INFORMATION zone;
+        if (GetTimeZoneInformation(&zone) == TIME_ZONE_ID_INVALID || !nr_timezone_text(&zone, timezone)) {
+            fputs("Windows timezone rules are unavailable or unsupported\n", stderr);
+            ExitProcess(124);
+        }
+        fprintf(stderr, "guest timezone source=Windows %s\n", timezone);
+    }
     unsigned char *memory = _alloca(NR_STACK_BYTES);
     run->stack_low = (uintptr_t)memory;
     run->stack_high = (uintptr_t)memory + NR_STACK_BYTES;
@@ -493,6 +506,7 @@ static DWORD WINAPI start_guest(void *argument) {
     for (int i = 0; i < run->environment_count; ++i) environment[i] = push_string(&cursor, run->environment[i]);
     uintptr_t env_path = push_string(&cursor, "PATH=/usr/bin:/bin");
     uintptr_t env_lang = push_string(&cursor, "LANG=C");
+    uintptr_t env_timezone = has_timezone ? 0 : push_string(&cursor, timezone);
     uintptr_t platform = push_string(&cursor, sizeof(void *) == 8 ? "x86_64" : "i686");
     cursor -= 16;
     uintptr_t random = cursor;
@@ -515,7 +529,7 @@ static DWORD WINAPI start_guest(void *argument) {
         {11, 1000}, {12, 1000}, {13, 1000}, {14, 1000}, {15, platform},
         {16, 0}, {17, 100}, {23, 0}, {25, random}, {26, 0}, {31, arguments[0]}, {0, 0},
     };
-    size_t words = 1 + (size_t)run->argc + 1 + (size_t)run->environment_count + 2 + 1 + sizeof(aux) / sizeof(uintptr_t);
+    size_t words = 1 + (size_t)run->argc + 1 + (size_t)run->environment_count + 2 + (env_timezone ? 1 : 0) + 1 + sizeof(aux) / sizeof(uintptr_t);
     uintptr_t stack = (cursor - words * sizeof(uintptr_t)) & ~(uintptr_t)15;
     if (stack < run->stack_low) ExitProcess(124);
     uintptr_t *out = (uintptr_t *)stack;
@@ -525,6 +539,7 @@ static DWORD WINAPI start_guest(void *argument) {
     for (int i = 0; i < run->environment_count; ++i) *out++ = environment[i];
     *out++ = env_path;
     *out++ = env_lang;
+    if (env_timezone) *out++ = env_timezone;
     *out++ = 0;
     memcpy(out, aux, sizeof(aux));
     run->auxv_address = (uintptr_t)out;

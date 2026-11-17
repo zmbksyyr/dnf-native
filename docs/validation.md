@@ -2,6 +2,25 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## P45 本机时间与时区（2026-11-17）
+
+原实现的 Unix 时钟已读取当前 Windows 实时时钟，但资源没有 `/etc/localtime` 或 zoneinfo，原版 glibc 默认按 UTC 格式化本地时间；MySQL 5.7 错误日志也默认 UTC。本轮为 ELF 默认注入 Windows 时区规则，MySQL 的 SQL 默认时区和日志统一指定 SYSTEM，GUI 继续使用原有本地时间。没有修改 Windows 时钟、原 ELF、资源 ZIP、历史日志或现存数据。更新后重开控制台并正常重启服务生效。
+
+环境为 Windows 10 x64 10.0.19044（本机中国标准时间 UTC+08:00）、LLVM-MinGW 20261104 MSVCRT、基底 glibc 2.17、MySQL 5.7.44。以下收据路径相对 `../x/dnf-native-output/`，仅记录本轮实际范围：
+
+| 检查 | 结果与范围 | 收据 |
+| --- | --- | --- |
+| 双架构时间 | i686／x86_64 原版 glibc 的 localtime/mktime 与 Windows API 对照；本机、太平洋、尼泊尔、豪勋爵岛及禁用夏令时；100 个固定时刻涵盖转换边界；当前实时时间戳、单调时钟、32 项显式环境保留 | `P45-system-time/timezone-final/receipt.json` |
+| 数据库 | 新实例初始化、TLS、SQL 当前时间与日志本地偏移、字节读写、备份恢复及自然关闭 | `probes/20261117T063212240864Z/mysql-tools/receipt.json` |
+| 实际原版输出与 GUI | 原版 game 启动日期、Lua os.time/os.date、DP2 日志；独立旧配置实例的 SQL、GUI 控制台和实际 MySQL 日志；正常停库退出 | `P45-system-time/clock-integration-receipt.json` |
+| ELF 基础回归 | 两架构入口、syscall、TLS 拒绝及 x64 redzone | `P45-system-time/entry-checks.json` |
+
+原版 game 实测输出 `2026-11-17T14:34:55+0800`，MySQL SQL 为 `2026-11-17T14:34:57`，日志为 `2026-11-17T14:34:56.788752+08:00`，均与 Windows 一致。转换规则仅限当前 Windows 周期规则，未提供跨年份历史时区表；显式 TZ 仍优先。测试不更改 Windows 系统时区。
+
+首次时区测试修正了开发夹具所用枚举 API 的 SDK 版本声明；数据库时间断言改为直接从原日志字节读取 ASCII 时间戳，避免非 UTF-8 本地诊断触发解码错误，完整重跑通过。全服务日志专项因当前用户实例占用 3306，在身份检查阶段明确拒绝；保留 `probes/20261117T063236816226Z/gui-logs/receipt.json`，未停止或修改当前实例。随后在该专项自己的独立副本中使用空闲端口验证 GUI／MySQL 时间，并以独立 game/Lua 夹具核对原版输出，不把该结果记录为全服务回归通过。
+
+正式目录仍为 `../DNF-Native-3.0/`，八个交付文件与本轮包逐项核对一致。更新记录见外部 `P45-system-time/delivery-receipt.json`；旧文件备份在该阶段的 `previous-delivery/`，完整构建及测试现场也保留在外部目录。未结束用户进程。
+
 ## P44 插件开关间距（2026-11-17）
 
 DP2、Frida 控件宽度由 144 DIP 分别收紧为 80、84 DIP，使文字与开关靠近；各组起点及最右侧应用按钮位置不变。Windows 10 x64 10.0.19044、LLVM-MinGW 20261104 MSVCRT 构建及布局回归通过，125% 截图确认标签完整、控件不重叠。收据为 `../x/dnf-native-output/probes/20261117T061910936836Z/gui-layout/receipt.json`；正式 3.0 目录已更新主 EXE，资源不变，校验记录位于外部 `P44-compact-switches/delivery-receipt.json`。

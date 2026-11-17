@@ -102,7 +102,8 @@ static Child launch(const std::wstring &root, const std::wstring &instance, cons
     std::wstring application = root + L"\\bin\\" + tool + L".exe";
     std::wstring command = quote(application);
     for (const std::wstring &argument : arguments) command += L" " + quote(argument);
-    if (tool == L"mysqld") command += L" " + quote(L"--basedir=" + root) + L" " + quote(L"--datadir=" + instance + L"\\data");
+    if (tool == L"mysqld") command += L" " + quote(L"--basedir=" + root) + L" " + quote(L"--datadir=" + instance + L"\\data") +
+        L" --default-time-zone=SYSTEM --log-timestamps=SYSTEM";
     STARTUPINFOW startup = {};
     startup.cb = sizeof(startup);
     startup.dwFlags = STARTF_USESTDHANDLES;
@@ -150,7 +151,8 @@ static int initialize(const std::wstring &root, const std::wstring &instance, un
     std::string password = "uu5!^%jg";
     std::string server_config = "[mysqld]\nbind-address=127.0.0.1\nport=" + std::to_string(port) +
                                 "\nlower_case_table_names=1\ncharacter_set_server=latin1\n"
-                                "sql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n";
+                                "sql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n"
+                                "default-time-zone=SYSTEM\nlog-timestamps=SYSTEM\n";
     write_private(instance + L"\\server.cnf", server_config);
     write_private(instance + L"\\client.private.cnf", "[client]\nprotocol=TCP\nhost=127.0.0.1\nport=" +
                   std::to_string(port) + "\nuser=root\npassword=" + password + "\nssl-mode=REQUIRED\n");
