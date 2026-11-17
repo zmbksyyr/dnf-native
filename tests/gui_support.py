@@ -88,7 +88,7 @@ def wait_for(check, description, timeout=120):
 
 def click(window, identifier):
     button = user.GetDlgItem(window, identifier)
-    if not button and identifier in (221, 222, 225):
+    if not button and identifier in (221, 222):
         # Service actions are now context-menu commands. The controller checks
         # the same availability predicate for the menu and these WM_COMMANDs.
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "service commands enabled", 10)

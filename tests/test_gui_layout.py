@@ -184,12 +184,12 @@ def main():
             for left,right in zip(identifiers,identifiers[1:]):
                 assert rect(user.GetDlgItem(market,left),market).right < rect(user.GetDlgItem(market,right),market).left
         level_label, level, dp2, frida, apply = [rect(user.GetDlgItem(market,i),market) for i in [235,233,230,231,234]]
-        assert level_label.top == level.top and level_label.bottom <= level.bottom < dp2.top
-        assert level.bottom < dp2.top < dp2.bottom < frida.top < frida.bottom < apply.top
-        assert level_label.left == dp2.left == frida.left == apply.left
-        assert level.right == dp2.right == frida.right == apply.right
+        assert len({area.top for area in [level_label,level,dp2,frida,apply]}) == 1
+        assert all(a.right < b.left for a,b in zip([level_label,level,dp2,frida],[level,dp2,frida,apply]))
+        assert abs(apply.right - rect(user.GetDlgItem(market,313),market).right) <= 1  # DPI rounding.
+        assert max(area.bottom for area in [level_label,level,dp2,frida,apply]) < rect(user.GetDlgItem(market,322),market).top
         assert title(user.GetDlgItem(market,234)) == "应用并重启"
-        checks["vertical_level_dp2_frida_single_apply_without_extra_save_or_explanations"] = True
+        checks["horizontal_level_dp2_frida_with_single_apply_aligned_right"] = True
         summary=rect(user.GetDlgItem(market,308),market)
         state=rect(user.GetDlgItem(market,309),market)
         assert summary.bottom<=state.top and state.bottom-summary.top<=round(40*120/96)

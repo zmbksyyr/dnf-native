@@ -43,14 +43,14 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 SendMessageW(level,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
             }
             SendMessageW(level,CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),app->px(28));
-            add(L"BUTTON",L"DP2",BS_AUTOCHECKBOX|WS_TABSTOP,DP2_ENABLE,32,148,174,30);
-            add(L"BUTTON",L"Frida",BS_AUTOCHECKBOX|WS_TABSTOP,FRIDA_ENABLE,32,188,174,30);
-            add(L"BUTTON",L"应用并重启",BS_OWNERDRAW|WS_TABSTOP,LEVEL_APPLY,32,228,174,32);
-            add(L"STATIC",L"兼容设置",SS_CENTERIMAGE,322,32,290,96,22);
-            add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,32,318,396,30);
-            add(L"BUTTON",L"锻造兼容 · 同时处理搜索和均价",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_REFINE,452,318,396,30);
-            add(L"BUTTON",L"DP2 搜索保护 · 仅有效孔／宝石记录覆盖",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_DP2,32,354,396,30);
-            add(L"BUTTON",L"PVF 变化时自动检查索引与存量订单",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_AUTO,452,354,396,30);
+            add(L"BUTTON",L"DP2",BS_AUTOCHECKBOX|WS_TABSTOP,DP2_ENABLE,264,108,144,30);
+            add(L"BUTTON",L"Frida",BS_AUTOCHECKBOX|WS_TABSTOP,FRIDA_ENABLE,452,108,144,30);
+            add(L"BUTTON",L"应用并重启",BS_OWNERDRAW|WS_TABSTOP,LEVEL_APPLY,674,108,174,30);
+            add(L"STATIC",L"兼容设置",SS_CENTERIMAGE,322,32,170,96,22);
+            add(L"BUTTON",L"扩展等级检索 · 匹配 PVF 装备等级",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_LEVELS,32,198,396,30);
+            add(L"BUTTON",L"锻造兼容 · 同时处理搜索和均价",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_REFINE,452,198,396,30);
+            add(L"BUTTON",L"DP2 搜索保护 · 仅有效孔／宝石记录覆盖",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_DP2,32,234,396,30);
+            add(L"BUTTON",L"PVF 变化时自动检查索引与存量订单",BS_AUTOCHECKBOX|WS_TABSTOP,MARKET_AUTO,452,234,396,30);
             auto o=market::options(app->current);
             for(auto p:{std::pair<int,bool>{MARKET_LEVELS,o.levels},{MARKET_REFINE,o.refine},{MARKET_DP2,o.dp2},{MARKET_AUTO,o.automatic}}) SendMessageW(GetDlgItem(w,p.first),BM_SETCHECK,p.second?BST_CHECKED:BST_UNCHECKED,0);
             app->market_guard_supported=true;
@@ -58,16 +58,16 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             catch(const std::exception &e) {app->market_guard_supported=false;app->notice(L"DP2 搜索保护不可用："+decode(e.what()));}
             // Exact script compatibility is also checked before writing.
             // One maintenance panel: four index actions, then four data actions.
-            add(L"STATIC",L"索引维护",SS_CENTERIMAGE,MARKET_INDEX_LABEL,32,408,96,22);
-            add(L"BUTTON",L"检查兼容性",BS_OWNERDRAW|WS_TABSTOP,market::Check,32,438,195,38);
-            add(L"BUTTON",L"重建并同步 iteminfo",BS_OWNERDRAW|WS_TABSTOP,market::Sync,239,438,195,38);
-            add(L"BUTTON",L"恢复上一版索引",BS_OWNERDRAW|WS_TABSTOP,market::RestoreIndex,446,438,195,38);
-            add(L"BUTTON",L"应用并重启相关服务",BS_OWNERDRAW|WS_TABSTOP,market::Apply,653,438,195,38);
-            add(L"STATIC",L"数据维护",SS_CENTERIMAGE,MARKET_DATA_LABEL,32,488,96,22);
-            add(L"BUTTON",L"清理不兼容订单",BS_OWNERDRAW|WS_TABSTOP,market::CleanInvalid,32,516,195,38);
-            add(L"BUTTON",L"清空在售订单",BS_OWNERDRAW|WS_TABSTOP,market::ClearOrders,239,516,195,38);
-            add(L"BUTTON",L"清空均价数据",BS_OWNERDRAW|WS_TABSTOP,market::ClearPrices,446,516,195,38);
-            add(L"BUTTON",L"重置拍卖库",BS_OWNERDRAW|WS_TABSTOP,market::Reset,653,516,195,38);
+            add(L"STATIC",L"索引维护",SS_CENTERIMAGE,MARKET_INDEX_LABEL,32,288,96,22);
+            add(L"BUTTON",L"检查兼容性",BS_OWNERDRAW|WS_TABSTOP,market::Check,32,318,195,38);
+            add(L"BUTTON",L"重建并同步 iteminfo",BS_OWNERDRAW|WS_TABSTOP,market::Sync,239,318,195,38);
+            add(L"BUTTON",L"恢复上一版索引",BS_OWNERDRAW|WS_TABSTOP,market::RestoreIndex,446,318,195,38);
+            add(L"BUTTON",L"应用并重启相关服务",BS_OWNERDRAW|WS_TABSTOP,market::Apply,653,318,195,38);
+            add(L"STATIC",L"数据维护",SS_CENTERIMAGE,MARKET_DATA_LABEL,32,368,96,22);
+            add(L"BUTTON",L"清理不兼容订单",BS_OWNERDRAW|WS_TABSTOP,market::CleanInvalid,32,396,195,38);
+            add(L"BUTTON",L"清空在售订单",BS_OWNERDRAW|WS_TABSTOP,market::ClearOrders,239,396,195,38);
+            add(L"BUTTON",L"清空均价数据",BS_OWNERDRAW|WS_TABSTOP,market::ClearPrices,446,396,195,38);
+            add(L"BUTTON",L"重置拍卖库",BS_OWNERDRAW|WS_TABSTOP,market::Reset,653,396,195,38);
             for(int id:std::initializer_list<int>{325,322,MARKET_INDEX_LABEL,MARKET_DATA_LABEL})
                 SendMessageW(GetDlgItem(w,id),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
             app->show_plugins(); app->show_level(); app->controls();
@@ -89,9 +89,9 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 rounded(dc,r,fill,border,app->px(12));
             };
             panel(16,12,864,64,RGB(247,250,255),RGB(222,231,245));
-            panel(16,72,864,276,RGB(255,255,255),RGB(228,234,245));
-            panel(16,284,864,394,RGB(255,255,255),RGB(228,234,245));
-            panel(16,402,864,566,RGB(255,255,255),RGB(228,234,245));
+            panel(16,72,864,156,RGB(255,255,255),RGB(228,234,245));
+            panel(16,164,864,274,RGB(255,255,255),RGB(228,234,245));
+            panel(16,282,864,446,RGB(255,255,255),RGB(228,234,245));
             EndPaint(w,&paint); return 0;
         }
         case WM_CTLCOLORSTATIC:
@@ -137,7 +137,7 @@ static void open_market_window() {
     if(app->market_window) { SetForegroundWindow(app->market_window); return; }
     WNDCLASSW cls{}; cls.lpfnWndProc=market_proc; cls.hInstance=GetModuleHandleW(nullptr); cls.hCursor=LoadCursorW(nullptr,IDC_ARROW); cls.lpszClassName=L"DnfNativeMarketMaintenance";
     if(!RegisterClassW(&cls) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) require(false,"Register market maintenance window");
-    RECT size{0,0,app->px(880),app->px(580)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
+    RECT size{0,0,app->px(880),app->px(460)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
     RECT owner;GetWindowRect(app->window,&owner);
     HWND w=CreateWindowExW(WS_EX_CONTROLPARENT,cls.lpszClassName,L"功能",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,
         std::max(0L,owner.left+(owner.right-owner.left-(size.right-size.left))/2),std::max(0L,owner.top),size.right-size.left,size.bottom-size.top,app->window,nullptr,cls.hInstance,nullptr);

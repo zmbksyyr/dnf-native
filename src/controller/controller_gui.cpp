@@ -13,7 +13,7 @@
 #include <thread>
 
 enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, RESTORE, RECOVER, FOLDER, LOGS,
-       SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP, SERVICE_LOGS,
+       SERVICE_LIST = 220, ELF_START, ELF_STOP, ALL_START, ALL_STOP,
        DP2_ENABLE = 230, FRIDA_ENABLE, LEVEL_CAP = 233, LEVEL_APPLY, LEVEL_LABEL, MONTHLY_PREPARE,
        LOG_ENCODING = 241, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
        SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES };
@@ -464,7 +464,7 @@ struct App {
         const Service &service=services[static_cast<size_t>(selected)];
         if(id==ELF_START) return session.process && !running(service) && !instance_pending();
         if(id==ELF_STOP) return running(service);
-        return id==SERVICE_LOGS;
+        return false;
     }
     std::wstring database_identity() const {
         std::string uuid = session.uuid;
@@ -1614,7 +1614,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 SendMessageW(window,WM_COMMAND,MAKEWPARAM(SERVICE_LIST,LBN_SELCHANGE),reinterpret_cast<LPARAM>(GetDlgItem(window,SERVICE_LIST)));
             }
             HMENU menu=CreatePopupMenu();
-            for (auto entry : {std::pair<int,const wchar_t *>{ELF_START,L"启动所选(&S)"},{ELF_STOP,L"停止所选(&T)"},{SERVICE_LOGS,L"查看日志(&L)"},{CHECK_RESOURCES,L"检查资源与服务信息(&I)"}})
+            for (auto entry : {std::pair<int,const wchar_t *>{ELF_START,L"启动所选(&S)"},{ELF_STOP,L"停止所选(&T)"},{CHECK_RESOURCES,L"检查资源(&I)"}})
                 AppendMenuW(menu,MF_STRING|((entry.first==CHECK_RESOURCES || app->service_command_available(entry.first))?MF_ENABLED:MF_GRAYED),entry.first,entry.second);
             int chosen=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,point.x,point.y,0,window,nullptr);DestroyMenu(menu);
             if(chosen)SendMessageW(window,WM_COMMAND,chosen,0);
@@ -1721,7 +1721,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     app->action(DELETE_INSTANCE);
                 return 0;
             }
-            if (id == SERVICE_LOGS) { app->scan_logs(true); return 0; }
             if (id == FOLDER || id == LOGS) {
                 std::wstring path = full_path(window_text(app->path)) + (id == LOGS ? L"\\.mysql" : L"");
                 ShellExecuteW(window, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL); return 0;
@@ -1782,8 +1781,6 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     if (MessageBoxW(window, preview.c_str(), L"确认还原", MB_OKCANCEL | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDOK) return 0;
                 }
                 app->action(id, target);
-            } else if (id == SERVICE_LOGS) {
-                app->scan_logs(true);
             } else if (id >= ELF_START && id <= ALL_STOP) {
                 if((id==ELF_START || id==ELF_STOP) && !app->service_command_available(id)) return 0;
                 app->action(id, L"", app->selected_service_index());

@@ -30,6 +30,10 @@ user.GetCursorPos.argtypes = [c.POINTER(w.POINT)]
 user.SetCursorPos.argtypes = [c.c_int, c.c_int]
 user.SetForegroundWindow.argtypes = [w.HWND]
 user.IsWindowVisible.argtypes = [w.HWND]
+user.GetMenuItemCount.argtypes = [w.HMENU]
+user.GetMenuItemID.argtypes = [w.HMENU, c.c_int]
+user.GetMenuItemID.restype = w.UINT
+user.GetMenuStringW.argtypes = [w.HMENU, w.UINT, w.LPWSTR, c.c_int, w.UINT]
 gdi = c.WinDLL("gdi32", use_last_error=True)
 gdi.CreateCompatibleDC.argtypes, gdi.CreateCompatibleDC.restype = [w.HDC], w.HDC
 gdi.CreateDIBSection.argtypes, gdi.CreateDIBSection.restype = [w.HDC, c.c_void_p, w.UINT, c.POINTER(c.c_void_p), w.HANDLE, w.DWORD], w.HBITMAP
@@ -226,6 +230,18 @@ def main():
         baseline = len(title(user.GetDlgItem(window, 206)))
         user.PostMessageW(window, 0x7B, grid, -1)
         wait_for(lambda: menu_open(window), "service context menu")
+        popup=wait_for(lambda: next(iter(windows(process.pid,"#32768")),None),"service popup window",5)
+        menu=user.SendMessageW(popup,0x01E1,0,0)  # MN_GETHMENU returns a system menu handle.
+        assert user.GetMenuItemCount(menu)==3
+        menu_labels=[]
+        for index,identifier in enumerate([221,222,262]):
+            assert user.GetMenuItemID(menu,index)==identifier
+            label=c.create_unicode_buffer(128)
+            assert user.GetMenuStringW(menu,index,label,len(label),0x400)
+            menu_labels.append(label.value)
+        assert menu_labels==["启动所选(&S)","停止所选(&T)","检查资源(&I)"],menu_labels
+        record["service_context_menu_labels"]=menu_labels
+        checks["service_context_menu_has_three_four_character_actions_without_log_entry"]=True
         key(window, ord("I"))
         wait_for(lambda: "SHA-256：" in title(user.GetDlgItem(window, 206))[baseline:], "inspection from context menu")
         assert not windows(process.pid, "#32770")
@@ -260,16 +276,18 @@ def main():
         checks["selection_only_saves_both_instances_and_restores_last_across_restarts"] = True
         close()
         for fixture, identity in zip(fixtures, identities):
-            assert {p.relative_to(fixture).as_posix(): sha256(p) for p in fixture.rglob("*") if p.is_file()} == identity
+            # Opening Features can create a derived DP2 script cache in .mysql.
+            # Every input metadata file must retain its original contents.
+            assert {name: sha256(fixture / name) for name in identity} == identity
         checks["instance_metadata_unchanged_and_history_external_to_package"] = True
     except Exception as error:
-        record["error"] = str(error)
+        record["error"] = type(error).__name__ + ": " + str(error)
         record["traceback"] = traceback.format_exc()
     finally:
         user.SetCursorPos(cursor.x,cursor.y)
         if window and user.IsWindow(window):
             close()
-        record["passed"] = not record.get("error") and all(checks.values())
+        record["passed"] = "error" not in record and all(checks.values())
         (probe / "receipt.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print("GUI interactions:", "PASS" if record["passed"] else "FAIL", probe / "receipt.json", flush=True)
     if not record["passed"]:

@@ -105,7 +105,7 @@ def main():
         context_action("T")
         ready_stopped(window, "channel", 45)
         checks["individual_channel_normal_stop"] = "代码 0" in service_row(window, "channel")
-        click(window, 225)
+        select_service(window, "channel")
         # Application files now have their own live view; select the runtime's
         # actual stderr explicitly when checking its guest-exit diagnostic.
         choose_log_source(window, ".stderr.private.log")
