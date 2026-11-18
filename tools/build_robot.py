@@ -37,8 +37,11 @@ def main():
     command = ["go", "build", "-trimpath", "-ldflags=-s -w", "-o", str(binary), "./cmd/robot"]
     subprocess.run(command, cwd=source, env=env, check=True)
     names = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=source, text=True).splitlines()
+    embedded = ("internal/entry/webadmin/assets/", "internal/capability/keypair/defaults/",
+                "internal/capability/marketapp/seeds/", "internal/bootstrap/runtime/defaults/")
     sources = {name: sha256(source / name) for name in names
-               if (source / name).is_file() and (name.endswith(".go") or name in ("go.mod", "go.sum"))}
+               if (source / name).is_file() and (name.endswith(".go") or name in ("go.mod", "go.sum")
+                                                or name.startswith(embedded))}
     receipt = {
         "source": str(source), "command": command, "goos": "windows", "goarch": "amd64",
         "cgo": False, "output_sha256": sha256(binary), "output_bytes": binary.stat().st_size,

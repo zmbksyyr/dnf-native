@@ -3,10 +3,15 @@
 #include <winsock2.h>
 #include "../win32_files.h"
 #include "../game_levels.h"
+#include "log_view.h"
 #include <algorithm>
 #include <cstdint>
 
 static const wchar_t *dp2_preload = L"LD_PRELOAD=/dp2/libdp2pre.so";
+
+static bool robot_profile_member(const std::wstring &name) {
+    return name == L"game" || name == L"auction" || name == L"point" || name == L"monitor" || name == L"relay";
+}
 
 struct Service {
     std::wstring name, host, root, cwd, elf, loader_hash, elf_hash, pid_file;
@@ -26,6 +31,8 @@ struct Service {
     bool application_initialized = false;
     uint64_t readiness_offset = 0;
     std::string readiness_tail;
+    struct InitLog { std::wstring path; uint64_t offset; std::string tail; };
+    std::vector<InitLog> readiness_init;
 };
 
 static std::wstring setting(const std::wstring &file, const std::wstring &section, const std::wstring &key) {
@@ -135,7 +142,7 @@ static std::vector<Service> load_services(const std::wstring &instance, const st
         service.elf_hash = get(L"elf_sha256"); service.loader_hash = get(L"loader_sha256");
         auto pid = get(L"pid_file");
         if (!pid.empty()) service.pid_file = service.root + pid;
-        if (service.name == L"game" || service.name == L"auction" || service.name == L"point")
+        if (robot_profile_member(service.name))
             service.robot_pid_file = instance + L"\\robot\\state\\pids\\" + service.name + L".pid";
         if (service.cwd.empty() || service.elf_hash.size() != 64 || service.loader_hash.size() != 64)
             throw std::runtime_error("Service paths or ELF identities are missing");
@@ -251,7 +258,7 @@ static void write_robot_profile(const Service &robot, const std::wstring &instan
         ",\n  \"capabilities\":{\"auction\":true,\"point\":true,\"memory_patch\":true},\n  \"services\":{\n";
     bool first = true;
     for (const auto &service : load_services(instance, robot.host)) {
-        if (service.name != L"game" && service.name != L"auction" && service.name != L"point") continue;
+        if (!robot_profile_member(service.name)) continue;
         if (!first) json += ",\n";
         first = false;
         json += "    " + robot_profile_string(service.name) + ":" + robot_profile_service_json(service);
@@ -259,36 +266,72 @@ static void write_robot_profile(const Service &robot, const std::wstring &instan
     write_private(robot.config_dir + L"\\conf\\host-profile.json", json + "\n  }\n}\n",CREATE_ALWAYS);
 }
 
-static bool refresh_service_readiness(Service &service) {
-    // Only game has an original, verified initialization marker. Read the
-    // fresh stdout belonging to this launch, never the application's old
-    // .init files or a previous host's output.
-    if (service.name != L"game" || service.application_initialized || !running(service) || service.out.empty()) return false;
-    HANDLE file = CreateFileW(service.out.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+static std::vector<LogSource> game_initialization_logs(const Service &service) {
+    std::vector<LogSource> logs;
+    if (service.name == L"game") application_logs(service.root + service.cwd + L"\\log", L"", logs);
+    logs.erase(std::remove_if(logs.begin(), logs.end(), [](const LogSource &log) {
+        return log.path.size() < 5 || log.path.substr(log.path.size() - 5) != L".init";
+    }), logs.end());
+    return logs;
+}
+
+static void reset_service_readiness(Service &service) {
+    service.application_initialized = false;
+    service.readiness_offset = 0;
+    service.readiness_tail.clear();
+    service.readiness_init.clear();
+    // Snapshot old application logs before starting the process. Only bytes
+    // appended by this launch may establish readiness, including after midnight.
+    for (const auto &log : game_initialization_logs(service)) {
+        WIN32_FILE_ATTRIBUTE_DATA data;
+        if (GetFileAttributesExW(log.path.c_str(), GetFileExInfoStandard, &data))
+            service.readiness_init.push_back({log.path,
+                (uint64_t(data.nFileSizeHigh) << 32) | data.nFileSizeLow, {}});
+    }
+}
+
+static bool read_initialization_marker(const std::wstring &path, uint64_t &position, std::string &tail) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                               nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return false;
-    LARGE_INTEGER offset; offset.QuadPart = static_cast<LONGLONG>(service.readiness_offset);
-    bool changed = false;
+    LARGE_INTEGER size;
+    if (GetFileSizeEx(file, &size) && uint64_t(size.QuadPart) < position) { position = 0; tail.clear(); }
+    LARGE_INTEGER offset; offset.QuadPart = static_cast<LONGLONG>(position);
+    bool found = false;
     if (SetFilePointerEx(file, offset, nullptr, FILE_BEGIN)) {
         char bytes[16384];
         DWORD count = 0;
         if (ReadFile(file, bytes, sizeof(bytes), &count, nullptr) && count) {
-            service.readiness_offset += count;
-            service.readiness_tail.append(bytes, count);
+            position += count;
+            tail.append(bytes, count);
             const std::string marker = " server has been started successfully.";
-            if (service.readiness_tail.find(marker) != std::string::npos) {
-                service.application_initialized = true;
-                service.state = L"进程运行中（应用已初始化）";
-                service.readiness = L"应用已初始化";
-                changed = true;
-            }
-            // Retain only the overlap needed if a read splits the marker.
-            if (service.readiness_tail.size() >= marker.size())
-                service.readiness_tail.erase(0, service.readiness_tail.size() - marker.size() + 1);
+            found = tail.find(marker) != std::string::npos;
+            if (tail.size() >= marker.size()) tail.erase(0, tail.size() - marker.size() + 1);
         }
     }
     CloseHandle(file);
-    return changed;
+    return found;
+}
+
+static bool refresh_service_readiness(Service &service) {
+    if (service.name != L"game" || service.application_initialized || !running(service) || service.out.empty()) return false;
+    bool found = read_initialization_marker(service.out, service.readiness_offset, service.readiness_tail);
+    // Original stdout may stay buffered indefinitely on an idle server. Its
+    // native .init log flushes the same success record during initialization.
+    for (const auto &log : game_initialization_logs(service)) {
+        auto item = std::find_if(service.readiness_init.begin(), service.readiness_init.end(),
+            [&](const Service::InitLog &entry) { return entry.path == log.path; });
+        if (item == service.readiness_init.end()) {
+            service.readiness_init.push_back({log.path, 0, {}});
+            item = service.readiness_init.end() - 1;
+        }
+        found = read_initialization_marker(item->path, item->offset, item->tail) || found;
+    }
+    if (!found) return false;
+    service.application_initialized = true;
+    service.state = L"进程运行中（应用已初始化）";
+    service.readiness = L"应用已初始化";
+    return true;
 }
 
 static bool refresh_service(Service &service) {
@@ -372,9 +415,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     }
     service.state = L"正在启动";
     service.readiness = L"宿主启动中";
-    service.application_initialized = false;
-    service.readiness_offset = 0;
-    service.readiness_tail.clear();
+    reset_service_readiness(service);
     directory(instance + L"\\service-logs");
     std::wstring tag = service.name + L"-" + std::to_wstring(GetTickCount64());
     service.out = instance + L"\\service-logs\\" + tag + L".stdout.private.log";
@@ -408,7 +449,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
         require(false, "Own ELF host before execution");
     }
     CloseHandle(child.hThread); service.process = child.hProcess; service.pid = child.dwProcessId;
-    if (!service.external && (service.name==L"game" || service.name==L"auction" || service.name==L"point")) {
+    if (!service.external && robot_profile_member(service.name)) {
         service.robot_pid_file=instance+L"\\robot\\state\\pids\\"+service.name+L".pid";
         directory(instance+L"\\robot\\state\\pids");
         write_private(service.robot_pid_file,std::to_string(service.pid),CREATE_ALWAYS);

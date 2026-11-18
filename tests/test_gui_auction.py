@@ -32,6 +32,13 @@ def main():
     work=BUILD/"probes"/datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")/"gui-auction"
     instance=work/"instance"; before=tree_identity(source/"data")
     shutil.copytree(source,instance,ignore=shutil.ignore_patterns(".mysql","service-logs",".instance.lock"))
+    # An already synchronized source is valid input too. Remove one currency
+    # definition only from the cold fixture so rebuilding must restore it.
+    for name in ("auction", "point"):
+        index = instance / f"home/neople/{name}/iteminfo.dat"
+        lines = index.read_bytes().splitlines(keepends=True)
+        assert any(line.startswith(b"2675336 ") for line in lines)
+        index.write_bytes(b"".join(line for line in lines if not line.startswith(b"2675336 ")))
     config=configparser.ConfigParser(interpolation=None); config.read(instance/"services.ini",encoding="utf-16")
     config["auction"].update({"extend_levels":"1","extend_refine":"1","dp2_guard":"0","auto_check":"1"})
     config["plugins"]={"mode":"frida"}

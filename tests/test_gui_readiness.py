@@ -55,7 +55,7 @@ def main():
     assert old_logs, "Use a stopped instance with a previous successful initialization log"
     record = {"recorded_utc": stamp, "os": platform.platform(), "source_instance": str(source),
               "gui_sha256": sha256(gui), "script_sha256": sha256(Path(__file__)),
-              "scope": "GUI application initialization from the current original game stdout and peer registration",
+              "scope": "GUI application initialization from fresh original stdout or appended native init log, and peer registration",
               "pvf_sha256": pvf_hash,
               "script_encoding_override": args.script_encoding,
               "checks": {}, "launches": [], "forced_cleanup": False}
@@ -73,6 +73,7 @@ def main():
         for launch in [1, 2]:
             select_service(window, "game")
             previous_outputs = set((instance / "service-logs").glob("game-*.stdout.private.log"))
+            init_offsets = {p: p.stat().st_size for p in (root / "home/neople/game/log").rglob("*.init")}
             registration = {}
             for peer in ("monitor", "guild"):
                 folder = instance / manifest[peer]["root"] / manifest[peer]["cwd"].lstrip("/") / "log"
@@ -93,7 +94,10 @@ def main():
             outputs = set((instance / "service-logs").glob("game-*.stdout.private.log")) - previous_outputs
             assert len(outputs) == 1
             output = outputs.pop()
-            assert MARKER in output.read_bytes()
+            fresh_init = {str(p.relative_to(instance)): p.read_bytes()[init_offsets.get(p, 0):]
+                          for p in (root / "home/neople/game/log").rglob("*.init")}
+            assert MARKER in output.read_bytes() or any(MARKER in data for data in fresh_init.values())
+            item["fresh_native_init_logs_with_marker"] = [name for name, data in fresh_init.items() if MARKER in data]
             diagnostic = output.with_name(output.name.replace(".stdout.", ".stderr.")).read_bytes()
             assert b"iconv error" not in output.read_bytes() + diagnostic, "PVF encoding conversion failed"
             item["script_encoding_selection"] = [line for line in diagnostic.decode("utf-8", "replace").splitlines()

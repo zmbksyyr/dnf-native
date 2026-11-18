@@ -30,7 +30,7 @@ def main():
                    "-DZYDIS_STATIC_BUILD", "-DZYCORE_STATIC_BUILD", "-DZYDIS_DISABLE_FORMATTER",
                    "-I", str(decoder / "include"), "-I", str(decoder / "src"),
                    "-I", str(decoder / "dependencies/zycore/include"),
-                   *map(str, sources + dependency_sources), "-lbcrypt", "-liphlpapi", "-lws2_32", "-o", str(output)]
+                   *map(str, sources + dependency_sources), "-lbcrypt", "-liphlpapi", "-lws2_32", "-lwinmm", "-o", str(output)]
         if arch == "i686":
             command.append("-Wl,--large-address-aware")
         subprocess.run(command, env=env, check=True, cwd=ROOT)

@@ -2,6 +2,7 @@
 #include "timezone.h"
 #include <bcrypt.h>
 #include <malloc.h>
+#include <mmsystem.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -64,7 +65,28 @@ static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
         }
         if (covered == address) return 0;
         MEMORY_BASIC_INFORMATION info;
-        if (!VirtualQuery((const void *)address, &info, sizeof(info)) || info.State != MEM_COMMIT ||
+        int cached = 0;
+        for (unsigned i = 0; i < active->memory_region_count; ++i) {
+            const MEMORY_BASIC_INFORMATION *region = &active->memory_regions[i];
+            uintptr_t first = (uintptr_t)region->BaseAddress;
+            if (address >= first && address - first < region->RegionSize) {
+                info = *region; cached = 1; break;
+            }
+        }
+        if (!cached) {
+            if (!VirtualQuery((const void *)address, &info, sizeof(info))) return 0;
+            /* Querying a large committed region walks its page tables on
+               Windows. Reusing its result avoids millisecond costs for every
+               small packet, while VM/brk operations invalidate all entries.
+               Code, file views and guards retain the direct query path. */
+            if (info.State == MEM_COMMIT && info.Type == MEM_PRIVATE &&
+                info.Protect == PAGE_READWRITE && info.RegionSize >= 65536) {
+                active->memory_regions[active->memory_region_cursor] = info;
+                active->memory_region_cursor = (active->memory_region_cursor + 1) % 8;
+                if (active->memory_region_count < 8) ++active->memory_region_count;
+            }
+        }
+        if (info.State != MEM_COMMIT ||
             (info.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return 0;
         if (write && !(info.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_WRITECOPY))) return 0;
         uintptr_t region_end = (uintptr_t)info.BaseAddress + info.RegionSize;
@@ -291,20 +313,26 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
     if (number == SYS_GETPID) return (intptr_t)GetCurrentProcessId();
     if (number == SYS_GETTID) return (intptr_t)nr_current()->tid;
     if (number == SYS_BRK) {
+        EnterCriticalSection(&active->memory_lock);
+        intptr_t result = (intptr_t)active->heap_break;
         if (!a || a < active->heap_base || a - active->heap_base > 64 * 1024 * 1024)
-            return (intptr_t)active->heap_break;
+            goto brk_done;
         size_t committed = (size_t)((a - active->heap_base + 4095) & ~(uintptr_t)4095);
+        active->memory_region_count = active->memory_region_cursor = 0;
         if (committed > active->heap_committed &&
             !VirtualAlloc((void *)(active->heap_base + active->heap_committed),
                           committed - active->heap_committed, MEM_COMMIT, PAGE_READWRITE))
-            return (intptr_t)active->heap_break;
+            goto brk_done;
         if (committed < active->heap_committed &&
             !VirtualFree((void *)(active->heap_base + committed),
                          active->heap_committed - committed, MEM_DECOMMIT))
-            return (intptr_t)active->heap_break;
+            goto brk_done;
         active->heap_committed = committed;
         active->heap_break = a;
-        return (intptr_t)a;
+        result = (intptr_t)a;
+brk_done:
+        LeaveCriticalSection(&active->memory_lock);
+        return result;
     }
     if (number == SYS_WRITE) {
         HANDLE file = output_handle(a);
@@ -467,6 +495,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     DWORD fatal = exception->ExceptionRecord->ExceptionCode;
     if ((fatal == EXCEPTION_ACCESS_VIOLATION || fatal == EXCEPTION_ILLEGAL_INSTRUCTION ||
          fatal == EXCEPTION_PRIV_INSTRUCTION) && executable(pc)) {
+        if (nr_deliver_fault(active, c, exception->ExceptionRecord)) return EXCEPTION_CONTINUE_EXECUTION;
         nr_log_crash(active, exception);
         fflush(NULL);
         ExitProcess(125);
@@ -600,12 +629,21 @@ int nr_run(NrRun *run) {
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     SetUnhandledExceptionFilter(unhandled);
     if (!AddVectoredExceptionHandler(1, trap_handler)) return 1;
+    /* Short Linux sleeps otherwise inherit Windows' coarse process timer
+       resolution. Windows also releases this request on guest ExitProcess. */
+    MMRESULT timer = timeBeginPeriod(1);
+    if (timer != TIMERR_NOERROR)
+        fprintf(stderr, "1ms timer resolution unavailable: %u\n", (unsigned)timer);
     HANDLE thread = CreateThread(NULL, 16 * 1024 * 1024, start_guest, run, 0, NULL);
-    if (!thread) return 1;
+    if (!thread) {
+        if (timer == TIMERR_NOERROR) timeEndPeriod(1);
+        return 1;
+    }
     WaitForSingleObject(thread, INFINITE);
     for (unsigned i = 1; i < 64; ++i)
         if (run->threads[i].handle) WaitForSingleObject(run->threads[i].handle, INFINITE);
     CloseHandle(thread);
+    if (timer == TIMERR_NOERROR) timeEndPeriod(1);
     fputs("guest thread returned without process exit\n", stderr);
     return 1;
 }

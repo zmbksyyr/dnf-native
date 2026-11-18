@@ -437,7 +437,9 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     /* Threads share one Linux address space. Reserve, publish and release its
        records together so concurrent mmap/munmap cannot claim the same slot. */
     EnterCriticalSection(&run->memory_lock);
+    run->memory_region_count = run->memory_region_cursor = 0;
     int handled = vm_operation(run, number, args, result);
+    run->memory_region_count = run->memory_region_cursor = 0;
     LeaveCriticalSection(&run->memory_lock);
     return handled;
 }

@@ -24,6 +24,7 @@ static intptr_t socket_errno(int error) {
         case WSAEADDRINUSE: return -98;
         case WSAEADDRNOTAVAIL: return -99;
         case WSAEAFNOSUPPORT: return -97;
+        case WSAECONNABORTED: return -103;
         case WSAECONNRESET: return -104;
         case WSAECONNREFUSED: return -111;
         case WSAETIMEDOUT: return -110;
@@ -318,7 +319,9 @@ static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uint
     size_t capacity = maximum > NR_FD_SLOTS ? NR_FD_SLOTS : maximum;
     if (!nr_memory(address, capacity * 12, 1)) return -14;
     NrPoll polls[NR_FD_SLOTS]; unsigned count = 0;
-    for (unsigned fd = 0; fd < NR_FD_SLOTS; ++fd) {
+    unsigned cursor = run->epoll_cursor[epoll_fd];
+    for (unsigned step = 0; step < NR_FD_SLOTS; ++step) {
+        unsigned fd = (cursor + step) % NR_FD_SLOTS;
         if (!watches[fd].used) continue;
         polls[count].fd = (int32_t)fd;
         polls[count].events = (int16_t)(watches[fd].events & 5);
@@ -333,6 +336,9 @@ static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uint
         if (!events) continue;
         unsigned char *out = (unsigned char *)address + written * 12;
         memcpy(out, &events, 4); memcpy(out + 4, &watches[polls[i].fd].data, 8); ++written;
+        /* Linux rotates the ready list when maxevents truncates a batch.
+           Always starting at fd zero starves later sockets under load. */
+        run->epoll_cursor[epoll_fd] = ((unsigned)polls[i].fd + 1) % NR_FD_SLOTS;
     }
     if (epoll_trace_enabled(run)) {
         fprintf(stderr, "epoll wait epfd=%u max=%llu timeout=%lld watches=%u ready=%lld returned=%lld\n",
@@ -370,6 +376,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         run->epolls[fd] = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NR_FD_SLOTS * sizeof(NrWatch));
         if (!run->epolls[fd]) { run->file_access[fd] = 0; *result = -12; return 1; }
         run->file_access[fd] = 8;
+        run->epoll_cursor[fd] = 0;
         if (epoll_trace_enabled(run)) fprintf(stderr, "epoll create epfd=%u\n", fd);
         *result = fd; return 1;
     }

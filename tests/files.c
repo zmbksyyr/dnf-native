@@ -29,10 +29,10 @@ static result call6(word n, word a, word b, word c, word d, word e, word f) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, LSTAT=6, FSTAT=5, SEEK=8, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
+enum {READ=0, WRITE=1, OPEN=2, CLOSE=3, STAT=4, LSTAT=6, FSTAT=5, SEEK=8, PREAD=17, READLINK=89, FCNTL=72, TRUNCATE=77, PIPE=22, PIPE2=293, EXIT=60,
       FLOCK=73, IOCTL=16, MMAP=9, MPROTECT=10, MUNMAP=11, GETDENTS=217, STAT_BYTES=144, INODE=8, MODE=24, DEVICE=40, SIZE=48};
 #else
-enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, LSTAT=196, FSTAT=197, SEEK=19, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
+enum {READ=3, WRITE=4, OPEN=5, CLOSE=6, STAT=195, LSTAT=196, FSTAT=197, SEEK=19, PREAD=180, READLINK=85, FCNTL=221, TRUNCATE=194, PIPE=42, PIPE2=331, EXIT=1,
       FLOCK=143, IOCTL=54, MMAP=192, MPROTECT=125, MUNMAP=91, GETDENTS=220, STAT_BYTES=96, INODE=88, MODE=16, DEVICE=32, SIZE=44};
 #endif
 
@@ -302,6 +302,13 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(LSTAT, (word)"/directory-link", (word)other, 0) == -38);
     CHECK(call(FCNTL, fd, 2, 1) == 0 && call(FCNTL, fd, 1, 0) == 1);
     CHECK(call(SEEK, fd, 3, 0) == 3);
+    CHECK(call6(PREAD, fd, (word)data, 2, 1, 0, 0) == 2 && data[0] == 'b' && data[1] == 'c');
+    CHECK(call(SEEK, fd, 0, 1) == 3); /* pread must preserve the shared offset. */
+    CHECK(call6(PREAD, fd, (word)data, 4, 5, 0, 0) == 1 && data[0] == 'f');
+    CHECK(call6(PREAD, fd, (word)data, 1, 99, 0, 0) == 0);
+    CHECK(call6(PREAD, fd, 1, 1, 0, 0, 0) == -14);
+    CHECK(call6(PREAD, fd, (word)data, 1, (word)-1, (word)-1, 0) == -22);
+    CHECK(call(SEEK, fd, 0, 1) == 3);
     CHECK(call(TRUNCATE, fd, 4, 0) == 0);
     CHECK(call(SEEK, fd, 0, 1) == 3);
     CHECK(call(TRUNCATE, fd, 9, 0) == 0);

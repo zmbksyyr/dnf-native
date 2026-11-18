@@ -19,9 +19,9 @@ static __attribute__((noinline)) result call6(word n, word a, word b, word c, wo
 }
 
 #ifdef __x86_64__
-enum {WRITE = 1, MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, EXIT = 60};
+enum {WRITE = 1, MMAP = 9, MPROTECT = 10, MUNMAP = 11, MADVISE = 28, CLOCK = 228, EXIT = 60};
 #else
-enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, EXIT = 1};
+enum {WRITE = 4, MMAP = 192, MPROTECT = 125, MUNMAP = 91, MADVISE = 219, MREMAP = 163, CLOCK = 265, EXIT = 1};
 #endif
 
 static void check(int condition, word line) {
@@ -38,6 +38,20 @@ static void check(int condition, word line) {
 __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     /* Seventeen pages cross both a bitmap byte and the Windows 64 KiB unit. */
     const word page = 4096, bytes = 17 * 4096;
+    /* Warm a large writable region, then change one page at a time. Pointer
+       validation must observe protection changes, holes and replacement. */
+    word checked = (word)call6(MMAP, 0, 1024 * 1024, 3, 0x22, (word)-1, 0);
+    CHECK(checked && checked < (word)-4095);
+    CHECK(call6(CLOCK, 1, checked, 0, 0, 0, 0) == 0);
+    CHECK(PROTECT(checked + page, page, 1) == 0);
+    CHECK(call6(CLOCK, 1, checked + page, 0, 0, 0, 0) == -14);
+    CHECK(call6(CLOCK, 1, checked, 0, 0, 0, 0) == 0);
+    CHECK(UNMAP(checked + 2 * page, page) == 0);
+    CHECK(call6(CLOCK, 1, checked + 2 * page, 0, 0, 0, 0) == -14);
+    CHECK((word)call6(MMAP, checked + 2 * page, page, 3, 0x32, (word)-1, 0) == checked + 2 * page);
+    CHECK(call6(CLOCK, 1, checked + 2 * page, 0, 0, 0, 0) == 0);
+    CHECK(UNMAP(checked, 1024 * 1024) == 0);
+    CHECK(call6(CLOCK, 1, checked, 0, 0, 0, 0) == -14);
     word base = (word)call6(MMAP, 0, bytes, 0, 0x4022, (word)-1, 0);
     CHECK(base && base < (word)-4095 && !(base & (page - 1)));
     word middle = base + 8 * page, last = base + 16 * page;

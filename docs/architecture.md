@@ -59,7 +59,7 @@ flowchart TD
 
 `munmap` 遍历所有相交 VM 记录，允许跨相邻映射及已解除的空洞。局部释放保留页位图；匿名页 decommit，文件视图页设置为不可访问，直到该记录全部解除后释放实际 Windows view。guest 内存检查和 maps 均排除这些页。程序、解释器、初始栈和 brk 堆的解除仍明确拒绝；跨记录 MAP_FIXED、通用地址复用不由这项修正提供。
 
-`SA_NODEFER` 允许同一未屏蔽信号在 handler 内再次投递，但 action 中的显式 mask 仍然生效。每层 handler 保存独立中断上下文、掩码及 guest 帧，`sigreturn` 逐层恢复。投递仍发生在本项目已有的 syscall/运行时边界；接受 Frida 的处理器注册不代表已支持原生同步访问异常的 Linux 信号转交。
+`SA_NODEFER` 允许同一未屏蔽信号在 handler 内再次投递，但 action 中的显式 mask 仍然生效。每层 handler 保存独立中断上下文、掩码及 guest 帧，`sigreturn` 逐层恢复。guest 模块执行中的 Windows 访问异常同步交给该线程已注册且未屏蔽的 Linux SIGSEGV handler，填写 `si_addr`、MAPERR/ACCERR、页错误编号和 ucontext；handler 可修复内存或修改 PC 后恢复。未注册或屏蔽时保留原崩溃诊断与退出 125；备用信号栈、浮点扩展状态、其他异常类型与纯计算中的异步信号仍未补齐。
 
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
 
@@ -175,7 +175,7 @@ PVF 解析读取目录、字符串表、equipment／stackable 主列表、实际
 
 索引清单 `.mysql/market-index.ini` 绑定 PVF、两份 dat 哈希和 UTF-8 编码，定义记录另存 `market-definitions.txt`。相关启动前及 15 分钟复查发现哈希变化后检查候选；关闭自动检查时由维护窗口手动应用。候选在内存完整生成后才进入写入。写操作限定当前控制台 SQL UUID／PID／TLS 身份；停止本窗口持有的三个写入服务后再次检查，官方 SQL 备份覆盖选中市场全部表。索引操作额外备份 dat、配置、manifest、定义与 DP2 脚本，以临时文件和原子替换提交。失败导回 SQL 及原文件，保持相关服务停止；成功按原运行集合重新拉起。上一版 dat 绑定其旧 manifest 的 PVF，未知来源记录为空，恢复时拒绝不同或未知 PVF。
 
-DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和用户代码；未知自定义 hook 明确拒绝启用，关闭只还原本项目已安装的段。按原分发入口解析每项，只对有效装备 ID／实例 ID 和装备组查询，要求 SQL 成功、有且仅一条、HEX 为恰好 30 字节并带非空孔记录才覆盖；无记录及失败保持原包字节，加入重入保护与异常日志。此实现未改变上架、购买、定价和机器人逻辑。
+DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和用户代码；未知自定义 hook 明确拒绝启用，关闭只还原本项目已安装的段。v7 根据搜索包中的物品和实例编号查询已有孔记录，要求 SQL 成功、有且仅一条、HEX 为恰好 30 字节并带非空孔记录才覆盖；取消原有 `CDataManager/CItem` 调用，避免 PVF 缺失物品引发空对象解引用。无记录及失败保持原包字节，加入重入保护与异常日志。Windows 初始化会安装已识别的新版本并保存原段；Linux 保留原有显式安装入口。此实现未改变上架、购买、定价和机器人逻辑。
 
 ## 已确认的兼容限制
 
@@ -183,7 +183,7 @@ DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和�
 - `/dev/shm` 的真实共享文件映射已有路径；System V shm/sem 不等于文件映射，尚无通用实现。
 - 网络以现有 TCP/UDP、select/poll、LT epoll 路径为主；AF_UNIX、完整 sendmsg/recvmsg 辅助数据、ET/ONESHOT 等未完成。
 - 非 PI robust list 注册及正常线程退出时的 owner death、pending 节点与进程内唤醒已有实现；PI 锁、跨进程 futex、强制终止后的恢复、线程退出槽复用、pthread cancel 和通用线程定向信号未完整覆盖。
-- SA_SIGINFO/SA_NODEFER 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、嵌套投递、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；浮点扩展状态、备用信号栈、同步异常转交、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
+- SA_SIGINFO/SA_NODEFER 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、嵌套投递、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；同步访问异常支持范围见上文。浮点扩展状态、备用信号栈、其他同步异常、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
 - 匿名私有映射的 `madvise(MADV_DONTNEED)` 使用 Windows `MEM_RESET` 保留地址、权限和并发访问；Windows 不保证 Linux 下一次读一定立即得到零页，因此不能把它扩展为通用页面回收或跨进程共享语义。
 - 打开目标上的 POSIX rename、符号链接、普通文件执行映射、EOF 外整页的 SIGBUS、跨多个预留区固定映射及部分 msync 行为存在边界。
 - inotify_init/init1 仍返回 ENOSYS；固定原版 Frida Gadget 的 `GPollFileMonitor` 轮询回退已通过覆盖写入、原子替换和新版 RPC 结果验证，延迟约 5 秒。无需为此路径增加文件监视兼容层；通用 inotify、全部编辑器行为和业务运行中的任意脚本热加载不在已验证范围。
@@ -207,4 +207,6 @@ TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的�
 
 `src/runtime/elf.c` 的全文件哈希仍保持 SHA-256 身份校验，但读取改为 64 KiB `ReadFile` 分块，减少大 ELF 启动时对只读映射工作集的影响。`NrRun` 在启动时缓存 `DNF_NATIVE_TRACE`、`DNF_NATIVE_EPOLL_TRACE` 和 QPC 频率，syscall、socket、epoll 与文件热路径不再重复查询环境变量或频率。
 
-Robot 通过独立 `robot.exe` 进程接入服务列表末尾。Native 只创建实例目录配置、命名停止事件和 Job Object 归属；Robot 通过 `--config-dir`、`--stop-event` 及 `host-profile.json` 选择宿主。市场维护的 Linux `/proc`、shell 和内存写入操作在 Windows 返回明确错误或记录 controller 归属，避免假成功。详见 [Robot 接入](robot.md)。
+大块可写私有内存的 `VirtualQuery` 结果使用 8 项缓存，guest 所有权仍逐次核对；VM、brk 与零页重置在同一映射锁内使缓存失效。代码页、文件映射和 guard 保留直接查询。运行 ELF 时申请 1ms Windows 定时器分辨率，正常返回时配对释放。epoll 从上次返回位置继续扫描就绪项，避免小 `maxevents` 长期饿死后续描述符。`pread64` 用独立重开句柄和 OVERLAPPED 偏移读取，保留原文件位置。
+
+Robot 通过独立 `robot.exe` 进程接入服务列表末尾。Native 只创建实例目录配置、命名停止事件和 Job Object 归属；Robot 通过 `--config-dir`、`--stop-event` 及 `host-profile.json` 选择宿主。Windows 进程、内存补丁和市场维护由 Robot 自己的平台层处理，Linux 原有路径保留；依赖 `/root/run`、`/root/stop` 的入口在 Windows 明确不支持并置灰。详见 [Robot 接入](robot.md)。

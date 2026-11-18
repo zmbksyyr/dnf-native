@@ -82,6 +82,9 @@ def main():
     parser.add_argument("--instance", type=Path, required=True, help="Stopped instance; only metadata is copied")
     args = parser.parse_args()
     gui, source = args.gui.resolve(strict=True), args.instance.resolve(strict=True)
+    config = configparser.ConfigParser(interpolation=None)
+    config.read(source / "services.ini", encoding="utf-16")
+    service_count = 20 if config.getboolean("robot", "enabled", fallback=False) else 19
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = BUILD / "probes" / stamp / "gui-interactions"
     probe.mkdir(parents=True)
@@ -135,7 +138,8 @@ def main():
         nonlocal process, window
         process = subprocess.Popen([str(gui), *(["--instance", str(initial)] if initial else [])], env=environment)
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
-        wait_for(lambda: len(rows(window)) == 19, "19 cards")
+        user.ShowWindow(window, 4)
+        wait_for(lambda: len(rows(window)) == service_count, "service cards")
 
     def close():
         nonlocal window
@@ -148,7 +152,7 @@ def main():
         grid = user.GetDlgItem(window, 220)
         purposes={"game":"游戏主服务","auction":"拍卖行","point":"金币寄售"}
         record["service_tooltips"] = hover_cards(purposes)
-        checks["all_19_cards_show_service_purpose_on_real_mouse_hover_and_blank_area_has_none"] = True
+        checks["all_cards_show_service_purpose_on_real_mouse_hover_and_blank_area_has_none"] = True
         rect = w.RECT()
         user.SendMessageW(grid, 0x198, 9, c.addressof(rect))
         point = ((rect.left + rect.right) // 2) | ((rect.top + rect.bottom) // 2 << 16)

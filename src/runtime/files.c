@@ -29,6 +29,29 @@ static intptr_t file_error(void) {
     }
 }
 
+/* A separate overlapped handle gives pread its independent file position.
+   Passing OVERLAPPED to a synchronous handle would still move that handle's
+   current offset on Windows and race ordinary read/lseek in another thread. */
+static intptr_t positioned_read(HANDLE file, void *buffer, DWORD bytes, uint64_t offset) {
+    if (GetFileType(file) != FILE_TYPE_DISK) return -29;
+    HANDLE reader = ReOpenFile(file, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               FILE_FLAG_OVERLAPPED);
+    if (reader == INVALID_HANDLE_VALUE) return file_error();
+    OVERLAPPED operation = {0};
+    operation.Offset = (DWORD)offset;
+    operation.OffsetHigh = (DWORD)(offset >> 32);
+    operation.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!operation.hEvent) { CloseHandle(reader); return -12; }
+    DWORD count = 0;
+    BOOL ok = ReadFile(reader, buffer, bytes, &count, &operation);
+    if (!ok && GetLastError() == ERROR_IO_PENDING)
+        ok = GetOverlappedResult(reader, &operation, &count, TRUE);
+    intptr_t result = ok ? (intptr_t)count : GetLastError() == ERROR_HANDLE_EOF ? 0 : file_error();
+    CloseHandle(operation.hEvent);
+    CloseHandle(reader);
+    return result;
+}
+
 int nr_path(NrRun *run, const char *guest, wchar_t *path) {
     if (!run->root[0]) return -38;
     char combined[8192];
@@ -416,6 +439,35 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     enum {READ = 3, OPEN = 5, OPENAT = 295, CLOSE = 6, STAT = 195, LSTAT = 196, FSTAT = 197, LSEEK = 19, READLINK = 85, ACCESS = 33, CHDIR = 12, GETCWD = 183, MKDIR = 39, UNLINK = 10, RENAME = 38, FCNTL = 55, FTRUNCATE = 194, IOCTL = 54, FLOCK = 143, STATFS = 99, FSTATFS = 100, GETDENTS = 220};
 #endif
     uintptr_t a = args[0], b = args[1], c = args[2];
+#ifdef _WIN64
+    const uintptr_t pread_number = 17;
+#else
+    const uintptr_t pread_number = 180;
+#endif
+    if (number == pread_number) {
+        uint64_t offset = args[3];
+#ifndef _WIN64
+        offset |= (uint64_t)args[4] << 32;
+#endif
+        if (a >= NR_FD_SLOTS || !run->file_access[a]) { *result = -9; return 1; }
+        unsigned access = run->file_access[a];
+        if (!(access & 1) && access != NR_MAPS && access != NR_AUXV && access != NR_URANDOM) {
+            *result = access == 4 ? -29 : -9; return 1;
+        }
+        if (offset > INT64_MAX) { *result = -22; return 1; }
+        if (c > 0x7ffff000) c = 0x7ffff000;
+        if (!nr_memory(b, c, 1)) { *result = -14; return 1; }
+        if (run->file_access[a] == NR_MAPS || run->file_access[a] == NR_AUXV) {
+            size_t available = offset < run->synthetic_sizes[a] ? run->synthetic_sizes[a] - (size_t)offset : 0;
+            size_t copied = c < available ? (size_t)c : available;
+            if (copied) memcpy((void *)b, run->synthetic_files[a] + (size_t)offset, copied);
+            *result = (intptr_t)copied;
+        } else if (run->file_access[a] == NR_URANDOM) {
+            *result = !c ? 0 : BCryptGenRandom(NULL, (PUCHAR)b, (ULONG)c, BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0 ? -5 : (intptr_t)c;
+        } else if (!run->files[a]) *result = -29;
+        else *result = positioned_read(run->files[a], (void *)b, (DWORD)c, offset);
+        return 1;
+    }
     if (number == RENAME) {
         wchar_t source[32768], destination[32768];
         *result = guest_path(run, a, source);

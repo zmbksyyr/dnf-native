@@ -2,6 +2,44 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## Windows 兼容层与 Robot 容量验收（2026-11-18）
+
+环境为 Windows 10 IoT Enterprise LTSC 2021 x64、build 19044，12 个逻辑处理器、约 32 GiB 内存；原版 game ELF 为 i686，glibc 2.17、MySQL 5.7.44，Robot 使用 Go 1.26.4、Windows amd64、无 CGO。原实例 `3333` 停库后复制到独立 `load-550/instance`，1547 个数据库文件经 SHA-256 核对，冷备份单独保留。原实例、输入 ELF、固定 ZIP 和参考目录保持只读。以下证据路径相对仓库外 `../x/dnf-native-output/`。
+
+实际瓶颈是大块已提交可写内存上的重复 `VirtualQuery`，单个小缓冲检查约 0.80 ms；使用 8 项查询缓存后，独立大区夹具为 i686 约 0.014 ms、x64 约 0.010 ms。guest 所有权仍逐次检查，VM、brk 和零页重置在同一锁内使缓存失效，代码和文件映射保留直接查询。1 ms 睡眠实测从约 15.7 ms 降至约 1.98 ms。这些是特定原语的前后对照，不能换算为整个游戏或相对 Linux 的性能提升百分比。证据为 `load-550/memory-check-comparison.json`、`sleep-comparison.json`。
+
+本轮另补齐 `pread64` 的独立文件位置、epoll 就绪轮转及同步内存故障的 Linux SIGSEGV 投递。双架构文件、网络、epoll、VM、并发 VM、robust mutex、入口、加载器、TLS 和进程/信号回归通过；信号夹具实际触发未映射、只读和 PROT_NONE 访问，验证 handler 修复内存或修改 PC 后恢复，已屏蔽故障仍明确退出。备用信号栈、浮点扩展状态和其他异常不在新增支持范围。根目录对应 `*-checks.json` 保留程序、脚本哈希和逐项结果。
+
+| 范围 | 实测结果 | 证据 |
+| --- | --- | --- |
+| 鼠标和布局 | 19 项服务实际悬停、空白区、重复选择、焦点提示、40 轮缩放、菜单、实例选择后重开恢复通过 | `probes/20261117T232958023687Z/gui-interactions/receipt.json` |
+| 键盘 | 真实消息队列的焦点、方向键、弹窗取消、实例切换和数据库生命周期通过；测试独立保存历史 | `probes/20261117T182933180873Z/gui-keyboard/receipt.json` |
+| 服务及日志 | 原版辅助协议、独立启停、哈希拒绝、重启及全停；滚轮、无滚动条、跟随/暂停、编码、轮转、原版应用和 MySQL 日志通过 | `probes/20261117T233110525003Z/gui-services/receipt.json`、`probes/20261117T233400617510Z/gui-logs/receipt.json` |
+| game 初始化 | 两次实际启动均经历等待和本次初始化成功，约 57.9/54.7 秒；旧 init 日志未误判，monitor/guild 原始登记成功，正常退出 | `probes/20261117T233554471187Z/gui-readiness/receipt.json` |
+| GUI 资源统计 | 全进程树与 Windows CPU/工作集对照、旧父 PID 过滤、停启和无关进程排除通过 | `probes/20261117T180405626937Z/gui-metrics/receipt.json`、`probes/20261117T180116000653Z/gui-metrics-sample/receipt.json` |
+| 数据库维护 | 真实备份恢复、损坏输入拒绝、SQL 失败和激活回滚、三个重命名中断窗口、包装器退出清理 mysqld 通过 | `probes/20261117T180220059196Z/mysql-maintenance/receipt.json` |
+| Native 双市场维护 | PVF/订单兼容检查、索引重建恢复、货币定义、均价键和清理通过；用 trigger 令第二库删除失败后实际恢复两库；85 级/锻造 10 订单经原市场两次加载 | `probes/20261117T185437590325Z/gui-auction/receipt.json` |
+| Robot GUI 接入 | 首次密钥准备、开关立即保存与市场置灰、市场重启后接回、真实角色登录/移动/登出、Robot 停启和释放通过 | `probes/20261117T184727/gui-robot/receipt.json` |
+| Robot 平台功能 | 最新候选包五项服务身份识别、组队/邮箱补丁开关和恢复、六项市场补丁回读、600/601 配置边界及 Linux 脚本明确禁用通过 | `load-550/basic-ready.private.json` |
+| 拍卖搜索保护 | 旧 hook 对空 CItem 调用是已定位的崩溃路径；v7 使用已有孔记录，独立原版 Gadget 夹具覆盖空/无效地址、缺失物品、30 字节边界、递归和 count 101 | `robot-guard-runtime/receipt.json` |
+| 手动容量 | 最终达到并连续保持 600 在线 60 秒；额外 5 个账号未突破 600；605 个账号登出全部确认，操作约 19.9 秒 | `load-550/capacity-ready.private.json` 的对应子项；该收据整体因后续 580 混合阶段失败而为 false |
+| 混合容量 | 600 目标下自动移动、喊话及两类摊位工作，连续 180.3 秒保持至少 550 在线；Robot 工作集 256–366 MiB，game 约 1556.0–1556.9 MiB | `load-550/mixed600-ready.private.json` |
+| SQL 断连恢复 | 按 Robot PID、客户端源端口及 PROCESSLIST 对应关系只关闭 Robot 连接，旧连接消失、同进程新连接及实际 SELECT 成功；未重启 MySQL | `load-550/database-fault-ready.private.json` |
+| 高负载重启 | 596 在线、59 个忙碌 actor 时 Web 重启，在同一 PID 内约 18.3 秒建立新运行环境；重启后实际登录、移动、登出完成 | `load-550/restart-load-fixed.private.json`、`restart-load-recovery.private.json` |
+| 上线中停服 | 600 人批量上线正在连接时，从 GUI 正常停止 Robot，约 1.42 秒退出 0；game 继续运行，重开后密钥可用 | `load-550/stop-ready.private.json` |
+| 危险删除 | 独立创建账号后验证 CID、UID、范围删除、邻项保留及一次性口令；删除前序列化备份和 SHA-256 复核，恢复后全部捕获行精确一致 | `load-550/delete-ready.private.json` |
+| 实际客户端 | 完整独立客户端副本，经默认登录器进入 85 级角色；搜索 3 条真实“流光星陨刀”订单并重复 10 次；金币寄售 100 万金币上架、搜到自己的订单、取消成功，SQL 核对测试订单移除 | `client-ready/business-receipt.private.json` 及四张操作截图 |
+
+容量存在明确限制：手动上线操作的首次终态只确认 414 个，随后 actor 重试才达到 600；580 目标混合阶段在 10 分钟内未能连续保持 550+，保留失败，不能以 600 目标的成功覆盖。600 混合阶段仍出现摆摊失败和登录超时，180 秒观察不是长时间稳定性保证。
+
+高负载重启最初因摆摊清理的离线等待和同 UID 重新登录休眠未响应关闭，超过 15 秒并退出 1。现将 manager 关闭传播至这些等待、选角存档和分解摊确认；关闭返回取消错误，阻止后续数据库写入，不把取消当成已经离线。正常运行的存档和同 UID 安全等待保持。修复后高负载重启完成，但首次同步登录仍先返回 pending，后续真实运行、移动和登出另存恢复收据；因此 `restart-load-fixed.private.json` 的整体失败状态保留，不改写为通过。相关竞态和全仓测试在 `robot/race-shutdown-fixed-windows.log`、`full-shutdown-ready-windows.log`。
+
+拍卖保护夹具的 SQL 和原函数转发是测试回调，不能代替实际客户端交易。本轮客户端通过实际鼠标完成上述搜索与金币寄售操作；未声称本轮完成物品购买、重新上架或邮件领取。测试前保存目标角色、背包、邮件和寄售行备份，客户端源目录关键文件哈希前后保持一致。DirectX 窗口使用 PrintWindow 会得到黑图，实际画面改从屏幕上游戏窗口范围采集；不把截图接口黑图误记为游戏黑屏。
+
+本轮 Robot 全仓普通测试、全仓 race，以及批量操作修改后的相关 race 通过；Linux amd64 交叉编译通过，记录位于 `robot/`。Windows 市场、组队、邮箱、进程诊断现已有平台实现；本文末尾 2026-11-17 的 `/proc` 限制是当时状态。Linux 原生对照尚待系统重启使已启用的 WSL/VirtualMachinePlatform 生效；导入发行版明确返回 `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`，没有 Linux 运行数据。正式产品仍在 Windows 原生运行。
+
+正式 `../DNF-Native-3.0/` 已更新，根层仅主 EXE 与 resources，9 个文件与外部 `release-verified-20261118/` 逐项 SHA-256 一致；旧文件先备份并核验，异常恢复路径核对哈希，交付收据为 `delivery-20261118-verified.json`。Robot 源码为 `feature/windows-host-adapter` 的 `260f4ab`；构建收据同时核对 Go 源码和实际嵌入的网页、默认配置、密钥及种子资源，防止静态资源改变后误用旧二进制。
+
 ## P49 标题栏采样与进程编号复用（2026-11-17）
 
 用户当前控制台的标题持续显示 `CPU -- · 内存 --`。只读检查确认服务复用了 PID 5504，两天前创建的 csrss、winlogon 仍将该编号记录为旧父进程；仅按 PID 遍历使它们及其子进程进入统计，csrss 的工作集访问拒绝（Win32 5）随后将整组结果标为失败。定时器正常运行，缺少的是父子进程创建时间校验。原始诊断留在外部 `P49-metrics-pid-reuse/diagnosis.json`。

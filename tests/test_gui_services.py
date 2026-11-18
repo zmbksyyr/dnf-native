@@ -119,7 +119,8 @@ def main():
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "failed start completed")
         checks["changed_elf_rejected_without_stopping_other_services"] = sum("进程运行中" in row for row in rows(window)) == 14
         elf.write_bytes(original)
-        context_action("S"); ready(window, "channel：进程运行中", 20)
+        baseline = len(log_text(window))
+        context_action("S"); ready(window, "channel：进程运行中", 20, since=baseline)
         time.sleep(1)
         checks["individual_channel_restart_protocol"] = channel(7001)
         checks["real_context_menu_start_and_stop_without_toolbar_buttons"] = True

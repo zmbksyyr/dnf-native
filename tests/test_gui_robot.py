@@ -35,7 +35,14 @@ def main():
     work.mkdir(parents=True)
     before = tree_identity(source / "data")
     print("Copying private instance:", instance, flush=True)
-    shutil.copytree(source, instance, ignore=shutil.ignore_patterns(".mysql", "service-logs", ".instance.lock"))
+    # Exercise first initialization even when the source has previously run Robot.
+    def ignore(directory, names):
+        excluded = {".mysql", "service-logs", ".instance.lock"}
+        if Path(directory) == source:
+            excluded.add("robot")
+        return excluded.intersection(names)
+
+    shutil.copytree(source, instance, ignore=ignore)
     manifest = instance / "services.ini"
     ini = configparser.ConfigParser(interpolation=None)
     ini.read(manifest, encoding="utf-16")
@@ -132,8 +139,12 @@ def main():
         keys = api("keypairStatus")
         assert keys["loaded"] and keys["game_valid"] and keys["config_valid"], keys
         assert sha256(private) == sha256(instance / "robot/keys/privatekey.pem")
+        # Keep this lifecycle test independent of the fresh default auto target.
+        api("autoStop")
         checks["real_robot_initializes_database_pvf_and_synchronizes_game_keys"] = True
-        assert api("hostProfileStatus")["market_owner"] == "robot"
+        profile = api("hostProfileStatus")
+        assert profile["market_owner"] == "robot"
+        assert {"game", "auction", "point", "monitor", "relay"} <= set(profile["services"])
         api("databaseStatus")
         created=api("createRobots", {"count": 1})
         assert len(created["robots"]) == 1, created

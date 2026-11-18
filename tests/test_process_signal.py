@@ -42,6 +42,22 @@ def main():
     receivers = {arch: build(arch, "signal-receiver") for arch in ARCHES}
     records = []
     for arch, (triple, base) in ARCHES.items():
+        for blocked in (False, True):
+            fault = BUILD / "fixtures" / arch / ("signal-fault-blocked" if blocked else "signal-fault")
+            build_fault = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib", "-static",
+                           "-ffreestanding", "-fno-stack-protector", "-fno-pic", "-O2", "-Wall", "-Wextra", "-Werror",
+                           "-Wl,--image-base=" + base, "-Wl,-e,_start", str(ROOT / "tests/signal_fault.c"), "-o", str(fault)]
+            if blocked:
+                build_fault.append("-DNR_BLOCKED")
+            subprocess.run(build_fault, check=True)
+            result = subprocess.run(command(arch, fault), capture_output=True, timeout=10)
+            passed = (result.returncode == 125 and b"unhandled exception" in result.stderr if blocked else
+                      result.returncode == 42 and result.stdout == b"native-fault-recovery-ok\n")
+            records.append({"receiver_arch": arch, "case": "blocked_fault" if blocked else "fault_recovery",
+                            "host_sha256": sha(BUILD / arch / "dnf-host.exe"), "fixture_sha256": sha(fault),
+                            "exit_code": result.returncode, "stdout": result.stdout.decode(errors="replace"),
+                            "stderr": result.stderr.decode(errors="replace"), "passed": passed})
+            print(arch, "fault blocked=" + str(blocked), "PASS" if passed else "FAIL", flush=True)
         fixture = BUILD / "fixtures" / arch / "signal-siginfo"
         fixture.parent.mkdir(parents=True, exist_ok=True)
         build_command = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib", "-static",
@@ -108,7 +124,7 @@ def main():
             records.append(record)
             print(send_arch, "->", receive_arch, "PASS" if passed else "FAIL", flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-              "scope": "Own native ELF processes: SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM. No game shutdown acceptance.",
+              "scope": "Own native ELF processes: synchronous SIGSEGV for unmapped/read-only/PROT_NONE memory with si_addr, si_code and ucontext recovery; blocked fault diagnostic exit; SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM. No game shutdown acceptance.",
               "results": records}
     (BUILD / "process-signal-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(row["passed"] for row in records):

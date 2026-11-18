@@ -85,6 +85,29 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call(CLOSE, pipe[0], 0, 0, 0) == 0);
     CHECK(call(CLOSE, pipe[1], 0, 0, 0) == 0);
 
+    /* A permanently readable low fd must not hide later ready descriptors
+       when maxevents is smaller than the ready set (epoll(7) round robin). */
+    int fair[6][2];
+    for (unsigned i = 0; i < 6; ++i) {
+        CHECK(call(PIPE2, (word)fair[i], 0x80800, 0, 0) == 0);
+        input.events = 1; input.data = i;
+        CHECK(call(CTL, epoll, 1, fair[i][0], (word)&input) == 0);
+        CHECK(call(WRITE, fair[i][1], (word)"f", 1, 0) == 1);
+    }
+    unsigned seen = 0;
+    for (unsigned i = 0; i < 3; ++i) {
+        CHECK(call(WAIT, epoll, (word)output, 2, 0) == 2);
+        for (unsigned j = 0; j < 2; ++j) {
+            CHECK(output[j].data < 6);
+            seen |= 1u << output[j].data;
+        }
+    }
+    CHECK(seen == 63);
+    for (unsigned i = 0; i < 6; ++i) {
+        CHECK(call(CLOSE, fair[i][0], 0, 0, 0) == 0);
+        CHECK(call(CLOSE, fair[i][1], 0, 0, 0) == 0);
+    }
+
     input.data = 0xabcdef0123456789ULL;
     CHECK(call(CTL, epoll, 1, 0, (word)&input) == 0);
     CHECK(call(WRITE, 1, (word)"epoll-wait\n", 11, 0) == 11);

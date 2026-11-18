@@ -1,9 +1,11 @@
 """Exercise queued keyboard input through the real Win32 GUI and modal dialogs."""
 import argparse
+import configparser
 import ctypes as c
 from ctypes import wintypes as w
 import datetime
 import json
+import os
 from pathlib import Path
 import platform
 import shutil
@@ -71,6 +73,9 @@ def main():
     parser.add_argument("--instance", type=Path, required=True, help="Stopped private instance to copy")
     args = parser.parse_args()
     gui, source = args.gui.resolve(strict=True), args.instance.resolve(strict=True)
+    config = configparser.ConfigParser(interpolation=None)
+    config.read(source / "services.ini", encoding="utf-16")
+    service_count = 20 if config.getboolean("robot", "enabled", fallback=False) else 19
     before = tree_identity(source / "data")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     probe = BUILD / "probes" / stamp / "gui-keyboard"
@@ -80,12 +85,13 @@ def main():
               "script_sha256": sha256(Path(__file__)), "checks": {}, "forced_cleanup": False,
               "scope": "Real Win32 queued keyboard input, focus traversal, modal cancellation and database lifecycle; input delivered through the Win32 message queue."}
     checks = record["checks"]
-    process = subprocess.Popen([str(gui), "--instance", str(instance)])
+    process = subprocess.Popen([str(gui), "--instance", str(instance)],
+                               env=dict(os.environ, LOCALAPPDATA=str(probe / "profile")))
     window = None
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "controller")
         user.ShowWindow(window, 4)
-        assert len(rows(window)) == 19
+        assert len(rows(window)) == service_count
         button_types = {identifier: user.GetWindowLongW(user.GetDlgItem(window, identifier), -16) & 15
                         for identifier in range(100, 275) if user.GetDlgItem(window, identifier) and
                         user.SendMessageW(user.GetDlgItem(window, identifier), 0x87, 0, 0) & 0x2000}
@@ -127,7 +133,7 @@ def main():
         wait_for(lambda: menu_open(window), "real instance history opens", 5)
         key(window, ord("1"))
         wait_for(lambda: title(path) == str(instance), "history switches back to private copy", 5)
-        assert len(rows(window)) == 19
+        assert len(rows(window)) == service_count
         checks["selector_switches_between_real_instances_and_retains_private_test_target"] = True
 
         box = user.GetDlgItem(window, 220)
@@ -143,7 +149,7 @@ def main():
         wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 1, "Up restores previous row", 5)
         key(window, 37)
         wait_for(lambda: user.SendMessageW(box, 0x188, 0, 0) == 0, "Left restores first card", 5)
-        assert len(rows(window)) == 19
+        assert len(rows(window)) == service_count
         checks["grid_arrows_update_selection_and_details_without_losing_services"] = True
 
         combo = user.GetDlgItem(window, 241)

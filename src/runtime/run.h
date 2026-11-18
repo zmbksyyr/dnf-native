@@ -77,10 +77,14 @@ typedef struct {
     uint64_t receive_timeout[NR_FD_SLOTS];
     uint64_t send_timeout[NR_FD_SLOTS];
     NrWatch *epolls[NR_FD_SLOTS];
+    unsigned epoll_cursor[NR_FD_SLOTS];
     NrEventFd *eventfds[NR_FD_SLOTS];
     NrVm vm[NR_VM_SLOTS];
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;
+    /* Writable private regions only; cleared under memory_lock on VM/brk changes. */
+    MEMORY_BASIC_INFORMATION memory_regions[8];
+    unsigned memory_region_count, memory_region_cursor;
     NrSignal actions[65];
     uint64_t signal_pending;
     int32_t signal_sender[65], signal_origin[65];
@@ -113,6 +117,7 @@ int nr_zero_fill(NrRun *run, CONTEXT *context);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 int nr_deliver_signal(NrRun *run, CONTEXT *context);
+int nr_deliver_fault(NrRun *run, CONTEXT *context, const EXCEPTION_RECORD *fault);
 int nr_restore_signal(NrRun *run, CONTEXT *context);
 int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 NrThread *nr_current(void);

@@ -192,6 +192,79 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
     return 0;
 }
 
+static int deliver_action(NrRun *run, CONTEXT *c, unsigned signal, const EXCEPTION_RECORD *fault) {
+    NrThread *thread=nr_current();
+    uint64_t bit=1ULL<<(signal-1);
+    NrSignal action=run->actions[signal];
+    if (!nr_memory(action.handler, 1, 0) || !run->signal_code) return 0;
+    int info=(action.flags & SA_SIGINFO) != 0;
+    size_t bytes=info ? sizeof(NrSignalFrame) : 2*sizeof(uintptr_t);
+    uintptr_t stack=SP(c);
+    size_t redzone=sizeof(void *)==8 ? 128 : 0;
+    if (stack < bytes + redzone + 16) return 0;
+    stack=((stack-bytes-redzone)&~(uintptr_t)15)-sizeof(uintptr_t);
+    if (!nr_memory(stack,bytes,1)) return 0;
+    uintptr_t restorer=(action.flags & SA_RESTORER) && action.restorer ? action.restorer : (uintptr_t)run->signal_code;
+    NrSignalFrame *frame=(NrSignalFrame *)thread->signal_frame_data;
+    memset(frame,0,sizeof(*frame));
+    frame->restorer=restorer;
+    uintptr_t info_address=stack+offsetof(NrSignalFrame,info);
+    uintptr_t context_address=stack+offsetof(NrSignalFrame,context);
+#ifndef _WIN64
+    frame->signal=signal;
+    frame->info_address=info_address;
+    frame->context_address=context_address;
+#endif
+    if (info) {
+        int32_t signo=(int32_t)signal, code=fault ? 1 : run->signal_origin[signal];
+        int32_t pid=run->signal_sender[signal], uid=code==128 ? 0 : 1000;
+        memcpy(frame->info,&signo,4);
+        memcpy(frame->info+8,&code,4);
+        size_t payload=sizeof(void *)==8 ? 16 : 12;
+        if (fault) {
+            uintptr_t address=(uintptr_t)fault->ExceptionInformation[1];
+            MEMORY_BASIC_INFORMATION region;
+            if (VirtualQuery((void *)address,&region,sizeof(region)) && region.State==MEM_COMMIT) code=2;
+            memcpy(frame->info+8,&code,4);
+            memcpy(frame->info+payload,&address,sizeof(address));
+        } else {
+            memcpy(frame->info+payload,&pid,4);
+            memcpy(frame->info+payload+4,&uid,4);
+        }
+        frame->context.stack_flags=2; /* SS_DISABLE; no alternate stack. */
+        save_machine(&frame->context.machine,c,thread);
+        if (fault) {
+            frame->context.machine.trapno=14;
+            frame->context.machine.cr2=(uintptr_t)fault->ExceptionInformation[1];
+            frame->context.machine.err=4 | (code==2 ? 1 : 0) |
+                (fault->ExceptionInformation[0]==1 ? 2 : 0) |
+                (fault->ExceptionInformation[0]==8 ? 16 : 0);
+        }
+        memcpy(frame->context.mask,&thread->signal_mask,8);
+    }
+    NrSignalState *state=HeapAlloc(GetProcessHeap(), 0, sizeof(*state));
+    if (!state) return 0;
+    state->context=*c;
+    state->mask=thread->signal_mask;
+    state->info=info;
+    state->frame=stack;
+    state->previous=thread->signal_state;
+    thread->signal_state=state;
+    thread->signal_mask |= action.mask;
+    if (!(action.flags & SA_NODEFER)) thread->signal_mask |= bit;
+    thread->signal_mask &= ~((1ULL<<8) | (1ULL<<18));
+    if (action.flags & SA_RESETHAND) memset(&run->actions[signal], 0, sizeof(NrSignal));
+    SP(c) = stack;
+    PC(c) = (uintptr_t)nr_signal_enter;
+#ifdef _WIN64
+    c->Rax=action.handler; c->Rdi=stack; c->Rsi=(uintptr_t)frame; c->Rcx=bytes;
+    c->Rdx=signal; c->R8=info_address; c->R9=context_address;
+#else
+    c->Eax=action.handler; c->Edi=stack; c->Esi=(uintptr_t)frame; c->Ecx=(DWORD)bytes;
+#endif
+    return 1;
+}
+
 int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread = nr_current();
     if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) {
@@ -208,58 +281,18 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
         NrSignal action = run->actions[signal];
         if (action.handler == 1 || (!action.handler && (signal == 17 || signal == 23 || signal == 28))) continue;
         if (!action.handler) ExitProcess(128 + signal);
-        if (!nr_memory(action.handler, 1, 0) || !run->signal_code) return 0;
-        int info=(action.flags & SA_SIGINFO) != 0;
-        size_t bytes=info ? sizeof(NrSignalFrame) : 2*sizeof(uintptr_t);
-        uintptr_t stack=SP(c);
-        size_t redzone=sizeof(void *)==8 ? 128 : 0;
-        if (stack < bytes + redzone + 16) return 0;
-        stack=((stack-bytes-redzone)&~(uintptr_t)15)-sizeof(uintptr_t);
-        if (!nr_memory(stack,bytes,1)) return 0;
-        uintptr_t restorer=(action.flags & SA_RESTORER) && action.restorer ? action.restorer : (uintptr_t)run->signal_code;
-        NrSignalFrame *frame=(NrSignalFrame *)thread->signal_frame_data;
-        memset(frame,0,sizeof(*frame));
-        frame->restorer=restorer;
-        uintptr_t info_address=stack+offsetof(NrSignalFrame,info);
-        uintptr_t context_address=stack+offsetof(NrSignalFrame,context);
-#ifndef _WIN64
-        frame->signal=signal;
-        frame->info_address=info_address;
-        frame->context_address=context_address;
-#endif
-        if (info) {
-            int32_t signo=(int32_t)signal, code=run->signal_origin[signal];
-            int32_t pid=run->signal_sender[signal], uid=code==128 ? 0 : 1000;
-            memcpy(frame->info,&signo,4);
-            memcpy(frame->info+8,&code,4);
-            size_t payload=sizeof(void *)==8 ? 16 : 12;
-            memcpy(frame->info+payload,&pid,4);
-            memcpy(frame->info+payload+4,&uid,4);
-            frame->context.stack_flags=2; /* SS_DISABLE; no alternate stack. */
-            save_machine(&frame->context.machine,c,thread);
-            memcpy(frame->context.mask,&thread->signal_mask,8);
-        }
-        NrSignalState *state=HeapAlloc(GetProcessHeap(), 0, sizeof(*state));
-        if (!state) return 0;
-        state->context=*c;
-        state->mask=thread->signal_mask;
-        state->info=info;
-        state->frame=stack;
-        state->previous=thread->signal_state;
-        thread->signal_state=state;
-        thread->signal_mask |= action.mask;
-        if (!(action.flags & SA_NODEFER)) thread->signal_mask |= bit;
-        thread->signal_mask &= ~((1ULL<<8) | (1ULL<<18));
-        if (action.flags & SA_RESETHAND) memset(&run->actions[signal], 0, sizeof(NrSignal));
-        SP(c) = stack;
-        PC(c) = (uintptr_t)nr_signal_enter;
-#ifdef _WIN64
-        c->Rax=action.handler; c->Rdi=stack; c->Rsi=(uintptr_t)frame; c->Rcx=bytes;
-        c->Rdx=signal; c->R8=info_address; c->R9=context_address;
-#else
-        c->Eax=action.handler; c->Edi=stack; c->Esi=(uintptr_t)frame; c->Ecx=(DWORD)bytes;
-#endif
-        return 1;
+        return deliver_action(run,c,signal,NULL);
     }
     return 1;
+}
+
+/* Synchronous memory faults belong to the interrupted guest thread, never the
+   process-wide pending queue. A handler may repair memory or edit ucontext to
+   resume; missing/blocked handlers retain the normal crash diagnostic path. */
+int nr_deliver_fault(NrRun *run, CONTEXT *c, const EXCEPTION_RECORD *fault) {
+    if (fault->ExceptionCode!=EXCEPTION_ACCESS_VIOLATION || fault->NumberParameters<2) return 0;
+    const unsigned signal=11;
+    NrThread *thread=nr_current();
+    if (run->actions[signal].handler<=1 || (thread->signal_mask & (1ULL<<(signal-1)))) return 0;
+    return deliver_action(run,c,signal,fault);
 }
