@@ -2,6 +2,39 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## 单次非阻塞收发与真实 LuaSQL（2026-11-18）
+
+GM 在线桥接的实际准备实验发现，自带 LuaSQL MySQL 驱动的 `pvio_socket_read`
+调用 recv(MSG_DONTWAIT)，宿主原先返回 ENOSYS，导致 MySQL 握手失败。库身份为
+`fdcb3167ae382e07e93a4735bce4dfd1048746aa46df45f46ebeb8f6111fc39b`。
+现保持 Winsock 非阻塞，由兼容层按 guest 调用模式等待真实就绪；原 ELF 和插件不变。
+
+Windows 10 x64 build 19044、LLVM-MinGW 20261104，以下检查已通过：
+
+- `tests/test_net_nowait.py --linux-distro DNF-Compare-20261118`：同一批双架构 ELF
+  共八个场景在两端通过。同连接另一线程持续阻塞读取时连续 32 次 DONTWAIT 不干扰它；
+  发送缓冲区满时返回 EAGAIN，实际接收字节数与成功发送总数完全相同；UDP 空收、
+  单次发送和有数据接收正确；F_SETFL 切换后非阻塞空 accept 返回 EAGAIN，恢复阻塞后
+  等待真实连接并完成双向收发。F_GETFL 核对 guest 模式及 accepted fd 的阻塞默认值。
+- `tests/test_net.py` 的双架构四轮 TCP、部分读取、poll、100ms 超时及 linger 通过；
+  `tests/test_net_closed.py` 原有 42 个场景在两端通过。双架构 epoll、poll、并发关闭
+  select 与 TCP FIN/RST 就绪回归通过。
+- 独立原 game 的 luv.new_work 后台线程使用实际 LuaSQL 建连，并逐字节核对十次
+  1 MiB 查询结果，未使用替代数据库驱动。初次配置把游戏加密密码当作明文的失败保留；
+  改用副本的有效数据库连接后通过，不把认证失败归为宿主网络缺口。
+- 同一副本完成原 game 单角色协议登录、移动请求和退出后，整套正常停服。
+  最新 17 份服务日志无未处理异常，manager 和三个 DBMW 均完成三个原网络线程的 join。
+  未再出现 socket flags 缺口；保留 Frida 的两项 inotify 回退，以及 luv 工作线程
+  初始化时 prlimit64(RLIMIT_STACK) 的 ENOSYS 后回退，不能据查询成功宣称全部 syscall 完整。
+
+原异步提交后取消的实验已撤回：专门夹具发现发送字节数不符及并发读取失败，
+失败证据保留为仓库外 `../x/dnf-gm-output/evidence/dontwait-cancel-failed.json`。
+最终夹具证据见同目录 `dontwait-final-io.json`、`dontwait-final-net.json`、
+`dontwait-final-closed.json`；真实驱动证据为 `dontwait-original-game.private.json`。
+正常停服、脚本恢复和日志核对见 `dontwait-postcheck.private.json`。独立原 relay 的
+双向转发、分片/合并、UDP 断开及三轮重连也通过，原版输入和 ZIP 基底未变。
+在线 GM 队列和泡点产品接入仍在进行，实际 LuaSQL 通过不代表它们已交付。
+
 ## errno 与线程清理 TLS 热路径（2026-11-18）
 
 排空积压时，实际忙碌线程位于原 game 离场广播、断线和日志链；采样还包括

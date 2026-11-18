@@ -17,7 +17,8 @@ static result call(word n, word a, word b, word c) {
 
 static result net(unsigned operation, word a, word b, word c, word d, word e) {
 #ifdef __x86_64__
-    word number = operation == 1 ? 41 : operation == 3 ? 42 : operation == 7 ? 52 : operation == 15 ? 55 : 54;
+    word number = operation == 1 ? 41 : operation == 3 ? 42 : operation == 7 ? 52 :
+                  operation == 10 ? 45 : operation == 15 ? 55 : 54;
     register word r10 __asm__("r10") = d;
     register word r8 __asm__("r8") = e;
     result r;
@@ -31,9 +32,9 @@ static result net(unsigned operation, word a, word b, word c, word d, word e) {
 }
 
 #ifdef __x86_64__
-enum {READ=0, WRITE=1, CLOSE=3, IOCTL=16, POLL=7, CLOCK=228, PIPE2=293, EXIT=60};
+enum {READ=0, WRITE=1, CLOSE=3, IOCTL=16, FCNTL=72, POLL=7, CLOCK=228, PIPE2=293, EXIT=60};
 #else
-enum {READ=3, WRITE=4, CLOSE=6, IOCTL=54, POLL=168, CLOCK=265, PIPE2=331, EXIT=1};
+enum {READ=3, WRITE=4, CLOSE=6, IOCTL=54, FCNTL=55, POLL=168, CLOCK=265, PIPE2=331, EXIT=1};
 #endif
 
 static void check(int condition, word line) {
@@ -80,6 +81,11 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(net(14, fd, 1, 13, 1, sizeof(linger)) == -14);
     CHECK(net(14, fd, 1, 13, (word)linger, sizeof(linger)) == 0);
     CHECK(net(3, fd, (word)&address, sizeof(address), 0, 0) == 0);
+    /* MSG_DONTWAIT affects one call, while the shared descriptor stays blocking.
+       The peer cannot reply before our later request, so no-data is deterministic. */
+    CHECK(call(FCNTL, fd, 3, 0) == 2);
+    CHECK(net(10, fd, (word)reply, sizeof(reply), 0x40, 0) == -11);
+    CHECK(call(FCNTL, fd, 3, 0) == 2);
     int socket_error = -1, error_length = 4;
     CHECK(net(15, fd, 1, 4, (word)&socket_error, (word)&error_length) == 0 && socket_error == 0 && error_length == 4);
     result refused = net(1, 2, 0x801, 0, 0, 0);
@@ -129,7 +135,10 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     report[7] = (int)call(POLL, (word)mixed, 2, 5000); report[8] = mixed[0].revents;
     CHECK(report[7] == 1 && report[8] == 1 && mixed[1].revents == 0);
     CHECK(call(CLOSE, pipe[0], 0, 0) == 0 && call(CLOSE, pipe[1], 0, 0) == 0);
-    word received = 0;
+    result first_byte = net(10, fd, (word)reply, 1, 0x40, 0);
+    CHECK(first_byte == 1 && reply[0] == expected[0]);
+    CHECK(call(FCNTL, fd, 3, 0) == 2);
+    word received = 1;
     while (received < sizeof(reply)) {
         result count = call(READ, fd, (word)(reply + received), sizeof(reply) - received);
         CHECK(count > 0); received += (word)count;

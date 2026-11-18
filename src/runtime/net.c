@@ -52,14 +52,42 @@ static intptr_t broken_pipe(int flags) {
     return -32;
 }
 
+/* Keep Winsock nonblocking. Guest O_NONBLOCK and MSG_DONTWAIT decide whether
+   this caller waits; they must never change another thread's socket mode.
+   Zero timeout means unlimited; a finite timeout keeps one deadline on retry. */
+static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout, ULONGLONG started) {
+    struct timeval duration, *limit = NULL;
+    if (timeout) {
+        uint64_t elapsed = (GetTickCount64() - started) * 1000;
+        if (elapsed >= timeout) return -11;
+        uint64_t remaining = timeout - elapsed;
+        duration.tv_sec = remaining / 1000000 > LONG_MAX ? LONG_MAX : (long)(remaining / 1000000);
+        duration.tv_usec = (long)(remaining % 1000000);
+        limit = &duration;
+    }
+    fd_set set, errors;
+    FD_ZERO(&set); FD_SET(socket, &set);
+    FD_ZERO(&errors); FD_SET(socket, &errors);
+    int ready = select(0, writing ? NULL : &set, writing ? &set : NULL, &errors, limit);
+    if (ready == SOCKET_ERROR) return socket_error();
+    return ready ? 0 : -11;
+}
+
 static intptr_t socket_transfer(NrRun *run, unsigned fd, void *buffer, int bytes, int receiving,
                                 int flags, struct sockaddr *address, int *length) {
     SOCKET s = (SOCKET)run->sockets[fd];
     int stream = run->socket_type[fd] == SOCK_STREAM;
     if (stream && !receiving && (run->stream_state[fd] & (STREAM_ERROR_CONSUMED | STREAM_WRITE_SHUT)))
         return broken_pipe(flags);
-    int r = receiving ? recvfrom(s, buffer, bytes, flags & ~0x4000, address, length) :
-                        sendto(s, buffer, bytes, flags & ~0x4000, address, address ? 16 : 0);
+    ULONGLONG started = GetTickCount64();
+    int r;
+    for (;;) {
+        r = receiving ? recvfrom(s, buffer, bytes, flags & ~(0x4000 | 0x40), address, length) :
+                        sendto(s, buffer, bytes, flags & ~(0x4000 | 0x40), address, address ? 16 : 0);
+        if (r != SOCKET_ERROR || WSAGetLastError() != WSAEWOULDBLOCK || run->nonblock[fd] || (flags & 0x40)) break;
+        intptr_t waited = wait_socket(s, !receiving, receiving ? run->receive_timeout[fd] : run->send_timeout[fd], started);
+        if (waited) return waited;
+    }
     if (r != SOCKET_ERROR) return r;
     int error = WSAGetLastError();
     if (!stream && !receiving && !address && error == WSAENOTCONN) return -89;
@@ -78,18 +106,6 @@ static intptr_t socket_transfer(NrRun *run, unsigned fd, void *buffer, int bytes
 }
 
 static int epoll_trace_enabled(const NrRun *run) { return run->epoll_trace_enabled != 0; }
-
-static intptr_t wait_socket(SOCKET socket, int writing, uint64_t timeout) {
-    if (!timeout) return 0;
-    if (timeout / 1000000 > LONG_MAX) return -22;
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(socket, &set);
-    struct timeval duration = {(long)(timeout / 1000000), (long)(timeout % 1000000)};
-    int ready = select(0, writing ? NULL : &set, writing ? &set : NULL, NULL, &duration);
-    if (ready == SOCKET_ERROR) return socket_error();
-    return ready ? 0 : -11;
-}
 
 static int interface_mac(unsigned char mac[6]) {
     ULONG bytes = 0;
@@ -110,10 +126,8 @@ static int interface_mac(unsigned char mac[6]) {
 }
 
 static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock, int type) {
-    if (nonblock) {
-        u_long mode = 1;
-        if (ioctlsocket(s, FIONBIO, &mode)) { intptr_t error = socket_error(); closesocket(s); return error; }
-    }
+    u_long mode = 1;
+    if (ioctlsocket(s, FIONBIO, &mode)) { intptr_t error = socket_error(); closesocket(s); return error; }
     unsigned fd = nr_fd_reserve(run);
     if (fd == NR_FD_SLOTS) { closesocket(s); return -24; }
     run->sockets[fd] = (uintptr_t)s;
@@ -509,13 +523,6 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         size_t bytes = args[2] > 0x7ffff000 ? 0x7ffff000 : args[2];
         if (!nr_memory(args[1], bytes, receiving)) { *result = -14; return 1; }
         if (!bytes && receiving) { *result = 0; return 1; }
-        if (!run->nonblock[fd] && !(run->stream_state[fd] &
-                                  (receiving ? STREAM_ERROR_CONSUMED : STREAM_ERROR_CONSUMED | STREAM_WRITE_SHUT)) &&
-            (receiving ? run->receive_timeout[fd] : run->send_timeout[fd]) > (uint64_t)(MAXDWORD - 1) * 1000) {
-            intptr_t waited = wait_socket(s, !receiving,
-                                          receiving ? run->receive_timeout[fd] : run->send_timeout[fd]);
-            if (waited) { *result = waited; return 1; }
-        }
         *result = socket_transfer(run, (unsigned)fd, (void *)args[1], (int)bytes, receiving, 0, NULL, NULL);
         return 1;
     }
@@ -537,9 +544,8 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     if (number == FCNTL && !operation) {
         if (args[1] == 3) *result = 2 | (run->nonblock[fd] ? 0x800 : 0);
         else if (args[1] == 4 && !(args[2] & ~(uintptr_t)(2 | 0x800))) {
-            u_long mode = (args[2] & 0x800) != 0;
-            *result = ioctlsocket(s, FIONBIO, &mode) == 0 ? 0 : socket_error();
-            if (!*result) run->nonblock[fd] = mode != 0;
+            run->nonblock[fd] = (args[2] & 0x800) != 0;
+            *result = 0;
         } else *result = -38;
         return 1;
     }
@@ -558,8 +564,8 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         if (args[1] != 0x5421 || !nr_memory(args[2], 4, 0)) { *result = args[1] == 0x5421 ? -14 : -38; return 1; }
         u_long mode; memcpy(&mode, (const void *)args[2], 4); mode = mode != 0;
-        *result = ioctlsocket(s, FIONBIO, &mode) == 0 ? 0 : socket_error();
-        if (!*result) run->nonblock[fd] = mode != 0;
+        run->nonblock[fd] = mode != 0;
+        *result = 0;
         return 1;
     }
     if (operation == 2 || operation == 3) {
@@ -569,8 +575,15 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         if (operation == 3) run->connect_state[fd] = 0;
         int r = operation == 2 ? bind(s, (const struct sockaddr *)&address, 16) : connect(s, (const struct sockaddr *)&address, 16);
         if (r == SOCKET_ERROR && operation == 3 && WSAGetLastError() == WSAEWOULDBLOCK) {
-            run->connect_state[fd] = 1;
-            *result = -115;
+            if (run->nonblock[fd]) { run->connect_state[fd] = 1; *result = -115; }
+            else {
+                *result = wait_socket(s, 1, run->send_timeout[fd], GetTickCount64());
+                if (*result == -11) { run->connect_state[fd] = 1; *result = -115; }
+                else if (!*result) {
+                    int error = 0, length = sizeof(error);
+                    *result = getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&error, &length) ? socket_error() : socket_errno(error);
+                }
+            }
         } else *result = r == 0 ? 0 : socket_error();
         return 1;
     }
@@ -688,7 +701,16 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         }
         SOCKET accepted = INVALID_SOCKET;
         int r;
-        if (operation == 5) { accepted = accept(s, (struct sockaddr *)&address, &bytes); r = accepted == INVALID_SOCKET ? SOCKET_ERROR : 0; }
+        if (operation == 5) {
+            ULONGLONG started = GetTickCount64();
+            for (;;) {
+                accepted = accept(s, (struct sockaddr *)&address, &bytes);
+                r = accepted == INVALID_SOCKET ? SOCKET_ERROR : 0;
+                if (!r || WSAGetLastError() != WSAEWOULDBLOCK || run->nonblock[fd]) break;
+                intptr_t waited = wait_socket(s, 0, run->receive_timeout[fd], started);
+                if (waited) { *result = waited; return 1; }
+            }
+        }
         else r = operation == 6 ? getsockname(s, (struct sockaddr *)&address, &bytes) : getpeername(s, (struct sockaddr *)&address, &bytes);
         if (r == SOCKET_ERROR) { *result = socket_error(); return 1; }
         if (output) {
@@ -699,8 +721,10 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
     if (operation == 9 || operation == 10 || operation == 11 || operation == 12) {
         int receiving = operation == 10 || operation == 12;
-        uintptr_t unsupported_flags = args[3] & ~(uintptr_t)(receiving ? 0 : 0x4000);
+        uintptr_t unsupported_flags = args[3] & ~(uintptr_t)(receiving ? 0x40 : 0x4040);
         if (args[2] > INT_MAX || unsupported_flags || !nr_memory(args[1], args[2], receiving)) {
+            if (unsupported_flags) fprintf(stderr, "socket unsupported transfer op=%d flags=0x%llx bytes=%llu\n",
+                                           operation, (unsigned long long)args[3], (unsigned long long)args[2]);
             *result = unsupported_flags || args[2] > INT_MAX ? -38 : -14; return 1;
         }
         struct sockaddr_in address; int bytes = 16, capacity = 0;

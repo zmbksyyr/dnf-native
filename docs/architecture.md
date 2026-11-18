@@ -207,6 +207,13 @@ TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的�
 
 TCP 终止错误按描述符消费一次；之后读出 EOF、写入返回 EPIPE，并向当前写入线程投递 SIGPIPE。`SO_ERROR` 同样消费终止错误；本地关闭写端不影响读端。发送支持 `MSG_NOSIGNAL`，阻塞的普通信号合并，不能被其他线程接收；自发 `tgkill` 也使用线程待决队列。UDP、异步连接错误与 TCP 终止状态分开处理。仍存在 Winsock 底层边界：对端发送数据后立即 RST，Windows 可能丢弃未读取数据，而 Linux 仍能读出；当前同步收包实现未解决该差异，专项夹具会明确失败，不据常见断线检查通过宣称完整 TCP 等价。
 
+收发支持单次调用的 `MSG_DONTWAIT`。Winsock socket 始终保持非阻塞，guest 的
+`O_NONBLOCK`、FIONBIO 和单次 flags 决定当前调用是否等待；阻塞 read/write、
+send/recv、connect 和 accept 通过 select 等待真实就绪，重试保留同一超时截止点。
+不会为了一个调用临时切换共享 socket 模式，也不通过取消异步发送来模拟 EAGAIN：
+后者可能已经发送数据却返回取消，造成应用重发和协议字节错位。发送返回真实接受的
+字节数，等待就绪后仍重新尝试 I/O，以处理其他线程先读走数据的情况。
+
 新实例的公开演示登录使用用户指定的 game 数据库凭据和 test 游戏账号，四张登录表在初始化时建立；内部 dnf_game、维护 root、bridge 和 frida 仍按原职责使用实例凭据。登录器不读取服务端配置，默认值明文显示；控制台数据库详情显示当前实例实际连接参数，不记录到控制台日志。
 
 ## Robot 与性能阶段实现
