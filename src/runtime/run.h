@@ -36,6 +36,7 @@ typedef struct {
     uintptr_t clear_tid, robust_head;
     DWORD tid;
     HANDLE handle;
+    volatile LONG allocated;
     NrGap gaps[32];
 } NrThread;
 

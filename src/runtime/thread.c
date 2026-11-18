@@ -238,8 +238,11 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
        flag combinations remain unsupported instead of inventing a child. */
     if (args[0] != 0x3d0f00 || !args[1]) { *result = -38; return 1; }
     if (!nr_memory(args[1], 2 * sizeof(uintptr_t), 1) || !nr_memory(args[2], 4, 1)) { *result = -14; return 1; }
+    /* Simultaneous pthread_create callers must not select the same empty
+       slot while CreateThread is still filling its handle. */
     NrThread *child = NULL;
-    for (unsigned i = 1; i < 64; ++i) if (!run->threads[i].handle) { child = &run->threads[i]; break; }
+    for (unsigned i = 1; i < 64; ++i)
+        if (InterlockedCompareExchange(&run->threads[i].allocated, 1, 0) == 0) { child = &run->threads[i]; break; }
     if (!child) { *result = -11; return 1; }
     child->initial_context = *c;
     child->signal_mask = thread->signal_mask;
@@ -249,22 +252,26 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
     child->initial_context.Rip += 2; child->initial_context.Rcx = child->initial_context.Rip;
     child->initial_context.R11 = child->initial_context.EFlags & ~0x10000u;
 #else
-    if (!nr_memory(args[3], 16, 0)) { *result = -14; return 1; }
+    if (!nr_memory(args[3], 16, 0)) { InterlockedExchange(&child->allocated, 0); *result = -14; return 1; }
     uint32_t descriptor[4]; memcpy(descriptor, (const void *)args[3], sizeof(descriptor));
-    if (descriptor[0] != 12 || descriptor[2] != 0xfffff || descriptor[3] != 0x51) { *result = -38; return 1; }
+    if (descriptor[0] != 12 || descriptor[2] != 0xfffff || descriptor[3] != 0x51) {
+        InterlockedExchange(&child->allocated, 0); *result = -38; return 1;
+    }
     child->tls_base = descriptor[1]; child->clear_tid = args[4];
     child->initial_context.Esp = args[1]; child->initial_context.Eax = 0; child->initial_context.Eip += 2;
 #endif
-    if (!nr_memory(child->tls_base, sizeof(uintptr_t), 1) || !nr_memory(child->clear_tid, 4, 1)) { *result = -14; return 1; }
+    if (!nr_memory(child->tls_base, sizeof(uintptr_t), 1) || !nr_memory(child->clear_tid, 4, 1)) {
+        InterlockedExchange(&child->allocated, 0); *result = -14; return 1;
+    }
     DWORD tid;
     child->handle = CreateThread(NULL, 1024 * 1024, child_entry, child, CREATE_SUSPENDED, &tid);
-    if (!child->handle) { *result = -11; return 1; }
+    if (!child->handle) { InterlockedExchange(&child->allocated, 0); *result = -11; return 1; }
     child->tid = tid;
     memcpy((void *)args[2], &tid, 4);
     InterlockedIncrement(&run->thread_count);
     if (ResumeThread(child->handle) == (DWORD)-1) {
         TerminateThread(child->handle, 124); CloseHandle(child->handle); child->handle = NULL;
-        InterlockedDecrement(&run->thread_count); *result = -11; return 1;
+        InterlockedDecrement(&run->thread_count); InterlockedExchange(&child->allocated, 0); *result = -11; return 1;
     }
     *result = tid;
     return 1;

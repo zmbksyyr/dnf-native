@@ -2,6 +2,14 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## 并发创建线程的槽竞争（2026-11-18）
+
+独立 game 的原版线程与 luv worker 同时创建线程时，两条进入日志出现相同 TLS，随后异常退出。原来的空槽检查与 CreateThread 写入句柄之间没有预留，可能被另一父线程选中。现以原子比较交换预留，失败时释放。
+
+Windows 10 x64 build 19044、LLVM-MinGW 20261104：`tests/test_clone_parallel.py` 每轮由 24 个父线程同时创建 24 个子线程，检查 TLS 基址/内容、线程 ID 和 clear-tid 退出。修复前 32 位复现 TLS 不符；修复后双架构各十轮通过，同一 ELF 在 Linux 对照各十轮通过。x64 TLS 基址通过 ARCH_GET_FS 核对。既有双架构 TLS、futex 和原版 glibc robust mutex 回归通过。证据位于 `../x/dnf-native-output/clone-parallel-final.json` 及 `../x/dnf-gm-output/evidence/clone-*.log`。
+
+使用 32 位修复宿主的独立整套服务正常启动，实际 GM 复活币修改完成内存读回、SQL 保存、退出重登、错误角色拒绝及重复 token 不重放检查。在线桥接仍在开发，以上不表示其全部功能通过。扩展夹具中 x64 并发 FS 指令读路径另有异常，尚未解决；该路径与已通过的 ARCH_GET_FS 检查须分别看待，不宣称全部并发 TLS 等价。
+
 ## 单次非阻塞收发与真实 LuaSQL（2026-11-18）
 
 GM 在线桥接的实际准备实验发现，自带 LuaSQL MySQL 驱动的 `pvio_socket_read`
