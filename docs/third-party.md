@@ -19,6 +19,8 @@ Zydis/Zycore 由 `tools/bootstrap.py` 按固定提交获取；miniz 原样上游
 
 `dnf-winport/rednf` 只作为只读行为线索；口令格式、relay/monitor 行为及 NTFS inode 处理由原版 ELF、独立实验和 Microsoft 规范复核。项目没有将参考工程代码、字节表、生成器或其构建产物接入运行链。原版资源基底继承此前已记录的来源与变更，整理目录不使它们变为项目独创内容。
 
+2026-11-18 的邮箱初始化修复直接依据固定原版 ELF 的 `CMailBox::CMailBox`、加载编号读取和 SQL 调用反汇编，以及独立副本的实际对象/查询记录。只补齐原构造函数遗漏的标量初始化，继续原容器构造和数据库业务；未读取或移植参考工程的邮箱代码、补丁或字节表。执行内存的旧字节核验、日志和恢复方式见[实现说明](architecture.md)，原版方法及真实客户端交易证据见[验证记录](validation.md)。
+
 DBMW/manager 停服修正曾参考 `rednf/remake/source/DNFServer/GameServer/DBMW/` 中 `DNFThreadInterface.h`、`DNFTcpNetworkThread.cpp`、`DNFNetworkThread.cpp`、`DNFApplication.cpp` 和 `DNFUdpHandler.cpp` 的对象关系。实际地址、虚表槽、循环标志、I/O 等待及销毁顺序均从固定原版 ELF 独立核对，差异是本项目在原版 Free 之前补充真实的停止、取消阻塞和 guest join；没有编译、移植或复制参考线程实现。原始指令与虚表核验记录位于外部 `P8-20261116-service-stop/evidence/`，适配身份与恢复方法见[实现说明](architecture.md)。
 
 P9 的嵌套信号和普通私有文件映射独立实现依据为 Linux [sigaction(2)](https://man7.org/linux/man-pages/man2/sigaction.2.html)、[mmap/munmap(2)](https://man7.org/linux/man-pages/man2/mmap.2.html) 的 ABI 语义，以及 Microsoft [CreateFileMappingW](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingw)、[MapViewOfFile](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile) 和 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect) 的文件视图与保护约束。需求来自固定 game/Frida 的 syscall 日志；与现有 ELF snapshot 路径分开，未移植参考 compat 代码。Linux EOF 外整页的 SIGBUS、同步异常转交及地址复用限制均保留明确边界。

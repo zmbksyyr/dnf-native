@@ -106,6 +106,7 @@ int nr_service_stop(NrRun *run, CONTEXT *context);
 int nr_pvf_script(NrRun *run, CONTEXT *context);
 int nr_pvf_encoding(NrRun *run, const char **error);
 int nr_game_configure(NrRun *run, const char **error);
+int nr_game_mailbox(NrRun *run, CONTEXT *context);
 int nr_auction_configure(NrRun *run, const char **error);
 int nr_memory(uintptr_t address, uintptr_t bytes, int write);
 int nr_path(NrRun *run, const char *guest, wchar_t *path);

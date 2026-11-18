@@ -3,6 +3,23 @@ var callbacks = [];
 function check(ok, what) { if (!ok) throw new Error(what); }
 function probe(level) {
     console.log('game-rules-start level=' + level);
+    // Poison recycled storage: the original constructor omitted these scalar
+    // initializers. Exercise its real containers as well as the new gate.
+    var mailbox = Memory.alloc(0xa8);
+    mailbox.writeByteArray(new Uint8Array(0xa8).fill(0xa5));
+    var mailboxCtor = new NativeFunction(ptr('0x085579b2'), 'void', ['pointer'], 'sysv');
+    var mailboxDtor = new NativeFunction(ptr('0x08557aac'), 'void', ['pointer'], 'sysv');
+    mailboxCtor(mailbox);
+    for (var offset = 0; offset < 16; offset++)
+        check(mailbox.add(offset).readU8() === 0, 'mailbox initial scalar ' + offset);
+    check(mailbox.add(0x7c).readU32() === 0 && mailbox.add(0x80).readU32() === 0,
+          'mailbox initial letter counters');
+    check(mailbox.add(0x58).readPointer().equals(mailbox.add(0x58)) &&
+          mailbox.add(0x5c).readPointer().equals(mailbox.add(0x58)), 'mailbox original empty list');
+    var mailboxRemain = new NativeFunction(ptr('0x08557922'), 'int', ['pointer'], 'sysv');
+    check(mailboxRemain(mailbox) === 20, 'mailbox original package pool');
+    mailboxDtor(mailbox);
+    console.log('game-rules-mailbox-initialization');
     var dm = Memory.alloc(65536);
     var getSp = new NativeFunction(ptr('0x08360cb8'), 'int', ['pointer','int'], 'sysv');
     dm.add(8 + 4 * (0x36a2 + level)).writeU32(12345);

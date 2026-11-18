@@ -4,6 +4,20 @@
 
 ## Windows 兼容层与 Robot 容量验收（2026-11-18）
 
+桌面解锁后的追加验收发现并修复邮箱对象标量未初始化。修复前，600 个实际邮箱对象中有 62 个带非零起始编号；实际 SQL 使用 `postal_id > 71238656`、`letter_id > 67109920`，购买邮件已入库却被过滤。固定原 ELF 构造函数的独立反汇编确认缺失初始化，执行内存补齐后，启动时 600 个对象的起始编号均为零。70/85 级原版方法夹具使用非零填充的对象验证标量初始化、原链表、20 格附件池和析构；双架构同步故障、sigaction、跨进程信号及原版 Gadget 拍卖保护回归通过。证据为 `load-550/mailbox-uninitialized.private.json`、`mailbox-initialized.private.json`、`probes/20261118T020953862619Z/game-rules/receipt.json`、`20261118T021251182849Z/game-rules/receipt.json`、`process-signal-checks.json` 和 `auction-guard/receipt.json`。
+
+实际客户端以订单 13724 购买 2000 个无色小晶块；修复后领取邮件 23，重新上架为订单 99059，公开关键字搜索可见，撤回后领取邮件 25。前轮金币寄售取消的退款邮件 22 也已领取。正常登出后 SQL 核对三封邮件均为已领取、两条测试订单均移除、背包保存 2000 个物品 3037、金币 8,226,000。操作使用独立副本，先备份目标行；没有用 SQL 修改制造交易结果。收据和截图位于 `client-ready/trade-fixed-receipt.private.json`。这补齐了下文早一轮未执行的物品交易及邮件领取范围；邮件发送者和正文中的问号另属当前种子/模板链路，不能据此宣称文字编码已全面解决。
+
+追加服务故障测试在 550+ 自动在线时，逐个核对测试进程的路径、ELF 哈希和 PID 后模拟异常退出。拍卖/寄售分别约 13.6/14.5 秒由 Robot 拉起，GUI 接回新 PID；relay 原版双向转发和 monitor 对未登录测试账号的拒绝恢复。monitor 停止时世界喊话明确失败，重启后发送恢复；此项仅证明发送链路。game 在 567 在线时退出，约 125.9 秒清空摆摊等会话，重新初始化后实际角色登录、移动、登出通过，Robot 保持响应。耗时不作为快速恢复结论，relay 协议也不等同于真实玩家组队。证据为 `load-550/service-faults.private.json`。
+
+最新 GUI 在活动实例上经真实鼠标检查 20 项悬停、24 次重复选择、实时标题统计及日志滚轮通过，见 `live-ui-ready/receipt.json`；桌面再次解锁后使用最终邮箱宿主复验同一路径通过，见 `live-ui-mailbox-final/receipt.json`。首个夹具未取得前台焦点的失败现场另存，未改写为通过。
+
+延长混合负载后发现新摆摊与到期收摊的并发预算不一致，600 目标在约 4.5 分钟时回落至 546 运行、51 连接中。Robot 现让两者共用已有名额，名额不足的收摊保持原摊位并下轮重试，恢复上线等实际进城后才释放名额。全仓 Go 测试、相关 actor/scheduler race 和 Linux amd64 交叉编译通过，见 `robot-store-churn-fixed/checks.json`；首次 race 缺少编译器 PATH 的失败日志保留，配置已有工具链后重跑通过。
+
+使用最终邮箱宿主及上述 Robot 从全新 game 进程启动，600 目标混合负载连续 900.0 秒、每 15 秒采样均保持 555–599 个实际运行角色，game PID 不变。Robot 工作集 225–334 MiB，game 1448.1–1462.2 MiB；观察段新增移动 20571 次、本地喊话 6137 次、世界喊话 6183 次、成功摆摊 234 次，累计到期收摊 172 次。最终登录、移动和喊话失败计数均为零，但仍有 99 次摆摊失败，不能称所有动作零失败。随后自动退出约 146.7 秒、整套正常停服约 43.1 秒，game 从发送停止到下一服务停止约 2 秒，没有强制结束进程。证据为 `load-550/soak-store-churn-cold.private.json`、`lifecycle-store-churn-cold.private.json`；这覆盖本次干净进程路径，不覆盖下一段先前热重开的失败。
+
+同一轮测试还记录到热重开 Robot 后 10 分钟未达到 550 运行，以及 game 正常停服超过 180 秒；后者保留全部依赖服务及数据库，没有用强制退出冒充正常停服。线程采样、连接快照和日志保存在 `load-550/restart-runtime-state.private.json`、`shutdown-game-stack.private.json`、`soak-store-churn-fixed.private.json` 和 `coldstart-store-churn.private.json`。核对目标身份后仅强制结束该独立测试 game，随后其余服务和数据库正常停止，见 `game-hang-recovery.private.json`。这些失败不能由之前的短负载和重启成功记录覆盖，当前尚未定位其完整根因。
+
 环境为 Windows 10 IoT Enterprise LTSC 2021 x64、build 19044，12 个逻辑处理器、约 32 GiB 内存；原版 game ELF 为 i686，glibc 2.17、MySQL 5.7.44，Robot 使用 Go 1.26.4、Windows amd64、无 CGO。原实例 `3333` 停库后复制到独立 `load-550/instance`，1547 个数据库文件经 SHA-256 核对，冷备份单独保留。原实例、输入 ELF、固定 ZIP 和参考目录保持只读。以下证据路径相对仓库外 `../x/dnf-native-output/`。
 
 实际瓶颈是大块已提交可写内存上的重复 `VirtualQuery`，单个小缓冲检查约 0.80 ms；使用 8 项查询缓存后，独立大区夹具为 i686 约 0.014 ms、x64 约 0.010 ms。guest 所有权仍逐次检查，VM、brk 和零页重置在同一锁内使缓存失效，代码和文件映射保留直接查询。1 ms 睡眠实测从约 15.7 ms 降至约 1.98 ms。这些是特定原语的前后对照，不能换算为整个游戏或相对 Linux 的性能提升百分比。证据为 `load-550/memory-check-comparison.json`、`sleep-comparison.json`。
@@ -34,7 +48,7 @@
 
 高负载重启最初因摆摊清理的离线等待和同 UID 重新登录休眠未响应关闭，超过 15 秒并退出 1。现将 manager 关闭传播至这些等待、选角存档和分解摊确认；关闭返回取消错误，阻止后续数据库写入，不把取消当成已经离线。正常运行的存档和同 UID 安全等待保持。修复后高负载重启完成，但首次同步登录仍先返回 pending，后续真实运行、移动和登出另存恢复收据；因此 `restart-load-fixed.private.json` 的整体失败状态保留，不改写为通过。相关竞态和全仓测试在 `robot/race-shutdown-fixed-windows.log`、`full-shutdown-ready-windows.log`。
 
-拍卖保护夹具的 SQL 和原函数转发是测试回调，不能代替实际客户端交易。本轮客户端通过实际鼠标完成上述搜索与金币寄售操作；未声称本轮完成物品购买、重新上架或邮件领取。测试前保存目标角色、背包、邮件和寄售行备份，客户端源目录关键文件哈希前后保持一致。DirectX 窗口使用 PrintWindow 会得到黑图，实际画面改从屏幕上游戏窗口范围采集；不把截图接口黑图误记为游戏黑屏。
+拍卖保护夹具的 SQL 和原函数转发是测试回调，不能代替实际客户端交易。早一轮客户端通过实际鼠标完成上述搜索与金币寄售操作，物品购买、重新上架和邮件领取由本文顶部的追加测试补齐。测试前保存目标角色、背包、邮件和寄售行备份，客户端源目录关键文件哈希前后保持一致。DirectX 窗口使用 PrintWindow 会得到黑图，实际画面改从屏幕上游戏窗口范围采集；不把截图接口黑图误记为游戏黑屏。
 
 本轮 Robot 全仓普通测试、全仓 race，以及批量操作修改后的相关 race 通过；Linux amd64 交叉编译通过，记录位于 `robot/`。Windows 市场、组队、邮箱、进程诊断现已有平台实现；本文末尾 2026-11-17 的 `/proc` 限制是当时状态。Linux 原生对照尚待系统重启使已启用的 WSL/VirtualMachinePlatform 生效；导入发行版明确返回 `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`，没有 Linux 运行数据。正式产品仍在 Windows 原生运行。
 

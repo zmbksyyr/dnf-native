@@ -423,6 +423,9 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
 #else
     uintptr_t pc = c->Eip;
     if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
+        int mailbox = nr_game_mailbox(active, c);
+        if (mailbox < 0) { fflush(NULL); ExitProcess(126); }
+        if (mailbox) return EXCEPTION_CONTINUE_EXECUTION;
         int script = nr_pvf_script(active, c);
         if (script < 0) { fflush(NULL); ExitProcess(126); }
         if (script) return EXCEPTION_CONTINUE_EXECUTION;

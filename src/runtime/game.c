@@ -48,7 +48,39 @@ static int patch(uintptr_t pc, const void *bytes, size_t size) {
     memcpy((void *)pc, bytes, size);
     return VirtualProtect((void *)pc, size, old, &ignored) && FlushInstructionCache(GetCurrentProcess(), (void *)pc, size);
 }
+
+/* The pinned CMailBox constructor builds its containers but leaves its scalar
+   state indeterminate. A reused allocation can then filter every real postal
+   row with a garbage last-loaded ID. Initialize only those scalar members,
+   before the original constructor runs; its containers and database paths stay
+   original. UD2 replaces the three-byte frame prologue, replayed below. */
+#define MAILBOX_CONSTRUCTOR 0x085579b2u
+static const unsigned char mailbox_prologue[] = {0x55,0x89,0xe5,0x56,0x53,0x83,0xec,0x10};
 #endif
+
+int nr_game_mailbox(NrRun *run, CONTEXT *c) {
+#ifdef _WIN64
+    (void)run; (void)c;
+    return 0;
+#else
+    if (c->Eip != MAILBOX_CONSTRUCTOR || run->program.bias ||
+        strcmp(run->program.sha256, "da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979")) return 0;
+    EnterCriticalSection(&run->memory_lock);
+    int valid = c->Esp >= 4 && nr_memory(c->Esp, 8, 0) && nr_memory(c->Esp - 4, 4, 1);
+    uintptr_t object = valid ? *(const uint32_t *)(uintptr_t)(c->Esp + 4) : 0;
+    valid = valid && nr_memory(object, 0xa8, 1);
+    if (valid) {
+        memset((void *)object, 0, 16);
+        memset((void *)(object + 0x7c), 0, 8);
+        c->Esp -= 4;
+        *(uint32_t *)(uintptr_t)c->Esp = c->Ebp;
+        c->Ebp = c->Esp;
+        c->Eip += 3;
+    }
+    LeaveCriticalSection(&run->memory_lock);
+    return valid ? 1 : -1;
+#endif
+}
 
 int nr_game_configure(NrRun *run, const char **error) {
     const char *value = NULL;
@@ -68,6 +100,15 @@ int nr_game_configure(NrRun *run, const char **error) {
     *error = "game rules require the i386 host";
     return 0;
 #else
+    if (!expected(elf, MAILBOX_CONSTRUCTOR, mailbox_prologue, sizeof(mailbox_prologue))) {
+        *error = "mailbox constructor instructions differ"; return 0;
+    }
+    const unsigned char mailbox_trap[] = {0x0f,0x0b,0x90};
+    if (!patch(MAILBOX_CONSTRUCTOR, mailbox_trap, sizeof(mailbox_trap))) {
+        *error = "mailbox constructor patch failed"; return 0;
+    }
+    fprintf(stderr, "game mailbox sha256=%s pc=0x%08x original=5589e5 replacement=0f0b90 scope=execution-memory; scalar state initialized before original constructor\n",
+            elf->sha256, MAILBOX_CONSTRUCTOR);
     unsigned limit = 70;
     if (value) {
         size_t length = strlen(value);
