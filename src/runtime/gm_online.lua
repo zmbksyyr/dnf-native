@@ -27,6 +27,7 @@ local database_work = function(encoded)
             {version=2, suffix='v2', field='money', operations="'set_money','add_money'"},
             {version=3, suffix='v3', field='fatigue', operations="'refill_fatigue'"},
             {version=4, suffix='v4', field='remain_sp', operations="'set_skill_points'"},
+            {version=5, suffix='v5', field='qp', operations="'set_quest_points'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
@@ -98,6 +99,8 @@ local database_work = function(encoded)
             if queue.version==4 then
                 saved_table='taiwan_cain_2nd.skill'
                 saved_extra=' AND i.remain_sp_2nd=q.after_sp2 AND i.remain_sfp_1st=q.after_tp AND i.remain_sfp_2nd=q.after_tp2'
+            elseif queue.version==5 then
+                saved_table='taiwan_cain.charac_quest_shop'
             end
             exec(string.format([[UPDATE %s q JOIN %s i ON i.charac_no=q.charac_no
                 SET q.state='done',q.note='saved',q.updated=NOW(6)
@@ -171,7 +174,10 @@ void *DNF_GM_SkillWrite(CUser *);
 void DNF_GM_GetSkillPoints(void *, int *, int *, int *, int *);
 void DNF_GM_SetSkillPoints(void *, int, int, int, int);
 void DNF_GM_SendSkill(CUser *);
-void DNF_GM_SaveSkill(CUser *);
+void DNF_GM_UpdateData(CUser *);
+int DNF_GM_GetQP(CUser *);
+void DNF_GM_SetQP(CUser *, int);
+void *DNF_GM_GetExpandData(CUser *, int);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -195,7 +201,10 @@ symbols.alias('DNF_GM_SkillWrite', '_ZN15CUserCharacInfo18getCurCharacSkillWEv')
 symbols.alias('DNF_GM_GetSkillPoints', '_ZNK9SkillSlot13get_remain_spEPiS0_S0_S0_')
 symbols.alias('DNF_GM_SetSkillPoints', '_ZN9SkillSlot13set_remain_spEiiii')
 symbols.alias('DNF_GM_SendSkill', '_ZN5CUser15send_skill_infoEv')
-symbols.alias('DNF_GM_SaveSkill', '_ZN5CUser10UpdateDataEv')
+symbols.alias('DNF_GM_UpdateData', '_ZN5CUser10UpdateDataEv')
+symbols.alias('DNF_GM_GetQP', '_ZN5CUser13getQuestPointEv')
+symbols.alias('DNF_GM_SetQP', '_ZN5CUser13setQuestPointEi')
+symbols.alias('DNF_GM_GetExpandData', '_ZNK5CUser19GetCharacExpandDataE23ENUM_CHARAC_EXPAND_TYPE')
 
 local function skill_points(ptr)
     local values=ffi.new('int[4]')
@@ -229,6 +238,7 @@ end,function(encoded)
         local coin = req.version==1 and (req.operation=='set_coin' or req.operation=='add_coin')
         local fatigue = req.version==3 and req.operation=='refill_fatigue'
         local skills = req.version==4 and req.operation=='set_skill_points'
+        local quest_points = req.version==5 and req.operation=='set_quest_points'
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
                 receipt.state,receipt.note,receipt.charac_no='done','active_character',user:GetCharacNo()
@@ -253,10 +263,31 @@ end,function(encoded)
                     ffi.C.DNF_GM_SendSkill(user.fptr)
                     -- _SaveCharacData does not serialize skills; use the original
                     -- dirty-skill path, which also retains learned skills/commands.
-                    ffi.C.DNF_GM_SaveSkill(user.fptr)
+                    ffi.C.DNF_GM_UpdateData(user.fptr)
                 end)
                 if ok then receipt.state,receipt.note='applied','save_queued' end
             else receipt.note='skill_points_limit' end
+        elseif quest_points and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
+            local after=tonumber(req.amount)
+            -- The original QP dispatchers use expand type 11. The public getter
+            -- returns zero when absent, so check the module before accepting zero.
+            if ffi.C.DNF_GM_GetExpandData(user.fptr,11)==nil then
+                receipt.note='quest_shop_unavailable'
+            else
+                local before=tonumber(ffi.C.DNF_GM_GetQP(user.fptr))
+                if after and after>=0 and after<=2147483647 and after%1==0 and before>=0 then
+                    receipt.before,receipt.after=before,after
+                    receipt.state,receipt.note='unknown','apply_failed'
+                    local ok=pcall(function()
+                        -- setQuestPoint marks the original expand data dirty and
+                        -- sends the 32-bit notification. UpdateData saves it.
+                        ffi.C.DNF_GM_SetQP(user.fptr,after)
+                        assert(tonumber(ffi.C.DNF_GM_GetQP(user.fptr))==after,'QP readback differs')
+                        ffi.C.DNF_GM_UpdateData(user.fptr)
+                    end)
+                    if ok then receipt.state,receipt.note='applied','save_queued' end
+                else receipt.note='quest_points_limit' end
+            end
         elseif fatigue and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local ptr=user.fptr
             local maximum=tonumber(ffi.C.DNF_GM_MaxFatigue(ptr))
@@ -278,7 +309,7 @@ end,function(encoded)
                 end)
                 if ok then receipt.state,receipt.note='applied','save_queued' end
             else receipt.note='fatigue_limit' end
-        elseif not money and not coin and not fatigue and not skills then receipt.note='unsupported_operation'
+        elseif not money and not coin and not fatigue and not skills and not quest_points then receipt.note='unsupported_operation'
         elseif (money or coin) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local inventory = user:GetCurCharacInvenR()
             if inventory then
@@ -324,5 +355,5 @@ _DP.add_unload_handler(function()
     state.timer:stop()
     if not uv.is_closing(state.timer) then state.timer:close() end
 end)
-io.stderr:write('GM bridge installed; online coin/money/fatigue/skill commands require an acknowledged save\n')
+io.stderr:write('GM bridge installed; online coin/money/fatigue/skill/QP commands require an acknowledged save\n')
 return state

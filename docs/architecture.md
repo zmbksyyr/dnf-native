@@ -35,9 +35,14 @@ SP/TP 四组计数限定 0..65535。通过原 `SkillSlot::get_remain_sp/set_rema
 可写技能访问器标记脏数据；读回一致后调用 `CUser::send_skill_info/UpdateData`，
 再确认 `skill` 表四组字段全部等于目标。`_SaveCharacData` 不负责技能存档，不能用于此操作。
 沿用原技能序列化，保留已学技能与技能指令；离线同时检查归属、未删除、离线及技能记录存在。
+QP 调用原 `CUser::getQuestPoint/setQuestPoint`。设置接口标记扩展数据为已修改并发送 32 位通知，
+`UpdateData` 沿用原 `CQuestShop::_saveData` 保存属性、重置计数和任务碎片，确认 SQL 的 QP 后才完成。
+按原调度器检查扩展模块 11，避免缺模块时 getter 返回零被误认成成功。
+QP 限定为原 getter 的非负有符号 32 位范围；离线允许懒建 QP 行，实际写入同时检查角色归属、未删除与离线，
+仅更新 QP，不重置已有属性、重置计数或任务碎片。
 `inspect` 命令只读当前角色，供 GM 冻结仅在线泡点收件名单；没有把登录表账号在线标记外推为所有角色在线。
 
-复活币／inspect 沿用 v1 队列，金币使用 v2，补满疲劳使用 v3，SP/TP 使用 v4；各自独立队列和心跳，防止旧 helper 误处理新操作。
+复活币／inspect 沿用 v1 队列，金币使用 v2，补满疲劳使用 v3，SP/TP 使用 v4，QP 使用 v5；各自独立队列和心跳，防止旧 helper 误处理新操作。
 同账号任一队列存在 claimed／applied 时，其他队列不领取，避免原游戏保存时互相覆盖。
 MySQL 队列表使用唯一 token，状态为 pending→claimed→applied→done，
 或 rejected/unknown。每 500ms 至多处理 32 条，同账号只领取最早一条，
