@@ -5,12 +5,13 @@ import json
 from pathlib import Path
 import platform
 import subprocess
+import time
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from bootstrap import TOOLCHAIN, BUILD
-from runtime_support import unpack_runtime
+from runtime_support import unpack_runtime, request_stop
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = TOOLCHAIN
@@ -89,6 +90,42 @@ def main():
                         "host_sha256":sha(BUILD/arch/"dnf-host.exe"),"program_sha256":sha(program),"loader_sha256":sha(loader),
                         "stderr":stderr,"passed":passed})
         print(arch,"original glibc sigaction/raise/restorer","PASS" if passed else "FAIL",flush=True)
+        for blocked in (False, True):
+            program = directory / ("thread-signal-blocked" if blocked else "thread-signal")
+            build_command = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib",
+                             "-fno-stack-protector", "-fno-pic", "-no-pie", "-O2", "-Wall", "-Wextra", "-Werror",
+                             "-Wl,--image-base=" + base, "-Wl,-e,_start", "-Wl,--dynamic-linker=/" + lib + "/ld-2.17.so",
+                             str(ROOT / "tests/process_signal_threaded.c"), "-L" + str(directory / lib),
+                             "-l:libpthread.so.0", "-l:libc.so.6", "-o", str(program)]
+            if blocked:
+                build_command.append("-DNR_BLOCK_LEADER")
+            subprocess.run(build_command, check=True)
+            host = BUILD / arch / "dnf-host.exe"
+            child = subprocess.Popen([str(host), "--root", str(directory), sha(loader), "--run", str(program),
+                                      sha(program), "thread-signal"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+            forced, error = False, None
+            try:
+                assert child.stdout.readline() == b"thread-signal-ready\n"
+                request_stop(child.pid, 12)
+                # The leader stays inside read while its worker makes syscalls.
+                # An unmasked leader's signal must remain pending until return.
+                time.sleep(.1)
+                child.stdin.write(b"u"); child.stdin.flush()
+                child.wait(timeout=5)
+            except Exception as failure:
+                error = repr(failure)
+            finally:
+                if child.poll() is None:
+                    forced = True; child.terminate(); child.wait(timeout=5)
+                child.stdin.close()
+            stderr = child.stderr.read().decode(errors="replace")
+            child.stderr.close(); child.stdout.close()
+            passed = child.returncode == 42 and not forced and error is None
+            records.append({"receiver_arch": arch, "case": "thread-signal-blocked-leader" if blocked else "thread-signal-leader",
+                            "host_sha256": sha(host), "fixture_sha256": sha(program), "exit_code": child.returncode,
+                            "stderr": stderr, "forced_cleanup": forced, "error": error, "passed": passed})
+            print(arch, "process signal leader blocked=" + str(blocked), "PASS" if passed else "FAIL", flush=True)
     for receive_arch in ARCHES:
         for send_arch in ARCHES:
             receiver = subprocess.Popen(command(receive_arch, receivers[receive_arch]), stdin=subprocess.PIPE,

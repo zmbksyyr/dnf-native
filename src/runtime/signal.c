@@ -277,6 +277,12 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     for (unsigned signal = 1; signal <= 64; ++signal) {
         uint64_t bit = 1ULL << (signal - 1);
         if (!(ready & bit)) continue;
+        /* External process signals prefer the guest group leader, as on
+           Linux. Letting the busiest worker consume a controller stop can
+           reenter its logger from the original game's shutdown handler. A
+           blocked leader still leaves other unblocked threads eligible. */
+        if (run->signal_origin[signal] == 128 && thread != &run->threads[0] &&
+            !(run->threads[0].signal_mask & bit)) continue;
         run->signal_pending &= ~bit;
         NrSignal action = run->actions[signal];
         if (action.handler == 1 || (!action.handler && (signal == 17 || signal == 23 || signal == 28))) continue;

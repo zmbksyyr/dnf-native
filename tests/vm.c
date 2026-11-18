@@ -45,6 +45,14 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(call6(CLOCK, 1, checked, 0, 0, 0, 0) == 0);
     CHECK(PROTECT(checked + page, page, 1) == 0);
     CHECK(call6(CLOCK, 1, checked + page, 0, 0, 0, 0) == -14);
+    /* A cached readable range must still reject writes, including a request
+       that starts in the preceding writable page and crosses its boundary. */
+    CHECK(call6(CLOCK, 1, checked + page, 0, 0, 0, 0) == -14);
+    CHECK(call6(CLOCK, 1, checked + page - sizeof(word), 0, 0, 0, 0) == -14);
+    CHECK(PROTECT(checked + page, page, 0) == 0);
+    CHECK(call6(CLOCK, 1, checked + page, 0, 0, 0, 0) == -14);
+    CHECK(PROTECT(checked + page, page, 3) == 0);
+    CHECK(call6(CLOCK, 1, checked + page, 0, 0, 0, 0) == 0);
     CHECK(call6(CLOCK, 1, checked, 0, 0, 0, 0) == 0);
     CHECK(UNMAP(checked + 2 * page, page) == 0);
     CHECK(call6(CLOCK, 1, checked + 2 * page, 0, 0, 0, 0) == -14);

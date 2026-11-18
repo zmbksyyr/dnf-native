@@ -61,6 +61,8 @@ flowchart TD
 
 `SA_NODEFER` 允许同一未屏蔽信号在 handler 内再次投递，但 action 中的显式 mask 仍然生效。每层 handler 保存独立中断上下文、掩码及 guest 帧，`sigreturn` 逐层恢复。guest 模块执行中的 Windows 访问异常同步交给该线程已注册且未屏蔽的 Linux SIGSEGV handler，填写 `si_addr`、MAPERR/ACCERR、页错误编号和 ucontext；handler 可修复内存或修改 PC 后恢复。未注册或屏蔽时保留原崩溃诊断与退出 125；备用信号栈、浮点扩展状态、其他异常类型与纯计算中的异步信号仍未补齐。
 
+控制台及跨进程事件传入的 SIGUSR2/SIGTERM 优先由未屏蔽该信号的 guest 初始线程处理；该线程屏蔽时，其他未屏蔽线程仍可处理。这样进程停服不再由执行 syscall 最密集的工作线程抢先处理，避免原游戏日志函数被同线程停服 handler 重入。投递仍发生在现有 syscall/异常返回边界，不提供阻塞 Windows 调用或纯计算过程中的任意即时中断；线程自发的 `tgkill` 和同步故障不由此改投初始线程。
+
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
 
 `service.c` 对固定原版 DBMW 和 manager 的 `CApplication::Free()` 增加局部停服适配。原版 `stop()` 仅清除对象 `+8`，TCP dispatch 实际循环标志在 `+0x2c`；原版清理还在工作线程退出前删除 handler，且没有调用已有的 `pthread_join`。这属于应用生命周期缺陷，不能通过改变通用线程或网络 syscall 语义修复。
@@ -209,6 +211,6 @@ TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的�
 
 `src/runtime/elf.c` 的全文件哈希仍保持 SHA-256 身份校验，但读取改为 64 KiB `ReadFile` 分块，减少大 ELF 启动时对只读映射工作集的影响。`NrRun` 在启动时缓存 `DNF_NATIVE_TRACE`、`DNF_NATIVE_EPOLL_TRACE` 和 QPC 频率，syscall、socket、epoll 与文件热路径不再重复查询环境变量或频率。
 
-大块可写私有内存的 `VirtualQuery` 结果使用 8 项缓存，guest 所有权仍逐次核对；VM、brk 与零页重置在同一映射锁内使缓存失效。代码页、文件映射和 guard 保留直接查询。运行 ELF 时申请 1ms Windows 定时器分辨率，正常返回时配对释放。epoll 从上次返回位置继续扫描就绪项，避免小 `maxevents` 长期饿死后续描述符。`pread64` 用独立重开句柄和 OVERLAPPED 偏移读取，保留原文件位置。
+已提交私有内存的 `VirtualQuery` 结果使用 32 项缓存，代码读取和数据访问均保留真实页权限检查；guest 所有权仍逐次核对。Windows 查询从当前页开始返回区间，因此缓存把同一分配、相同权限且终点相同的重复尾段合并，避免角色对象交错访问时重复淘汰和扫描大区页表。VM、brk 与零页重置在同一映射锁内使缓存失效；文件视图、未提交页和 guard 保留直接查询。该规则依据 [VirtualQuery](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualquery) 返回区间语义独立实现。运行 ELF 时申请 1ms Windows 定时器分辨率，正常返回时配对释放。epoll 从上次返回位置继续扫描就绪项，避免小 `maxevents` 长期饿死后续描述符。`pread64` 用独立重开句柄和 OVERLAPPED 偏移读取，保留原文件位置。
 
 Robot 通过独立 `robot.exe` 进程接入服务列表末尾。Native 只创建实例目录配置、命名停止事件和 Job Object 归属；Robot 通过 `--config-dir`、`--stop-event` 及 `host-profile.json` 选择宿主。Windows 进程、内存补丁和市场维护由 Robot 自己的平台层处理，Linux 原有路径保留；依赖 `/root/run`、`/root/stop` 的入口在 Windows 明确不支持并置灰。详见 [Robot 接入](robot.md)。

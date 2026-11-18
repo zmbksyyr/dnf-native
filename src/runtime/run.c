@@ -32,6 +32,25 @@ static int executable(uintptr_t pc) {
     return found;
 }
 
+static void cache_memory_region(MEMORY_BASIC_INFORMATION info) {
+    /* VirtualQuery starts at the queried page, not the start of its protection
+       range. Descending user addresses otherwise fill the cache with suffixes
+       of the same large allocation and repeatedly scan its page tables. */
+    for (unsigned i = 0; i < active->memory_region_count; ++i) {
+        MEMORY_BASIC_INFORMATION *region = &active->memory_regions[i];
+        uintptr_t first = (uintptr_t)region->BaseAddress;
+        uintptr_t start = (uintptr_t)info.BaseAddress;
+        if (region->AllocationBase == info.AllocationBase && region->Protect == info.Protect &&
+            first + region->RegionSize == start + info.RegionSize && start <= first) {
+            *region = info;
+            return;
+        }
+    }
+    active->memory_regions[active->memory_region_cursor] = info;
+    active->memory_region_cursor = (active->memory_region_cursor + 1) % NR_MEMORY_REGIONS;
+    if (active->memory_region_count < NR_MEMORY_REGIONS) ++active->memory_region_count;
+}
+
 static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
     if (!bytes) return 1;
     if (address > UINTPTR_MAX - bytes) return 0;
@@ -75,16 +94,12 @@ static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
         }
         if (!cached) {
             if (!VirtualQuery((const void *)address, &info, sizeof(info))) return 0;
-            /* Querying a large committed region walks its page tables on
-               Windows. Reusing its result avoids millisecond costs for every
-               small packet, while VM/brk operations invalidate all entries.
-               Code, file views and guards retain the direct query path. */
+            /* Cache both code reads and data, retaining the queried protection
+               for the write check below. VM/brk changes invalidate all entries;
+               file views, uncommitted pages and guards remain uncached. */
             if (info.State == MEM_COMMIT && info.Type == MEM_PRIVATE &&
-                info.Protect == PAGE_READWRITE && info.RegionSize >= 65536) {
-                active->memory_regions[active->memory_region_cursor] = info;
-                active->memory_region_cursor = (active->memory_region_cursor + 1) % 8;
-                if (active->memory_region_count < 8) ++active->memory_region_count;
-            }
+                !(info.Protect & (PAGE_NOACCESS | PAGE_GUARD)))
+                cache_memory_region(info);
         }
         if (info.State != MEM_COMMIT ||
             (info.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return 0;

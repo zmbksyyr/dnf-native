@@ -9,6 +9,7 @@
 #define NR_FD_SLOTS 1024
 #define NR_EVENTFD 32
 #define NR_FD_RESERVED 255
+#define NR_MEMORY_REGIONS 32
 typedef struct NrEventFd NrEventFd;
 typedef struct NrSignalState NrSignalState;
 
@@ -82,8 +83,8 @@ typedef struct {
     NrVm vm[NR_VM_SLOTS];
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;
-    /* Writable private regions only; cleared under memory_lock on VM/brk changes. */
-    MEMORY_BASIC_INFORMATION memory_regions[8];
+    /* Committed private regions; cleared under memory_lock on VM/brk changes. */
+    MEMORY_BASIC_INFORMATION memory_regions[NR_MEMORY_REGIONS];
     unsigned memory_region_count, memory_region_cursor;
     NrSignal actions[65];
     uint64_t signal_pending;
