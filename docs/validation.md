@@ -1374,3 +1374,20 @@ GM 现在只对只读 inspect 的该明确结果跳过账号及其角色，实�
 再次核对构建哈希。最终组合的 GM 六并发增量、泡点、退出存档及离线守卫分别记录于
 `gm-online-extra-graceful-save-final-{windows,linux}.private.json`，均通过且恢复测试值。
 两端真实桥接的无当前角色回归为 `gm-live-inactive-targets-{windows,linux}.log`。
+
+### 摆摊区域规则定点对照（2026-11-19）
+
+Native 宿主未修改。Robot 补齐 PVF `[use private store]` 区域权限，旧导出自动
+升级为版本 8；普通自动摊与分解摊共用村庄 7 限制。手动摆摊明确拒绝后立即
+结束确认等待并保留服务端错误码。来源哈希与固定原 ELF 独立核对见仓库外
+`x/dnf-gm-output/evidence/store-permission-source-study.json`，没有引入参考产物。
+
+Windows 10 x64 19044 Native 与授权 Linux 5.10.16.3 WSL2 原 ELF 独立副本
+分开完成同一组 8 个坐标：两处受限区域返回 `0x3e`，其余六处展示确认成功。
+使用满级、无公会测试角色，避免混入地图等级门槛；不代表所有位置零失败，
+也不替代已有 600 人负载证据。Go 全仓测试及双平台构建通过。
+
+两端原始业务记录为 `store-permission-{windows,linux}-actual-final.private.json`。
+Windows 辅助清理与停服重叠的失败记录保留，随后停 game、恢复并逐表复核测试
+快照，见 `store-permission-windows-cleanup-recovery.json`；Linux 自动恢复快照。
+Robot 对应提交为 `aa648bd`；正式包仅更新 Robot 及其资源校验清单。
