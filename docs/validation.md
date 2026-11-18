@@ -1215,3 +1215,52 @@ GETPID 的进程 CPU 时间中位数，x86 从 1.4297 秒变为 1.2578 秒，x64
 `signal-wait-benchmark.json`、`signal-wait-profile-comparison.json` 和
 `signal-fast-load-comparison.json`、`gm-online-extra-signal-fast-windows.private.json`、
 `signal-fast-normal-stop.private.log`。采样、原始负载和上一阶段记录独立保留。
+
+## i386 查询直达与分解摊村庄规则（2026-11-18）
+
+继续使用 Windows 10 x64 19044、LLVM-MinGW 20261104 MSVCRT 和独立原版服务
+副本。退出时原 loader 网关入口样本中，最多的 syscall 是 `time(NULL)` 和写日志。
+新增的直接路径仅覆盖固定 loader 的三种无输出指针查询；不改磁盘 ELF、loader
+指令或 TLS 内容。改变 TLS 回调或原入口被 detour 后，仍执行实际目标。
+
+新夹具在 1000 轮原查询/直接查询比较中核对 GPR、ESP、算术标志和 DF，以及
+x87、XMM、MXCSR 的完整 FXSAVE 区。测试包含静态 ELF 的任意 GS:16 回调、
+动态回调替换、固定原 loader 的临时 detour 与六字节/页权限恢复、非空时间指针、
+EFAULT、屏蔽信号、仅查询循环中的外部 SIGUSR2、pthread 身份及开启 trace 后
+的回退。两种 trace 模式通过；既有双架构 TLS、入口、文件、信号、robust mutex、
+各十轮并发 clone 和原 glibc MADVISE/线程栈回收检查通过。
+
+相同查询夹具与原 glibc 在授权的 Linux 5.10.16.3 WSL2 对照中通过，哈希一致。
+Linux 通常使用内核 vDSO，因此未进入只针对固定 loader 入口的 detour 测试分支；
+不把该分支的 Windows 结果外推到 Linux。没有据此声称 AVX 扩展状态或全部
+syscall 已经直接执行。
+
+独立 ELF 每类执行 300000 次 GS:16 查询，前后版本交错各四次。`time(NULL)`
+进程 CPU 中位数从 1.3203 秒降至 0.0859 秒，`getpid` 从 1.3125 秒降至
+0.0938 秒，`gettid` 从 1.3281 秒降至 0.0938 秒。其余 syscall 保留原处理路径，
+这些局部结果不能解释为整体游戏倍数提升或裸机 Linux 性能比例。
+
+联调发现自动分解摊仍选择村庄 7。只读参考 `ExpertJobLink4/OnCreateDisjointStore.inc`
+后，独立核对固定原 game 的 `CDisjointer::OnCreateDisjointStore`：`0x085d2d68`
+读取村庄，`0x085d2d6d` 比较 7，`0x085d2d76` 返回 `0xbe`，早于坐标检查。
+Robot 在公共自动分解摊选点中排除此村庄，保留普通移动、普通摊及已有公会规则；
+没有修改原 ELF 或搬运参考实现。Windows 的 shared/scheduler/store 测试、Linux
+的 shared/scheduler 测试通过；来源与差异另存 `disjoint-village7-source-study.json`。
+
+仅新宿主配旧 Robot 的 600 目标/120 秒负载为 594–600 在线，摆摊 94／2、移动
+3440／0，最大积压 11.02 秒；两次摆摊失败也包含排空阶段，不能全部归因于村庄 7。
+最终新宿主与新 Robot 同跑，595–600 在线，摆摊 81／0、移动 3442／0，最大
+积压 10.32 秒，约 30.02 秒排空并连续三次恢复到 2 秒内；稳态 game CPU 为
+29.22 秒。该轮 44 条分解摊尝试/成功日志没有村庄 7。上一发布同类随机负载的
+最大积压 15.17 秒、game CPU 35.45 秒；此对照说明已观察到改善，不能建立统一
+吞吐比例，也不能宣称剩余十秒积压、所有位置拒绝或 Linux 完整业务复测已完成。
+
+本阶段收据位于 `../x/dnf-gm-output/evidence/`：`sysinfo-final-summary.json`、
+`sysinfo-query-state.json`、`sysinfo-linux-query-state.json`、`sysinfo-benchmark.json`、
+`sysinfo-{tls,signals,madvise,robust,clone,entry,files}.json`、两轮原始负载及
+`sysinfo-robot-running-processes.json`。原始二进制、资源 ZIP 与 GM 源码没有改变。
+
+最终组合再次执行 GM 六并发在线增量、当前角色泡点、退出存档、离线增量及
+溢出/归属拒绝，全部通过并恢复测试值。整套服务、Robot、数据库与控制台正常
+停止，无相关进程残留；Linux 对照已关闭。证据为
+`gm-online-extra-sysinfo-robot-windows.private.json` 和 `sysinfo-robot-normal-stop.private.log`。

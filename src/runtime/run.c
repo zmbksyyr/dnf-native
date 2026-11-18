@@ -118,6 +118,28 @@ int nr_memory(uintptr_t address, uintptr_t bytes, int write) {
     return valid;
 }
 
+#ifndef _WIN64
+uintptr_t nr_sysinfo_pc;
+
+/* EDX:EAX returns handled:result to the i386 gateway. Pending signals and
+   tracing keep the original INT 80 path, including its full guest context. */
+uint64_t nr_fast_syscall(uintptr_t number, uintptr_t argument) {
+    NrThread *thread = nr_current();
+    if (active->trace_enabled || __atomic_load_n(&active->external_signal_pending, __ATOMIC_ACQUIRE) ||
+        active->signal_pending || thread->signal_pending) return 0;
+    uint32_t result;
+    if (number == 20) result = GetCurrentProcessId();
+    else if (number == 224) result = thread->tid;
+    else if (number == 13 && !argument) {
+        FILETIME time;
+        GetSystemTimeAsFileTime(&time);
+        uint64_t ticks = (((uint64_t)time.dwHighDateTime << 32) | time.dwLowDateTime) - 116444736000000000ULL;
+        result = (uint32_t)(ticks / 10000000);
+    } else return 0;
+    return (1ULL << 32) | result;
+}
+#endif
+
 static HANDLE output_handle(uintptr_t fd) {
     if (fd >= NR_FD_SLOTS || !(active->file_access[fd] & 2)) return INVALID_HANDLE_VALUE;
     HANDLE file = active->files[fd];
@@ -675,6 +697,22 @@ int nr_run(NrRun *run) {
         bytes += n;
     }
     active = run;
+#ifndef _WIN64
+    /* Pinned original glibc 2.17 loader. No loader or TLS data is changed;
+       arbitrary GS:16 call targets always retain their original behavior. */
+    NrElf *loader = &run->interpreter;
+    if (!strcmp(loader->sha256, "12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd")) {
+        uintptr_t pc = loader->bias + 0x1130;
+        if (pc < (uintptr_t)loader->allocation || loader->allocation_size < 3 ||
+            pc - (uintptr_t)loader->allocation > loader->allocation_size - 3 ||
+            memcmp((const void *)pc, "\xcd\x80\xc3", 3)) {
+            fputs("original sysinfo gateway identity mismatch\n", stderr); return 1;
+        }
+        nr_sysinfo_pc = pc;
+        fprintf(stderr, "direct sysinfo sha256=%s pc=0x%llx original=cd80c3 queries=time-null,getpid,gettid\n",
+                loader->sha256, (unsigned long long)pc);
+    }
+#endif
     run->trace_enabled = GetEnvironmentVariableW(L"DNF_NATIVE_TRACE", NULL, 0) != 0;
     wchar_t trace[2] = {};
     run->epoll_trace_enabled = GetEnvironmentVariableW(L"DNF_NATIVE_EPOLL_TRACE", trace, 2) == 1 && trace[0] == L'1';

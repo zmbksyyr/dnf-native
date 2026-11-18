@@ -172,6 +172,13 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         "movl %%esp, %%edx\n\txorl %%eax, %%eax\n\tstc\n\tcall *%%gs:12"
         : "=a"(called), "+c"(preserved) : : "edx", "memory", "cc");
     CHECK(called == 123 && preserved == 0x13579bdf);
+    /* A static ELF has no recognized loader. GS:16 remains an arbitrary
+       callback even when EAX happens to contain a direct query number. */
+    tls[4] = (word)target_state;
+    __asm__ volatile(
+        "movl %%esp, %%edx\n\txorl %%eax, %%eax\n\tstc\n\tmovl $20, %%eax\n\tcall *%%gs:16"
+        : "=a"(called), "+c"(preserved) : : "edx", "memory", "cc");
+    CHECK(called == 123 && preserved == 0x13579bdf);
     tls[3] = (word)target;
     for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
         tls[3] = (i & 1) ? (word)target : (word)target_other;

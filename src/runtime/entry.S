@@ -34,6 +34,65 @@ nr_signal_enter:
     jmp *%rax
 #else
     .text
+    .globl _nr_sysinfo_gateway
+_nr_sysinfo_gateway:
+    /* The TLS CALL trampoline left [original target, guest return PC]. Only
+       the verified loader gateway and these simple queries may run directly.
+       Every other target/syscall retains its original INT 80 and context. */
+    pushfl
+    pushl %ecx
+    movl _nr_sysinfo_pc, %ecx
+    testl %ecx, %ecx
+    jz 1f
+    cmpl %ecx, 8(%esp)
+    jne 1f
+    cmpw $0x80cd, (%ecx)
+    jne 1f
+    cmpb $0xc3, 2(%ecx)
+    jne 1f
+    cmpl $20, %eax
+    je 2f
+    cmpl $224, %eax
+    je 2f
+    cmpl $13, %eax
+    jne 1f
+    testl %ebx, %ebx
+    jne 1f
+2:
+    popl %ecx
+    popfl
+    pushfl
+    pushal
+    movl %esp, %ebp
+    andl $-16, %esp
+    subl $528, %esp
+    fxsave 16(%esp)
+    cld
+    movl 28(%ebp), %eax
+    movl %eax, (%esp)
+    movl 16(%ebp), %eax
+    movl %eax, 4(%esp)
+    call _nr_fast_syscall
+    testl %edx, %edx
+    jz 3f
+    movl %eax, 28(%ebp)
+    fxrstor 16(%esp)
+    movl %ebp, %esp
+    popal
+    popfl
+    leal 4(%esp), %esp
+    ret
+3:
+    fxrstor 16(%esp)
+    movl %ebp, %esp
+    popal
+    popfl
+    ret
+1:
+    popl %ecx
+    popfl
+    ret
+
     .globl _nr_enter
 _nr_enter:
     movl 4(%esp), %eax

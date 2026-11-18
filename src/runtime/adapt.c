@@ -9,6 +9,7 @@
 #ifndef _WIN64
 DWORD nr_thread_tls_slot(void);
 void nr_tls_uninitialized(void);
+void nr_sysinfo_gateway(void);
 
 /* Absolute GS operands cover glibc's thread/canary checks, errno, cleanup,
    cancellation atomics and syscall gateway. Read our per-thread pointer from
@@ -29,6 +30,7 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
         ((operand->actions & ZYDIS_OPERAND_ACTION_MASK_WRITE) && instruction->mnemonic != ZYDIS_MNEMONIC_MOV &&
          instruction->mnemonic != ZYDIS_MNEMONIC_CMPXCHG) ||
         operand->size != 32) return 0;
+    int gateway = call && operand->mem.disp.value == 16;
     unsigned scratch = 1; /* ECX, or EDX if the original instruction uses ECX. */
     for (unsigned i = 0; i < instruction->operand_count_visible; ++i) {
         if (operands[i].type != ZYDIS_OPERAND_TYPE_REGISTER) continue;
@@ -67,7 +69,7 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
         memcpy(code + bytes, "\xc7\x44\x24\x04", 4); bytes += 4;
         uint32_t next = (uint32_t)(pc + instruction->length);
         memcpy(code + bytes, &next, 4); bytes += 4;
-        code[bytes++] = 0xc3;
+        code[bytes++] = gateway ? 0xe9 : 0xc3;
     } else {
         code[bytes++] = (unsigned char)(0x58 + scratch);
         code[bytes++] = 0xe9;
@@ -79,8 +81,9 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
         page->next = elf->tls_pages; elf->tls_pages = page;
     }
     unsigned char *target = page->code + page->used;
-    if (!call) {
-        uint32_t back = (uint32_t)(pc + instruction->length - (uintptr_t)(target + bytes + 4));
+    if (!call || gateway) {
+        uintptr_t destination = gateway ? (uintptr_t)nr_sysinfo_gateway : pc + instruction->length;
+        uint32_t back = (uint32_t)(destination - (uintptr_t)(target + bytes + 4));
         memcpy(code + bytes, &back, 4); bytes += 4;
     }
     code[14] = (unsigned char)(bytes - 15);

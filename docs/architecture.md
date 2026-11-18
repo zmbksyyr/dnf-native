@@ -112,6 +112,8 @@ TLS 失败记录使用直接 WriteFile 的既有日志路径，避免 MSVCRT 写
 
 已有的宿主主线程在等待 guest 线程期间，用 `WaitForMultipleObjects` 同时接收这两个外部事件，原子发布待决标记；syscall 返回只读该标记，有信号时再原子取走并进入原有投递逻辑。没有可投递信号时直接返回，不再扫描全部 64 位。初始 guest 线程退出后，等待其他 guest 线程期间仍接收事件，无需增加后台线程。等待失败记录真实错误并终止本次运行。普通文件 `write/writev` 保留描述符、访问权限和实际 `WriteFile` 错误检查，去掉写入前重复的 `GetFileType` 查询。
 
+i386 的既有绝对 `GS:16` CALL 跳板可直接执行 `time(NULL)`、`getpid`、`gettid` 查询。仅当实际调用目标为固定原 glibc 2.17 loader（SHA-256 `12d9ecb8cd7ddc7491b2726d0bc5a2a47f4364646e49da115b7c7b4548535dfd`）的 `0x1130` 网关，且该处仍为 `cd 80 c3` 时启用；不改 loader 指令或 TLS 数据。跳板保存全部 GPR、ESP、标志、x87/XMM/MXCSR，清除 DF 后调用原有 Windows 时间或身份来源，再完整恢复。存在待决信号、开启 trace、非空时间指针、其他 syscall、改变回调或原入口被插桩时仍进入原网关，保留原错误及信号路径。普通 `int 80`、x64 和其他 loader 不因此变成直接调用；扩展浮点状态仍受本项目既有支持范围限制。
+
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
 
 `service.c` 对固定原版 DBMW 和 manager 的 `CApplication::Free()` 增加局部停服适配。原版 `stop()` 仅清除对象 `+8`，TCP dispatch 实际循环标志在 `+0x2c`；原版清理还在工作线程退出前删除 handler，且没有调用已有的 `pthread_join`。这属于应用生命周期缺陷，不能通过改变通用线程或网络 syscall 语义修复。
