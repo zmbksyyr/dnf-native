@@ -800,4 +800,35 @@ GUI 专项收据 `probes/20261115T194156105324Z/gui-services/receipt.json` 再�
 | 发布包 | 包含 `DNF-Native.exe`、两个宿主、MySQL 工具、登录器、ZIP 基底和 `robot.exe`；资源哈希写入清单 | `../x/dnf-native-output/package-release/` |
 | 默认密钥 | 登录器导出公钥与 `resources/native.zip` 中服务端公钥一致 | `tools/build_login.py` 收据 |
 
-本阶段未改动固定 ZIP 基底；构建、收据和测试现场均在仓库外 `../x/`。Robot 的 Windows 市场内存维护依赖 Linux `/proc`，当前会明确失败或交由 Native controller，不报告为已完成操作。
+本阶段未改动固定 ZIP 基底；构建、收据和测试现场均在仓库外 `../x/`。当时 Robot 的 Windows 市场内存维护仍依赖 Linux `/proc`；后续已由 Robot 自己的平台层实现并完成实际回读，当前接口见 [Robot 模块](robot.md)。
+
+## 原版 Linux 与 Windows 同机对照（2026-11-18）
+
+测试机为 Windows 10 IoT Enterprise LTSC x64 19044.1288，12 逻辑处理器、约 32 GiB 内存；Linux 对照为 WSL2 5.10.16.3、Ubuntu 22.04.5、输入包 glibc 2.17，在独立 ext4/chroot 副本执行原 ELF。WSL 只用于对照，产品仍直接在 Windows 运行。Linux 完成后正常停服并终止测试发行版，再开始 Windows 测试；该结果不等同于裸机 Linux 性能。
+
+两端采用同一 game ELF `da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979`、仓库 stock PVF `c3dde22a8b19e5deff5c498533e0830d13fec5605e81adeda9373841e6e22dec`、MySQL 5.7.44 冷库、600 个新建 50–70 级角色和 DP2/Frida。数据库完成冷备份、逐文件还原和 SQL 启动验证后，才清理独立副本的两市场库并限定两张 Robot 元数据表；原用户数据库不变。Robot 为 Go 1.26.4 amd64、CGO 关闭，构建收据的 513 项源码/测试/内嵌资源哈希与 `1a17552` 一致；程序保留提交前构建的旧 VCS 元数据。
+
+实际完成 600 手动在线持续 60 秒、600 批量登出、连续 300 秒保持 550+ 的混合移动/喊话/普通摊/分解摊，以及 Web 重启恢复后再连续 120 秒保持 550+。首段有效混合样本 Linux 为 590–600，Windows 为 589–600。
+
+| 有效混合样本均值 | Linux | Windows |
+| --- | ---: | ---: |
+| game 驻留内存 | 1555.5 MiB RSS | 1441.6 MiB 工作集 |
+| Robot 全进程树驻留内存 | 240.2 MiB RSS | 291.3 MiB 工作集 |
+| 全部被测进程驻留之和 | 8354.4 MiB RSS | 2786.4 MiB 工作集 |
+| game CPU，单核为 100% | 40.2% | 80.1% |
+| 600 批量上线操作 | 30.09 秒 | 50.19 秒 |
+| 600 批量登出操作 | 20.09 秒 | 20.13 秒 |
+| 自动行为排空 | 30.24 秒 | 60.33 秒 |
+| 随后整套正常停服 | 26.52 秒 | 41.83 秒 |
+
+全部进程包括 16 个原服务、MySQL、Robot；Windows 还含 GUI、包装器，Robot 子树含 Web 及其 conhost。RSS/工作集可能重复统计共享页，不能与私有提交内存混用。Windows 混合阶段私有提交均值为全套 9665.9 MiB、game 1804.5 MiB；全零池优化减少驻留页，并没有等量消除提交额度。原 Linux 的 bridge/channel 等服务也有很大的预分配池。
+
+game 秒级时钟最大积压为 Linux 6.02 秒、Windows 52.68 秒，主要出现在批量退出/重连；稳态随后恢复。该指标不是客户端 RTT，批量操作返回也不等于原服务已排空全部队列。不能据这组数据宣称已达到裸机 Linux 的全部实时性，或用空载 CPU 推导统一的兼容层损耗百分比。摆摊仍有失败计数，成功条件不是所有尝试零失败。
+
+Linux 未新增 core dump；Windows 最终日志未发现未处理异常、停服失败或额外兼容缺口，正常停服后未残留本轮服务进程。Windows 记录到固定 Frida 的 `inotify_init1`（i386 nr332）及加载器路径的 `inotify_init`（nr291）ENOSYS；它们是[架构边界](architecture.md)已有的轮询回退路径，完整原始记录保留于 `windows-postcheck.private.json`，不能表述为所有 syscall 均兼容。原版部分辅助服务正常信号退出时仍返回 1，日志保留该返回值，不把它重写为 0。
+
+当前用户 PVF `1c831d491f6e108bb80d8db095f121bd54796be699b5e68cedccbc2b3ca58699` 在修正后的原版 Linux 环境仍于 `setEquipmentAniScriptLay -> snprintf -> strchrnul` 崩溃，格式指针为 `0x28`；因此本次资源对照使用 stock PVF，当前用户 PVF 的 Windows 业务结果另见此前收据。不把此固定 ELF/插件/环境组合的失败外推到所有原服部署。
+
+测试环境曾缺少 WSL 启动会话中的 proc/dev/run-shm 挂载、三个误排除的 DP2 core 模块、Linux 原重启脚本需要的 nohup，以及 Windows 手工副本的 log/pid 空目录。已分别修正并保留失败现场；Windows 常规实例创建原本会准备这些目录。Linux 原有 Web 重启的 TERM/KILL 脚本未改动，最终整套停服另用正常信号路径。
+
+统计、冷库哈希、数据库备份、原始失败与修正后收据均位于仓库外 `../x/dnf-native-output/linux-comparison/`；主要入口为 `comparison-summary.json`、`Linux与Windows同机验收对照.md`、`benchmark-windows-stock.private.json` 和 `linux-evidence/measurements/benchmark-stock.private.json`。私有现场不进入 Git 或正式运行包。本轮没有修改产品二进制和 ZIP 基底，正式 `DNF-Native-3.0` 沿用已通过前序客户端业务及三轮热重启的交付。
