@@ -39,6 +39,19 @@ static void check(int condition, word line) {
 #define CHECK(c) check((c), __LINE__)
 
 __attribute__((noinline)) static word target(void) { return 123; }
+__attribute__((noinline)) static word target_other(void) { return 456; }
+
+#ifndef __x86_64__
+/* Observe the state on arrival, before a C prologue can change it. EDX holds
+   the caller's ESP; a real indirect CALL contributes exactly one return word. */
+__attribute__((naked, noinline)) static word target_state(void) {
+    __asm__ volatile(
+        "pushfl\n\tpopl %eax\n\tandl $0x41, %eax\n\tcmpl $0x41, %eax\n\tjne 1f\n\t"
+        "cmpl $0x13579bdf, %ecx\n\tjne 1f\n\t"
+        "leal 4(%esp), %eax\n\tcmpl %edx, %eax\n\tjne 1f\n\t"
+        "movl $123, %eax\n\tret\n1:\txorl %eax, %eax\n\tret");
+}
+#endif
 
 __attribute__((noinline)) static word tls_call(void) {
     word value;
@@ -104,14 +117,29 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         CHECK(loaded == 0 && ok == 1 && preserved == i + 21);
     }
     /* The direct path must read the current TLS base on every execution. */
-    word other[8] = {0}; other[2] = 0x13579bdf;
+    word other[8] = {0}; other[2] = 0x13579bdf; other[3] = (word)target_other;
     for (word i = 0; i < 8; ++i) {
         descriptor[1] = (unsigned)(word)((i & 1) ? tls : other);
         CHECK(call(243, (word)descriptor, 0, 0) == 0);
         word loaded;
         __asm__ volatile("movl %%gs:8, %0" : "=a"(loaded));
         CHECK(loaded == ((i & 1) ? tls[2] : other[2]));
+        CHECK(tls_call() == ((i & 1) ? 123 : 456));
     }
+    tls[3] = (word)target_state;
+    word called, preserved = 0x13579bdf;
+    __asm__ volatile(
+        "movl %%esp, %%edx\n\txorl %%eax, %%eax\n\tstc\n\tcall *%%gs:12"
+        : "=a"(called), "+c"(preserved) : : "edx", "memory", "cc");
+    CHECK(called == 123 && preserved == 0x13579bdf);
+    tls[3] = (word)target;
+    for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
+        tls[3] = (i & 1) ? (word)target : (word)target_other;
+        CHECK(tls_call() == ((i & 1) ? 123 : 456));
+    }
+    tls[3] = (word)target;
+#else
+    (void)target_other;
 #endif
 
     /* Register-based addressing changes on each iteration; no stale address. */

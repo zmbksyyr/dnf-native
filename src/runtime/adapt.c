@@ -10,31 +10,38 @@
 DWORD nr_thread_tls_slot(void);
 void nr_tls_uninitialized(void);
 
-/* Absolute GS reads dominate glibc's thread/canary checks. Read our per-thread
-   pointer from the SDK TEB layout, then execute the same instruction natively.
-   Other TLS operands keep the existing exception path. */
+/* Absolute GS reads and calls cover glibc's thread/canary checks and syscall
+   gateway. Read our per-thread pointer from the SDK TEB layout, then execute
+   natively. Other TLS operands keep the existing exception path. */
 static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *instruction,
                       const ZydisDecodedOperand *operands) {
     DWORD slot = nr_thread_tls_slot();
+    int call = instruction->mnemonic == ZYDIS_MNEMONIC_CALL && instruction->operand_count_visible == 1;
     if (slot >= TLS_MINIMUM_AVAILABLE || instruction->length < 5 || instruction->address_width != 32 ||
-        instruction->operand_count_visible != 2 ||
+        (!call && (instruction->operand_count_visible != 2 ||
         (instruction->mnemonic != ZYDIS_MNEMONIC_MOV && instruction->mnemonic != ZYDIS_MNEMONIC_XOR &&
-         instruction->mnemonic != ZYDIS_MNEMONIC_CMP)) return 0;
-    unsigned memory = operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY ? 0 : 1;
+         instruction->mnemonic != ZYDIS_MNEMONIC_CMP)))) return 0;
+    unsigned memory = call || operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY ? 0 : 1;
     const ZydisDecodedOperand *operand = &operands[memory];
     if (operand->type != ZYDIS_OPERAND_TYPE_MEMORY || operand->mem.segment != ZYDIS_REGISTER_GS ||
         operand->mem.base != ZYDIS_REGISTER_NONE || operand->mem.index != ZYDIS_REGISTER_NONE ||
         (operand->actions & ZYDIS_OPERAND_ACTION_MASK_WRITE) || operand->size != 32) return 0;
     unsigned scratch = 1; /* ECX, or EDX if the original instruction uses ECX. */
-    for (unsigned i = 0; i < 2; ++i) {
+    for (unsigned i = 0; i < instruction->operand_count_visible; ++i) {
         if (operands[i].type != ZYDIS_OPERAND_TYPE_REGISTER) continue;
         if (operands[i].reg.value == ZYDIS_REGISTER_ESP || operands[i].size != 32) return 0;
         if (operands[i].reg.value == ZYDIS_REGISTER_ECX) scratch = 2;
     }
     ZydisEncoderRequest request;
-    if (!ZYAN_SUCCESS(ZydisEncoderDecodedInstructionToEncoderRequest(instruction, operands, 2, &request))) return 0;
+    if (!ZYAN_SUCCESS(ZydisEncoderDecodedInstructionToEncoderRequest(instruction, operands,
+                       instruction->operand_count_visible, &request))) return 0;
     request.prefixes &= ~ZYDIS_ATTRIB_HAS_SEGMENT;
     request.operands[memory].mem.base = scratch == 1 ? ZYDIS_REGISTER_ECX : ZYDIS_REGISTER_EDX;
+    if (call) {
+        request.mnemonic = ZYDIS_MNEMONIC_PUSH;
+        request.branch_type = ZYDIS_BRANCH_TYPE_NONE;
+        request.branch_width = ZYDIS_BRANCH_WIDTH_NONE;
+    }
     unsigned char code[64];
     code[0] = (unsigned char)(0x50 + scratch); /* PUSH scratch preserves flags. */
     code[1] = 0x9c;
@@ -48,8 +55,20 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
     ZyanUSize length = 15;
     if (!ZYAN_SUCCESS(ZydisEncoderEncodeInstruction(&request, code + 16, &length))) return 0;
     size_t bytes = 16 + length;
-    code[bytes++] = (unsigned char)(0x58 + scratch);
-    code[bytes++] = 0xe9;
+    if (call) {
+        /* PUSH target; restore scratch from the preceding stack slot; replace
+           that slot with the guest return PC. RET consumes only the target,
+           leaving exactly the stack/registers/flags of the original CALL. */
+        code[bytes++] = 0x8b; code[bytes++] = (unsigned char)(0x44 | (scratch << 3));
+        code[bytes++] = 0x24; code[bytes++] = 0x04;
+        memcpy(code + bytes, "\xc7\x44\x24\x04", 4); bytes += 4;
+        uint32_t next = (uint32_t)(pc + instruction->length);
+        memcpy(code + bytes, &next, 4); bytes += 4;
+        code[bytes++] = 0xc3;
+    } else {
+        code[bytes++] = (unsigned char)(0x58 + scratch);
+        code[bytes++] = 0xe9;
+    }
     NrCodePage *page = elf->tls_pages;
     if (!page || sizeof(page->code) - page->used < bytes + 11) {
         page = VirtualAlloc(NULL, sizeof(*page), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
@@ -57,8 +76,10 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
         page->next = elf->tls_pages; elf->tls_pages = page;
     }
     unsigned char *target = page->code + page->used;
-    uint32_t back = (uint32_t)(pc + instruction->length - (uintptr_t)(target + bytes + 4));
-    memcpy(code + bytes, &back, 4); bytes += 4;
+    if (!call) {
+        uint32_t back = (uint32_t)(pc + instruction->length - (uintptr_t)(target + bytes + 4));
+        memcpy(code + bytes, &back, 4); bytes += 4;
+    }
     code[14] = (unsigned char)(bytes - 15);
     code[bytes++] = 0x9d; code[bytes++] = (unsigned char)(0x58 + scratch); code[bytes++] = 0xe9;
     uint32_t failure = (uint32_t)((uintptr_t)nr_tls_uninitialized - (uintptr_t)(target + bytes + 4));
