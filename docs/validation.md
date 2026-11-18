@@ -1058,3 +1058,74 @@ Windows 的 Web 与诊断子进程改为分离启动，Linux 保留原 exec.Comm
 `stall-background-windows-restart-console.json`、`gm-bundled-selftest.txt` 和
 `gm-bundled-package-check.json`，均留在上述仓库外目录。首轮 Linux 53 成功／13 失败、
 Windows 63 成功／0 失败的中间候选记录保留，不混作最终二进制的结果。
+
+## glibc TLS 原子比较交换（2026-11-18）
+
+沿用上一节的 Windows 10 x64 19044、stock PVF、原 ELF、MySQL 5.7.44 和 Robot。
+对实际批量离线热点线程采样，65 次 TLS 回退跳板样本中有 60 次为 libc/pthread
+取消状态的 `LOCK CMPXCHG`，余下 5 次为 pthread_setspecific 的字节写入。
+现场跳板字节与返回函数保留于 `perf-tls-fallback-20261118-threads.private.json`，
+不是根据函数名或静态调用次数推断热点。
+
+仅扩展已有 i386 GS 绝对地址直接路径以支持 32 位 CMPXCHG；保留 LOCK 前缀，
+由 CPU 执行原子比较交换，每次重新取得当前 TLS 基址。未改变取消状态机、Linux
+原库、原 ELF、Robot 或 GM 业务语义。x64 沿用原实现。
+
+原语验证覆盖比较成功与失败、EAX/ECX/EDX 源寄存器、算术标志、无关寄存器和
+TLS 基址切换；48 个 guest 线程共享 TLS 字段竞争递增，核对总数和 clear-tid 退出。
+双架构各 10 轮 clone 通过，双架构入口、未初始化 TLS 明确失败、raw robust 与
+原 glibc robust mutex 的 EOWNERDEAD/recovery/ENOTRECOVERABLE 均通过。
+同一组 raw TLS 和 clone ELF 在授权的独立 Linux 对照中也返回预期结果。
+首个竞争夹具因新增局部数组触发 SSE 对齐要求失败，已在汇编调用的 C 入口声明
+栈重对齐，保留失败收据；没有修改宿主来掩盖夹具 ABI 问题。
+
+相同 TLS 夹具、相同输入各运行五次，i386 本机进程耗时中位数由 0.296215 秒降至
+0.151461 秒；x64 为 0.084669／0.084028 秒。它包括进程启动和其他 TLS 指令，
+不能外推为整服提升百分比。真实 600 目标、120 秒混合测试稳态为 596–600 在线，
+累计摆摊成功 71／失败 1、移动成功 3275／失败 0；自动行为约 55.02 秒排空，
+最大 game 秒级时钟积压仍为 35.78 秒，随后连续三次采样恢复到 2 秒以内。
+因此本轮证明原子路径的局部收益，未证明批量退出延迟已解决。
+
+随后在同一原 game 中执行 GM 六并发在线增量、当前角色泡点、正常退出存档、
+离线增量、溢出与归属拒绝，均通过并恢复原测试值。
+本轮亦试过普通下线先返回选角再断开连接；实际 600 负载仍积压 35.92 秒且有选角
+超时，已撤回该候选，未进入交付。失败日志和候选差异保留，避免将其作为优化结论。
+
+主要收据位于 `../x/dnf-gm-output/evidence/`：`cancel-atomics-tls-before-after.json`、
+`cancel-atomics-{tls,entry,clone,robust}-checks.json`、`cancel-atomics-linux-fixtures.json`、
+`cancel-atomics-load-summary.json`、`tls-call-load-cancel-atomics-20261118.private.json`、
+`gm-online-extra-cancel-atomics-windows.private.json` 及 `graceful-logout-candidate-rejection.json`。
+
+## 大块清零后的权限缓存（2026-11-18）
+
+沿用上述同机、同实例与原 ELF 基线。原子路径优化后的热态重登和退出采样中，
+最热线程 893 个样本有 464 个落在 `ZwQueryVirtualMemory`；现场查询对象为私有
+已提交页，主要属于同一大块池。根因是每次大块清零都清空整个权限缓存，导致
+后续访问重新查询。没有据此扩大缓存或更改原 game 的连接池、异常与退出逻辑。
+
+`zero.c` 在既有映射锁内核对并恢复相同私有可写页后保留权限缓存；映射、保护、
+brk 等真正改变有效范围或权限的路径仍失效。双架构零填充、VM、TLS 检查通过；
+新增实际 write 暖缓存、清零后访问、PROT_NONE 后拒绝及恢复权限后访问的验证。
+原有精确零字节、边界、共享别名、文件 COW、非零填充、可执行页和预加载插桩
+检查继续通过。两架构 48 MiB 清零检查各减少 50,327,552 驻留字节，提交量保持
+不变。同一零填充 ELF 与原 glibc 在独立 Linux 对照中，普通与预加载两条路径
+均返回预期结果；这里只核对语义，没有比较 Linux 常驻内存。
+
+最终候选同时包含 TLS 原子路径和权限缓存修复，Robot、GM 保持上一轮版本。
+600 目标、120 秒混合测试稳态为 596–600 在线，摆摊成功 83／失败 1，移动成功
+3416／失败 0。排空约 30.01 秒，最大 game 时钟积压 15.73 秒，随后连续三次
+采样恢复至 2 秒内。仅含原子路径的上一候选为 55.02 秒／35.78 秒。两轮随机
+地图和摆摊行为不同，稳态 game CPU 分别为 36.48／31.73 秒，不能由此宣称
+统一吞吐或 CPU 提升百分比，也不能宣称剩余积压已经解决。
+
+同进程再次热态重登达到 600 在线，采样轮最大时钟积压为 12.03 秒并正常排空。
+最热线程 919 个样本中权限查询为 2 个，多数样本已进入休眠；采样覆盖恢复过程，
+且短暂停线程，样本比例不能作为精确性能基准。随后在最终候选实际执行 GM
+六并发在线增量、当前角色泡点、退出存档、离线增量、溢出与归属拒绝，均通过
+并恢复测试值。整套服务和数据库正常停止，候选与测试实例无进程残留。
+
+收据位于 `../x/dnf-gm-output/evidence/`：`zero-cache-load-comparison.json`、
+`zero-cache-profile-comparison.json`、`zero-cache-{zero-pages,vm,tls}-checks.json`、
+`zero-cache-linux-fixtures.json`、`gm-online-extra-zero-cache-windows.private.json`、
+`zero-cache-normal-stop.private.log`；原始负载和线程采样各有独立文件，未覆盖
+前轮记录。本轮未改既有 `MADV_DONTNEED` 的 MEM_RESET 语义边界，该项仍需后续处理。

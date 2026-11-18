@@ -106,7 +106,9 @@ static int zero_pages(NrRun *run, uintptr_t address, size_t size) {
         uintptr_t next=(uintptr_t)info.BaseAddress+info.RegionSize;
         cursor=next<last?next:last;
     }
-    run->memory_region_count=run->memory_region_cursor=0;
+    /* The lock hides the transient decommit, and success restores exactly the
+       committed private RW pages checked above. Cached permissions stay valid;
+       discarding unrelated entries here makes each user reset rescan its pool. */
     if(!VirtualFree((void *)first,last-first,MEM_DECOMMIT) ||
        !VirtualAlloc((void *)first,last-first,MEM_COMMIT,PAGE_READWRITE)) {
         fprintf(stderr,"zero-page memset failed address=0x%llx bytes=%zu win32=%lu\n",

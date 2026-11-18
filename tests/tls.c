@@ -98,6 +98,27 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(flags_ok == 1 && tls[0] == 0);
 
 #ifndef __x86_64__
+    /* glibc's async-cancel state uses LOCK CMPXCHG with either ECX or EDX.
+       Both success and failure must retain the accumulator, source, unrelated
+       register and arithmetic flags. EAX as source is legal as well. */
+    for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
+        word expected = i + 10, replacement = i + 20, preserved = i + 30, flags;
+        tls[5] = expected;
+        __asm__ volatile("lock cmpxchgl %%ecx, %%gs:20\n\tpushfl\n\tpopl %3"
+                         : "+a"(expected), "+c"(replacement), "+d"(preserved), "=r"(flags) : : "memory", "cc");
+        CHECK(expected == i + 10 && replacement == i + 20 && preserved == i + 30);
+        CHECK(tls[5] == i + 20 && (flags & 0x8d5) == 0x44);
+        expected = i + 10;
+        __asm__ volatile("lock cmpxchgl %%edx, %%gs:20\n\tpushfl\n\tpopl %3"
+                         : "+a"(expected), "+c"(preserved), "+d"(replacement), "=r"(flags) : : "memory", "cc");
+        word native_flags, a = i + 10, b = i + 20;
+        __asm__ volatile("cmpl %2, %1\n\tpushfl\n\tpopl %0"
+                         : "=r"(native_flags) : "r"(a), "r"(b) : "cc");
+        CHECK(expected == i + 20 && replacement == i + 20 && preserved == i + 30);
+        CHECK(tls[5] == i + 20 && (flags & 0x8d5) == (native_flags & 0x8d5));
+        __asm__ volatile("lock cmpxchgl %%eax, %%gs:20" : "+a"(expected) : : "memory", "cc");
+        CHECK(expected == i + 20 && tls[5] == i + 20);
+    }
     /* glibc errno ADD and cleanup-list MOV stores. Preserve unrelated EDX,
        MOV flags and carry/zero from real arithmetic, including TLS rebasing. */
     for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
@@ -139,6 +160,10 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         CHECK(loaded == ((i & 1) ? tls[2] : other[2]));
         __asm__ volatile("movl %0, %%gs:4" : : "c"(i+71) : "memory");
         CHECK(((i & 1) ? tls[1] : other[1])==i+71);
+        word expected=i, replacement=i+101;
+        ((i & 1) ? tls : other)[5]=i;
+        __asm__ volatile("lock cmpxchgl %%ecx, %%gs:20" : "+a"(expected) : "c"(replacement) : "memory", "cc");
+        CHECK(expected==i && ((i & 1) ? tls : other)[5]==replacement);
         CHECK(tls_call() == ((i & 1) ? 123 : 456));
     }
     tls[3] = (word)target_state;

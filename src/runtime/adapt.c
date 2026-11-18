@@ -10,9 +10,9 @@
 DWORD nr_thread_tls_slot(void);
 void nr_tls_uninitialized(void);
 
-/* Absolute GS operands cover glibc's thread/canary checks, errno, cleanup
-   chain and syscall gateway. Read our per-thread pointer from the SDK TEB
-   layout, then execute natively. Other TLS operands keep the exception path. */
+/* Absolute GS operands cover glibc's thread/canary checks, errno, cleanup,
+   cancellation atomics and syscall gateway. Read our per-thread pointer from
+   the SDK TEB layout, then execute natively. Other TLS operands keep trapping. */
 static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *instruction,
                       const ZydisDecodedOperand *operands) {
     DWORD slot = nr_thread_tls_slot();
@@ -20,12 +20,14 @@ static int direct_tls(NrElf *elf, uintptr_t pc, const ZydisDecodedInstruction *i
     if (slot >= TLS_MINIMUM_AVAILABLE || instruction->length < 5 || instruction->address_width != 32 ||
         (!call && (instruction->operand_count_visible != 2 ||
         (instruction->mnemonic != ZYDIS_MNEMONIC_MOV && instruction->mnemonic != ZYDIS_MNEMONIC_ADD &&
-         instruction->mnemonic != ZYDIS_MNEMONIC_XOR && instruction->mnemonic != ZYDIS_MNEMONIC_CMP)))) return 0;
+         instruction->mnemonic != ZYDIS_MNEMONIC_XOR && instruction->mnemonic != ZYDIS_MNEMONIC_CMP &&
+         instruction->mnemonic != ZYDIS_MNEMONIC_CMPXCHG)))) return 0;
     unsigned memory = call || operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY ? 0 : 1;
     const ZydisDecodedOperand *operand = &operands[memory];
     if (operand->type != ZYDIS_OPERAND_TYPE_MEMORY || operand->mem.segment != ZYDIS_REGISTER_GS ||
         operand->mem.base != ZYDIS_REGISTER_NONE || operand->mem.index != ZYDIS_REGISTER_NONE ||
-        ((operand->actions & ZYDIS_OPERAND_ACTION_MASK_WRITE) && instruction->mnemonic != ZYDIS_MNEMONIC_MOV) ||
+        ((operand->actions & ZYDIS_OPERAND_ACTION_MASK_WRITE) && instruction->mnemonic != ZYDIS_MNEMONIC_MOV &&
+         instruction->mnemonic != ZYDIS_MNEMONIC_CMPXCHG) ||
         operand->size != 32) return 0;
     unsigned scratch = 1; /* ECX, or EDX if the original instruction uses ECX. */
     for (unsigned i = 0; i < instruction->operand_count_visible; ++i) {

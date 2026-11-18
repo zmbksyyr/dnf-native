@@ -15,6 +15,8 @@ extern int munmap(void *,size_t);
 extern void *memset(void *,int,size_t);
 extern long write(int,const void *,size_t);
 extern long read(int,void *,size_t);
+extern int open(const char *,int,...);
+extern int close(int);
 extern int __libc_start_main(int (*)(void),int,char **,void *,void *,void *,void *);
 extern void _exit(int) __attribute__((noreturn));
 #define CHECK(c) do {if(!(c)) _exit(__LINE__);} while(0)
@@ -51,17 +53,22 @@ static int test(void) {
     for(size_t i=31+length;i<size+8192;++i) CHECK(p[i]==0x37);
     CHECK(memset(first,-1,length)==first);
     for(size_t i=0;i<length;++i) CHECK(first[i]==255);
+    int sink=open("/cache-sink",0x242,0600);
+    CHECK(sink>=0 && write(sink,first+8192,1)==1); /* Warm validation cache. */
     CHECK(memset(first,0,length)==first);
     CHECK(first[0]==0 && first[length/2]==0 && first[length-1]==0);
     CHECK(p[30]==0x37 && first[length]==0x37);
+    CHECK(write(sink,first+8192,1)==1);
+    CHECK(mprotect((void *)(p+8192),4096,0)==0);
+    CHECK(write(sink,first+8192,1)==-1); /* A real protection change must invalidate. */
+    CHECK(mprotect((void *)(p+8192),4096,3)==0);
+    CHECK(write(sink,first+8192,1)==1 && close(sink)==0);
     CHECK(mprotect((void *)p,size+8192,7)==0);
     CHECK(memset(first,0x49,length)==first);
     CHECK(memset(first,0,length)==first); /* Executable private pages use libc. */
     CHECK(first[0]==0 && first[length/2]==0 && first[length-1]==0);
     CHECK(munmap((void *)p,size+8192)==0);
     /* A shared mapping must update its aliases, never become private zeros. */
-    extern int open(const char *,int,...);
-    extern int close(int);
     int fd=open("/shared-zero",0x242,0600);
     CHECK(fd>=0);
     unsigned char block[4096]={0};

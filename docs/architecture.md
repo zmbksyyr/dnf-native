@@ -52,7 +52,11 @@ GM 显示实际部分结果并停止泡点，避免定时重复发放。登录�
 
 `time`、`gettimeofday` 和 `CLOCK_REALTIME` 继续从 Windows 实时时钟取得 Unix UTC 时间戳；单调时钟继续使用性能计数器，不将本地时区偏移加到时间戳。`run.c` 启动 ELF 时，若没有显式 `TZ`，通过 `GetTimeZoneInformation` 读取本机规则，并由 `timezone.h` 转为 POSIX `TZ` 交给原版 glibc；固定偏移、分数小时、南北半球周期夏令时均保留。该默认值不占用原有 32 项显式环境槽。显式 `--env TZ=...` 优先；按绝对年份指定的转换规则明确报错，当前实现不生成历史时区数据库。时区规则在服务启动时读取，更改 Windows 时区后需重新拉起服务。MySQL 包装器的所有 mysqld 启动路径统一追加 `--default-time-zone=SYSTEM --log-timestamps=SYSTEM`，新实例配置也写入这两项；既有实例无需改配置。GUI 日志原本已使用 `GetLocalTime`。旧日志与已存数据不回写。规则依据 [Windows TIME_ZONE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information) 和 [POSIX TZ 环境变量](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html) 独立实现。
 
-`adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取、MOV 写入、ADD 读取及 32 位间接调用可经每线程 Windows TLS 槽直接执行，每次重新读取当前 TLS 基址与调用目标。MOV 写入和 ADD 覆盖 glibc 线程清理链、errno 查询；保留真实 CPU 标志及无关寄存器。间接调用保留原寄存器、标志、返回地址和一个返回字的栈布局，避免 glibc syscall 入口重复异常解码与刷新指令缓存。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
+`nr_memory` 的缓存只记录有效范围和页权限，不缓存内存内容。大块清零在同一映射锁内
+将已核对的私有可写页还原为相同的已提交、可读写状态，因此保留权限缓存；失败会
+明确终止。改变映射、保护或 brk 的路径仍使缓存失效，防止沿用已撤销权限。
+
+`adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取、MOV 写入、ADD 读取、32 位 CMPXCHG 及间接调用可经每线程 Windows TLS 槽直接执行，每次重新读取当前 TLS 基址与调用目标。MOV 写入和 ADD 覆盖 glibc 线程清理链、errno 查询；CMPXCHG 覆盖 glibc/pthread 取消状态的高频原子更新，保留原 LOCK 前缀和 CPU 比较交换语义，不在宿主中模拟读改写。跳板保留真实 CPU 标志及无关寄存器；间接调用保留原寄存器、标志、返回地址和一个返回字的栈布局，避免重复异常解码与刷新指令缓存。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
 
 `clone` 通过原子操作预留独立线程槽，再设置子线程现场及创建 Windows 线程；创建失败释放预留。不能用尚未填入的线程句柄判断槽是否可分配，否则同时调用的父线程会覆盖同一份 TLS 和寄存器现场。现有 64 槽及退出后不复用的限制保持明确。
 

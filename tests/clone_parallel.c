@@ -20,6 +20,10 @@ static result call(word n, word a, word b, word c) {
 static unsigned char stacks[PARENTS*2][1024*1024] __attribute__((aligned(16)));
 static word tls[PARENTS*2][8];
 static unsigned descriptors[PARENTS*2][4], tids[PARENTS*2], ready, go, finished;
+#ifndef __x86_64__
+static word shared_tls[8];
+#define ATOMIC_ROUNDS 1000
+#endif
 extern result spawn(word top,word parent_tid,word tls,word child_tid);
 static void pause_thread(void) { result duration[2]={0,1000000}; CHECK(call(SLEEP,(word)duration,0,0)==0); }
 static void create(unsigned i) {
@@ -35,7 +39,7 @@ static void create(unsigned i) {
 #endif
     CHECK(spawn(top,(word)&tids[i],thread_tls,(word)&tids[i])>0);
 }
-__attribute__((noreturn)) void child_main(void *arg) {
+__attribute__((noreturn,force_align_arg_pointer)) void child_main(void *arg) {
     unsigned i=(unsigned)(word)arg;
     word current;
 #ifdef __x86_64__
@@ -54,6 +58,17 @@ __attribute__((noreturn)) void child_main(void *arg) {
         while(!__atomic_load_n(&go,__ATOMIC_SEQ_CST)) pause_thread();
         create(i+PARENTS);
     } else __atomic_add_fetch(&finished,1,__ATOMIC_SEQ_CST);
+#ifndef __x86_64__
+    /* Deliberately share a TLS base to verify the translated LOCK survives
+       actual contention. A per-thread copy or lost LOCK loses increments. */
+    unsigned shared_descriptor[4]={12,(unsigned)(word)shared_tls,0xfffff,0x51};
+    CHECK(call(243,(word)shared_descriptor,0,0)==0);
+    for(unsigned n=0;n<ATOMIC_ROUNDS;n++) {
+        __asm__ volatile("xorl %%eax,%%eax\n1:\tleal 1(%%eax),%%ecx\n\t"
+                         "lock cmpxchgl %%ecx,%%gs:0\n\tjne 1b"
+                         :::"eax","ecx","memory","cc");
+    }
+#endif
     call(EXIT,0,0,0); __builtin_unreachable();
 }
 __attribute__((noreturn,force_align_arg_pointer)) void _start(void) {
@@ -62,5 +77,8 @@ __attribute__((noreturn,force_align_arg_pointer)) void _start(void) {
     __atomic_store_n(&go,1,__ATOMIC_SEQ_CST);
     while(__atomic_load_n(&finished,__ATOMIC_SEQ_CST)!=PARENTS) pause_thread();
     for(unsigned i=0;i<PARENTS*2;i++) while(__atomic_load_n(&tids[i],__ATOMIC_SEQ_CST)) pause_thread();
+#ifndef __x86_64__
+    CHECK(shared_tls[0]==PARENTS*2*ATOMIC_ROUNDS);
+#endif
     call(GROUP_EXIT,42,0,0); __builtin_unreachable();
 }
