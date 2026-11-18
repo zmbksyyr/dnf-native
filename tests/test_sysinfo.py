@@ -1,4 +1,4 @@
-"""Check the verified i386 glibc query/file gateway and its fallbacks."""
+"""Check the verified i386 glibc query/file/socket gateway and its fallbacks."""
 import datetime
 import hashlib
 import json
@@ -53,14 +53,14 @@ def main():
         stderr = log.read_text(encoding="utf-8", errors="replace")
         passed = error is None and process.returncode == 42 and stdout == b"native-sysinfo-state-ok\n" and "syscall gap" not in stderr
         if trace:
-            passed = passed and "nr=13 " in stderr and "nr=20 " in stderr and "nr=224 " in stderr
+            passed = passed and "nr=13 " in stderr and "nr=20 " in stderr and "nr=224 " in stderr and "nr=3 " in stderr and "socket op=10 " in stderr
         records.append({"arch": "i686", "case": "trace-fallback" if trace else "query-state",
                         "command": command, "host_sha256": sha(host), "fixture_sha256": sha(program),
                         "loader_sha256": sha(loader), "exit_code": process.returncode,
                         "stdout": (marker + stdout).decode(errors="replace"), "stderr": stderr, "error": error, "passed": passed})
         print("i686 sysinfo", "trace" if trace else "direct", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     receipt = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-               "scope": "Original i386 glibc GS:16 queries and disk writes: GPR/ESP/flags including DF, x87/XMM/MXCSR, actual file/pipe bytes, EFAULT/zero-length/closed/read-only writes and descriptor reuse, ignored broken-pipe EPIPE; raw-query comparison, changed callback, in-place detour and verified byte/protection restore, time(pointer)/EFAULT, pending and external signals during a query-only loop, pthread identity and enabled trace fallback. Not integrated game acceptance.",
+               "scope": "Original i386 glibc2.17 GS:16 queries, disk writes and nonblocking TCP/UDP I/O: GPR/ESP/flags including DF, x87/XMM/MXCSR, actual file/pipe bytes, EFAULT/zero-length/closed/read-only writes and descriptor reuse, ignored pipe EPIPE and socket SIGPIPE with/without MSG_NOSIGNAL; raw-query comparison, changed callback, in-place detour and verified byte/protection restore, time(pointer)/EFAULT, pending and external signals during a nonblocking receive loop, pthread identity and enabled trace fallback. Not integrated game acceptance.",
                "build": build, "results": records}
     (BUILD / "sysinfo-checks.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     if not all(r["passed"] for r in records):

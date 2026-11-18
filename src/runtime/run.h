@@ -132,7 +132,8 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
 int nr_deliver_signal(NrRun *run, CONTEXT *context);
 int nr_deliver_fault(NrRun *run, CONTEXT *context, const EXCEPTION_RECORD *fault);
 int nr_restore_signal(NrRun *run, CONTEXT *context);
-int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+/* Direct mode only accepts nonblocking reads; writes keep the signal boundary. */
+int nr_net(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result, int direct_read);
 NrThread *nr_current(void);
 DWORD nr_thread_tls_slot(void);
 int nr_thread_init(NrRun *run);

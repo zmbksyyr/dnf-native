@@ -408,7 +408,7 @@ static intptr_t epoll_wait(NrRun *run, unsigned epoll_fd, NrWatch *watches, uint
     return written;
 }
 
-int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *result) {
+int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *result, int direct_read) {
 #ifdef _WIN64
     enum {READ = 0, WRITE = 1, CLOSE = 3, IOCTL = 16, FCNTL = 72, SELECT = 23, POLL = 7, EP_CREATE = 213, EP_CREATE1 = 291, EP_CTL = 233, EP_WAIT = 232};
 #else
@@ -497,6 +497,17 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
     }
 #endif
     uintptr_t fd = args[0];
+    if (direct_read) {
+        /* Classify the same snapshot used below. Sends stay outside the
+           gateway, avoiding an extra FP save and failed attempt per broadcast. */
+        if (fd >= NR_FD_SLOTS || run->file_access[fd] != 4 ||
+            (!run->nonblock[fd] && !(operation && (args[3] & 0x40)))) return 0;
+        if (operation && ((operation != 10 && operation != 12) || args[2] > INT_MAX ||
+            (args[3] & ~(uintptr_t)0x40))) return 0;
+        /* Keep this call nonblocking even if another thread changes O_NONBLOCK
+           after the eligibility check. It retains the observed descriptor mode. */
+        args[3] |= 0x40;
+    }
     if (operation && run->trace_enabled)
         fprintf(stderr, "socket op=%d args=0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx\n", operation,
                 (unsigned long long)args[0], (unsigned long long)args[1], (unsigned long long)args[2],
@@ -523,7 +534,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         size_t bytes = args[2] > 0x7ffff000 ? 0x7ffff000 : args[2];
         if (!nr_memory(args[1], bytes, receiving)) { *result = -14; return 1; }
         if (!bytes && receiving) { *result = 0; return 1; }
-        *result = socket_transfer(run, (unsigned)fd, (void *)args[1], (int)bytes, receiving, 0, NULL, NULL);
+        *result = socket_transfer(run, (unsigned)fd, (void *)args[1], (int)bytes, receiving, direct_read ? 0x40 : 0, NULL, NULL);
         return 1;
     }
     if (number == CLOSE && !operation) {

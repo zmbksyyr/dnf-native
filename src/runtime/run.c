@@ -141,6 +141,11 @@ uint64_t nr_fast_syscall(uintptr_t number, uintptr_t argument, uintptr_t bytes, 
         /* Only disk files use this path. Pipes/sockets retain their dispatcher
            and signal return boundary. Cache the handle type once at open. */
         result = (uint32_t)write_output(argument, bytes, count);
+    } else if (number == 3 || number == 102) {
+        uintptr_t input[6] = {argument, bytes, count, 0, 0, 0};
+        intptr_t transferred;
+        if (!nr_net(active, number, input, &transferred, 1) || transferred == -38) return 0;
+        result = (uint32_t)transferred;
     } else return 0;
     return (1ULL << 32) | result;
 }
@@ -189,7 +194,7 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
                 (unsigned long long)pc, (unsigned long long)number, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c,
                 (unsigned long long)args[3], (unsigned long long)args[4], (unsigned long long)args[5]);
     intptr_t result;
-    if (nr_net(active, number, args, &result)) {
+    if (nr_net(active, number, args, &result, 0)) {
         if (result == -38) fprintf(stderr, "network unsupported nr=%llu op=%llu\n", (unsigned long long)number, (unsigned long long)a);
         return result;
     }

@@ -7,7 +7,8 @@ extern int pthread_join(word, void **);
 extern int memcmp(const void *, const void *, unsigned);
 extern int pipe(int *);
 extern void _exit(int) __attribute__((noreturn));
-#define CHECK(c) do { if (!(c)) _exit(100 + __LINE__ % 100); } while (0)
+static void fail(unsigned line) __attribute__((noreturn));
+#define CHECK(c) do { if (!(c)) fail(__LINE__); } while (0)
 
 static unsigned char original_fp[512] __attribute__((aligned(16),used));
 static unsigned char before_fp[512] __attribute__((aligned(16),used));
@@ -16,12 +17,18 @@ static const unsigned vector[4] __attribute__((aligned(16),used)) = {0x12345678,
 static const unsigned mxcsr __attribute__((used)) = 0x5f80;
 static unsigned before_flags __attribute__((used)),after_flags __attribute__((used));
 static unsigned before_sp __attribute__((used)),before_bp __attribute__((used)),bad __attribute__((used));
-static volatile unsigned seen;
+static volatile unsigned seen, pipe_seen;
 
 static int raw(unsigned number, unsigned a, unsigned b, unsigned d, unsigned s) {
     int result;
     __asm__ volatile("int $0x80":"=a"(result):"a"(number),"b"(a),"c"(b),"d"(d),"S"(s):"memory");
     return result;
+}
+static void fail(unsigned line) {
+    char msg[]="check failed line 0000\n";
+    for(unsigned i=0;i<4;++i) {msg[21-i]='0'+line%10;line/=10;}
+    raw(4,2,(word)msg,sizeof(msg)-1,0);
+    _exit(100);
 }
 static unsigned checked_call(unsigned number, unsigned argument, unsigned third, unsigned fourth) {
     unsigned result, a=argument, c=third, d=fourth;
@@ -47,6 +54,77 @@ static unsigned checked_call(unsigned number, unsigned argument, unsigned third,
 }
 static unsigned query(unsigned number, unsigned argument) {
     return checked_call(number,argument,0x12345678,0x23456789);
+}
+static int socket_call(unsigned op, word a, word b, word c, word d, word e, word f) {
+    word args[]={a,b,c,d,e,f};
+    return raw(102,op,(word)args,0,0);
+}
+__attribute__((naked)) static void restore(void);
+static void pipe_handler(int signal, void *info, void *context) {
+    (void)info; (void)context; CHECK(signal==13); ++pipe_seen;
+}
+static void socket_state_test(void) {
+    const char payload[]="socket-gateway-bytes";
+    char buffer[sizeof(payload)];
+    unsigned char address[16]={2,0,0,0,127,0,0,1};
+    unsigned length=16;
+    int receiver=socket_call(1,2,2,0,0,0,0),sender=socket_call(1,2,2,0,0,0,0);
+    CHECK(receiver>=0 && sender>=0);
+    CHECK(socket_call(2,receiver,(word)address,16,0,0,0)==0);
+    CHECK(socket_call(6,receiver,(word)address,(word)&length,0,0,0)==0);
+    word send_args[]={sender,(word)payload,sizeof(payload),0x4040,(word)address,16};
+    word recv_args[]={receiver,(word)buffer,sizeof(buffer),0x40,0,0};
+    CHECK((int)checked_call(102,12,(word)recv_args,0)==-11);
+    CHECK(checked_call(102,11,(word)send_args,0)==sizeof(payload));
+    CHECK(checked_call(102,12,(word)recv_args,0)==sizeof(buffer));
+    CHECK(memcmp(buffer,payload,sizeof(buffer))==0);
+    CHECK(raw(55,receiver,4,0x802,0)==0);
+    CHECK((int)checked_call(3,receiver,(word)buffer,sizeof(buffer))==-11);
+    CHECK(checked_call(102,11,(word)send_args,0)==sizeof(payload));
+    CHECK(checked_call(3,receiver,(word)buffer,sizeof(buffer))==sizeof(buffer));
+    CHECK(memcmp(buffer,payload,sizeof(buffer))==0);
+    CHECK(checked_call(102,11,(word)send_args,0)==sizeof(payload));
+    CHECK((int)checked_call(3,receiver,1,1)==-14);
+    CHECK((int)checked_call(102,10,1,0)==-14);
+    CHECK(checked_call(102,11,(word)send_args,0)==sizeof(payload));
+    recv_args[1]=1;
+    CHECK((int)checked_call(102,10,(word)recv_args,0)==-14);
+    CHECK(raw(6,receiver,0,0,0)==0 && raw(6,sender,0,0,0)==0);
+    CHECK((int)checked_call(3,receiver,(word)buffer,sizeof(buffer))==-9);
+
+    int listener=socket_call(1,2,1,0,0,0,0);
+    address[2]=address[3]=0;
+    CHECK(listener>=0 && socket_call(2,listener,(word)address,16,0,0,0)==0);
+    CHECK(socket_call(6,listener,(word)address,(word)&length,0,0,0)==0);
+    CHECK(socket_call(4,listener,1,0,0,0,0)==0);
+    sender=socket_call(1,2,1,0,0,0,0);
+    CHECK(sender>=0 && socket_call(3,sender,(word)address,16,0,0,0)==0);
+    receiver=socket_call(5,listener,0,0,0,0,0);
+    CHECK(receiver>=0 && raw(6,listener,0,0,0)==0);
+    CHECK(raw(55,receiver,4,0x802,0)==0);
+    CHECK(raw(55,sender,4,0x802,0)==0);
+    word stream_send[]={sender,(word)payload,sizeof(payload),0x4000};
+    word stream_recv[]={receiver,(word)buffer,sizeof(buffer),0};
+    CHECK((int)checked_call(102,10,(word)stream_recv,0)==-11);
+    CHECK(checked_call(102,9,(word)stream_send,0)==sizeof(payload));
+    struct {int fd;short events,revents;} poll={receiver,1,0};
+    CHECK(raw(168,(word)&poll,1,2000,0)==1);
+    CHECK(checked_call(102,10,(word)stream_recv,0)==sizeof(payload));
+    CHECK(memcmp(buffer,payload,sizeof(buffer))==0);
+    CHECK(checked_call(3,receiver,1,0)==0);
+    int linger[2]={1,0};
+    CHECK(socket_call(14,sender,1,13,(word)linger,sizeof(linger),0)==0);
+    CHECK(raw(6,sender,0,0,0)==0);
+    CHECK(raw(168,(word)&poll,1,2000,0)==1);
+    CHECK((int)checked_call(3,receiver,(word)buffer,1)==-104);
+    CHECK(checked_call(102,10,(word)stream_recv,0)==0);
+    stream_send[0]=receiver;
+    struct { word handler,flags,restorer; unsigned long long mask; } action={(word)pipe_handler,0x04000004,(word)restore,0};
+    CHECK(raw(174,13,(word)&action,0,8)==0);
+    CHECK((int)checked_call(102,9,(word)stream_send,0)==-32 && pipe_seen==0);
+    stream_send[3]=0x40; /* No MSG_NOSIGNAL: retain the signal-capable dispatcher. */
+    CHECK((int)checked_call(102,9,(word)stream_send,0)==-32 && pipe_seen==1);
+    CHECK(raw(6,receiver,0,0,0)==0);
 }
 __attribute__((naked)) static void custom_target(void) {
     __asm__ volatile("movl $0x654321, %eax; ret");
@@ -124,6 +202,7 @@ static int main_test(void) {
     CHECK(raw(174,13,(word)&ignore,0,8)==0);
     CHECK((int)checked_call(4,fds[1],(word)payload,sizeof(payload))==-32);
     CHECK(raw(6,fds[1],0,0,0)==0);
+    socket_state_test();
     /* A self-directed blocked signal stays pending across the fast candidates,
        then runs when unblocked; delivery must never disappear in a shortcut. */
     struct { word handler,flags,restorer; unsigned long long mask; } action={(word)handler,0x04000004,(word)restore,0};
@@ -134,11 +213,18 @@ static int main_test(void) {
     CHECK(query(13,0)>0 && seen==0);
     CHECK(checked_call(4,1,1,0)==0 && seen==0);
     CHECK(raw(175,1,(word)&mask,0,8)==0 && seen==1);
+    int signal_socket=socket_call(1,2,2,0,0,0,0);
+    CHECK(signal_socket>=0);
+    unsigned char signal_address[16]={2,0,0,0,127,0,0,1};
+    CHECK(socket_call(2,signal_socket,(word)signal_address,16,0,0,0)==0);
+    char signal_byte;
+    word signal_receive[]={signal_socket,(word)&signal_byte,1,0x40};
     const char ready[]="sysinfo-signal-ready\n";
     CHECK(raw(4,1,(word)ready,sizeof(ready)-1,0)==sizeof(ready)-1);
-    unsigned deadline=query(13,0)+5;
-    while (seen==1 && query(13,0)<deadline) CHECK(query(20,0)>0);
+    for (unsigned i=0;seen==1 && i<10000000;++i)
+        CHECK((int)checked_call(102,10,(word)signal_receive,0)==-11);
     CHECK(seen==2);
+    CHECK(raw(6,signal_socket,0,0,0)==0);
     word thread;
     CHECK(pthread_create(&thread,0,worker,0)==0);
     CHECK(pthread_join(thread,0)==0);

@@ -56,6 +56,16 @@ _nr_sysinfo_gateway:
     je 2f
     cmpl $4, %eax
     je 2f
+    cmpl $3, %eax
+    je 2f
+    cmpl $102, %eax
+    jne 4f
+    cmpl $10, %ebx
+    je 2f
+    cmpl $12, %ebx
+    jne 1f
+    jmp 2f
+4:
     cmpl $13, %eax
     jne 1f
     testl %ebx, %ebx

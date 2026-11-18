@@ -152,7 +152,7 @@ int nr_service_stop(NrRun *run, CONTEXT *context) {
         if (!nr_memory(handler, 4, 1)) return failed("unreadable UDP socket", handler);
         uintptr_t args[6] = {*(const uint32_t *)handler};
         intptr_t result;
-        if (!nr_net(run, 6, args, &result) || result) return failed("UDP receive cancellation failed", handler);
+        if (!nr_net(run, 6, args, &result, 0) || result) return failed("UDP receive cancellation failed", handler);
         *(uint32_t *)handler = UINT32_MAX;
     }
     for (unsigned i = 0; i < 3; ++i) {
