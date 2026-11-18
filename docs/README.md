@@ -41,10 +41,11 @@ GitHub 仓库使用 Git LFS 管理这两份 ZIP。克隆前准备 Git LFS 并执
 已有克隆执行 `git lfs pull` 取回资源。GitHub 的源码下载压缩包不作为完整构建输入，
 应使用已取回 LFS 实体文件的 Git 克隆；构建会核对资源哈希，LFS 指针文本不能替代 ZIP。
 
-## GM 在线复活币
+## GM 在线金币与复活币
 
 [独立 GM 工具](https://github.com/zmbksyyr/dnf-dm-c) 可连接 Native 或原版 Linux 服务端。
-离线角色按数据库原状态写入；在线复活币通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
+离线角色按数据库原状态写入；在线金币、复活币通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
+快捷增加按实际余额累加；金币使用原游戏的等级／PVF 金币上限，超限拒绝，不截断发放。
 其他缓存角色数值仍需退出游戏后修改。此接口不依赖 Robot，也不新增端口。
 
 Native 在固定 game 启用 DP2 时自动安装桥接，从实例 `login.private.cnf` 读取连接，
@@ -53,7 +54,8 @@ Linux 可使用同一份 [gm_online.lua](../src/runtime/gm_online.lua)：将其�
 `/dp2/dnf-gm-online.lua`，创建 `/dp2/gm-online.private.json`，再于 DP2 入口加载 helper。
 配置为 `{"host":"127.0.0.1","port":3306,"user":"game","password":"uu5!^%jg","channel":3011}`；
 `channel` 取实际 `server_group*1000+channel_no`，密码为数据库明文连接密码，不能使用游戏配置中的加密值。
-连接账号须能创建和读写 `d_taiwan.dnf_gm_hosts_v1`、`dnf_gm_online_v1`。
+连接账号须能创建和读写 `d_taiwan.dnf_gm_hosts_v1/v2`、`dnf_gm_online_v1/v2`。
+金币使用独立 v2 队列，旧版仅支持复活币的桥接不能处理金币；升级时同时更新 GM 和 helper。
 
 “仅在线”泡点只奖励游戏线程确认的当前角色；指定账号或全服复活币若包含在线账号的多个角色，
 会在提交奖励前拒绝，需改用仅在线范围或先退出该账号。不确定或部分完成时 GM 会提示并停用泡点，
