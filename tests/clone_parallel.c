@@ -42,7 +42,7 @@ __attribute__((noreturn)) void child_main(void *arg) {
     word base=0;
     CHECK(call(158,0x1003,(word)&base,0)==0);
     CHECK(base==(word)tls[i]);
-    current=((word *)base)[1];
+    __asm__ volatile("mov %%fs:8,%0":"=r"(current));
 #else
     __asm__ volatile("mov $0x63,%%ax; mov %%ax,%%gs":::"eax");
     __asm__ volatile("mov %%gs:4,%0":"=r"(current));

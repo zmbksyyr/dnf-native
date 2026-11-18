@@ -136,6 +136,7 @@ void nr_log_image(const NrElf *elf, const char *path);
 void nr_log_gap(NrRun *run, uintptr_t number, const uintptr_t args[6], uintptr_t pc);
 void nr_log_crash(NrRun *run, EXCEPTION_POINTERS *exception);
 void nr_log_thread_exit(const NrThread *thread, uintptr_t status);
+void nr_log_tls_failure(const NrThread *thread, uintptr_t pc);
 void nr_log_robust_failure(const NrThread *thread, uintptr_t address, const char *reason);
 int nr_eventfd(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 intptr_t nr_eventfd_events(NrRun *run, unsigned fd, short requested);

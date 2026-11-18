@@ -2,6 +2,25 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## x64 TLS 跳板并发分配（2026-11-18）
+
+直接 FS 指令夹具最终定位到 `tls.c`：多个线程在 VirtualQuery 后抢同一空地址，
+VirtualAlloc 失败的线程按过时的空闲区域长度前进，跳过整片仍可用的近地址空间，误报不支持 TLS。
+现在仅对地址冲突前进一个分配粒度后重新查询；其他分配错误仍明确失败。
+该错误的 fprintf 又触发 MSVCRT `_write` 内部按 Windows TEB 栈界限探测已切换的 guest 栈，
+出现 0x80000001/0xc0000005，掩盖前一错误；TLS 失败分支改用已有的直接内核日志机制。
+没有忽略异常、禁用栈探测或改写原 ELF。
+
+Windows 10 x64 build 19044、LLVM-MinGW 20261104：相同 x64 FS 夹具旧宿主 12 轮中
+8 轮通过、4 轮异常；新宿主连续 100 轮全部通过。修订的 `test_clone_parallel.py`
+同时核对 ARCH_GET_FS 与直接 FS 读值，双架构 Native/Linux 各十轮通过；TLS/标志/跳转和 futex 回归通过。
+新增未初始化 TLS 夹具在双架构明确记录原因并退出 126，不以宿主异常代替兼容缺口。
+证据为外部 `tls-allocation-before-after.json`、`clone-parallel-fs-final.log`、
+`tls-allocation-tls-with-missing.log` 和调试器的 `fs-diagnostic/failure-stack.json`。
+最终包另通过原版 channel 挑战及分包/合包、relay 双向转发和未登录拒绝、x64 STUN 五个响应、
+原 game 六并发增量/当前角色泡点/存档恢复，并完成整套正常停服；证据为同目录 `tls-allocation-*.log`。
+此项修复此前记录的并发 FS 故障，不外推为任意 TLS 指令或所有 CRT 错误路径已验证。
+
 ## GM 在线保存与真实界面（2026-11-18）
 
 固定原 game、stock PVF、MySQL 5.7.44、DP2，在 Windows 10 x64 build 19044 的 Native
@@ -32,7 +51,7 @@
 
 Windows 10 x64 build 19044、LLVM-MinGW 20261104：`tests/test_clone_parallel.py` 每轮由 24 个父线程同时创建 24 个子线程，检查 TLS 基址/内容、线程 ID 和 clear-tid 退出。修复前 32 位复现 TLS 不符；修复后双架构各十轮通过，同一 ELF 在 Linux 对照各十轮通过。x64 TLS 基址通过 ARCH_GET_FS 核对。既有双架构 TLS、futex 和原版 glibc robust mutex 回归通过。证据位于 `../x/dnf-native-output/clone-parallel-final.json` 及 `../x/dnf-gm-output/evidence/clone-*.log`。
 
-使用 32 位修复宿主的独立整套服务正常启动，实际 GM 复活币修改完成内存读回、SQL 保存、退出重登、错误角色拒绝及重复 token 不重放检查。在线桥接仍在开发，以上不表示其全部功能通过。扩展夹具中 x64 并发 FS 指令读路径另有异常，尚未解决；该路径与已通过的 ARCH_GET_FS 检查须分别看待，不宣称全部并发 TLS 等价。
+使用 32 位修复宿主的独立整套服务正常启动，实际 GM 复活币修改完成内存读回、SQL 保存、退出重登、错误角色拒绝及重复 token 不重放检查。当时在线桥接仍在开发，最终接入结果见上节。扩展夹具中另行发现的 x64 并发 FS 异常现已定位并修复，见本文开头的 TLS 跳板分配记录；不把旧 ARCH_GET_FS 检查当作直接指令验证。
 
 ## 单次非阻塞收发与真实 LuaSQL（2026-11-18）
 

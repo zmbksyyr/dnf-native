@@ -53,6 +53,12 @@ static int code_buffer(NrThread *thread, uintptr_t address) {
         if (info.State == MEM_FREE) {
             thread->tls_code = VirtualAlloc((void *)cursor, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
             if (thread->tls_code) return 1;
+            /* Another thread can reserve this address after VirtualQuery.
+               Do not skip the entire formerly free region using stale info;
+               its remaining pages may be our only RIP-relative allocation. */
+            if (GetLastError() != ERROR_INVALID_ADDRESS) return 0;
+            cursor += 65536;
+            continue;
         }
         uintptr_t next = ((uintptr_t)info.BaseAddress + info.RegionSize + 65535) & ~(uintptr_t)65535;
         if (next <= cursor) break;

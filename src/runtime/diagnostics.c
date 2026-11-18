@@ -154,6 +154,12 @@ void nr_log_thread_exit(const NrThread *thread, uintptr_t status) {
     thread_record(labels, values, NULL);
 }
 
+void nr_log_tls_failure(const NrThread *thread, uintptr_t pc) {
+    const char *labels[] = {"unimplemented guest TLS site pc=0x", " tid=0x", " tls=0x"};
+    uintptr_t values[] = {pc, thread->tid, thread->tls_base};
+    thread_record(labels, values, NULL);
+}
+
 void nr_log_robust_failure(const NrThread *thread, uintptr_t address, const char *reason) {
     const char *labels[] = {"robust cleanup stopped tid=0x", " head=0x", " address=0x"};
     uintptr_t values[] = {thread->tid, thread->robust_head, address};

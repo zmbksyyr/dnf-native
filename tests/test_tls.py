@@ -47,6 +47,20 @@ def main():
                         "stdout": stdout, "stderr": stderr, "passed": passed})
         print(arch, "PASS" if passed else "FAIL", "exit", process.returncode,
               "seconds", round(elapsed, 3), flush=True)
+        missing = fixture.with_name("tls-missing")
+        command_build = [str(BIN / "clang.exe"), "--target=" + target, "-fuse-ld=lld", "-nostdlib", "-static",
+                         "-Wl,--image-base=" + base, "-Wl,-e,_start", str(ROOT / "tests/tls_missing.S"), "-o", str(missing)]
+        subprocess.run(command_build, env=env, check=True)
+        missing_sha = hashlib.sha256(missing.read_bytes()).hexdigest()
+        command = [str(host), "--run", str(missing), missing_sha, "tls-missing"]
+        process = subprocess.run(command, capture_output=True, timeout=10)
+        stderr = process.stderr.decode("utf-8", "replace")
+        passed = process.returncode == 126 and "unimplemented guest TLS site" in stderr
+        records.append({"arch": arch, "case": "uninitialized TLS diagnostic", "build": command_build,
+                        "command": command, "host_sha256": hashlib.sha256(host.read_bytes()).hexdigest(),
+                        "fixture_sha256": missing_sha, "exit_code": process.returncode,
+                        "stderr": stderr, "passed": passed})
+        print(arch, "missing TLS", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "os": platform.platform(), "scope": "Own TLS fixtures; timing is local observation only, not service acceptance",
               "results": records}

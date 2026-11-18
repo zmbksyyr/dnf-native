@@ -471,8 +471,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     if (record && executable(pc)) {
         if (record->tls) {
             if (nr_tls(active, c, record)) return EXCEPTION_CONTINUE_EXECUTION;
-            fprintf(stderr, "unimplemented guest TLS site pc=0x%llx\n", (unsigned long long)pc);
-            fflush(NULL);
+            nr_log_tls_failure(nr_current(), pc);
             ExitProcess(126);
         }
 #ifdef _WIN64
