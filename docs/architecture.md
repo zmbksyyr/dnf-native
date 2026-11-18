@@ -260,6 +260,10 @@ TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的�
 
 TCP 终止错误按描述符消费一次；之后读出 EOF、写入返回 EPIPE，并向当前写入线程投递 SIGPIPE。`SO_ERROR` 同样消费终止错误；本地关闭写端不影响读端。发送支持 `MSG_NOSIGNAL`，阻塞的普通信号合并，不能被其他线程接收；自发 `tgkill` 也使用线程待决队列。UDP、异步连接错误与 TCP 终止状态分开处理。仍存在 Winsock 底层边界：对端发送数据后立即 RST，Windows 可能丢弃未读取数据，而 Linux 仍能读出；当前同步收包实现未解决该差异，专项夹具会明确失败，不据常见断线检查通过宣称完整 TCP 等价。
 
+预挂接收与 64 KiB socket 自有缓冲的候选没有纳入当前实现：它改善小包复位读取，
+但缓冲满后仍丢数据，600 连接的独立夹具还显示 CPU、内存和句柄开销增加。
+取舍与逐项证据见 `validation.md` 的“TCP 预挂接收候选的取舍”。
+
 收发支持单次调用的 `MSG_DONTWAIT`。Winsock socket 始终保持非阻塞，guest 的
 `O_NONBLOCK`、FIONBIO 和单次 flags 决定当前调用是否等待；阻塞 read/write、
 send/recv、connect 和 accept 通过 select 等待真实就绪，重试保留同一超时截止点。
