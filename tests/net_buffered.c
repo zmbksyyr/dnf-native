@@ -60,20 +60,28 @@ __attribute__((noreturn,force_align_arg_pointer)) void _start(void) {
         CHECK(net(14,fd,1,8,(word)&capacity,4)==0);
     }
     unsigned char address[16]={2,0,(NR_PORT>>8)&255,NR_PORT&255,127,0,0,1};
-    if (NR_CASE==4) {
+    if (NR_CASE==4 || NR_CASE==5) {
         CHECK(net(2,fd,(word)address,16,0,0)==0 && net(4,fd,1,0,0,0)==0);
         CHECK(call(WRITE,1,(word)"L",1,0)==1);
+        if (NR_CASE==5) {
+            char peer_closed=0;
+            observed=call(READ,0,(word)&peer_closed,1,0);
+            CHECK(observed==1 && peer_closed=='a');
+            result before_accept[2]={0,250000000};
+            CHECK(call(SLEEP,(word)before_accept,0,0,0)==0);
+        }
         result accepted=net(5,fd,0,0,0,0);
+        observed=accepted;
         CHECK(accepted>=0 && call(CLOSE,fd,0,0,0)==0);
         fd=accepted;
     } else CHECK(net(3,fd,(word)address,16,0,0)==0);
     result epoll=call(CREATE,0,0,0,0);
     struct Event event={1,0x123456789abcdef0ULL};
     CHECK(epoll>=0 && call(CTL,epoll,1,fd,(word)&event)==0);
-    CHECK(call(WRITE,fd,(word)"x",1,0)==1);
+    if (NR_CASE!=5) CHECK(call(WRITE,fd,(word)"x",1,0)==1);
     result delay[2]={0,250000000};
     CHECK(call(SLEEP,(word)delay,0,0,0)==0);
-    if (NR_CASE==0 || NR_CASE==1 || NR_CASE==4) {
+    if (NR_CASE==0 || NR_CASE==1 || NR_CASE==4 || NR_CASE==5) {
         int error=0,length=4;
         observed=net(15,fd,1,4,(word)&error,(word)&length);
         CHECK(observed==0 && error==104);

@@ -1,4 +1,4 @@
-"""Delayed single/split TCP payload, cached poll/select/epoll and receive-ring wrap."""
+"""Delayed TCP payloads, poll/select/epoll and reset before application accept."""
 import argparse
 import datetime
 import hashlib
@@ -17,24 +17,26 @@ import time
 def exercise(command, case, port):
     errors = []
     listener = None
-    if case != 4:
+    if case not in (4, 5):
         listener = socket.socket()
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(('127.0.0.1', port))
         listener.listen(1)
         listener.settimeout(8)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command, stdin=subprocess.PIPE if case == 5 else None,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def peer():
         try:
-            if case == 4:
+            if case in (4, 5):
                 assert process.stdout.read(1) == b'L'
                 stream = socket.create_connection(('127.0.0.1', port), 8)
             else:
                 stream = listener.accept()[0]
             with stream:
                 stream.settimeout(8)
-                assert stream.recv(1) == b'x'
+                if case != 5:
+                    assert stream.recv(1) == b'x'
                 size = 49152 if case == 1 else 262144 if case == 2 else 131072 if case == 3 else 4096
                 data = bytes(i % 251 for i in range(size))
                 if case in (1, 3):
@@ -48,6 +50,9 @@ def exercise(command, case, port):
                 if case != 2:
                     stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
                                       struct.pack('HH' if os.name == 'nt' else 'ii', 1, 0))
+            if case == 5:
+                process.stdin.write(b'a')
+                process.stdin.flush()
         except Exception as exc:
             errors.append(repr(exc))
 
@@ -75,7 +80,7 @@ def main():
     parser.add_argument('--buffered-reset', action='store_true',
                         help='Expose the known Winsock loss of unread reset payloads; currently fails Windows')
     parser.add_argument('--probe-limits', action='store_true',
-                        help='Also expose loss when an unread reset exceeds the owned receive buffer')
+                        help='Also expose large unread resets and reset before application accept')
     parser.add_argument('--native', type=Path)
     parser.add_argument('--case', type=int)
     parser.add_argument('--port', type=int)
@@ -87,7 +92,7 @@ def main():
     from bootstrap import TOOLCHAIN, BUILD
     records = []
     for arch, target, base in [('i686', 'i386-linux-gnu', '0x8048000'), ('x86_64', 'x86_64-linux-gnu', '0x400000')]:
-        cases = [0, 1, 2, 3, 4] if args.probe_limits else [0, 1, 2, 4] if args.buffered_reset else [2]
+        cases = [0, 1, 2, 3, 4, 5] if args.probe_limits else [0, 1, 2, 4] if args.buffered_reset else [2]
         for case in cases:
             with socket.socket() as reserved:
                 reserved.bind(('127.0.0.1', 0))

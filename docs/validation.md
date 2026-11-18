@@ -1594,3 +1594,36 @@ x86_64 各 24 次同步接收均丢失数据，各 24 次预先挂起 WSARecv �
 源码、构建与 96 次原始结果保留于仓库外
 `../x/dnf-gm-output/reset-overlapped-primitive.c` 和
 `../x/dnf-gm-output/evidence/reset-overlapped-primitive/receipt.json`。
+
+### TCP 共享完成通知候选与边界（2026-11-19）
+
+继续在独立源码副本中实现共享 IOCP 接收和共享网络事件，每个进程使用一个接收完成线程，
+不再给每个套接字建立独立接收等待。接收容量跟随显式 SO_RCVBUF 设置，消除旧候选固定
+64 KiB 对 128 KiB 复位场景的截断。候选尚未进入生产源码或正式包。
+
+Windows 10 x64 build 19044、LLVM-MinGW 20261104，i686/x86_64 与 Linux 对相同 ELF
+执行：既有五种缓冲场景全部通过，包括 128 KiB 分段复位、256 KiB 正常关闭、poll/select/epoll
+连续就绪；44 项关闭/错误/SIGPIPE、8 项非阻塞/共享读、双架构 select 并发关闭回归通过。
+Linux 对照使用既有授权的 Ubuntu 22.04.5 / WSL2 Linux 5.10.16.3 x86_64，仅作独立测试。
+新增场景在 listen 后等待对端发送 4096 字节、关闭并通过管道确认，再延迟 250 ms 才 accept：Linux 通过，
+稳定宿主和候选均失败。另一个跳过 SO_ERROR 查询的只读诊断同样显示候选失败、Linux 通过。
+
+相同 ELF 的 600 连接、64 轮 × 256 字节校验回显，三轮交错运行的中位数：
+
+| 架构/宿主 | 耗时（秒） | CPU（秒） | 私有内存（MiB） | 句柄 |
+| --- | ---: | ---: | ---: | ---: |
+| i686 稳定 | 0.740 | 0.734 | 26.69 | 685 |
+| i686 候选 | 0.691 | 0.797 | 64.70 | 692 |
+| x86_64 稳定 | 0.443 | 0.438 | 26.91 | 668 |
+| x86_64 候选 | 0.414 | 0.531 | 64.79 | 675 |
+
+耗时略降，但 CPU 与内存增加；这不是原 game/Robot 的性能增益。独立原语实验进一步将完成线程
+首次取结果延迟 300 ms：即使接收容量 256 KiB，128 KiB 分段复位仍只保留首个 16 KiB，
+两种架构各八轮均如此；单次大块发送与正常 FIN 则保留完整数据。不能以扩容和小包成功宣称
+缺口已修复。MSG_WAITALL 又不能用于现有非阻塞套接字，也不能作为及时读取的替代。
+
+`tests/test_net_buffered.py --probe-limits` 已纳入 accept 前复位，默认正常关闭检查保持不变。
+该诊断选项在稳定宿主上仍明确失败。候选源码、哈希、逐轮结果和结论位于仓库外
+`../x/dnf-gm-output/evidence/receive-shared-integration/`；独立原语分别位于
+`reset-waitall-primitive/`、`reset-iocp-primitive/`、`reset-iocp-delayed-pump/`。
+后续应先解决 accept 队列和完成调度间隙的数据所有权，再决定是否承担异步接收成本。
