@@ -26,12 +26,17 @@ local database_work = function(encoded)
             {version=1, suffix='v1', field='coin', operations="'set_coin','add_coin','inspect'"},
             {version=2, suffix='v2', field='money', operations="'set_money','add_money'"},
             {version=3, suffix='v3', field='fatigue', operations="'refill_fatigue'"},
+            {version=4, suffix='v4', field='remain_sp', operations="'set_skill_points'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
-                local fatigue_columns = queue.version==3 and [[
+                local extra_columns = queue.version==3 and [[
                     before_used INT UNSIGNED NULL, before_premium INT UNSIGNED NULL,
-                    after_premium INT UNSIGNED NULL,]] or ''
+                    after_premium INT UNSIGNED NULL,]] or queue.version==4 and [[
+                    amount_sp2 INT UNSIGNED NOT NULL, amount_tp INT UNSIGNED NOT NULL, amount_tp2 INT UNSIGNED NOT NULL,
+                    before_sp2 INT UNSIGNED NULL, after_sp2 INT UNSIGNED NULL,
+                    before_tp INT UNSIGNED NULL, after_tp INT UNSIGNED NULL,
+                    before_tp2 INT UNSIGNED NULL, after_tp2 INT UNSIGNED NULL,]] or ''
                 exec(string.format([[CREATE TABLE IF NOT EXISTS dnf_gm_hosts_%s (
                     channel_no INT UNSIGNED PRIMARY KEY, owner CHAR(32) CHARACTER SET ascii NOT NULL,
                     seen DATETIME(6) NOT NULL) ENGINE=InnoDB]], queue.suffix))
@@ -44,7 +49,7 @@ local database_work = function(encoded)
                     note VARCHAR(80) CHARACTER SET ascii NOT NULL DEFAULT '',
                     %s created DATETIME(6) NOT NULL, expires DATETIME(6) NOT NULL, updated DATETIME(6) NOT NULL,
                     INDEX pending_commands(state,created), INDEX account_commands(m_id,state,created)) ENGINE=InnoDB]],
-                    queue.suffix, queue.operations, fatigue_columns))
+                    queue.suffix, queue.operations, extra_columns))
             end
             return {owner=rows("SELECT REPLACE(UUID(),'-','') AS owner")[1].owner, commands={}}
         end
@@ -78,6 +83,10 @@ local database_work = function(encoded)
                         values=values..string.format(',before_used=%u,before_premium=%u,after_premium=%u',
                             receipt.before_used,receipt.before_premium,receipt.after_premium)
                     end
+                    if receipt.before_sp2 then
+                        values=values..string.format(',before_sp2=%u,after_sp2=%u,before_tp=%u,after_tp=%u,before_tp2=%u,after_tp2=%u',
+                            receipt.before_sp2,receipt.after_sp2,receipt.before_tp,receipt.after_tp,receipt.before_tp2,receipt.after_tp2)
+                    end
                     exec(string.format([[UPDATE %s SET state='%s',note='%s',updated=NOW(6)%s
                         WHERE token=%s AND owner=%s AND state='claimed']],pending_table,receipt.state,receipt.note,values,token(receipt.token),owner))
                 end
@@ -86,6 +95,10 @@ local database_work = function(encoded)
             -- reporting enqueue as persistence or replaying the command.
             local saved_table = queue.version==3 and 'taiwan_cain.charac_stat' or 'taiwan_cain_2nd.inventory'
             local saved_extra = queue.version==3 and ' AND i.used_fatigue=0 AND i.premium_fatigue=q.after_premium' or ''
+            if queue.version==4 then
+                saved_table='taiwan_cain_2nd.skill'
+                saved_extra=' AND i.remain_sp_2nd=q.after_sp2 AND i.remain_sfp_1st=q.after_tp AND i.remain_sfp_2nd=q.after_tp2'
+            end
             exec(string.format([[UPDATE %s q JOIN %s i ON i.charac_no=q.charac_no
                 SET q.state='done',q.note='saved',q.updated=NOW(6)
                 WHERE q.owner=%s AND q.state='applied' AND i.%s=q.after_value%s]],pending_table,saved_table,owner,queue.field,saved_extra))
@@ -101,13 +114,14 @@ local database_work = function(encoded)
                 WHERE owner=%s AND state='claimed' AND expires<NOW(6)]],pending_table,owner))
             exec(string.format([[UPDATE %s SET state='rejected',note='expired',updated=NOW(6)
                 WHERE state='pending' AND expires<NOW(6)]],pending_table))
-            local pending = rows(string.format([[SELECT q.token,q.m_id,q.charac_no,q.operation,q.amount
+            local extra_fields=queue.version==4 and ',q.amount_sp2,q.amount_tp,q.amount_tp2' or ''
+            local pending = rows(string.format([[SELECT q.token,q.m_id,q.charac_no,q.operation,q.amount%s
                 FROM %s q JOIN taiwan_login.login_account_3 l ON l.m_id=q.m_id
                 WHERE q.state='pending' AND q.expires>NOW(6) AND l.login_status>=1 AND l.m_channel_no=%d
                 AND NOT EXISTS (SELECT 1 FROM %s prior WHERE prior.m_id=q.m_id
                     AND (prior.state IN ('claimed','applied') OR (prior.state='pending'
                         AND (prior.created<q.created OR (prior.created=q.created AND prior.token<q.token)))))
-                %s ORDER BY q.created LIMIT 32]],pending_table,cfg.channel,pending_table,other_work))
+                %s ORDER BY q.created LIMIT 32]],extra_fields,pending_table,cfg.channel,pending_table,other_work))
             for _, req in ipairs(pending) do
                 local changed = exec(string.format([[UPDATE %s SET state='claimed',owner=%s,updated=NOW(6)
                     WHERE token=%s AND state='pending' AND expires>NOW(6)]],pending_table,owner,token(req.token)))
@@ -152,6 +166,12 @@ void DNF_GM_SetPremiumFatigue(CUser *, unsigned short);
 void DNF_GM_ResetUsedFatigue(CUser *);
 void DNF_GM_SendFatigue(CUser *);
 void DNF_GM_SaveCharac(CUser *);
+void *DNF_GM_SkillRead(CUser *);
+void *DNF_GM_SkillWrite(CUser *);
+void DNF_GM_GetSkillPoints(void *, int *, int *, int *, int *);
+void DNF_GM_SetSkillPoints(void *, int, int, int, int);
+void DNF_GM_SendSkill(CUser *);
+void DNF_GM_SaveSkill(CUser *);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -170,6 +190,18 @@ symbols.alias('DNF_GM_SetPremiumFatigue', '_ZN15CUserCharacInfo26setCurCharacPre
 symbols.alias('DNF_GM_ResetUsedFatigue', '_ZN15CUserCharacInfo25resetCurCharacUsedFatigueEv')
 symbols.alias('DNF_GM_SendFatigue', '_ZN5CUser11SendFatigueEv')
 symbols.alias('DNF_GM_SaveCharac', '_ZN5CUser15_SaveCharacDataEv')
+symbols.alias('DNF_GM_SkillRead', '_ZNK15CUserCharacInfo18getCurCharacSkillREv')
+symbols.alias('DNF_GM_SkillWrite', '_ZN15CUserCharacInfo18getCurCharacSkillWEv')
+symbols.alias('DNF_GM_GetSkillPoints', '_ZNK9SkillSlot13get_remain_spEPiS0_S0_S0_')
+symbols.alias('DNF_GM_SetSkillPoints', '_ZN9SkillSlot13set_remain_spEiiii')
+symbols.alias('DNF_GM_SendSkill', '_ZN5CUser15send_skill_infoEv')
+symbols.alias('DNF_GM_SaveSkill', '_ZN5CUser10UpdateDataEv')
+
+local function skill_points(ptr)
+    local values=ffi.new('int[4]')
+    ffi.C.DNF_GM_GetSkillPoints(ffi.C.DNF_GM_SkillRead(ptr),values,values+1,values+2,values+3)
+    return {tonumber(values[0]),tonumber(values[1]),tonumber(values[2]),tonumber(values[3])}
+end
 
 local state = {owner='', receipts={}, busy=false}
 local worker = uv.new_work(function(encoded)
@@ -196,10 +228,35 @@ end,function(encoded)
         local money = req.version==2 and (req.operation=='set_money' or req.operation=='add_money')
         local coin = req.version==1 and (req.operation=='set_coin' or req.operation=='add_coin')
         local fatigue = req.version==3 and req.operation=='refill_fatigue'
+        local skills = req.version==4 and req.operation=='set_skill_points'
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
                 receipt.state,receipt.note,receipt.charac_no='done','active_character',user:GetCharacNo()
             end
+        elseif skills and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
+            local after={tonumber(req.amount),tonumber(req.amount_sp2),tonumber(req.amount_tp),tonumber(req.amount_tp2)}
+            local before=skill_points(user.fptr)
+            local valid=true
+            for i=1,4 do
+                if not after[i] or after[i]<0 or after[i]>65535 or after[i]%1~=0 or before[i]<0 then valid=false end
+            end
+            if valid then
+                receipt.before,receipt.after=before[1],after[1]
+                receipt.before_sp2,receipt.after_sp2=before[2],after[2]
+                receipt.before_tp,receipt.after_tp=before[3],after[3]
+                receipt.before_tp2,receipt.after_tp2=before[4],after[4]
+                receipt.state,receipt.note='unknown','apply_failed'
+                local ok=pcall(function()
+                    ffi.C.DNF_GM_SetSkillPoints(ffi.C.DNF_GM_SkillWrite(user.fptr),table.unpack(after))
+                    local actual=skill_points(user.fptr)
+                    for i=1,4 do assert(actual[i]==after[i],'skill points readback differs') end
+                    ffi.C.DNF_GM_SendSkill(user.fptr)
+                    -- _SaveCharacData does not serialize skills; use the original
+                    -- dirty-skill path, which also retains learned skills/commands.
+                    ffi.C.DNF_GM_SaveSkill(user.fptr)
+                end)
+                if ok then receipt.state,receipt.note='applied','save_queued' end
+            else receipt.note='skill_points_limit' end
         elseif fatigue and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local ptr=user.fptr
             local maximum=tonumber(ffi.C.DNF_GM_MaxFatigue(ptr))
@@ -221,7 +278,7 @@ end,function(encoded)
                 end)
                 if ok then receipt.state,receipt.note='applied','save_queued' end
             else receipt.note='fatigue_limit' end
-        elseif not money and not coin and not fatigue then receipt.note='unsupported_operation'
+        elseif not money and not coin and not fatigue and not skills then receipt.note='unsupported_operation'
         elseif (money or coin) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local inventory = user:GetCurCharacInvenR()
             if inventory then
@@ -267,5 +324,5 @@ _DP.add_unload_handler(function()
     state.timer:stop()
     if not uv.is_closing(state.timer) then state.timer:close() end
 end)
-io.stderr:write('GM bridge installed; online coin/money/fatigue commands require an acknowledged save\n')
+io.stderr:write('GM bridge installed; online coin/money/fatigue/skill commands require an acknowledged save\n')
 return state
