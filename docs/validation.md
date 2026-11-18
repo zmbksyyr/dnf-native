@@ -1311,3 +1311,66 @@ GM 分别连接两套服务，通过六并发在线增量、当前角色泡点�
 `gm-online-extra-file-gateway-windows.private.json` 和
 `gm-online-extra-file-gateway-linux-ready.private.json`。早期失败日志独立保留。
 两套服务、Robot、数据库及 Windows 控制台均正常停止，无测试进程残留。
+
+## Robot 退出节流与 GM 在线名单（2026-11-19）
+
+沿用上节 Windows 10 x64 19044、原版 i386 ELF、MySQL 5.7.44 和独立副本；
+Linux 对照为授权的 Linux 5.10.16.3 WSL2/Ubuntu 22.04.5，使用私有 glibc 2.17。
+两端重新核对 119 份原 ELF，当前 PVF 和两套市场索引哈希一致。
+本轮没有修改 Native 运行时、原 ELF 指令或其异常处理表。
+
+批量停止自动行为原来会同时关闭所有 actor 连接。只限制本地退出为 32 或 16 并发，
+仍分别出现 10.09、23.52 秒最大时钟积压。原 ELF 的缺失场景分支会抛出并捕获
+整数异常，静态 unwind 表缺少二级查询索引；这是定位结果，不是已证明的兼容层错误。
+更直接的日志证据是连接已关闭、服务端用户仍在清理，继续广播引发失效发送：
+16 并发混合负载退出约 70158 条发送错误，约 24 MB 日志。
+
+Robot 的公共流程现在让全部 actor 正常退出共用 16 个并发名额，保留原 500 ms
+本地关闭确认，再每 100 ms 查询服务端账号状态，最多等 5 秒；离线后才失效角色缓存、
+释放名额。失败明确记录，不确认成功，不放宽既有存档稳定期和数据库写入边界。
+内部正常关闭期限由 15 秒改为 25 秒，末尾 2 秒仍用于原强制清理，GUI 等待仍为 30 秒。
+
+额外的“混合负载中直接停止 Robot 进程”暴露出上述账号确认仍不足：Windows
+积压 17.67 秒、退出码 1，25 秒期限仍有 49 个 actor 未完成，失败现场保留。
+最终候选对支持返回选角、运行中且未组队的角色，先沿用已有 CMD 7 保存和卸载角色，
+收到原服务确认才断开连接；关闭期间只允许完成该保存，不授权数据库写入。
+保存失败保留原有明确失败及强制关闭，未更改原游戏协议或延长 GUI 等待。
+
+最终候选重新运行 600 目标/120 秒混合负载并直接停止 Robot：Windows 23.56 秒、
+Linux 22.89 秒退出，最大时钟积压分别 1.01、1.05 秒。Windows 在既有期限末尾
+清理了最后 1 个连接，退出码 0；没有把它记录为全部连接优雅退出。两端原 game
+保持运行，Windows 独立 SQL 核对账号全离线，Linux 连续 15 秒独立确认全离线。
+Linux 停止时有 82 个活动摊位、移动 3350/0、摆摊 82/0。账号确认候选的下述
+负载和静止退出数字作为前一轮结果保留，不冒充最终 CMD 7 组合的实测。
+
+新候选的 Windows 600 目标/120 秒混合负载稳态为 595–600 在线，移动 3430/0，
+摆摊 77/0，最大退出时钟积压 1.09 秒；发送错误降至 4810 条，退出日志约 2.2 MB。
+Linux 同类负载为 596–600 在线，移动 3389/0，摆摊 69/0，最大退出积压 1.05 秒。
+两端 game 稳态 CPU 分别为 26.19、38.19 秒；随机负载和 WSL 不能用于推导
+整体原生性能比例。600 人静止时正常停止 Robot，Windows 约 19.53 秒、Linux
+约 19.24 秒退出，最大积压分别为 1.19、1.10 秒，原 game 保持运行。
+
+Linux 混合负载连接排空后，登录表有 5 个残留在线标记，游戏端已无当前角色。
+GM 首轮当前角色泡点因此拒绝整批，测试数据已恢复；没有把它报告为通过。
+GM 现在只对只读 inspect 的该明确结果跳过账号及其角色，实际写入、其他错误和
+不确定结果仍失败。保留残留标记时重测泡点通过，对无当前角色账号的直接增量
+仍拒绝且余额不变。Windows 与 Linux 均再次通过六并发在线增量、当前角色泡点、
+退出存档、离线增量、溢出及归属检查，测试值恢复。Linux 后续正常上线/退出
+600 人清除了残留标记，独立 SQL 连续 15 秒确认全离线，未直接重置登录状态。
+
+证据保留在 `../x/dnf-gm-output/evidence/`：
+`robot-server-logout-all-tests.log`、`server-logout-linux-tests.log`、
+两端 `server-logout` 原始负载与高频观察、`server-logout-log-volume.json`、
+`robot-shutdown-server-logout-static-{windows,linux}.private.json`、
+`gm-online-extra-server-logout-linux.private.json`（首轮失败）及带 `active-fix`
+的两端复测记录。已知摆摊交易区域拒绝、其他 GM 缓存字段和客户端检查继续跟进；
+本轮随机位置成功不表示所有位置都支持。
+
+最终组合证据补充为 `graceful-save-active-windows.private.json`、
+`robot-shutdown-graceful-save-active-linux.private.json`、
+`robot-graceful-save-all-tests.log`、`graceful-save-linux-tests.log`、
+`graceful-save-linux-sql-offline.json` 及 `gm-live-inactive-targets-windows.log`。
+最终 Robot 提交为 `4cf110f`，GM 为 `d919c07`；两个最终运行文件的实际进程映像
+再次核对构建哈希。最终组合的 GM 六并发增量、泡点、退出存档及离线守卫分别记录于
+`gm-online-extra-graceful-save-final-{windows,linux}.private.json`，均通过且恢复测试值。
+两端真实桥接的无当前角色回归为 `gm-live-inactive-targets-{windows,linux}.log`。
