@@ -18,6 +18,8 @@
 
 同一轮测试还记录到热重开 Robot 后 10 分钟未达到 550 运行，以及 game 正常停服超过 180 秒；后者保留全部依赖服务及数据库，没有用强制退出冒充正常停服。线程采样、连接快照和日志保存在 `load-550/restart-runtime-state.private.json`、`shutdown-game-stack.private.json`、`soak-store-churn-fixed.private.json` 和 `coldstart-store-churn.private.json`。核对目标身份后仅强制结束该独立测试 game，随后其余服务和数据库正常停止，见 `game-hang-recovery.private.json`。这些失败不能由之前的短负载和重启成功记录覆盖，当前尚未定位其完整根因。
 
+最终另起完整实例，在 599 个实际运行角色且有忙碌 actor 时执行 Web 热重启，约 15.6 秒重建运行环境；保持同一个 game PID，重新达到并连续 60.1 秒保持 586–598 运行，移动、喊话和摆摊继续执行。随后自动退出约 140.6 秒、整套正常停服约 36.5 秒，无强制结束，见 `load-550/restart-store-churn-final.private.json`。这次复测通过，未重现上一段旧测试进程中的积压和挂起；旧失败及其根因边界仍保留，不据此推断长时间运行均无问题。
+
 环境为 Windows 10 IoT Enterprise LTSC 2021 x64、build 19044，12 个逻辑处理器、约 32 GiB 内存；原版 game ELF 为 i686，glibc 2.17、MySQL 5.7.44，Robot 使用 Go 1.26.4、Windows amd64、无 CGO。原实例 `3333` 停库后复制到独立 `load-550/instance`，1547 个数据库文件经 SHA-256 核对，冷备份单独保留。原实例、输入 ELF、固定 ZIP 和参考目录保持只读。以下证据路径相对仓库外 `../x/dnf-native-output/`。
 
 实际瓶颈是大块已提交可写内存上的重复 `VirtualQuery`，单个小缓冲检查约 0.80 ms；使用 8 项查询缓存后，独立大区夹具为 i686 约 0.014 ms、x64 约 0.010 ms。guest 所有权仍逐次检查，VM、brk 和零页重置在同一锁内使缓存失效，代码和文件映射保留直接查询。1 ms 睡眠实测从约 15.7 ms 降至约 1.98 ms。这些是特定原语的前后对照，不能换算为整个游戏或相对 Linux 的性能提升百分比。证据为 `load-550/memory-check-comparison.json`、`sleep-comparison.json`。
@@ -52,7 +54,7 @@
 
 本轮 Robot 全仓普通测试、全仓 race，以及批量操作修改后的相关 race 通过；Linux amd64 交叉编译通过，记录位于 `robot/`。Windows 市场、组队、邮箱、进程诊断现已有平台实现；本文末尾 2026-11-17 的 `/proc` 限制是当时状态。Linux 原生对照尚待系统重启使已启用的 WSL/VirtualMachinePlatform 生效；导入发行版明确返回 `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`，没有 Linux 运行数据。正式产品仍在 Windows 原生运行。
 
-正式 `../DNF-Native-3.0/` 已更新，根层仅主 EXE 与 resources，9 个文件与外部 `release-verified-20261118/` 逐项 SHA-256 一致；旧文件先备份并核验，异常恢复路径核对哈希，交付收据为 `delivery-20261118-verified.json`。Robot 源码为 `feature/windows-host-adapter` 的 `260f4ab`；构建收据同时核对 Go 源码和实际嵌入的网页、默认配置、密钥及种子资源，防止静态资源改变后误用旧二进制。
+正式 `../DNF-Native-3.0/` 已再次更新，根层仅主 EXE 与 resources，9 个文件与外部 `release-accepted-20261118/` 逐项 SHA-256 一致；旧文件先备份并核验，异常恢复路径核对哈希，交付收据为 `delivery-20261118-accepted.json`。交付 Robot 的业务源码和内嵌资源已与 `feature/windows-host-adapter` 的 `51264a2` 逐项哈希核对；构建收据同时覆盖 Go 源码及实际嵌入的网页、默认配置、密钥和种子资源，防止静态资源改变后误用旧二进制。邮箱修复对应 Native `0dadb1b`，两个代码提交均已推送原远程。
 
 ## P49 标题栏采样与进程编号复用（2026-11-17）
 
