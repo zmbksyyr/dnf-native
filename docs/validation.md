@@ -60,7 +60,7 @@
 
 拍卖保护夹具的 SQL 和原函数转发是测试回调，不能代替实际客户端交易。早一轮客户端通过实际鼠标完成上述搜索与金币寄售操作，物品购买、重新上架和邮件领取由本文顶部的追加测试补齐。测试前保存目标角色、背包、邮件和寄售行备份，客户端源目录关键文件哈希前后保持一致。DirectX 窗口使用 PrintWindow 会得到黑图，实际画面改从屏幕上游戏窗口范围采集；不把截图接口黑图误记为游戏黑屏。
 
-本轮 Robot 全仓普通测试、全仓 race，以及批量操作修改后的相关 race 通过；Linux amd64 交叉编译通过，记录位于 `robot/`。Windows 市场、组队、邮箱、进程诊断现已有平台实现；本文末尾 2026-11-17 的 `/proc` 限制是当时状态。Linux 原生对照尚待系统重启使已启用的 WSL/VirtualMachinePlatform 生效；导入发行版明确返回 `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`，没有 Linux 运行数据。正式产品仍在 Windows 原生运行。
+本轮 Robot 全仓普通测试、全仓 race，以及批量操作修改后的相关 race 通过；Linux amd64 交叉编译通过，记录位于 `robot/`。Windows 市场、组队、邮箱、进程诊断现已有平台实现；本文末尾 2026-11-17 的 `/proc` 限制是当时状态。早期 Linux 对照曾因 WSL/VirtualMachinePlatform 等待重启而返回 `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`；后经用户授权重启，已完成原版 Linux 实际对照，结果见本文“原版 Linux 与 Windows 同机对照（2026-11-18）”。正式产品仍在 Windows 原生运行。
 
 正式 `../DNF-Native-3.0/` 已再次更新，根层仅主 EXE 与 resources，9 个文件与外部 `release-accepted-20261118/` 逐项 SHA-256 一致；旧文件先备份并核验，异常恢复路径核对哈希，交付收据为 `delivery-20261118-accepted.json`。交付 Robot 的业务源码和内嵌资源已与 `feature/windows-host-adapter` 的 `51264a2` 逐项哈希核对；构建收据同时覆盖 Go 源码及实际嵌入的网页、默认配置、密钥和种子资源，防止静态资源改变后误用旧二进制。邮箱修复对应 Native `0dadb1b`，两个代码提交均已推送原远程。
 
