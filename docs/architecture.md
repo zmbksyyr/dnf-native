@@ -28,7 +28,7 @@ flowchart TD
 
 `time`、`gettimeofday` 和 `CLOCK_REALTIME` 继续从 Windows 实时时钟取得 Unix UTC 时间戳；单调时钟继续使用性能计数器，不将本地时区偏移加到时间戳。`run.c` 启动 ELF 时，若没有显式 `TZ`，通过 `GetTimeZoneInformation` 读取本机规则，并由 `timezone.h` 转为 POSIX `TZ` 交给原版 glibc；固定偏移、分数小时、南北半球周期夏令时均保留。该默认值不占用原有 32 项显式环境槽。显式 `--env TZ=...` 优先；按绝对年份指定的转换规则明确报错，当前实现不生成历史时区数据库。时区规则在服务启动时读取，更改 Windows 时区后需重新拉起服务。MySQL 包装器的所有 mysqld 启动路径统一追加 `--default-time-zone=SYSTEM --log-timestamps=SYSTEM`，新实例配置也写入这两项；既有实例无需改配置。GUI 日志原本已使用 `GetLocalTime`。旧日志与已存数据不回写。规则依据 [Windows TIME_ZONE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information) 和 [POSIX TZ 环境变量](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html) 独立实现。
 
-`adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取及 32 位间接调用可经每线程 Windows TLS 槽直接执行，每次重新读取当前 TLS 基址与调用目标。间接调用保留原寄存器、标志、返回地址和一个返回字的栈布局，避免 glibc syscall 入口重复异常解码与刷新指令缓存。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
+`adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取、MOV 写入、ADD 读取及 32 位间接调用可经每线程 Windows TLS 槽直接执行，每次重新读取当前 TLS 基址与调用目标。MOV 写入和 ADD 覆盖 glibc 线程清理链、errno 查询；保留真实 CPU 标志及无关寄存器。间接调用保留原寄存器、标志、返回地址和一个返回字的栈布局，避免 glibc syscall 入口重复异常解码与刷新指令缓存。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
 
 固定 x64 STUN 的历史失败站点已定位为原版 glibc 2.17 `start_thread+0x1b` 的 FS 写入。P15 以当前宿主完成三个原版 pthread worker 的协议与自然停服，结合原版控制流确认该站点路径已覆盖，沿用现有 TLS 实现；通用 ELF 的其他 FS/GS 指令仍以实际支持和验证范围为准，详见[验证记录](validation.md)。
 

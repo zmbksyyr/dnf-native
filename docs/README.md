@@ -37,6 +37,10 @@
 
 两个 ZIP 纳入仓库；native.zip 已按完整 Linux 目录树规整，不纳入自研宿主或 GUI 的历史 EXE。打包时校验基底身份、原生全部成员与 ELF 直接依赖，并用本轮构建的程序重新生成产品 `resources.ini`。目录迁移保留所有 ELF、库、资产和种子原字节，仅修改服务模板中的根路径；3.0 按用户授权仅将默认公钥改为与独立登录器配对，657 个成员中其余 656 个内容不变，原 ZIP 和清单可从父提交恢复。基底内嵌的两份自研插件辅助脚本还会与当前源码核对，避免源码变化后静默发布旧实现。
 
+GitHub 仓库使用 Git LFS 管理这两份 ZIP。克隆前准备 Git LFS 并执行 `git lfs install`；
+已有克隆执行 `git lfs pull` 取回资源。GitHub 的源码下载压缩包不作为完整构建输入，
+应使用已取回 LFS 实体文件的 Git 克隆；构建会核对资源哈希，LFS 指针文本不能替代 ZIP。
+
 ## 开发构建
 
 需要 Windows x64、Python 3.11 或更新版本、Git，以及固定版本 LLVM-MinGW 20261104 MSVCRT 和 Zydis 4.1.1 / Zycore。Python 只供开发与测试。

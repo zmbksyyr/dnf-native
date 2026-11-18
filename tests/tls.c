@@ -98,6 +98,19 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
     CHECK(flags_ok == 1 && tls[0] == 0);
 
 #ifndef __x86_64__
+    /* glibc errno ADD and cleanup-list MOV stores. Preserve unrelated EDX,
+       MOV flags and carry/zero from real arithmetic, including TLS rebasing. */
+    for (word i = 0; i < NR_TLS_ROUNDS; ++i) {
+        word value=i+31, preserved=i+93, ok;
+        __asm__ volatile(
+            "xorl %%eax, %%eax\n\tstc\n\t"
+            "movl %2, %%gs:4\n\tjnc 1f\n\tjnz 1f\n\t"
+            "movl $-1, %%gs:0\n\tjnc 1f\n\tjnz 1f\n\t"
+            "movl $1, %%ecx\n\taddl %%gs:0, %%ecx\n\tjnc 1f\n\tjnz 1f\n\t"
+            "movl $1, %0\n\tjmp 2f\n1:\tmovl $0, %0\n2:"
+            : "=&r"(ok), "+d"(preserved) : "r"(value) : "eax", "ecx", "memory", "cc");
+        CHECK(ok==1 && tls[1]==value && tls[0]==(word)-1 && preserved==i+93);
+    }
     /* Absolute glibc-style reads must preserve unrelated registers and MOV
        flags; CMP/XOR must publish the real CPU flags. ECX forces a different
        scratch register from the EAX/EDX cases. */
@@ -124,6 +137,8 @@ __attribute__((noreturn, force_align_arg_pointer)) void _start(void) {
         word loaded;
         __asm__ volatile("movl %%gs:8, %0" : "=a"(loaded));
         CHECK(loaded == ((i & 1) ? tls[2] : other[2]));
+        __asm__ volatile("movl %0, %%gs:4" : : "c"(i+71) : "memory");
+        CHECK(((i & 1) ? tls[1] : other[1])==i+71);
         CHECK(tls_call() == ((i & 1) ? 123 : 456));
     }
     tls[3] = (word)target_state;
