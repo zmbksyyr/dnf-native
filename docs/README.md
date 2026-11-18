@@ -79,6 +79,10 @@ $env:DNF_NATIVE_LOCAL = 'D:\cache\dnf-runtime\x\your-development-cache'
 
 从仓库资源完整构建：
 
+完整产品包还需要同级 `dnf-robot`（`feature/windows-host-adapter` 分支）及
+`dnf-dm-c` 源码。Robot 使用 Go，GM 沿用自身的 Zig 构建入口；这些都是开发依赖，
+运行发布包无需安装它们。
+
 ```powershell
 python -B tools/build_all.py
 ```
@@ -91,6 +95,7 @@ python -B tools/build_mysql.py
 python -B tools/build_gui.py
 python -B tools/build_login.py
 python -B tools/build_robot.py  # 从同级 dnf-robot 分支构建可选 Windows Robot
+python -B tools/build_gm.py     # 从同级 dnf-dm-c 构建独立 GM
 python -B tools/build_instance_package.py --output ../x/dnf-native-output/package
 ```
 
@@ -109,6 +114,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 | `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
 | `build_login.py` | 独立登录器与默认密钥配对核验 |
 | `build_robot.py` | 从同级 dnf-robot 分支构建可选 Windows Robot |
+| `build_gm.py` | 从同级 dnf-dm-c 构建独立 GM，记录源码和程序哈希 |
 | `build_gui.py` | Win32 GUI 与 ZIP 解压组件 |
 | `build_instance_package.py` | 核对资源、源码和构建收据，生成当前产品包 |
 | `build_all.py` | 按顺序调用上述构建步骤 |
@@ -126,9 +132,16 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
     mysql-control.exe
     resources.ini
     DNFLogin.exe
+    robot.exe
+    DNF_GM.exe
 ```
 
 将整个目录复制到目标机器后打开 `DNF-Native.exe`。点击顶部“+”，选择新建或空目录；GUI 校验资源、解压程序、安全初始化数据库、导入并逐字节核对应用种子，完成后自动选中该实例。损坏资源和非空目标目录会拒绝；失败现场带 `instance.pending` 保留供诊断。
+
+GM 随正式包放在 `resources/DNF_GM.exe`，独立打开使用，不作为服务启动或停止。
+默认连接仍为 `127.0.0.1:3306`、`game / uu5!^%jg`，程序保留自己的配置；
+不会读取或覆盖控制台实例的连接配置。打包要求同级 `dnf-dm-c` 源码及其现有 Zig
+构建依赖，核对源码和构建收据后只交付 EXE，不附带开发机的测试配置或数据库。
 
 界面按用户指定的 Win32 参考图独立实现：顶部为实例选择、目录、服务 IP 与整体启停；中部按 7 列平铺全部 19 项真实服务，随后是独立 MySQL 横条；底部为日志。点击左上实例名展开已记住的实例列表，或选择其他本地目录，“+”创建实例，“⋯”提供初始化、删除及维护日志入口。卡片单击选择、双击看日志，方向键按行列移动；悬停各卡片显示服务用途，例如“游戏主服务”“拍卖行”“金币寄售”，不重复服务名称或添加括号，空白处不显示提示。服务区只保留“功能”按钮；右键菜单仅保留“启动所选”“停止所选”“检查资源”三个四字动作，顶部“检查资源”将资源检查、所选服务元数据和就绪状态统一写入主日志。目录地址与服务 IP 分组显示。参考图中的演示服务名称和模拟运行状态不进入产品。成功选择有效实例后即保存到当前用户 `%LOCALAPPDATA%\DNF-Native\instances.ini`，无需启动服务；关闭重开恢复最后选择，并保留其他实例。显式 `--instance` 参数优先，不会自动启动数据库或服务。
 

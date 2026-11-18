@@ -3486,3 +3486,11 @@ P32 的 UTF-8 拆分修复依据固定 auction／point 的 `NextToken` 反汇编
 MySQL 队列、状态回执与自动安装逻辑为本项目新增实现，Linux 与 Native 使用同一 helper。
 原接口的保存排队语义、两端真实存档和失败行为的验证见[验证记录](validation.md#gm-在线保存与真实界面2026-11-18)。
 原 ELF、DP2、LuaSQL 和 luv 继续沿用固定 ZIP 的既有来源与分发边界，未修改输入资产。
+
+## 随包提供的独立 GM
+
+用户于 2026-11-18 明确要求将其 `https://github.com/zmbksyyr/dnf-dm-c.git`
+项目随 Native 发布。`tools/build_gm.py` 调用该项目自己的 `tools/build.bat`，
+构建收据记录其提交、工作树状态、源码和 EXE 哈希；打包再次逐项核对。
+GM 源码仍在独立仓库，Native 仅附带 `resources/DNF_GM.exe`，不声称为本仓库重写，
+不导入其本机配置、数据库或工具链。GM 自带资源与依赖继续按其独立项目管理。

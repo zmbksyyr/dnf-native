@@ -1005,3 +1005,56 @@ Linux 未新增 core dump；Windows 最终日志未发现未处理异常、停�
 测试环境曾缺少 WSL 启动会话中的 proc/dev/run-shm 挂载、三个误排除的 DP2 core 模块、Linux 原重启脚本需要的 nohup，以及 Windows 手工副本的 log/pid 空目录。已分别修正并保留失败现场；Windows 常规实例创建原本会准备这些目录。Linux 原有 Web 重启的 TERM/KILL 脚本未改动，最终整套停服另用正常信号路径。
 
 统计、冷库哈希、数据库备份、原始失败与修正后收据均位于仓库外 `../x/dnf-native-output/linux-comparison/`；主要入口为 `comparison-summary.json`、`Linux与Windows同机验收对照.md`、`benchmark-windows-stock.private.json` 和 `linux-evidence/measurements/benchmark-stock.private.json`。私有现场不进入 Git 或正式运行包。本轮没有修改产品二进制和 ZIP 基底，正式 `DNF-Native-3.0` 沿用已通过前序客户端业务及三轮热重启的交付。
+
+## Robot 摆摊位置、后台运行与 GM 随包（2026-11-18）
+
+本轮使用独立 stock PVF 实例、固定原 ELF、MySQL 5.7.44 和 Go 1.26.4；
+Windows 为既有 Windows 10 x64 19044 测试机，GM 使用 Zig 0.17.0。
+没有修改用户原数据库、参考工程或 ZIP 基底。
+
+从 rednf 位置逻辑取得线索后，独立核对原 game 的两个摊位构造函数和矩形判断：
+碰撞框均为 160×100，边界接触仍碰撞。Robot 原先横向只排斥到 119，普通摊同区域
+换点重试也可能不移动。现修正占位距离，并在重试时调用已有坐标移动路径；仍依赖
+原服务确认。两个回归用同一组测试、Git HEAD 生产源码 overlay 复现失败，当前源码通过。
+原反汇编、参考文件哈希和实现差异见 `stall-position-source-study.json` 及
+`stall-regression-before-after.json`，均在仓库外 `../x/dnf-gm-output/evidence/`。
+
+Linux 首轮实际复现普通摊重试在新 CMD88 回包前读到旧拒绝：底层已重置，
+调度层仍保留最多 2 秒的缓存。现补上成功发起后的缓存失效处理，与分解摊已有
+行为一致；原 HEAD 源码 overlay 的同一回归失败，修复后通过。全仓 Go 测试与
+Windows/Linux amd64 无 CGO 构建通过。
+
+最终候选分别完成 600 目标、120 秒稳态混合负载，原服务创建与展示确认参与统计。
+Linux 原 ELF 在已授权的独立 WSL 对照副本运行，不能等同于裸机性能。
+
+| 最终样本 | Linux 原 ELF | Windows Native 原 ELF |
+| --- | ---: | ---: |
+| 稳态在线范围 | 597–600 | 593–600 |
+| 普通摊／分解摊并发峰值 | 38／41 | 42／42 |
+| 排空后累计摆摊成功／失败 | 79／3 | 84／3 |
+| 排空后累计移动成功／失败 | 3340／0 | 3468／0 |
+| 最后稳态样本至自动行为排空 | 30.03 秒 | 50.05 秒 |
+| game 秒级时钟最大积压 | 6.01 秒 | 35.86 秒 |
+
+Linux 日志实际出现普通摊、分解摊换点重试后成功。两端仍有位置拒绝和失败计数，
+Windows 批量退出仍有较大积压，均列入后续工作。随机地图、已有位置缓存和动态
+摆摊策略会改变负载，不能把两轮成功计数当作严格提升百分比，也不推导所有地图
+零失败。停止时出现的选角清理超时保留原记录，最终正常排空并整套停服。
+
+Windows 的 Web 与诊断子进程改为分离启动，Linux 保留原 exec.Command 行为。
+连续三次实际诊断、Robot 正常重开后的三次诊断均无所属 conhost 或可见黑窗；
+重开保持原 game PID，实际登录、移动、登出通过，随后整套正常停服且无候选进程残留。
+测试实例曾显式指向旧 Robot，该轮及一次隐藏 conhost 的试验已保留并排除，
+最终收据核对了实际运行程序路径。
+
+`resources/DNF_GM.exe` 由独立 dnf-dm-c 源码构建，只将 EXE 随包交付；
+打包核对其源码及输出哈希，不携带开发配置。自检零失败，SHA-256
+`19089b14479d540294a19c01e1b5689ee257cb6c901a22b14d650c2aab8a63fb`
+与前轮已完成真实在线联调的 GM 相同；本轮没有改动 GM 数据层或重新声称全部页面验收。
+
+本轮主要收据为 `stall-cache-final-summary.json`、`stall-cache-linux-load.private.json`、
+`tls-call-load-stall-cache-final-20261118.private.json`、`stall-cache-regression-before-after.json`、
+`stall-cache-windows-console.json`、`stall-background-windows-restart.private.json`、
+`stall-background-windows-restart-console.json`、`gm-bundled-selftest.txt` 和
+`gm-bundled-package-check.json`，均留在上述仓库外目录。首轮 Linux 53 成功／13 失败、
+Windows 63 成功／0 失败的中间候选记录保留，不混作最终二进制的结果。

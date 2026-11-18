@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--hosts", type=Path, default=BUILD, help="Current host build directory")
     parser.add_argument("--login-dir", type=Path, default=BUILD / "login")
     parser.add_argument("--robot-dir", type=Path, default=BUILD / "robot")
+    parser.add_argument("--gm-dir", type=Path, default=BUILD / "gm")
     parser.add_argument("--output", type=Path, default=BUILD / "package")
     args = parser.parse_args()
     source, gui, hosts, output = (p.resolve() for p in (args.source, args.gui_dir, args.hosts, args.output))
@@ -79,6 +80,13 @@ def main():
             raise ValueError("Robot sources changed; rebuild before packaging: " + name)
     if sha256(robot / "robot.exe") != robot_receipt["output_sha256"]:
         raise ValueError("Robot differs from its build receipt")
+    gm = args.gm_dir.resolve(strict=True)
+    gm_receipt = json.loads((gm / "build-receipt.json").read_text(encoding="utf-8"))
+    for name, expected in gm_receipt["sources"].items():
+        if sha256(Path(gm_receipt["source"]) / name) != expected:
+            raise ValueError("GM sources changed; rebuild before packaging: " + name)
+    if sha256(gm / "DNF_GM.exe") != gm_receipt["output_sha256"]:
+        raise ValueError("GM differs from its build receipt")
     host_receipts = json.loads((hosts / "build-receipt.json").read_text(encoding="utf-8"))
     for arch in ("i686", "x86_64"):
         receipt = next(r for r in host_receipts if r["arch"] == arch)
@@ -96,8 +104,9 @@ def main():
         shutil.copy2(source / name, resources / name)
     shutil.copy2(login / "DNFLogin.exe", resources / "DNFLogin.exe")
     shutil.copy2(robot / "robot.exe", resources / "robot.exe")
+    shutil.copy2(gm / "DNF_GM.exe", resources / "DNF_GM.exe")
     ini["package"] = {name: sha256(resources / name) for name in
-                      ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "robot.exe"]}
+                      ["mysql.zip", "native.zip", "dnf-host-x86.exe", "dnf-host-x64.exe", "mysql-control.exe", "robot.exe", "DNF_GM.exe"]}
     with (resources / "resources.ini").open("w", encoding="utf-16") as stream:
         ini.write(stream)
     record = {"baseline": baseline["files"], "elf_dependency_closure": closure,
