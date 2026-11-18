@@ -1416,3 +1416,36 @@ Go 全仓测试、双平台构建、Linux Actor/Scheduler 定向回归及旧代�
 证据为 `../x/dnf-gm-output/evidence/store-batch-final-summary.json`、
 `store-batch-before-after.json`、两端 `store-permission-batch-final-*`、
 `store-permission-batch-denials-final-*` 和 `gm-online-extra-store-batch-final-*`。
+
+### 摆摊会话权限与交易保护对照（2026-11-19）
+
+沿用上述原 ELF、PVF、MySQL 5.7.44 和双宿主独立副本。外部探针使用 Robot
+真实登录、CMD 88 创建和 CMD 7 保存/下线协议，跳过调度器的摆摊授权准备，
+分别构造无权限、有权限、交易处罚三种账号状态；修改前备份指定账号相关行，
+先验证恢复，再确认实际登录状态进入同一数据库，离线后逐表恢复并核对。
+
+Windows Native 与原版 Linux 各三项结果相同：缺少摆摊权限返回 `0x3f`，
+有权限在固定合法坐标创建成功，启用交易处罚后返回 `0x72`。全部收到实际
+创建确认或拒绝，随后正常下线、恢复快照。Robot 的既有分类无需生产修改；
+增加回归确认 `0x3f`/`0x72` 不触发换点，也不污染持久化选点数据，另一个账号
+仍能取得该点。Windows 和 Linux 的 store 包回归通过。此次不扩展为所有账号
+保护方式、物品展示、地图或新一轮 600 人负载的验收。
+
+首次同时启动两端时，WSL 回环转发将 Windows 协议探针接到 Linux，而夹具
+SQL 仍在 Windows，形成无效的表面差异。最终分开运行，并加入监听归属与
+同库在线确认；先前串连结果明确剔除，不能解释为兼容层缺陷。汇总、来源
+哈希和原始证据索引为 `../x/dnf-gm-output/evidence/store-session-final-summary.json`。
+两端测试服务均正常停止，正式包运行文件不变。
+
+### TCP 未读数据复位的异步接收原语（2026-11-19）
+
+上文 `--buffered-reset` 缺口仍在生产运行时中。本轮仅在仓库外编写独立 Winsock
+实验：对端发送 4096 字节后立即 RST，接收者延迟 100 ms 才取结果。i686 和
+x86_64 各 24 次同步接收均丢失数据，各 24 次预先挂起 WSARecv 均保留完整字节，
+后续读取仍返回真实复位错误；没有吞掉错误或修改正式宿主来满足测试。
+
+这是接收原语证据，尚未完成 Native 的 poll/select/epoll 就绪、取消关闭、
+缓冲区边界、accept 前已复位及吞吐验证，不能写成生产兼容缺口已修复。
+源码、构建与 96 次原始结果保留于仓库外
+`../x/dnf-gm-output/reset-overlapped-primitive.c` 和
+`../x/dnf-gm-output/evidence/reset-overlapped-primitive/receipt.json`。
