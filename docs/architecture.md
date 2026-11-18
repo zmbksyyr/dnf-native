@@ -18,6 +18,30 @@ flowchart TD
 
 普通指令由同架构 CPU 执行，宿主对 syscall 和 Linux TLS 边界进行适配。每个服务是独立 Windows 进程；DP2/Lua/Frida 和 game 保持同进程指针及 ABI。没有引入 CPU 模拟器、通用全程序翻译或内核驱动。
 
+## GM 在线命令
+
+`src/runtime/gm_online.lua` 使用固定原 game 的 DP2 符号接口，不更改 ELF 或新增网络监听。
+所有 SQL 在原 luv worker 中执行；完成回调在游戏线程重新查找账号、检查状态与当前角色，
+才调用 `CInventory::SetCoin/GetCoin`、`CUser::SendCoin/SaveMoneyCoin`。
+后者仅表示保存已排队，须另外查到 `inventory.coin` 等于回执值才确认完成。
+`inspect` 命令只读当前角色，供 GM 冻结仅在线泡点收件名单；没有把登录表账号在线标记外推为所有角色在线。
+
+MySQL 队列表使用唯一 token，状态为 pending→claimed→applied→done，
+或 rejected/unknown。每 500ms 至多处理 32 条，同账号只领取最早一条，
+保存确认前不执行下一条，连续增量由实际游戏内存计算。pending 20 秒过期；
+已领取命令、已修改内存但保存未确认的命令均不重放。旧宿主或丢失 worker 的命令
+明确终结为 unknown，避免永久阻塞该账号；这不表示原操作一定没发生。
+数据库奖励和在线队列在同一事务提交；内存操作在提交后进行，不能声称跨游戏内存与 SQL 整批原子回滚。
+GM 显示实际部分结果并停止泡点，避免定时重复发放。登录或切换角色竞态仍由游戏线程复查，拒绝错误目标。
+
+`controller/game_compat.h` 在固定 game、启用 DP2 且存在 `login.private.cnf` 时，
+从 GUI 内嵌资源安装 helper 和带标记的入口段。首次备份入口、旧 helper 及发生变更的自动配置；
+保留入口其他内容和无生成标记的自定义配置。Linux 使用相同 Lua 与配置格式，无需 Native GUI 或 Robot。
+原 luv 对较大 work function 的序列化曾在两端原游戏中崩溃，因此 worker 仅传短入口，
+业务代码在 worker 内 loadfile，不把数据库操作移回游戏主线程。
+停用时先停 game，再移除入口中的 GM 标记段及对应 helper/配置；保留队列与备份供核对。
+不要将 unknown 改回 pending 或自动重发；旧备份若包含后续用户改动，不能盲目覆盖整个 DP2 入口。
+
 ## ELF 宿主
 
 `src/runtime/main.c` 解析 `--map` 和 `--run`，以及 `--root ROOT INTERPRETER_SHA256`、`--cwd`、`--env`。程序 ELF 和动态加载器均按传入 SHA-256 校验，位数不匹配、错误文件边界或缺失入口会明确拒绝。

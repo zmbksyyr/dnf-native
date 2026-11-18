@@ -2,6 +2,30 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## GM 在线保存与真实界面（2026-11-18）
+
+固定原 game、stock PVF、MySQL 5.7.44、DP2，在 Windows 10 x64 build 19044 的 Native
+与已授权 Linux 对照（WSL2 5.10.16.3 / Ubuntu 22.04.5，私有 glibc 2.17）上联调。
+这不是裸机性能对照，也不代表任意 ELF 版本。Windows GM 使用 Zig 严格构建，连接两端独立数据库。
+
+两端实际通过在线复活币 17→40→42、SQL 保存、正常退出重登、重复 token 不重放、
+错误 CID 拒绝、六个并发增量全部累加、仅在线泡点只奖励当前角色、离线溢出及错误归属拒绝。
+真实 GM 界面在两端原游戏在线时连续三次“+100”，实际累计 +300，再设回原值；
+其他缓存数值保持置灰。该路径还发现并修复了搜索仅覆盖初始列表、编号被界面过滤、轮询覆盖搜索的问题。
+
+两端原游戏的保存失败注入也通过：触发器拒绝原游戏 coin 存档，GM 报部分提交且结果不确定，
+其他账号奖励如实保留，不伪称回滚；解除故障后用同一游戏接口恢复内存和存档。
+在线账号的多角色范围与非当前角色在提交前拒绝，过期 pending、旧 owner 及丢失 worker 的命令不重放，
+且后续新命令可执行。测试临时数据与触发器均恢复。
+
+证据位于 `../x/dnf-gm-output/evidence/`：`gm-online-{windows,linux}.private.json`、
+`gm-online-extra-{windows,linux}.private.json`、`gm-online-gui.private.json`、
+`gm-online-save-failure.private.json`、`gm-online-save-failure-windows.private.json`、
+`gm-online-boundaries-{linux,windows}-v3.private.json`。Linux 最终数据层 18 项通过，
+包括多角色预检查、零增量和归属守卫；两端均正常停服。Linux 测试入口按原哈希恢复，测试队列表保留于已停独立库供诊断。
+诊断和账号数据不提交。此节取代下文早期实验中“桥接仍在开发”的阶段性结论；
+保留历史失败的实际范围，不将在线复活币通过扩展为所有缓存字段均支持在线修改。
+
 ## 并发创建线程的槽竞争（2026-11-18）
 
 独立 game 的原版线程与 luv worker 同时创建线程时，两条进入日志出现相同 TLS，随后异常退出。原来的空槽检查与 CreateThread 写入句柄之间没有预留，可能被另一父线程选中。现以原子比较交换预留，失败时释放。

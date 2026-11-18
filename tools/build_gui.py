@@ -31,7 +31,9 @@ def main():
     manifest = ROOT / "src/controller/controller_gui.manifest"
     resource = work / "gui.rc"
     private_key = ROOT / "resources/login/private_key.pem"
-    resource.write_text('1 24 "' + manifest.as_posix() + '"\n201 RCDATA "' + private_key.as_posix() + '"\n', encoding="ascii")
+    gm_online = ROOT / "src/runtime/gm_online.lua"
+    resource.write_text('1 24 "' + manifest.as_posix() + '"\n201 RCDATA "' + private_key.as_posix() +
+                        '"\n202 RCDATA "' + gm_online.as_posix() + '"\n', encoding="ascii")
     obj = work / "gui-resource.o"
     subprocess.run([str(BIN / "x86_64-w64-mingw32-windres.exe"), "-i", str(resource), "-o", str(obj)], check=True)
     output = work / "DNF-Native.exe"
@@ -53,7 +55,7 @@ def main():
     target = work / "runtime/mysql-control.exe"
     record = {"command": command, "output_bytes": output.stat().st_size, "output_sha256": sha256(output),
               "sources": {str(p.relative_to(ROOT)).replace("\\", "/"): sha256(p)
-                          for p in [source, manifest, private_key, ROOT / "src/win32_files.h", ROOT / "src/game_levels.h", *sorted((ROOT / "src/controller").glob("*.h")), Path(__file__)]},
+                          for p in [source, manifest, private_key, gm_online, ROOT / "src/win32_files.h", ROOT / "src/game_levels.h", *sorted((ROOT / "src/controller").glob("*.h")), Path(__file__)]},
               "mysql_sha256": sha256(target), "mysql_build_receipt_sha256": sha256(mysql_dir / "build-receipt.json"),
               "scope": "Native database and ELF process GUI build; runtime regression receipts recorded separately."}
     (work / "build-receipt.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

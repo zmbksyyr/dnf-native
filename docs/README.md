@@ -41,6 +41,24 @@ GitHub 仓库使用 Git LFS 管理这两份 ZIP。克隆前准备 Git LFS 并执
 已有克隆执行 `git lfs pull` 取回资源。GitHub 的源码下载压缩包不作为完整构建输入，
 应使用已取回 LFS 实体文件的 Git 克隆；构建会核对资源哈希，LFS 指针文本不能替代 ZIP。
 
+## GM 在线复活币
+
+[独立 GM 工具](https://github.com/zmbksyyr/dnf-dm-c) 可连接 Native 或原版 Linux 服务端。
+离线角色按数据库原状态写入；在线复活币通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
+其他缓存角色数值仍需退出游戏后修改。此接口不依赖 Robot，也不新增端口。
+
+Native 在固定 game 启用 DP2 时自动安装桥接，从实例 `login.private.cnf` 读取连接，
+无需用户再填一套配置。没有该文件则跳过；DP2 未启用或桥接不可用时，GM 明确拒绝在线操作。
+Linux 可使用同一份 [gm_online.lua](../src/runtime/gm_online.lua)：将其复制为
+`/dp2/dnf-gm-online.lua`，创建 `/dp2/gm-online.private.json`，再于 DP2 入口加载 helper。
+配置为 `{"host":"127.0.0.1","port":3306,"user":"game","password":"uu5!^%jg","channel":3011}`；
+`channel` 取实际 `server_group*1000+channel_no`，密码为数据库明文连接密码，不能使用游戏配置中的加密值。
+连接账号须能创建和读写 `d_taiwan.dnf_gm_hosts_v1`、`dnf_gm_online_v1`。
+
+“仅在线”泡点只奖励游戏线程确认的当前角色；指定账号或全服复活币若包含在线账号的多个角色，
+会在提交奖励前拒绝，需改用仅在线范围或先退出该账号。不确定或部分完成时 GM 会提示并停用泡点，
+应核对记录后再操作，不能直接重发整批。详见[实现和恢复语义](architecture.md#gm-在线命令)。
+
 ## 开发构建
 
 需要 Windows x64、Python 3.11 或更新版本、Git，以及固定版本 LLVM-MinGW 20261104 MSVCRT 和 Zydis 4.1.1 / Zycore。Python 只供开发与测试。
