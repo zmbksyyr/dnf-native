@@ -1391,3 +1391,28 @@ Windows 10 x64 19044 Native 与授权 Linux 5.10.16.3 WSL2 原 ELF 独立副本
 Windows 辅助清理与停服重叠的失败记录保留，随后停 game、恢复并逐表复核测试
 快照，见 `store-permission-windows-cleanup-recovery.json`；Linux 自动恢复快照。
 Robot 对应提交为 `aa648bd`；正式包仅更新 Robot 及其资源校验清单。
+
+### 手动批量摆摊与登录时机（2026-11-19）
+
+沿用上节双宿主基线，重新核对 Linux 119 份原 ELF、与 Windows 相同的 PVF
+及两套市场索引。原 ELF、Native 运行时和 GM 源码均无变更。
+
+Robot 手动摆摊改用既有并发设置，保留请求顺序和逐人结果。手动分配只保留
+角色所有权，由具体命令登录，避免全部预先上线后又退出重登；切回自动模式
+仍正常接管。失败清理后立即刷新状态，消除短暂的假摆摊显示。停机时未开始
+的操作明确返回取消，没有绕过服务端限制或数据库离线写入边界。
+
+相同 8 人坐标：Windows 原串行实现 44.51 秒，最终候选 Windows 7.10 秒、
+Linux 7.14 秒，两端均为 6 个展示确认、2 个 `0x3e` 拒绝。另各执行 600 人
+村庄 7 受限点批量请求，Windows 193.11 秒、Linux 181.98 秒，全部逐人
+返回原 `0x3e`，顺序正确，返回后无残留摆摊类型；随后全部正常下线、释放
+手动角色并逐表恢复快照。该专项验证大量拒绝和清理，不代表 600 个摊位成功、
+账号保护等所有会话状态或新一轮混合负载性能。首个并发候选仍会提前登录，
+触发采集端 180 秒超时；失败及恢复记录保留，不计入通过结果。
+
+Go 全仓测试、双平台构建、Linux Actor/Scheduler 定向回归及旧代码 overlay
+对照通过。两端再次通过 GM 六并发在线复活币增量、当前角色泡点、退出存档、
+离线增量、溢出及归属拒绝，测试值恢复。全部测试服务正常停止。
+证据为 `../x/dnf-gm-output/evidence/store-batch-final-summary.json`、
+`store-batch-before-after.json`、两端 `store-permission-batch-final-*`、
+`store-permission-batch-denials-final-*` 和 `gm-online-extra-store-batch-final-*`。
