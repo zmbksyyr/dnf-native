@@ -26,10 +26,15 @@ flowchart TD
 金币调用 `CInventory::get_money/set_money` 和 `CUser::SendUpdateItemList(0,0)`。
 增加金币前用原 `CInventory::getValidMoney` 检查当前等级／PVF 上限，数值限定在有符号 32 位范围。
 `SaveMoneyCoin` 仅表示保存已排队，须另外查到 `inventory.coin` 或 `inventory.money` 等于回执值才确认完成。
+补满疲劳读取原 `CUserCharacInfo` 的基础和额外上限，分别设置剩余疲劳、清除 used 计数，
+读回后调用原 `CUser::SendFatigue/_SaveCharacData`；基础疲劳须为 1..32767，额外疲劳须不超过 32767，
+与原数据库有符号 SMALLINT 范围一致。确认 `charac_stat.fatigue`、`used_fatigue` 和 `premium_fatigue`
+全部等于目标后才完成。离线 GM 单条多表 UPDATE 同时核对归属、未删除、离线和有效上限，
+补满基础疲劳并保留额外疲劳，不推测离线角色当前的额外疲劳资格。
 `inspect` 命令只读当前角色，供 GM 冻结仅在线泡点收件名单；没有把登录表账号在线标记外推为所有角色在线。
 
-复活币／inspect 沿用 v1 队列，金币使用独立 v2 队列和心跳，防止旧 helper 将新操作误当复活币处理。
-同账号任一队列存在 claimed／applied 时，另一队列不领取，避免原游戏同时保存两个余额时互相覆盖。
+复活币／inspect 沿用 v1 队列，金币使用 v2，补满疲劳使用 v3；各自独立队列和心跳，防止旧 helper 误处理新操作。
+同账号任一队列存在 claimed／applied 时，其他队列不领取，避免原游戏保存时互相覆盖。
 MySQL 队列表使用唯一 token，状态为 pending→claimed→applied→done，
 或 rejected/unknown。每 500ms 至多处理 32 条，同账号只领取最早一条，
 保存确认前不执行下一条，连续增量由实际游戏内存计算。pending 20 秒过期；

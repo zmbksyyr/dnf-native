@@ -20,14 +20,18 @@ local database_work = function(encoded)
             assert(type(value)=='string' and #value==32 and value:match('^[0-9a-f]+$'), 'GM command token invalid')
             return "'" .. value .. "'"
         end
-        -- Separate wire versions keep a previous coin-only bridge from ever
-        -- interpreting a money command as SetCoin during rollback or upgrade.
+        -- Separate wire versions prevent older bridges from interpreting a new
+        -- command as an existing operation during rollback or upgrade.
         local queues = {
             {version=1, suffix='v1', field='coin', operations="'set_coin','add_coin','inspect'"},
             {version=2, suffix='v2', field='money', operations="'set_money','add_money'"},
+            {version=3, suffix='v3', field='fatigue', operations="'refill_fatigue'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
+                local fatigue_columns = queue.version==3 and [[
+                    before_used INT UNSIGNED NULL, before_premium INT UNSIGNED NULL,
+                    after_premium INT UNSIGNED NULL,]] or ''
                 exec(string.format([[CREATE TABLE IF NOT EXISTS dnf_gm_hosts_%s (
                     channel_no INT UNSIGNED PRIMARY KEY, owner CHAR(32) CHARACTER SET ascii NOT NULL,
                     seen DATETIME(6) NOT NULL) ENGINE=InnoDB]], queue.suffix))
@@ -38,9 +42,9 @@ local database_work = function(encoded)
                     state ENUM('pending','claimed','applied','done','rejected','unknown') NOT NULL DEFAULT 'pending',
                     owner CHAR(32) CHARACTER SET ascii NULL, before_value INT UNSIGNED NULL, after_value INT UNSIGNED NULL,
                     note VARCHAR(80) CHARACTER SET ascii NOT NULL DEFAULT '',
-                    created DATETIME(6) NOT NULL, expires DATETIME(6) NOT NULL, updated DATETIME(6) NOT NULL,
+                    %s created DATETIME(6) NOT NULL, expires DATETIME(6) NOT NULL, updated DATETIME(6) NOT NULL,
                     INDEX pending_commands(state,created), INDEX account_commands(m_id,state,created)) ENGINE=InnoDB]],
-                    queue.suffix, queue.operations))
+                    queue.suffix, queue.operations, fatigue_columns))
             end
             return {owner=rows("SELECT REPLACE(UUID(),'-','') AS owner")[1].owner, commands={}}
         end
@@ -48,7 +52,14 @@ local database_work = function(encoded)
         local commands = {}
         for _, queue in ipairs(queues) do
             local hosts, pending_table = 'dnf_gm_hosts_'..queue.suffix, 'dnf_gm_online_'..queue.suffix
-            local other_table = 'dnf_gm_online_'..(queue.version==1 and 'v2' or 'v1')
+            local other_work = ''
+            for _, other in ipairs(queues) do
+                if other.version~=queue.version then
+                    other_work=other_work..string.format([[ AND NOT EXISTS (
+                        SELECT 1 FROM dnf_gm_online_%s other WHERE other.m_id=q.m_id
+                        AND other.state IN ('claimed','applied'))]],other.suffix)
+                end
+            end
             exec(string.format('INSERT IGNORE INTO %s VALUES(%d,%s,NOW(6))',hosts,cfg.channel,owner))
             exec(string.format([[UPDATE %s SET owner=%s,seen=NOW(6) WHERE channel_no=%d
                 AND (owner=%s OR seen<DATE_SUB(NOW(6),INTERVAL 10 SECOND))]], hosts,owner,cfg.channel,owner))
@@ -63,15 +74,21 @@ local database_work = function(encoded)
                         values = string.format(',before_value=%u,after_value=%u', receipt.before, receipt.after)
                     end
                     if receipt.charac_no then values=values..string.format(',charac_no=%u',receipt.charac_no) end
+                    if receipt.before_used then
+                        values=values..string.format(',before_used=%u,before_premium=%u,after_premium=%u',
+                            receipt.before_used,receipt.before_premium,receipt.after_premium)
+                    end
                     exec(string.format([[UPDATE %s SET state='%s',note='%s',updated=NOW(6)%s
                         WHERE token=%s AND owner=%s AND state='claimed']],pending_table,receipt.state,receipt.note,values,token(receipt.token),owner))
                 end
             end
-            -- SaveMoneyCoin queues the original save. Confirm SQL separately, without
-            -- reporting its enqueue result as persistence or replaying the command.
-            exec(string.format([[UPDATE %s q JOIN taiwan_cain_2nd.inventory i ON i.charac_no=q.charac_no
+            -- Original save APIs enqueue work. Confirm SQL separately, without
+            -- reporting enqueue as persistence or replaying the command.
+            local saved_table = queue.version==3 and 'taiwan_cain.charac_stat' or 'taiwan_cain_2nd.inventory'
+            local saved_extra = queue.version==3 and ' AND i.used_fatigue=0 AND i.premium_fatigue=q.after_premium' or ''
+            exec(string.format([[UPDATE %s q JOIN %s i ON i.charac_no=q.charac_no
                 SET q.state='done',q.note='saved',q.updated=NOW(6)
-                WHERE q.owner=%s AND q.state='applied' AND i.%s=q.after_value]],pending_table,owner,queue.field))
+                WHERE q.owner=%s AND q.state='applied' AND i.%s=q.after_value%s]],pending_table,saved_table,owner,queue.field,saved_extra))
             exec(string.format([[UPDATE %s SET state='unknown',note='save_unconfirmed',updated=NOW(6)
                 WHERE owner=%s AND state='applied' AND updated<DATE_SUB(NOW(6),INTERVAL 15 SECOND)]],pending_table,owner))
             -- Lost work and a previous host's commands are ambiguous, never pending
@@ -90,8 +107,7 @@ local database_work = function(encoded)
                 AND NOT EXISTS (SELECT 1 FROM %s prior WHERE prior.m_id=q.m_id
                     AND (prior.state IN ('claimed','applied') OR (prior.state='pending'
                         AND (prior.created<q.created OR (prior.created=q.created AND prior.token<q.token)))))
-                AND NOT EXISTS (SELECT 1 FROM %s other WHERE other.m_id=q.m_id AND other.state IN ('claimed','applied'))
-                ORDER BY q.created LIMIT 32]],pending_table,cfg.channel,pending_table,other_table))
+                %s ORDER BY q.created LIMIT 32]],pending_table,cfg.channel,pending_table,other_work))
             for _, req in ipairs(pending) do
                 local changed = exec(string.format([[UPDATE %s SET state='claimed',owner=%s,updated=NOW(6)
                     WHERE token=%s AND state='pending' AND expires>NOW(6)]],pending_table,owner,token(req.token)))
@@ -106,7 +122,7 @@ local database_work = function(encoded)
 end
 if ...=='worker' then return database_work end
 
--- Online inventory commands for the pinned original game and its DP2 API.
+-- Online character commands for the pinned original game and its DP2 API.
 -- Database I/O runs in luv workers. Only the completion callback calls game APIs.
 local previous = rawget(_G, 'DNF_GM_ONLINE')
 if previous then return previous end
@@ -126,6 +142,16 @@ void DNF_GM_SendCoin(CUser *);
 unsigned int DNF_GM_GetMoney(CInventory *);
 void DNF_GM_SetMoney(CInventory *, unsigned int);
 int DNF_GM_MoneyLimit(CInventory *, int);
+unsigned short DNF_GM_Fatigue(CUser *);
+unsigned short DNF_GM_MaxFatigue(CUser *);
+unsigned short DNF_GM_PremiumFatigue(CUser *);
+unsigned short DNF_GM_MaxPremiumFatigue(CUser *);
+unsigned short DNF_GM_UsedFatigue(CUser *);
+void DNF_GM_SetFatigue(CUser *, int);
+void DNF_GM_SetPremiumFatigue(CUser *, unsigned short);
+void DNF_GM_ResetUsedFatigue(CUser *);
+void DNF_GM_SendFatigue(CUser *);
+void DNF_GM_SaveCharac(CUser *);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -134,6 +160,16 @@ symbols.alias('DNF_GM_SendCoin', '_ZN5CUser8SendCoinEv')
 symbols.alias('DNF_GM_GetMoney', '_ZNK10CInventory9get_moneyEv')
 symbols.alias('DNF_GM_SetMoney', '_ZN10CInventory9set_moneyEj')
 symbols.alias('DNF_GM_MoneyLimit', '_ZN10CInventory13getValidMoneyEi')
+symbols.alias('DNF_GM_Fatigue', '_ZNK15CUserCharacInfo19getCurCharacFatigueEv')
+symbols.alias('DNF_GM_MaxFatigue', '_ZNK15CUserCharacInfo22getCurCharacMaxFatigueEv')
+symbols.alias('DNF_GM_PremiumFatigue', '_ZNK15CUserCharacInfo26getCurCharacPremiumFatigueEv')
+symbols.alias('DNF_GM_MaxPremiumFatigue', '_ZNK15CUserCharacInfo29getCurCharacMaxPremiumFatigueEv')
+symbols.alias('DNF_GM_UsedFatigue', '_ZN15CUserCharacInfo23getCurCharacUsedFatigueEv')
+symbols.alias('DNF_GM_SetFatigue', '_ZN15CUserCharacInfo19setCurCharacFatigueEi')
+symbols.alias('DNF_GM_SetPremiumFatigue', '_ZN15CUserCharacInfo26setCurCharacPremiumFatigueEt')
+symbols.alias('DNF_GM_ResetUsedFatigue', '_ZN15CUserCharacInfo25resetCurCharacUsedFatigueEv')
+symbols.alias('DNF_GM_SendFatigue', '_ZN5CUser11SendFatigueEv')
+symbols.alias('DNF_GM_SaveCharac', '_ZN5CUser15_SaveCharacDataEv')
 
 local state = {owner='', receipts={}, busy=false}
 local worker = uv.new_work(function(encoded)
@@ -159,12 +195,34 @@ end,function(encoded)
         local user = ptr and game.fac.user(ptr)
         local money = req.version==2 and (req.operation=='set_money' or req.operation=='add_money')
         local coin = req.version==1 and (req.operation=='set_coin' or req.operation=='add_coin')
+        local fatigue = req.version==3 and req.operation=='refill_fatigue'
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
                 receipt.state,receipt.note,receipt.charac_no='done','active_character',user:GetCharacNo()
             end
-        elseif not money and not coin then receipt.note='unsupported_operation'
-        elseif user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
+        elseif fatigue and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
+            local ptr=user.fptr
+            local maximum=tonumber(ffi.C.DNF_GM_MaxFatigue(ptr))
+            local premium=tonumber(ffi.C.DNF_GM_MaxPremiumFatigue(ptr))
+            if maximum>0 and maximum<=32767 and premium<=32767 then
+                receipt.before,receipt.after=tonumber(ffi.C.DNF_GM_Fatigue(ptr)),maximum
+                receipt.before_used=tonumber(ffi.C.DNF_GM_UsedFatigue(ptr))
+                receipt.before_premium,receipt.after_premium=tonumber(ffi.C.DNF_GM_PremiumFatigue(ptr)),premium
+                receipt.state,receipt.note='unknown','apply_failed'
+                local ok=pcall(function()
+                    ffi.C.DNF_GM_SetFatigue(ptr,maximum)
+                    ffi.C.DNF_GM_SetPremiumFatigue(ptr,premium)
+                    ffi.C.DNF_GM_ResetUsedFatigue(ptr)
+                    assert(tonumber(ffi.C.DNF_GM_Fatigue(ptr))==maximum and
+                        tonumber(ffi.C.DNF_GM_PremiumFatigue(ptr))==premium and
+                        tonumber(ffi.C.DNF_GM_UsedFatigue(ptr))==0,'fatigue readback differs')
+                    ffi.C.DNF_GM_SendFatigue(ptr)
+                    ffi.C.DNF_GM_SaveCharac(ptr)
+                end)
+                if ok then receipt.state,receipt.note='applied','save_queued' end
+            else receipt.note='fatigue_limit' end
+        elseif not money and not coin and not fatigue then receipt.note='unsupported_operation'
+        elseif (money or coin) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local inventory = user:GetCurCharacInvenR()
             if inventory then
                 local get = money and ffi.C.DNF_GM_GetMoney or ffi.C.DNF_GM_GetCoin
@@ -209,5 +267,5 @@ _DP.add_unload_handler(function()
     state.timer:stop()
     if not uv.is_closing(state.timer) then state.timer:close() end
 end)
-io.stderr:write('GM bridge installed; online coin/money commands require an acknowledged save\n')
+io.stderr:write('GM bridge installed; online coin/money/fatigue commands require an acknowledged save\n')
 return state
