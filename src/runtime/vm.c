@@ -55,6 +55,63 @@ static int mapped(const NrVm *v, uintptr_t address, size_t length) {
     return 1;
 }
 
+/* Discarded anonymous pages have a transient decommit while becoming zero
+   pages with unchanged permissions. A legal concurrent reader may fault in
+   that interval. Wait for restoration and retry at most once per reset epoch;
+   actual guards, holes and permission violations continue to Linux signals. */
+int nr_vm_retry_access(NrRun *run, const EXCEPTION_RECORD *fault) {
+    if (fault->NumberParameters < 2) return 0;
+    uintptr_t address = fault->ExceptionInformation[1], access = fault->ExceptionInformation[0];
+    if (access != 0 && access != 1 && access != 8) return 0;
+    EnterCriticalSection(&run->memory_lock);
+    NrThread *thread = nr_current();
+    int retry = 0;
+    if (thread->vm_retry_generation != run->vm_reset_generation) {
+        for (unsigned i = 0; i < run->vm_count; ++i) {
+            const NrVm *v = &run->vm[i];
+            if (!contains((uintptr_t)v->base, v->size, address, 1) || v->image.file || v->section ||
+                !mapped(v, address & ~(uintptr_t)4095, 4096)) continue;
+            MEMORY_BASIC_INFORMATION info;
+            if (!VirtualQuery((const void *)address, &info, sizeof(info)) || info.State != MEM_COMMIT ||
+                (info.Protect & (PAGE_NOACCESS | PAGE_GUARD))) break;
+            DWORD allowed = access == 1 ? PAGE_READWRITE | PAGE_EXECUTE_READWRITE :
+                access == 8 ? PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE :
+                PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE;
+            retry = (info.Protect & allowed) != 0;
+            break;
+        }
+        thread->vm_retry_generation = run->vm_reset_generation;
+    }
+    LeaveCriticalSection(&run->memory_lock);
+    return retry;
+}
+
+static intptr_t discard_anonymous(NrRun *run, NrVm *v, uintptr_t address, size_t length) {
+    uintptr_t cursor = address, end = address + length;
+    intptr_t result = 0;
+    while (cursor < end) {
+        if (!mapped(v, cursor, 4096)) { result = -12; cursor += 4096; continue; }
+        MEMORY_BASIC_INFORMATION info;
+        if (!VirtualQuery((const void *)cursor, &info, sizeof(info))) return -12;
+        size_t bytes = info.RegionSize - (cursor - (uintptr_t)info.BaseAddress);
+        if (bytes > end - cursor) bytes = end - cursor;
+        if (v->mapped_pages) {
+            size_t present = 4096;
+            while (present < bytes && mapped(v, cursor + present, 4096)) present += 4096;
+            bytes = present;
+        }
+        if (info.State == MEM_COMMIT) {
+            ++run->vm_reset_generation;
+            if (!VirtualFree((void *)cursor, bytes, MEM_DECOMMIT) ||
+                !VirtualAlloc((void *)cursor, bytes, MEM_COMMIT, info.Protect)) return -12;
+            if ((info.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) &&
+                !FlushInstructionCache(GetCurrentProcess(), (void *)cursor, bytes)) return -5;
+        } else if (info.State != MEM_RESERVE) return -12;
+        cursor += bytes;
+    }
+    return result;
+}
+
 static void mark_pages(NrVm *v, uintptr_t address, size_t length, int present) {
     if (!v->mapped_pages) return;
     size_t first = (address - (uintptr_t)v->base) / 4096;
@@ -341,6 +398,7 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
         if (args[2] & 2) { fputs("msync unsupported MS_INVALIDATE\n", stderr); *result = -38; return 1; }
         if (!length) { *result = 0; return 1; }
     }
+    if (number == MADVISE && !(address & 4095) && !length && args[2] == 4) { *result = 0; return 1; }
     if ((address & 4095) || !length || length > SIZE_MAX - 4095) { *result = -22; return 1; }
     length = (length + 4095) & ~(size_t)4095;
     if (address > UINTPTR_MAX - length) { *result = -22; return 1; }
@@ -360,30 +418,9 @@ static int vm_operation(NrRun *run, uintptr_t number, const uintptr_t args[6], i
         return 1;
     }
     if (number == MADVISE) {
-        if (!v || !mapped(v, address, length)) *result = -12;
+        if (!v) *result = -12;
         else if (args[2] != 4 || v->image.file || v->section) *result = -38;
-        else {
-            /* DONTNEED discards anonymous contents without changing mappings
-               or permissions. A pthread stack can include PROT_NONE guards;
-               requiring writable memory rejects glibc's stack-cache cleanup. */
-            uintptr_t cursor = address, end = address + length;
-            *result = 0;
-            while (cursor < end) {
-                MEMORY_BASIC_INFORMATION info;
-                if (!VirtualQuery((const void *)cursor, &info, sizeof(info))) { *result = -12; break; }
-                size_t bytes = info.RegionSize - (cursor - (uintptr_t)info.BaseAddress);
-                if (bytes > end - cursor) bytes = end - cursor;
-                if (info.State == MEM_COMMIT) {
-                    /* MEM_RESET marks anonymous pages discardable while
-                       preserving their mapping, protection and live stack
-                       accesses. It is the closest Windows primitive to
-                       Linux MADV_DONTNEED and avoids decommitting a range
-                       that another guest thread may still be unwinding. */
-                    if (!VirtualAlloc((void *)cursor, bytes, MEM_RESET, PAGE_READWRITE)) { *result = -12; break; }
-                } else if (info.State != MEM_RESERVE) { *result = -12; break; }
-                cursor += bytes;
-            }
-        }
+        else *result = discard_anonymous(run, v, address, length);
         return 1;
     }
     int owned = v != NULL;

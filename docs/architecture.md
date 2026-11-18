@@ -48,6 +48,18 @@ GM 显示实际部分结果并停止泡点，避免定时重复发放。登录�
 
 `elf.c` 以只读文件视图保留输入，再为执行副本映射 PT_LOAD、零填充 BSS 并设置页权限。ET_EXEC 按原地址映射；ET_DYN 分配独立区域。原磁盘 ELF 不因加载和适配被改写。`run.c` 构造 argc/argv、环境、auxv 和初始栈，再经 `entry.S` 进入原动态加载器或程序入口。
 
+主线程的 guest 栈为独立 8 MiB 私有分配，与 clone 的 guest 栈一样和原 Windows 栈
+分离。`madvise` 在 VEH 返回后转到该线程原 Windows 栈执行，再通过既有现场恢复
+路径返回 guest，避免 glibc 丢弃自己旧栈页时覆盖 Windows 的 syscall 处理帧。
+线程退出也先切回原 Windows 栈，再处理 robust list、clear_tid 与唤醒，最后执行
+Windows 线程清理；唤醒 join 后不再使用 guest 栈或其 TLS。
+
+匿名页丢弃保持原页权限，短暂 decommit 期间的并发合法访问可在映射锁后重试。
+每个线程对同一重置代次最多重试一次，并复核页仍映射、已提交且允许该访问；
+真实保护页、空洞、非法写入及未解决的错误继续交给 guest 信号或故障诊断。
+该行为依据 [Linux madvise(2)](https://man7.org/linux/man-pages/man2/madvise.2.html)
+和 Windows 页提交接口独立实现，并用相同 ELF 夹具对照原 Linux 行为；没有引入参考兼容层。
+
 `zero.c` 从主 ELF 的动态符号、JUMP_SLOT 重定位及标准 PLT 推导 `memset` 跳转位置，核对原文件与执行副本的完整跳转指令，再仅在执行内存接入；日志记录 ELF 哈希、地址、原字节与恢复来源，不修改原 ELF。首调用及非优化路径执行原 GOT 跳转，保留惰性符号解析；仅在目标已解析到 libc、填充值低字节为零、长度至少 64 KiB 且整个目标属于可写私有匿名映射时，对内部完整页使用 `MEM_DECOMMIT` 后 `MEM_COMMIT`，由 Windows 保证后续读取得到零，边界不足一页的部分实际清零。映射锁覆盖检查与重置，任何失败明确终止并记录；不使用无法保证内容清零的 `MEM_RESET`，不清理工作集来制造短暂下降。共享页、文件 COW、可执行页及其他填充值仍由原 libc 处理；有 `LD_PRELOAD` 的程序完全保留预加载路径，避免绕过插件对 libc 的插桩。没有标准 PLT 的 ELF 正常沿用原路径。该优化降低常驻物理内存，不缩小连接池、虚拟地址范围或提交量。页语义依据 [VirtualFree / MEM_DECOMMIT](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree) 和 [VirtualAlloc / MEM_COMMIT](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc) 独立实现。
 
 `time`、`gettimeofday` 和 `CLOCK_REALTIME` 继续从 Windows 实时时钟取得 Unix UTC 时间戳；单调时钟继续使用性能计数器，不将本地时区偏移加到时间戳。`run.c` 启动 ELF 时，若没有显式 `TZ`，通过 `GetTimeZoneInformation` 读取本机规则，并由 `timezone.h` 转为 POSIX `TZ` 交给原版 glibc；固定偏移、分数小时、南北半球周期夏令时均保留。该默认值不占用原有 32 项显式环境槽。显式 `--env TZ=...` 优先；按绝对年份指定的转换规则明确报错，当前实现不生成历史时区数据库。时区规则在服务启动时读取，更改 Windows 时区后需重新拉起服务。MySQL 包装器的所有 mysqld 启动路径统一追加 `--default-time-zone=SYSTEM --log-timestamps=SYSTEM`，新实例配置也写入这两项；既有实例无需改配置。GUI 日志原本已使用 `GetLocalTime`。旧日志与已存数据不回写。规则依据 [Windows TIME_ZONE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information) 和 [POSIX TZ 环境变量](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html) 独立实现。
@@ -223,7 +235,7 @@ DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和�
 - 网络以现有 TCP/UDP、select/poll、LT epoll 路径为主；AF_UNIX、完整 sendmsg/recvmsg 辅助数据、ET/ONESHOT 等未完成。
 - 非 PI robust list 注册及正常线程退出时的 owner death、pending 节点与进程内唤醒已有实现；PI 锁、跨进程 futex、强制终止后的恢复、线程退出槽复用、pthread cancel 和通用线程定向信号未完整覆盖。
 - SA_SIGINFO/SA_NODEFER 已支持固定 i386/x86_64 `siginfo_t`/`ucontext` 帧、嵌套投递、GPR/PC/SP/flags/掩码修改及 `rt_sigreturn`；同步访问异常支持范围见上文。浮点扩展状态、备用信号栈、其他同步异常、纯计算中的异步抢占和完整 syscall 中断/重启语义仍有限。
-- 匿名私有映射的 `madvise(MADV_DONTNEED)` 使用 Windows `MEM_RESET` 保留地址、权限和并发访问；Windows 不保证 Linux 下一次读一定立即得到零页，因此不能把它扩展为通用页面回收或跨进程共享语义。
+- 匿名私有映射的 `madvise(MADV_DONTNEED)` 对已提交页 decommit/recommit 为原权限的零页，保留地址及 guest 映射；从未提交的 PROT_NONE 页继续保留。长度按页向上取整；范围内有解除映射的洞时返回 ENOMEM，并丢弃仍映射的部分，与 Linux 对照一致。当前范围须处于同一匿名记录，文件、共享映射及其他 advice 仍明确拒绝，不扩展为通用页面回收。
 - 打开目标上的 POSIX rename、符号链接、普通文件执行映射、EOF 外整页的 SIGBUS、跨多个预留区固定映射及部分 msync 行为存在边界。
 - inotify_init/init1 仍返回 ENOSYS；固定原版 Frida Gadget 的 `GPollFileMonitor` 轮询回退已通过覆盖写入、原子替换和新版 RPC 结果验证，延迟约 5 秒。无需为此路径增加文件监视兼容层；通用 inotify、全部编辑器行为和业务运行中的任意脚本热加载不在已验证范围。
 - 保留原地址不等于任意等级 ELF/PVF 都兼容；每个新组合都需要匹配资源和独立业务验证。

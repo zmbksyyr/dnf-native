@@ -26,17 +26,19 @@ typedef struct {
 
 typedef struct {
     uintptr_t tls_base;
+    uintptr_t native_stack;
     unsigned char *tls_code;
     uint64_t signal_mask;
     uint64_t signal_pending;
     int32_t signal_origin[65]; /* Self-directed signals; sender is the current process. */
-    CONTEXT initial_context;
+    CONTEXT initial_context; /* Clone entry or deferred-syscall resume context. */
     NrSignalState *signal_state;
     uint64_t signal_frame_data[64];
     uintptr_t clear_tid, robust_head;
     DWORD tid;
     HANDLE handle;
     volatile LONG allocated;
+    unsigned vm_retry_generation;
     NrGap gaps[32];
 } NrThread;
 
@@ -88,6 +90,7 @@ typedef struct {
     NrVm vm[NR_VM_SLOTS];
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;
+    unsigned vm_reset_generation;
     /* Committed private regions; cleared under memory_lock on VM/brk changes. */
     MEMORY_BASIC_INFORMATION memory_regions[NR_MEMORY_REGIONS];
     unsigned memory_region_count, memory_region_cursor;
@@ -120,6 +123,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
 unsigned nr_fd_reserve(NrRun *run);
 uint64_t nr_file_inode(HANDLE file);
 int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
+int nr_vm_retry_access(NrRun *run, const EXCEPTION_RECORD *fault);
 int nr_zero_fill(NrRun *run, CONTEXT *context);
 int nr_tls(NrRun *run, CONTEXT *context, const NrTrap *trap);
 int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);

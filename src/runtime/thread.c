@@ -15,6 +15,9 @@ __attribute__((noreturn, force_align_arg_pointer)) void nr_tls_uninitialized(voi
     ExitProcess(126);
 }
 void nr_thread_attach(NrThread *thread) {
+    /* Reuse this thread's original Windows stack for its final exit path.
+       Once clear_tid is published, Linux callers may reclaim the guest stack. */
+    thread->native_stack = (uintptr_t)__builtin_frame_address(0);
     if (!thread->tid) thread->tid = GetCurrentThreadId();
     if (!TlsSetValue(thread_key, thread)) ExitProcess(124);
 #ifndef _WIN64
@@ -173,6 +176,21 @@ static DWORD WINAPI child_entry(void *argument) {
     return 124;
 }
 
+__attribute__((noreturn)) void nr_thread_leave(uintptr_t stack, NrRun *run, uintptr_t status);
+__attribute__((noreturn, force_align_arg_pointer)) void nr_finish_thread(NrRun *run, uintptr_t status) {
+    NrThread *thread = nr_current();
+    nr_log_thread_exit(thread, status);
+    robust_exit(run, thread);
+    if (thread->clear_tid && nr_memory(thread->clear_tid, 4, 1)) {
+        InterlockedExchange((volatile LONG *)thread->clear_tid, 0);
+        wake(thread->clear_tid, UINT32_MAX);
+    }
+    if (thread->tls_code) VirtualFree(thread->tls_code, 0, MEM_RELEASE);
+    thread->tls_code = NULL;
+    if (!InterlockedDecrement(&run->thread_count)) ExitProcess((DWORD)status & 255);
+    ExitThread((DWORD)status & 255);
+}
+
 int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c, intptr_t *result) {
 #ifdef _WIN64
     enum {CLONE = 56, FUTEX = 202, SETTID = 218, EXIT = 60, ROBUST = 273};
@@ -187,16 +205,7 @@ int nr_threads(NrRun *run, uintptr_t number, const uintptr_t args[6], CONTEXT *c
         return 1;
     }
     if (number == EXIT) {
-        nr_log_thread_exit(thread, args[0]);
-        robust_exit(run, thread);
-        if (thread->clear_tid && nr_memory(thread->clear_tid, 4, 1)) {
-            InterlockedExchange((volatile LONG *)thread->clear_tid, 0);
-            wake(thread->clear_tid, UINT32_MAX);
-        }
-        if (thread->tls_code) VirtualFree(thread->tls_code, 0, MEM_RELEASE);
-        thread->tls_code = NULL;
-        if (!InterlockedDecrement(&run->thread_count)) ExitProcess((DWORD)args[0] & 255);
-        ExitThread((DWORD)args[0] & 255);
+        nr_thread_leave(thread->native_stack, run, args[0]);
     }
     if (number == FUTEX) {
         uintptr_t operation = args[1] & ~128u;

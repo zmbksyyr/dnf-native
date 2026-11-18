@@ -13,11 +13,11 @@ static result call(word n,word a,word b,word c,word d,word e,word f) {
     return r;
 }
 #ifdef __x86_64__
-enum {WRITE=1,MMAP=9,PROTECT=10,ACTION=13,MASK=14,EXIT=60};
+enum {WRITE=1,MMAP=9,PROTECT=10,ADVISE=28,ACTION=13,MASK=14,EXIT=60};
 #define PTR_REG "%%rax"
 typedef struct {word r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,pc,flags;unsigned short cs,gs,fs,ss;word err,trap,oldmask,address,fpstate,reserved[8];} Machine;
 #else
-enum {WRITE=4,MMAP=192,PROTECT=125,ACTION=174,MASK=175,EXIT=1};
+enum {WRITE=4,MMAP=192,PROTECT=125,ADVISE=219,ACTION=174,MASK=175,EXIT=1};
 #define PTR_REG "%%eax"
 typedef struct {word gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,rax,trap,err,pc,cs,flags,esp_signal,ss,fpstate,oldmask,address;} Machine;
 #endif
@@ -58,8 +58,10 @@ __attribute__((noreturn,force_align_arg_pointer)) void _start(void) {
     word page=(word)call(MMAP,0,4096,3,0x22,(word)-1,0);
     CHECK(page && page<(word)-4095);
     CHECK(call(PROTECT,page,4096,1,0,0,0)==0);
+    CHECK(call(ADVISE,page,4096,4,0,0,0)==0);
     fault(page,2,2);
     CHECK(call(PROTECT,page,4096,0,0,0,0)==0);
+    CHECK(call(ADVISE,page,4096,4,0,0,0)==0);
     fault(page,2,0);
     CHECK(seen==3);
     CHECK(call(WRITE,1,(word)"native-fault-recovery-ok\n",sizeof("native-fault-recovery-ok\n")-1,0,0,0)==sizeof("native-fault-recovery-ok\n")-1);

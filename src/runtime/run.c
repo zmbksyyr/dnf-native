@@ -409,6 +409,47 @@ static intptr_t syscall_result(uintptr_t number, const uintptr_t args[6], CONTEX
     return result;
 }
 
+/* glibc may discard the unused part of its own current stack. A Windows VEH
+   frame below guest SP can occupy those pages, so finish VEH before running
+   this syscall on the thread's original Windows stack, then resume the saved
+   guest context through the same path used to enter a clone child. */
+static __attribute__((noreturn)) void madvise_native(void) {
+    CONTEXT *guest = &nr_current()->initial_context;
+#ifdef _WIN64
+    uintptr_t args[] = {guest->Rdi, guest->Rsi, guest->Rdx, guest->R10, guest->R8, guest->R9};
+    uintptr_t number = 28, pc = guest->Rip - 2;
+#else
+    uintptr_t args[] = {guest->Ebx, guest->Ecx, guest->Edx, guest->Esi, guest->Edi, guest->Ebp};
+    uintptr_t number = 219, pc = guest->Eip - 2;
+#endif
+    intptr_t result = dispatch(number, args, pc);
+#ifdef _WIN64
+    guest->Rax = (DWORD64)result;
+#else
+    guest->Eax = (DWORD)result;
+#endif
+    if (!nr_deliver_signal(active, guest)) ExitProcess(124);
+    RaiseException(0xe0444e46u, 0, 0, NULL);
+    ExitProcess(124);
+}
+
+static void defer_madvise(CONTEXT *context) {
+    NrThread *thread = nr_current();
+    thread->initial_context = *context;
+    CONTEXT *guest = &thread->initial_context;
+#ifdef _WIN64
+    guest->Rip += 2;
+    guest->Rcx = guest->Rip;
+    guest->R11 = guest->EFlags & ~0x10000u;
+    context->Rip = (DWORD64)madvise_native;
+    context->Rsp = (thread->native_stack & ~(uintptr_t)15) - 40;
+#else
+    guest->Eip += 2;
+    context->Eip = (DWORD)madvise_native;
+    context->Esp = (thread->native_stack & ~(uintptr_t)15) - 4;
+#endif
+}
+
 static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
     if (!nr_current()) return EXCEPTION_CONTINUE_SEARCH;
     CONTEXT *c = exception->ContextRecord;
@@ -480,6 +521,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
             if (!nr_deliver_signal(active, c)) ExitProcess(124);
             return EXCEPTION_CONTINUE_EXECUTION;
         }
+        if (c->Rax == 28) { defer_madvise(c); return EXCEPTION_CONTINUE_EXECUTION; }
         uintptr_t args[] = {c->Rdi, c->Rsi, c->Rdx, c->R10, c->R8, c->R9};
         c->Rax = (DWORD64)syscall_result(c->Rax, args, c, pc);
         c->Rcx = pc + 2;
@@ -499,6 +541,7 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
             if (!nr_deliver_signal(active, c)) ExitProcess(124);
             return EXCEPTION_CONTINUE_EXECUTION;
         }
+        if (c->Eax == 219) { defer_madvise(c); return EXCEPTION_CONTINUE_EXECUTION; }
         uintptr_t args[] = {c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi, c->Ebp};
         c->Eax = (DWORD)syscall_result(c->Eax, args, c, pc);
         c->Eip = pc + 2;
@@ -510,6 +553,8 @@ static LONG CALLBACK trap_handler(EXCEPTION_POINTERS *exception) {
        metadata. Record unsupported guest faults at the VEH boundary, while
        the original register context still exists. */
     DWORD fatal = exception->ExceptionRecord->ExceptionCode;
+    if (fatal == EXCEPTION_ACCESS_VIOLATION && nr_vm_retry_access(active, exception->ExceptionRecord))
+        return EXCEPTION_CONTINUE_EXECUTION;
     if ((fatal == EXCEPTION_ACCESS_VIOLATION || fatal == EXCEPTION_ILLEGAL_INSTRUCTION ||
          fatal == EXCEPTION_PRIV_INSTRUCTION) && executable(pc)) {
         if (nr_deliver_fault(active, c, exception->ExceptionRecord)) return EXCEPTION_CONTINUE_EXECUTION;
@@ -549,7 +594,11 @@ static DWORD WINAPI start_guest(void *argument) {
         }
         fprintf(stderr, "guest timezone source=Windows %s\n", timezone);
     }
-    unsigned char *memory = _alloca(NR_STACK_BYTES);
+    /* Keep the leader's guest stack separate, just like clone stacks. Host
+       syscall/exit work must not overwrite live guest frames when switching
+       back to the original Windows stack. Pages become resident on demand. */
+    unsigned char *memory = VirtualAlloc(NULL, NR_STACK_BYTES, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (!memory) ExitProcess(124);
     run->stack_low = (uintptr_t)memory;
     run->stack_high = (uintptr_t)memory + NR_STACK_BYTES;
     uintptr_t cursor = run->stack_high - 256;

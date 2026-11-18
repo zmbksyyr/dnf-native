@@ -1129,3 +1129,44 @@ brk 等真正改变有效范围或权限的路径仍失效。双架构零填充�
 `zero-cache-linux-fixtures.json`、`gm-online-extra-zero-cache-windows.private.json`、
 `zero-cache-normal-stop.private.log`；原始负载和线程采样各有独立文件，未覆盖
 前轮记录。本轮未改既有 `MADV_DONTNEED` 的 MEM_RESET 语义边界，该项仍需后续处理。
+
+## MADV_DONTNEED 与线程栈隔离（2026-11-18）
+
+沿用 Windows 10 x64 19044、LLVM-MinGW 20261104 MSVCRT、原 glibc 2.17、固定
+原 game 与 stock PVF 的独立副本。收紧旧 VM 检查后，两种位数的旧宿主均在丢弃后
+读到旧字节；相同的独立 DONTNEED ELF 在 Linux 返回预期结果。旧测试允许旧值或零，
+只证明保留映射，没有证明 Linux 的下一次读取零页语义。
+
+首次真正清零的候选暴露了 glibc 退出时主动丢弃自己旧栈的路径：Windows 的 syscall
+处理帧也在这些页内，导致处理帧被清掉。将该调用移到原 Windows 栈后，又发现主线程
+guest 栈原先通过同一 Windows 栈的 alloca 建立，切换仍会互相覆盖。最终将主线程
+8 MiB guest 栈独立分配；MADVISE 在 VEH 返回后执行于原 Windows 栈，再恢复 guest
+现场。线程退出也切回原 Windows 栈后再执行 robust、clear_tid 和 Windows 清理。
+失败候选与原始调用记录保留，没有用保留旧字节、跳过栈清理或假返回成功代替修复。
+
+最终候选按原页权限 decommit/recommit 已提交匿名页；未提交的 PROT_NONE 页继续
+保留，并对恢复间隙中的合法并发访问作受限重试。双架构独立检查覆盖精确零字节、
+混合权限、页向上取整、未选邻页保持、空洞返回 ENOMEM 且其余映射已丢弃、零长度
+和初始 PROT_NONE；2000 次丢弃期间另一真实 guest 线程持续读取。原 glibc/libpthread
+各完成 24 轮自栈丢弃、join、立即清零整个用户栈及解除映射。六个相同 ELF 及原库在
+授权的独立 Linux 对照中也通过，哈希逐项相等；这不是对所有 VM syscall 的兼容声明。
+
+双架构入口、TLS、各 10 轮 clone 竞争、raw 与原 glibc robust mutex、VM 及八线程
+VM 并发、信号与四种跨进程位数组合均通过。同步故障检查新增了丢弃后只读页的非法
+写入和 PROT_NONE 读取，仍正确投递 SIGSEGV，受限重试没有吞掉这些错误。原大块
+memset 清零检查继续通过，双架构各减少 50,327,552 驻留字节，保留共享别名、COW
+与预加载行为。原 ELF、资源 ZIP、Robot 和 GM 源码没有改变。
+
+最终包的真实 600 目标混合负载持续 120 秒，稳态 597–600 在线，摆摊成功 72／失败 0，
+移动成功 3471／失败 0；约 20.01 秒排空，最大 game 时钟积压 15.49 秒，随后连续
+三次采样恢复至 2 秒内。game 稳态 CPU 为 34.63 秒。上一轮为 30.01 秒／15.73 秒
+与 36.48 CPU 秒；地图和随机行为不同，不推算统一性能提升比例，也不宣称所有地图
+摆摊零失败。GM 六并发在线增量、当前角色泡点、退出存档、离线增量与溢出/归属拒绝
+通过且恢复原测试值；整套服务正常停服的结果另存原始日志。
+
+主要收据保存在 `../x/dnf-gm-output/evidence/`：`madvise-before-semantics.json`、
+`madvise-thread-exit-trace.log`、`madvise-regression-summary.json`、
+`madvise-final-{semantics,entry,tls,signal,robust,clone,vm,vm-concurrent,zero-pages}.json`、
+`madvise-linux-fixtures.json`、`madvise-load-comparison.json` 和
+`gm-online-extra-madvise-windows.private.json`。文件/共享 DONTNEED、跨匿名记录范围、
+其他 advice 以及其他 VM 边界继续按实现中的明确支持范围处理。
