@@ -29,8 +29,10 @@ static intptr_t socket_errno(int error) {
         case WSAECONNREFUSED: return -111;
         case WSAETIMEDOUT: return -110;
         case WSAENETUNREACH: return -101;
+        case WSAENETRESET: return -102;
         case WSAEHOSTUNREACH: return -113;
         case WSAEMSGSIZE: return -90;
+        case WSAEDESTADDRREQ: return -89;
         case WSAENOPROTOOPT: return -92;
         case WSAENOTCONN: return -107;
         default: return -5;
@@ -39,8 +41,40 @@ static intptr_t socket_errno(int error) {
 
 static intptr_t socket_error(void) { return socket_errno(WSAGetLastError()); }
 
-static intptr_t socket_io_error(void) {
-    return WSAGetLastError() == WSAETIMEDOUT ? -11 : socket_error();
+enum { STREAM_ERROR_CONSUMED = 1, STREAM_WRITE_SHUT = 2 };
+
+static intptr_t broken_pipe(int flags) {
+    if (!(flags & 0x4000)) { /* Linux MSG_NOSIGNAL. SIGPIPE belongs to this writer. */
+        NrThread *thread = nr_current();
+        thread->signal_origin[13] = 0;
+        thread->signal_pending |= 1ULL << 12;
+    }
+    return -32;
+}
+
+static intptr_t socket_transfer(NrRun *run, unsigned fd, void *buffer, int bytes, int receiving,
+                                int flags, struct sockaddr *address, int *length) {
+    SOCKET s = (SOCKET)run->sockets[fd];
+    int stream = run->socket_type[fd] == SOCK_STREAM;
+    if (stream && !receiving && (run->stream_state[fd] & (STREAM_ERROR_CONSUMED | STREAM_WRITE_SHUT)))
+        return broken_pipe(flags);
+    int r = receiving ? recvfrom(s, buffer, bytes, flags & ~0x4000, address, length) :
+                        sendto(s, buffer, bytes, flags & ~0x4000, address, address ? 16 : 0);
+    if (r != SOCKET_ERROR) return r;
+    int error = WSAGetLastError();
+    if (!stream && !receiving && !address && error == WSAENOTCONN) return -89;
+    if (stream) {
+        /* Winsock retains a terminal connection error on every I/O. Linux
+           consumes it once, then reads EOF and writes EPIPE. Keep that state
+           per descriptor; UDP errors and asynchronous connect stay separate. */
+        if (error == WSAECONNRESET || error == WSAECONNABORTED || error == WSAENETRESET) {
+            LONG previous = InterlockedOr(&run->stream_state[fd], STREAM_ERROR_CONSUMED);
+            if (previous & STREAM_ERROR_CONSUMED) return receiving ? 0 : broken_pipe(flags);
+        }
+        if (!receiving && (error == WSAESHUTDOWN || error == WSAENOTCONN)) return broken_pipe(flags);
+        if (receiving && error == WSAESHUTDOWN) return 0;
+    }
+    return error == WSAETIMEDOUT ? -11 : socket_errno(error);
 }
 
 static int epoll_trace_enabled(const NrRun *run) { return run->epoll_trace_enabled != 0; }
@@ -75,7 +109,7 @@ static int interface_mac(unsigned char mac[6]) {
     return found;
 }
 
-static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
+static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock, int type) {
     if (nonblock) {
         u_long mode = 1;
         if (ioctlsocket(s, FIONBIO, &mode)) { intptr_t error = socket_error(); closesocket(s); return error; }
@@ -85,6 +119,8 @@ static intptr_t add_socket(NrRun *run, SOCKET s, int nonblock) {
     run->sockets[fd] = (uintptr_t)s;
     run->nonblock[fd] = nonblock != 0;
     run->connect_state[fd] = 0;
+    run->socket_type[fd] = (unsigned char)type;
+    run->stream_state[fd] = 0;
     run->file_access[fd] = 4;
     return fd;
 }
@@ -463,7 +499,7 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
             initialized = 1;
         }
         SOCKET s = socket((int)args[0], (int)(args[1] & 15), (int)args[2]);
-        *result = s == INVALID_SOCKET ? socket_error() : add_socket(run, s, (args[1] & 0x800) != 0);
+        *result = s == INVALID_SOCKET ? socket_error() : add_socket(run, s, (args[1] & 0x800) != 0, (int)(args[1] & 15));
         return 1;
     }
     if (fd >= NR_FD_SLOTS || run->file_access[fd] != 4) { *result = -9; return 1; }
@@ -472,15 +508,16 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         int receiving = number == READ;
         size_t bytes = args[2] > 0x7ffff000 ? 0x7ffff000 : args[2];
         if (!nr_memory(args[1], bytes, receiving)) { *result = -14; return 1; }
-        if (!bytes) { *result = 0; return 1; }
-        if (!run->nonblock[fd] &&
+        if (!bytes && receiving) { *result = 0; return 1; }
+        if (!run->nonblock[fd] && !(run->stream_state[fd] &
+                                  (receiving ? STREAM_ERROR_CONSUMED : STREAM_ERROR_CONSUMED | STREAM_WRITE_SHUT)) &&
             (receiving ? run->receive_timeout[fd] : run->send_timeout[fd]) > (uint64_t)(MAXDWORD - 1) * 1000) {
             intptr_t waited = wait_socket(s, !receiving,
                                           receiving ? run->receive_timeout[fd] : run->send_timeout[fd]);
             if (waited) { *result = waited; return 1; }
         }
-        int r = receiving ? recv(s, (char *)args[1], (int)bytes, 0) : send(s, (const char *)args[1], (int)bytes, 0);
-        *result = r == SOCKET_ERROR ? socket_io_error() : r; return 1;
+        *result = socket_transfer(run, (unsigned)fd, (void *)args[1], (int)bytes, receiving, 0, NULL, NULL);
+        return 1;
     }
     if (number == CLOSE && !operation) {
         /* Publish the closing state before closesocket wakes a blocked select.
@@ -490,6 +527,8 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         if (!*result) {
             run->nonblock[fd] = 0;
             run->connect_state[fd] = 0;
+            run->socket_type[fd] = 0;
+            run->stream_state[fd] = 0;
             run->receive_timeout[fd] = run->send_timeout[fd] = 0;
             run->file_access[fd] = 0;
         } else run->sockets[fd] = (uintptr_t)s;
@@ -536,7 +575,12 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         return 1;
     }
     if (operation == 4) { *result = listen(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
-    if (operation == 13) { *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error(); return 1; }
+    if (operation == 13) {
+        *result = shutdown(s, (int)args[1]) == 0 ? 0 : socket_error();
+        if (!*result && run->socket_type[fd] == SOCK_STREAM && (args[1] == 1 || args[1] == 2))
+            InterlockedOr(&run->stream_state[fd], STREAM_WRITE_SHUT);
+        return 1;
+    }
     if (operation == 15) {
         if (args[1] != 1 || (args[2] != 4 && args[2] != 7 && args[2] != 8)) {
             fprintf(stderr, "getsockopt unsupported level=%llu option=%llu\n",
@@ -550,14 +594,37 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
         if (bytes && !nr_memory(args[3], (size_t)bytes, 1)) { *result = -14; return 1; }
         int value, length = sizeof(value);
         int option = args[2] == 4 ? SO_ERROR : args[2] == 7 ? SO_SNDBUF : SO_RCVBUF;
-        if (args[2] == 4 && run->connect_state[fd] == 2) value = 0;
+        if (args[2] == 4 && (run->connect_state[fd] == 2 ||
+                            (run->stream_state[fd] & STREAM_ERROR_CONSUMED))) value = 0;
         else {
             if (getsockopt(s, SOL_SOCKET, option, (char *)&value, &length)) { *result = socket_error(); return 1; }
             if (args[2] == 4) {
+                /* Winsock can report zero SO_ERROR after a TCP reset while
+                   recv still exposes the terminal error. Peek only a socket
+                   with terminal readiness, so a healthy blocking socket is
+                   never read here and queued data remains untouched. */
+                if (!value && run->socket_type[fd] == SOCK_STREAM && !run->connect_state[fd]) {
+                    WSAPOLLFD poll = {s, POLLRDNORM, 0};
+                    if (WSAPoll(&poll, 1, 0) > 0 && (poll.revents & (POLLERR | POLLHUP))) {
+                        char byte;
+                        if (recv(s, &byte, 1, MSG_PEEK) == SOCKET_ERROR) {
+                            int error = WSAGetLastError();
+                            if (error == WSAECONNRESET || error == WSAECONNABORTED || error == WSAENETRESET)
+                                value = error;
+                        }
+                    }
+                }
+                if (run->socket_type[fd] == SOCK_STREAM && run->connect_state[fd] != 1 &&
+                    (value == WSAECONNRESET || value == WSAECONNABORTED || value == WSAENETRESET))
+                    InterlockedOr(&run->stream_state[fd], STREAM_ERROR_CONSUMED);
                 value = (int)-socket_errno(value);
                 /* Winsock retains a failed asynchronous connect's SO_ERROR.
                    Linux consumes it on the first query. A new connect resets it. */
                 if (value && run->connect_state[fd] == 1) run->connect_state[fd] = 2;
+                else if (!value && run->connect_state[fd] == 1) {
+                    struct sockaddr_in peer; int peer_bytes = sizeof(peer);
+                    if (!getpeername(s, (struct sockaddr *)&peer, &peer_bytes)) run->connect_state[fd] = 0;
+                }
             }
         }
         if (bytes) memcpy((void *)args[3], &value, (size_t)bytes);
@@ -628,12 +695,13 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
             if (capacity > 0) memcpy((void *)args[1], &address, (size_t)capacity);
             memcpy((void *)args[2], &bytes, 4);
         }
-        *result = operation == 5 ? add_socket(run, accepted, 0) : 0; return 1;
+        *result = operation == 5 ? add_socket(run, accepted, 0, SOCK_STREAM) : 0; return 1;
     }
     if (operation == 9 || operation == 10 || operation == 11 || operation == 12) {
         int receiving = operation == 10 || operation == 12;
-        if (args[2] > INT_MAX || args[3] || !nr_memory(args[1], args[2], receiving)) {
-            *result = args[3] || args[2] > INT_MAX ? -38 : -14; return 1;
+        uintptr_t unsupported_flags = args[3] & ~(uintptr_t)(receiving ? 0 : 0x4000);
+        if (args[2] > INT_MAX || unsupported_flags || !nr_memory(args[1], args[2], receiving)) {
+            *result = unsupported_flags || args[2] > INT_MAX ? -38 : -14; return 1;
         }
         struct sockaddr_in address; int bytes = 16, capacity = 0;
         if (args[4]) {
@@ -646,9 +714,9 @@ int nr_net(NrRun *run, uintptr_t number, const uintptr_t input[6], intptr_t *res
                 if (address.sin_family != AF_INET) { *result = -97; return 1; }
             }
         }
-        int r = receiving ? recvfrom(s, (char *)args[1], (int)args[2], 0, args[4] ? (struct sockaddr *)&address : NULL, args[4] ? &bytes : NULL) :
-                            sendto(s, (const char *)args[1], (int)args[2], 0, args[4] ? (const struct sockaddr *)&address : NULL, args[4] ? 16 : 0);
-        if (r == SOCKET_ERROR) { *result = socket_io_error(); return 1; }
+        intptr_t r = socket_transfer(run, (unsigned)fd, (void *)args[1], (int)args[2], receiving, (int)args[3],
+                                     args[4] ? (struct sockaddr *)&address : NULL, args[4] ? &bytes : NULL);
+        if (r < 0) { *result = r; return 1; }
         if (receiving && args[4]) {
             if (capacity > bytes) capacity = bytes;
             if (capacity > 0) memcpy((void *)args[4], &address, (size_t)capacity);

@@ -2,6 +2,36 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## TCP 终止错误与线程 SIGPIPE（2026-11-18）
+
+Windows 10 x64 build 19044、LLVM-MinGW 20261104；同一批独立 i386/x86_64 ELF
+在 Windows 宿主及已授权的 WSL2 Linux 对照中执行。修复前，Linux 消费一次
+ECONNRESET 后写入返回 EPIPE；Windows 连续返回 ECONNRESET，且未产生 SIGPIPE。
+现按 TCP 描述符保存终止状态，恢复 EPIPE、写端关闭和当前线程 SIGPIPE；
+UDP 无目标写入单独返回 EDESTADDRREQ，不套用 TCP 规则。
+
+`python -B tests/test_net_closed.py --linux-distro DNF-Compare-20261118` 的双架构
+42 个场景两端均通过：read/write/SO_ERROR 消费错误、重复及零字节写入、
+MSG_NOSIGNAL、忽略/处理/默认/阻塞信号、半关闭读端保留，以及另一线程不能
+抢走已阻塞的 SIGPIPE。既有 TCP/poll/超时、进程信号、TLS 及原版 relay
+双向转发、分片/合并、UDP 断开和三轮重连回归通过。
+收据位于 `../x/dnf-gm-output/evidence/net-closed-final-core.json`，修复前对照为
+`net-closed-baseline.json`。
+
+增加 `--buffered-reset` 会另测对端发送数据后立即 RST 的两项场景；Linux 通过、
+Windows 因 Winsock 丢弃未读取数据而失败，证据为 `net-closed-final.json`。
+这仍是兼容缺口，没有以 EOF 或测试预期成功替代原生收到的数据。
+
+独立原 game 的一次 600 目标混合负载，稳态 120 秒在线 592–600，game CPU
+46.03 秒、时钟最大采样延迟 0.63 秒；期间移动成功 3473、失败 0，摆摊成功
+58、失败 19。排空耗时 55.08 秒、最大时钟积压 40.69 秒，仍有明显卡顿。
+该轮运行配置的摆摊概率为 30%，此前 TLS 对照为 20%，不据此计算性能增益；
+它用于实际运行回归。负载程序使用本次网络语义的首轮候选；随后并发状态写入
+及缓冲读边界收尾的最终宿主另以接口回归核对。原始采样为
+`tls-call-load-net-closed.private.json`，不把本次网络修复写成排空性能问题已解决。
+该轮全部正常停服，17 份最新服务日志未发现未处理异常；game 仍保留既有
+Frida 的两项 inotify ENOSYS 回退记录，详见 `net-closed-postcheck.private.json`。
+
 ## GS 间接调用性能对照（2026-11-18）
 
 Windows 10 x64 build 19044、LLVM-MinGW 20261104、固定 i386 原 game、基底 glibc 2.17、

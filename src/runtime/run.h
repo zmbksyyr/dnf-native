@@ -28,6 +28,8 @@ typedef struct {
     uintptr_t tls_base;
     unsigned char *tls_code;
     uint64_t signal_mask;
+    uint64_t signal_pending;
+    int32_t signal_origin[65]; /* Self-directed signals; sender is the current process. */
     CONTEXT initial_context;
     NrSignalState *signal_state;
     uint64_t signal_frame_data[64];
@@ -75,6 +77,8 @@ typedef struct {
     uintptr_t sockets[NR_FD_SLOTS];
     unsigned char nonblock[NR_FD_SLOTS];
     unsigned char connect_state[NR_FD_SLOTS]; /* 1: pending, 2: failed SO_ERROR consumed */
+    unsigned char socket_type[NR_FD_SLOTS];
+    volatile LONG stream_state[NR_FD_SLOTS]; /* Terminal error consumed / local write shutdown. */
     uint64_t receive_timeout[NR_FD_SLOTS];
     uint64_t send_timeout[NR_FD_SLOTS];
     NrWatch *epolls[NR_FD_SLOTS];

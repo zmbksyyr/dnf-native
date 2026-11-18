@@ -205,6 +205,8 @@ DP2 搜索保护仅替换明确识别的搜索 hook 段，保留周围凭据和�
 
 TCP 的 FIN／RST 在 Windows WSAPoll 中可能仅返回 HUP／ERR。Linux 的读就绪必须让调用方读出 EOF 或待决错误，因此兼容层在 socket HUP 时保留 HUP，并补上调用方请求的 POLLIN／POLLRDNORM；epoll 同步得到 EPOLLIN。原 monitor 通过可读事件读取断开并清除频道，同一 game 正常停止后可重新注册，不能通过跳过重复频道检查掩盖。
 
+TCP 终止错误按描述符消费一次；之后读出 EOF、写入返回 EPIPE，并向当前写入线程投递 SIGPIPE。`SO_ERROR` 同样消费终止错误；本地关闭写端不影响读端。发送支持 `MSG_NOSIGNAL`，阻塞的普通信号合并，不能被其他线程接收；自发 `tgkill` 也使用线程待决队列。UDP、异步连接错误与 TCP 终止状态分开处理。仍存在 Winsock 底层边界：对端发送数据后立即 RST，Windows 可能丢弃未读取数据，而 Linux 仍能读出；当前同步收包实现未解决该差异，专项夹具会明确失败，不据常见断线检查通过宣称完整 TCP 等价。
+
 新实例的公开演示登录使用用户指定的 game 数据库凭据和 test 游戏账号，四张登录表在初始化时建立；内部 dnf_game、维护 root、bridge 和 frida 仍按原职责使用实例凭据。登录器不读取服务端配置，默认值明文显示；控制台数据库详情显示当前实例实际连接参数，不记录到控制台日志。
 
 ## Robot 与性能阶段实现

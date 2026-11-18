@@ -130,8 +130,8 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
         if (!a || !b || a != GetCurrentProcessId() || b != thread->tid) { *result = -3; return 1; }
         if (c > 64) { *result = -22; return 1; }
         if (c) {
-            run->signal_sender[c]=(int32_t)GetCurrentProcessId(); run->signal_origin[c]=-6;
-            run->signal_pending |= 1ULL << (c - 1);
+            thread->signal_origin[c]=-6;
+            thread->signal_pending |= 1ULL << (c - 1);
         }
         *result = 0; return 1;
     }
@@ -192,7 +192,8 @@ int nr_signals(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *
     return 0;
 }
 
-static int deliver_action(NrRun *run, CONTEXT *c, unsigned signal, const EXCEPTION_RECORD *fault) {
+static int deliver_action(NrRun *run, CONTEXT *c, unsigned signal, const EXCEPTION_RECORD *fault,
+                          int32_t origin, int32_t sender) {
     NrThread *thread=nr_current();
     uint64_t bit=1ULL<<(signal-1);
     NrSignal action=run->actions[signal];
@@ -216,8 +217,8 @@ static int deliver_action(NrRun *run, CONTEXT *c, unsigned signal, const EXCEPTI
     frame->context_address=context_address;
 #endif
     if (info) {
-        int32_t signo=(int32_t)signal, code=fault ? 1 : run->signal_origin[signal];
-        int32_t pid=run->signal_sender[signal], uid=code==128 ? 0 : 1000;
+        int32_t signo=(int32_t)signal, code=fault ? 1 : origin;
+        int32_t pid=sender, uid=code==128 ? 0 : 1000;
         memcpy(frame->info,&signo,4);
         memcpy(frame->info+8,&code,4);
         size_t payload=sizeof(void *)==8 ? 16 : 12;
@@ -273,7 +274,7 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     if (WaitForSingleObject(run->usr2_event, 0) == WAIT_OBJECT_0) {
         run->signal_origin[12]=128; run->signal_sender[12]=0; run->signal_pending |= 1ULL << 11;
     }
-    uint64_t ready = run->signal_pending & ~thread->signal_mask;
+    uint64_t ready = (run->signal_pending | thread->signal_pending) & ~thread->signal_mask;
     for (unsigned signal = 1; signal <= 64; ++signal) {
         uint64_t bit = 1ULL << (signal - 1);
         if (!(ready & bit)) continue;
@@ -281,13 +282,17 @@ int nr_deliver_signal(NrRun *run, CONTEXT *c) {
            Linux. Letting the busiest worker consume a controller stop can
            reenter its logger from the original game's shutdown handler. A
            blocked leader still leaves other unblocked threads eligible. */
-        if (run->signal_origin[signal] == 128 && thread != &run->threads[0] &&
+        int local = (thread->signal_pending & bit) != 0;
+        if (!local && run->signal_origin[signal] == 128 && thread != &run->threads[0] &&
             !(run->threads[0].signal_mask & bit)) continue;
-        run->signal_pending &= ~bit;
+        int32_t origin = local ? thread->signal_origin[signal] : run->signal_origin[signal];
+        int32_t sender = local ? (int32_t)GetCurrentProcessId() : run->signal_sender[signal];
+        if (local) thread->signal_pending &= ~bit;
+        else run->signal_pending &= ~bit;
         NrSignal action = run->actions[signal];
         if (action.handler == 1 || (!action.handler && (signal == 17 || signal == 23 || signal == 28))) continue;
         if (!action.handler) ExitProcess(128 + signal);
-        return deliver_action(run,c,signal,NULL);
+        return deliver_action(run,c,signal,NULL,origin,sender);
     }
     return 1;
 }
@@ -300,5 +305,5 @@ int nr_deliver_fault(NrRun *run, CONTEXT *c, const EXCEPTION_RECORD *fault) {
     const unsigned signal=11;
     NrThread *thread=nr_current();
     if (run->actions[signal].handler<=1 || (thread->signal_mask & (1ULL<<(signal-1)))) return 0;
-    return deliver_action(run,c,signal,fault);
+    return deliver_action(run,c,signal,fault,0,0);
 }
