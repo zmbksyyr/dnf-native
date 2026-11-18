@@ -5,6 +5,7 @@ extern int __libc_start_main(int (*)(void), int, char **, void *, void *, void *
 extern int pthread_create(word *, const void *, void *(*)(void *), void *);
 extern int pthread_join(word, void **);
 extern int memcmp(const void *, const void *, unsigned);
+extern int pipe(int *);
 extern void _exit(int) __attribute__((noreturn));
 #define CHECK(c) do { if (!(c)) _exit(100 + __LINE__ % 100); } while (0)
 
@@ -22,29 +23,30 @@ static int raw(unsigned number, unsigned a, unsigned b, unsigned d, unsigned s) 
     __asm__ volatile("int $0x80":"=a"(result):"a"(number),"b"(a),"c"(b),"d"(d),"S"(s):"memory");
     return result;
 }
-static unsigned query(unsigned number, unsigned argument) {
-    unsigned result;
+static unsigned checked_call(unsigned number, unsigned argument, unsigned third, unsigned fourth) {
+    unsigned result, a=argument, c=third, d=fourth;
     bad=0;
     __asm__ volatile(
         "fxsave original_fp\n\tfninit\n\tfldpi\n\tfld1\n\tldmxcsr mxcsr\n\t"
         "movdqa vector, %%xmm0\n\tmovdqa vector, %%xmm1\n\tmovdqa vector, %%xmm2\n\t"
         "movdqa vector, %%xmm3\n\tmovdqa vector, %%xmm4\n\tmovdqa vector, %%xmm5\n\t"
         "movdqa vector, %%xmm6\n\tmovdqa vector, %%xmm7\n\tfxsave before_fp\n\t"
-        "movl $0x12345678, %%ecx\n\tmovl $0x23456789, %%edx\n\t"
         "movl $0x3456789a, %%esi\n\tmovl $0x456789ab, %%edi\n\t"
         "movl %%esp, before_sp\n\tmovl %%ebp, before_bp\n\t"
         "pushl $0xcd7\n\tpopfl\n\tpushfl\n\tpopl before_flags\n\t"
         "call *%%gs:16\n\tpushfl\n\tpopl after_flags\n\tcld\n\tfxsave after_fp\n\t"
-        "cmpl $0x12345678, %%ecx\n\tjne 1f\n\tcmpl $0x23456789, %%edx\n\tjne 1f\n\t"
         "cmpl $0x3456789a, %%esi\n\tjne 1f\n\tcmpl $0x456789ab, %%edi\n\tjne 1f\n\t"
         "cmpl %%esp, before_sp\n\tjne 1f\n\tcmpl %%ebp, before_bp\n\tjne 1f\n\tjmp 2f\n\t"
         "1: movl $1, bad\n\t2: fxrstor original_fp"
-        : "=a"(result), "+b"(argument) : "a"(number)
-        : "ecx","edx","esi","edi","memory","cc");
+        : "=a"(result), "+b"(a), "+c"(c), "+d"(d) : "a"(number)
+        : "esi","edi","memory","cc");
     CHECK(!bad && !((before_flags ^ after_flags) & 0xcd5));
     CHECK(memcmp(before_fp,after_fp,sizeof(before_fp))==0);
-    CHECK(argument==0);
+    CHECK(a==argument && c==third && d==fourth);
     return result;
+}
+static unsigned query(unsigned number, unsigned argument) {
+    return checked_call(number,argument,0x12345678,0x23456789);
 }
 __attribute__((naked)) static void custom_target(void) {
     __asm__ volatile("movl $0x654321, %eax; ret");
@@ -95,6 +97,33 @@ static int main_test(void) {
     CHECK(result==t && t>0);
     __asm__ volatile("call *%%gs:16":"=a"(result):"a"(13),"b"(1):"memory","cc");
     CHECK((int)result==-14);
+    const char filename[]="/tmp/sysinfo-write.bin", payload[]="direct-write-payload\n";
+    int fd=raw(5,(word)filename,0x242,0600,0);
+    CHECK(fd>=0);
+    CHECK(checked_call(4,fd,(word)payload,sizeof(payload))==sizeof(payload));
+    CHECK(raw(19,fd,0,0,0)==0);
+    char bytes[sizeof(payload)];
+    CHECK(raw(3,fd,(word)bytes,sizeof(bytes),0)==sizeof(bytes));
+    CHECK(memcmp(bytes,payload,sizeof(bytes))==0);
+    CHECK((int)checked_call(4,fd,1,1)==-14);
+    CHECK(checked_call(4,fd,1,0)==0);
+    CHECK(raw(6,fd,0,0,0)==0);
+    CHECK((int)checked_call(4,fd,(word)payload,sizeof(payload))==-9);
+    fd=raw(5,(word)filename,0,0,0);
+    CHECK(fd>=0 && (int)checked_call(4,fd,(word)payload,sizeof(payload))==-9);
+    CHECK(raw(6,fd,0,0,0)==0);
+    CHECK(raw(10,(word)filename,0,0,0)==0);
+    int fds[2];
+    CHECK(pipe(fds)==0);
+    CHECK(checked_call(4,fds[1],(word)payload,sizeof(payload))==sizeof(payload));
+    CHECK(raw(3,fds[0],(word)bytes,sizeof(bytes),0)==sizeof(bytes));
+    CHECK(memcmp(bytes,payload,sizeof(bytes))==0);
+    CHECK(raw(6,fds[0],0,0,0)==0);
+    /* Ignore SIGPIPE, but still require the real broken-pipe return. */
+    struct { word handler,flags,restorer; unsigned long long mask; } ignore={1,0,0,0};
+    CHECK(raw(174,13,(word)&ignore,0,8)==0);
+    CHECK((int)checked_call(4,fds[1],(word)payload,sizeof(payload))==-32);
+    CHECK(raw(6,fds[1],0,0,0)==0);
     /* A self-directed blocked signal stays pending across the fast candidates,
        then runs when unblocked; delivery must never disappear in a shortcut. */
     struct { word handler,flags,restorer; unsigned long long mask; } action={(word)handler,0x04000004,(word)restore,0};
@@ -103,6 +132,7 @@ static int main_test(void) {
     CHECK(raw(175,0,(word)&mask,0,8)==0);
     CHECK(raw(37,query(20,0),12,0,0)==0);
     CHECK(query(13,0)>0 && seen==0);
+    CHECK(checked_call(4,1,1,0)==0 && seen==0);
     CHECK(raw(175,1,(word)&mask,0,8)==0 && seen==1);
     const char ready[]="sysinfo-signal-ready\n";
     CHECK(raw(4,1,(word)ready,sizeof(ready)-1,0)==sizeof(ready)-1);

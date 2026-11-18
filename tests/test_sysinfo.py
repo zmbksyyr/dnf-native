@@ -1,4 +1,4 @@
-"""Check the verified i386 glibc query gateway and its unchanged fallbacks."""
+"""Check the verified i386 glibc query/file gateway and its fallbacks."""
 import datetime
 import hashlib
 import json
@@ -60,7 +60,7 @@ def main():
                         "stdout": (marker + stdout).decode(errors="replace"), "stderr": stderr, "error": error, "passed": passed})
         print("i686 sysinfo", "trace" if trace else "direct", "PASS" if passed else "FAIL", "exit", process.returncode, flush=True)
     receipt = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-               "scope": "Original i386 glibc GS:16 queries: GPR/ESP/flags including DF, x87/XMM/MXCSR, raw-query comparison, changed callback, in-place detour and verified byte/protection restore, time(pointer)/EFAULT, pending and external signals during a query-only loop, pthread identity and enabled trace fallback. Not integrated game acceptance.",
+               "scope": "Original i386 glibc GS:16 queries and disk writes: GPR/ESP/flags including DF, x87/XMM/MXCSR, actual file/pipe bytes, EFAULT/zero-length/closed/read-only writes and descriptor reuse, ignored broken-pipe EPIPE; raw-query comparison, changed callback, in-place detour and verified byte/protection restore, time(pointer)/EFAULT, pending and external signals during a query-only loop, pthread identity and enabled trace fallback. Not integrated game acceptance.",
                "build": build, "results": records}
     (BUILD / "sysinfo-checks.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     if not all(r["passed"] for r in records):

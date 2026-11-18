@@ -71,6 +71,7 @@ typedef struct {
     char cwd[4096];
     HANDLE files[NR_FD_SLOTS];
     unsigned char file_access[NR_FD_SLOTS];
+    unsigned char file_disk[NR_FD_SLOTS]; /* Cached at adoption/open, cleared on reuse. */
     char *synthetic_files[NR_FD_SLOTS];
     size_t synthetic_sizes[NR_FD_SLOTS];
     uint64_t synthetic_offsets[NR_FD_SLOTS];

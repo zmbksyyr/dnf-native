@@ -43,6 +43,23 @@ def main():
     receivers = {arch: build(arch, "signal-receiver") for arch in ARCHES}
     records = []
     for arch, (triple, base) in ARCHES.items():
+        for default in (False, True):
+            fixture = BUILD / "fixtures" / arch / ("pipe-signal-default" if default else "pipe-signal")
+            build_pipe = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib", "-static",
+                          "-ffreestanding", "-fno-stack-protector", "-fno-pic", "-O2", "-Wall", "-Wextra", "-Werror",
+                          "-Wl,--image-base=" + base, "-Wl,-e,_start", str(ROOT / "tests/pipe_signal.c"), "-o", str(fixture)]
+            if default:
+                build_pipe.append("-DNR_DEFAULT")
+            subprocess.run(build_pipe, check=True)
+            result = subprocess.run(command(arch, fixture), capture_output=True, timeout=10)
+            passed = (result.returncode == 141 if default else
+                      result.returncode == 42 and result.stdout == b"native-pipe-signal-ok\n")
+            records.append({"receiver_arch": arch, "case": "pipe-signal-default" if default else "pipe-signal",
+                            "host_sha256": sha(BUILD / arch / "dnf-host.exe"), "fixture_sha256": sha(fixture),
+                            "build": build_pipe, "exit_code": result.returncode,
+                            "stdout": result.stdout.decode(errors="replace"), "stderr": result.stderr.decode(errors="replace"),
+                            "passed": passed})
+            print(arch, "pipe SIGPIPE default=" + str(default), "PASS" if passed else "FAIL", flush=True)
         for blocked in (False, True):
             fault = BUILD / "fixtures" / arch / ("signal-fault-blocked" if blocked else "signal-fault")
             build_fault = [str(BIN / "clang.exe"), "--target=" + triple, "-fuse-ld=lld", "-nostdlib", "-static",
@@ -164,7 +181,7 @@ def main():
             records.append(record)
             print(send_arch, "->", receive_arch, "PASS" if passed else "FAIL", flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-              "scope": "Own native ELF processes: synchronous SIGSEGV for unmapped/read-only/PROT_NONE memory with si_addr, si_code and ucontext recovery; blocked fault diagnostic exit; SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM for 16 rounds per architecture pair. No game shutdown acceptance.",
+              "scope": "Own native ELF processes: broken-pipe write/writev EPIPE and actual SIGPIPE handler, writer thread identity, blocked/coalesced, ignored and default termination; synchronous SIGSEGV for unmapped/read-only/PROT_NONE memory with si_addr, si_code and ucontext recovery; blocked fault diagnostic exit; SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM for 16 rounds per architecture pair. No game shutdown acceptance.",
               "results": records}
     (BUILD / "process-signal-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(row["passed"] for row in records):

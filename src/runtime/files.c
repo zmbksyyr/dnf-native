@@ -12,7 +12,10 @@ unsigned nr_fd_reserve(NrRun *run) {
     EnterCriticalSection(&run->memory_lock);
     unsigned fd;
     for (fd = 0; fd < NR_FD_SLOTS && run->file_access[fd]; ++fd) {}
-    if (fd < NR_FD_SLOTS) run->file_access[fd] = NR_FD_RESERVED;
+    if (fd < NR_FD_SLOTS) {
+        run->file_disk[fd] = 0;
+        run->file_access[fd] = NR_FD_RESERVED;
+    }
     LeaveCriticalSection(&run->memory_lock);
     return fd;
 }
@@ -763,6 +766,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
         run->files[fd] = file;
         run->descriptor_flags[fd] = (b & 0x80000) != 0;
         run->directory_offset[fd] = 0;
+        run->file_disk[fd] = GetFileType(file) == FILE_TYPE_DISK;
         run->file_access[fd] = (b & 3) == 0 ? 1 : (b & 3) == 1 ? 2 : 3;
         *result = fd;
         return 1;
@@ -814,7 +818,7 @@ int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *re
     if (!file) { *result = -9; return 1; }
     if (number == CLOSE) {
         *result = CloseHandle(file) ? 0 : file_error();
-        if (!*result) { run->files[a] = NULL; run->descriptor_flags[a] = 0; run->directory_offset[a] = 0; run->flock_mode[a] = 0; run->file_access[a] = 0; }
+        if (!*result) { run->files[a] = NULL; run->descriptor_flags[a] = 0; run->directory_offset[a] = 0; run->flock_mode[a] = 0; run->file_disk[a] = 0; run->file_access[a] = 0; }
     } else if (number == FSTAT) {
         *result = stat_file(file, b, legacy);
     } else if (number == LSEEK) {

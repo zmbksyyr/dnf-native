@@ -12,6 +12,7 @@
 
 static NrRun *active;
 __attribute__((noreturn)) void nr_enter(uintptr_t entry, uintptr_t stack);
+static intptr_t write_output(uintptr_t fd, uintptr_t bytes, uintptr_t count);
 
 static int in_image(const NrElf *elf, uintptr_t pc) {
     if (!elf->allocation) return 0;
@@ -123,7 +124,7 @@ uintptr_t nr_sysinfo_pc;
 
 /* EDX:EAX returns handled:result to the i386 gateway. Pending signals and
    tracing keep the original INT 80 path, including its full guest context. */
-uint64_t nr_fast_syscall(uintptr_t number, uintptr_t argument) {
+uint64_t nr_fast_syscall(uintptr_t number, uintptr_t argument, uintptr_t bytes, uintptr_t count) {
     NrThread *thread = nr_current();
     if (active->trace_enabled || __atomic_load_n(&active->external_signal_pending, __ATOMIC_ACQUIRE) ||
         active->signal_pending || thread->signal_pending) return 0;
@@ -135,6 +136,11 @@ uint64_t nr_fast_syscall(uintptr_t number, uintptr_t argument) {
         GetSystemTimeAsFileTime(&time);
         uint64_t ticks = (((uint64_t)time.dwHighDateTime << 32) | time.dwLowDateTime) - 116444736000000000ULL;
         result = (uint32_t)(ticks / 10000000);
+    } else if (number == 4 && argument < NR_FD_SLOTS && active->file_disk[argument] &&
+               (active->file_access[argument] == 2 || active->file_access[argument] == 3)) {
+        /* Only disk files use this path. Pipes/sockets retain their dispatcher
+           and signal return boundary. Cache the handle type once at open. */
+        result = (uint32_t)write_output(argument, bytes, count);
     } else return 0;
     return (1ULL << 32) | result;
 }
@@ -153,7 +159,27 @@ static intptr_t write_copy(HANDLE file, const void *bytes, DWORD count) {
     DWORD written = 0;
     if (WriteFile(file, bytes, count, &written, NULL)) return (intptr_t)written;
     DWORD error = GetLastError();
-    return error == ERROR_INVALID_HANDLE ? -9 : error == ERROR_BROKEN_PIPE ? -32 : -5;
+    if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA) {
+        NrThread *thread = nr_current();
+        thread->signal_origin[13] = 0;
+        thread->signal_pending |= 1ULL << 12;
+        return -32;
+    }
+    return error == ERROR_INVALID_HANDLE ? -9 : -5;
+}
+
+static intptr_t write_output(uintptr_t fd, uintptr_t bytes, uintptr_t count) {
+    HANDLE file = output_handle(fd);
+    if (file == INVALID_HANDLE_VALUE) return -9;
+    if (count > 0x7ffff000) count = 0x7ffff000;
+    if (!nr_memory(bytes, count, 0)) return -14;
+    if (!count) return 0;
+    unsigned char *copy = HeapAlloc(GetProcessHeap(), 0, (size_t)count);
+    if (!copy) return -12;
+    memcpy(copy, (const void *)bytes, (size_t)count);
+    intptr_t result = write_copy(file, copy, (DWORD)count);
+    HeapFree(GetProcessHeap(), 0, copy);
+    return result;
 }
 
 static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintptr_t pc) {
@@ -371,19 +397,7 @@ brk_done:
         LeaveCriticalSection(&active->memory_lock);
         return result;
     }
-    if (number == SYS_WRITE) {
-        HANDLE file = output_handle(a);
-        if (file == INVALID_HANDLE_VALUE) return -9;
-        if (c > 0x7ffff000) c = 0x7ffff000;
-        if (!nr_memory(b, c, 0)) return -14;
-        if (!c) return 0;
-        unsigned char *copy = HeapAlloc(GetProcessHeap(), 0, (size_t)c);
-        if (!copy) return -12;
-        memcpy(copy, (const void *)b, (size_t)c);
-        intptr_t result = write_copy(file, copy, (DWORD)c);
-        HeapFree(GetProcessHeap(), 0, copy);
-        return result;
-    }
+    if (number == SYS_WRITE) return write_output(a, b, c);
     if (number == SYS_WRITEV) {
         HANDLE file = output_handle(a);
         if (file == INVALID_HANDLE_VALUE) return -9;
@@ -709,7 +723,7 @@ int nr_run(NrRun *run) {
             fputs("original sysinfo gateway identity mismatch\n", stderr); return 1;
         }
         nr_sysinfo_pc = pc;
-        fprintf(stderr, "direct sysinfo sha256=%s pc=0x%llx original=cd80c3 queries=time-null,getpid,gettid\n",
+        fprintf(stderr, "direct sysinfo sha256=%s pc=0x%llx original=cd80c3 queries=time-null,getpid,gettid,file-write\n",
                 loader->sha256, (unsigned long long)pc);
     }
 #endif
@@ -738,8 +752,10 @@ int nr_run(NrRun *run) {
     for (unsigned i = 0; i < 3; ++i) {
         HANDLE handle = GetStdHandle(standard[i]);
         if (handle && handle != INVALID_HANDLE_VALUE &&
-            DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(), &run->files[i], 0, FALSE, DUPLICATE_SAME_ACCESS))
+            DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(), &run->files[i], 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+            run->file_disk[i] = GetFileType(run->files[i]) == FILE_TYPE_DISK;
             run->file_access[i] = i == 0 ? 1 : 2;
+        }
     }
     run->heap_base = (uintptr_t)VirtualAlloc(NULL, 64 * 1024 * 1024, MEM_RESERVE, PAGE_READWRITE);
     if (!run->heap_base) return 1;

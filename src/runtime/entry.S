@@ -37,7 +37,7 @@ nr_signal_enter:
     .globl _nr_sysinfo_gateway
 _nr_sysinfo_gateway:
     /* The TLS CALL trampoline left [original target, guest return PC]. Only
-       the verified loader gateway and these simple queries may run directly.
+       the verified loader gateway and selected syscalls may run directly.
        Every other target/syscall retains its original INT 80 and context. */
     pushfl
     pushl %ecx
@@ -53,6 +53,8 @@ _nr_sysinfo_gateway:
     cmpl $20, %eax
     je 2f
     cmpl $224, %eax
+    je 2f
+    cmpl $4, %eax
     je 2f
     cmpl $13, %eax
     jne 1f
@@ -72,6 +74,10 @@ _nr_sysinfo_gateway:
     movl %eax, (%esp)
     movl 16(%ebp), %eax
     movl %eax, 4(%esp)
+    movl 24(%ebp), %eax
+    movl %eax, 8(%esp)
+    movl 20(%ebp), %eax
+    movl %eax, 12(%esp)
     call _nr_fast_syscall
     testl %edx, %edx
     jz 3f

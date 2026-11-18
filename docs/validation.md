@@ -1264,3 +1264,50 @@ Robot 在公共自动分解摊选点中排除此村庄，保留普通移动、�
 溢出/归属拒绝，全部通过并恢复测试值。整套服务、Robot、数据库与控制台正常
 停止，无相关进程残留；Linux 对照已关闭。证据为
 `gm-online-extra-sysinfo-robot-windows.private.json` 和 `sysinfo-robot-normal-stop.private.log`。
+
+## 磁盘写入直达与断管信号（2026-11-18 至 19）
+
+沿用 Windows 10 x64 19044、LLVM-MinGW 20261104 MSVCRT 和独立原版服务副本。
+查询直达后的批量退出采样中，原网关入口的 74 个样本有 68 个为 `write`，未再出现
+时间查询。采样会暂停线程，仅用于定位。原 i386 跳板新增磁盘文件写入候选，继续
+调用共用的完整写入检查；句柄类型只在打开或接管时查询，关闭、复用时清除。
+管道、网络和其他描述符保留原分发路径及信号返回边界。
+
+扩展夹具复现了一个旧差异：关闭匿名管道读端后，Windows `WriteFile` 返回
+`ERROR_NO_DATA`（232），原实现将其映射为 EIO。现与 `ERROR_BROKEN_PIPE`
+一并返回 EPIPE，并向当前写线程排入 SIGPIPE。双架构分别验证实际 handler、
+写线程身份、屏蔽期间合并、解除屏蔽、忽略、默认终止及 `writev`；没有只核对错误码。
+默认 SIGPIPE 在宿主表现为退出码 141，在 Linux 表现为进程被信号 13 终止。
+
+扩充的原 glibc 查询/写入夹具核对完整 GPR/ESP/flags/FXSAVE 状态、真实文件和
+管道字节、EFAULT、零长度、关闭/只读描述符、复用及 trace 回退。双架构入口、
+文件/映射、八线程描述符分配和既有信号检查通过。相同 ELF 在授权的 Linux
+5.10.16.3 WSL2 独立对照中通过，夹具及原 loader 的哈希逐项对应。
+
+相同独立 ELF 交错运行前后版本各四次，每次执行 100000 次实际磁盘写入。
+进程 CPU 时间中位数从 0.640625 秒降至 0.21875 秒，每次输出均逐字节核对。
+这是局部写入路径的开销测量，不能解释为整体游戏倍数或裸机 Linux 性能比例。
+
+Windows 候选的 600 目标混合负载持续 120 秒，稳态 596–600 在线，摆摊成功
+82／失败 0，移动成功 3431／失败 0，最大 game 时钟积压 10.60 秒，随后恢复。
+该轮 game 稳态 CPU 为 32.83 秒；上一阶段为 29.22 秒。随机行为与位置不同，
+不能据写入原语提速声称整体负载已提速，剩余批量退出停顿仍需定位。
+
+独立 Linux 对照使用最新版 Robot `e407d7f` 的 amd64 构建；重新核验 119 份
+原 ELF 输入，当前 PVF 和两套市场索引与 Windows 夹具的哈希完全一致。
+600 目标/120 秒稳态为 596–600 在线，摆摊 62／0、移动 3308／0，排空后时钟
+恢复，最大积压 5.96 秒，game 稳态 CPU 为 40.33 秒。该对照运行于授权的
+Linux 5.10.16.3 WSL2，随机负载及测试配置并非
+裸机性能基准；原服务执行文件没有替换成源码重建版本。
+
+GM 分别连接两套服务，通过六并发在线增量、当前角色泡点、退出存档、离线增量、
+溢出及归属拒绝，测试值均恢复。Linux 首次在线请求因旧实验已还原入口、移除
+桥接而被拒绝；在停服副本备份后按文档安装与 Windows 相同字节的 helper，再
+重启通过上述检查。没有放宽就绪检查或改为直接覆盖在线角色数据库。
+
+本阶段收据保存于 `../x/dnf-gm-output/evidence/`：`file-gateway-final-summary.json`、
+`file-gateway-{state,signals,files,entry,descriptors}.json`、
+`file-gateway-linux-fixtures.json`、`file-gateway-benchmark.json`、两端原始负载、
+`gm-online-extra-file-gateway-windows.private.json` 和
+`gm-online-extra-file-gateway-linux-ready.private.json`。早期失败日志独立保留。
+两套服务、Robot、数据库及 Windows 控制台均正常停止，无测试进程残留。
