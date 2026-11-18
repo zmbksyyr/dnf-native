@@ -110,6 +110,8 @@ TLS 失败记录使用直接 WriteFile 的既有日志路径，避免 MSVCRT 写
 
 控制台及跨进程事件传入的 SIGUSR2/SIGTERM 优先由未屏蔽该信号的 guest 初始线程处理；该线程屏蔽时，其他未屏蔽线程仍可处理。这样进程停服不再由执行 syscall 最密集的工作线程抢先处理，避免原游戏日志函数被同线程停服 handler 重入。投递仍发生在现有 syscall/异常返回边界，不提供阻塞 Windows 调用或纯计算过程中的任意即时中断；线程自发的 `tgkill` 和同步故障不由此改投初始线程。
 
+已有的宿主主线程在等待 guest 线程期间，用 `WaitForMultipleObjects` 同时接收这两个外部事件，原子发布待决标记；syscall 返回只读该标记，有信号时再原子取走并进入原有投递逻辑。没有可投递信号时直接返回，不再扫描全部 64 位。初始 guest 线程退出后，等待其他 guest 线程期间仍接收事件，无需增加后台线程。等待失败记录真实错误并终止本次运行。普通文件 `write/writev` 保留描述符、访问权限和实际 `WriteFile` 错误检查，去掉写入前重复的 `GetFileType` 查询。
+
 设置 `DNF_NATIVE_EPOLL_TRACE=1` 后，运行时会把 epoll 创建、`EPOLL_CTL_ADD/MOD/DEL`、等待结果以及实际返回事件的 guest fd/data 写入标准错误。该开关默认关闭，用于把事件中的 fd、revents 和用户数据关联起来；不改变事件处理语义。
 
 `service.c` 对固定原版 DBMW 和 manager 的 `CApplication::Free()` 增加局部停服适配。原版 `stop()` 仅清除对象 `+8`，TCP dispatch 实际循环标志在 `+0x2c`；原版清理还在工作线程退出前删除 handler，且没有调用已有的 `pthread_join`。这属于应用生命周期缺陷，不能通过改变通用线程或网络 syscall 语义修复。

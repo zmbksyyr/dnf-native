@@ -98,6 +98,7 @@ typedef struct {
     uint64_t signal_pending;
     int32_t signal_sender[65], signal_origin[65];
     HANDLE terminate_event, usr2_event;
+    volatile LONG external_signal_pending; /* Host wait -> guest syscall boundary. */
     unsigned char *signal_code;
     NrThread threads[64];
     volatile LONG thread_count;

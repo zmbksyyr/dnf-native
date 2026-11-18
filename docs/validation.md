@@ -1170,3 +1170,48 @@ memset 清零检查继续通过，双架构各减少 50,327,552 驻留字节，�
 `madvise-linux-fixtures.json`、`madvise-load-comparison.json` 和
 `gm-online-extra-madvise-windows.private.json`。文件/共享 DONTNEED、跨匿名记录范围、
 其他 advice 以及其他 VM 边界继续按实现中的明确支持范围处理。
+
+## syscall 返回与日志写入开销（2026-11-18）
+
+沿用上一阶段的 Windows 10 x64 19044、LLVM-MinGW 20261104 MSVCRT 和独立原版
+服务副本。此前采样在 autoStop 返回后才开始，错过退出最忙阶段；本轮改为请求发出
+时采样。主线程前十秒 1564 个样本中，151 个位于每次 syscall 都执行的零超时信号
+事件等待，34 个位于日志写入前的句柄类型查询；栈链分别指向 `nr_deliver_signal`
+和 `output_handle`。转交已有宿主等待线程并移除重复查询后，对应 1558 个样本中
+这两项均为零。采样会短暂停线程，仅用于定位，不能把样本比例当耗时或提升比例。
+其余热点仍包括 syscall 异常往返、真实日志写入和原版 C++ 异常展开。
+
+最终候选再加入无可投递信号时的直接返回。双架构的入口、write/writev、文件及
+八线程描述符分配/复用、SA_SIGINFO、同步故障、原 glibc 信号、初始线程屏蔽与
+未屏蔽时的投递检查通过。四种收发位数组合各执行 16 轮 SIGUSR2 屏蔽、跨进程
+发送与解除屏蔽，同时核对 SIGTERM，未见丢失或重复。
+
+Linux 对照首次暴露了旧 raw 信号夹具没有显式 restorer 的问题：x64 内核需要
+返回入口，i386 的实时与旧式信号帧也不能混用。夹具改为显式 SA_SIGINFO/
+SA_RESTORER 和 rt_sigreturn，并重试真实 EINTR；没有改动产品以绕过该检查。
+最终两份接收 ELF 在授权的 Linux 5.10.16.3 WSL2 独立对照中各通过 16 轮，
+与 Windows 所运行文件哈希逐项一致。这是信号语义对照，不是裸机性能对比。
+
+另用相同独立 ELF 交错运行上一发布、移交事件后和最终候选，各四次。300000 次
+GETPID 的进程 CPU 时间中位数，x86 从 1.4297 秒变为 1.2578 秒，x64 从
+0.3906 秒变为 0.2969 秒；30000 次 64 字节实际文件写入，分别从 0.2031 秒变为
+0.1797 秒、从 0.0938 秒变为 0.0781 秒。输出逐字节一致，受本机调度与进程计时
+粒度影响；这些是局部开销测量，不能外推整体游戏提升百分比。
+
+最终包的 600 目标混合负载持续 120 秒，稳态 591–600 在线；摆摊成功 71／失败 0，
+移动成功 3330／失败 0。约 30.03 秒排空，最大 game 时钟积压 15.17 秒，随后
+连续三次采样恢复至 2 秒内；稳态 game CPU 为 35.45 秒。仅转交事件和移除查询的
+中间候选为 595–600 在线，摆摊 82／1、移动 3484／0、排空 30.07 秒、最大积压
+15.91 秒。中间候选那次分解摊失败的日志为两处位置收到 `disjoint_err_0xbe`，
+原因尚需继续定位。负载随机行为不同，不能证明整体游戏提速；批量退出的主要
+停顿仍在，下一步优先处理 syscall 异常往返及原业务中的大量失败日志/异常路径。
+
+最终候选的 GM 六并发在线增量、当前角色泡点、退出存档、离线增量、溢出与
+归属拒绝均通过，测试值已恢复。整套 GUI 正常停服完成，服务、Robot、数据库
+和控制台无进程残留；Linux 对照已关闭。Robot、GM、原 ELF 和资源 ZIP 未修改。
+
+收据位于 `../x/dnf-gm-output/evidence/`：`signal-fast-regression-summary.json`、
+`signal-fast-{signals,entry,files,descriptors}.json`、`signal-wait-linux-fixtures.json`、
+`signal-wait-benchmark.json`、`signal-wait-profile-comparison.json` 和
+`signal-fast-load-comparison.json`、`gm-online-extra-signal-fast-windows.private.json`、
+`signal-fast-normal-stop.private.log`。采样、原始负载和上一阶段记录独立保留。

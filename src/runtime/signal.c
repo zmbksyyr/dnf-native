@@ -268,13 +268,18 @@ static int deliver_action(NrRun *run, CONTEXT *c, unsigned signal, const EXCEPTI
 
 int nr_deliver_signal(NrRun *run, CONTEXT *c) {
     NrThread *thread = nr_current();
-    if (WaitForSingleObject(run->terminate_event, 0) == WAIT_OBJECT_0) {
+    /* The existing host waiter receives the named events. Most syscall exits
+       only need an atomic load, with no Windows wait or kernel transition. */
+    LONG external = __atomic_load_n(&run->external_signal_pending, __ATOMIC_ACQUIRE);
+    if (external) external = InterlockedExchange(&run->external_signal_pending, 0);
+    if (external & 1) {
         run->signal_origin[15]=128; run->signal_sender[15]=0; run->signal_pending |= 1ULL << 14;
     }
-    if (WaitForSingleObject(run->usr2_event, 0) == WAIT_OBJECT_0) {
+    if (external & 2) {
         run->signal_origin[12]=128; run->signal_sender[12]=0; run->signal_pending |= 1ULL << 11;
     }
     uint64_t ready = (run->signal_pending | thread->signal_pending) & ~thread->signal_mask;
+    if (!ready) return 1;
     for (unsigned signal = 1; signal <= 64; ++signal) {
         uint64_t bit = 1ULL << (signal - 1);
         if (!(ready & bit)) continue;

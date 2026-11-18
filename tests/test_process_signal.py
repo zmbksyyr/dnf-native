@@ -132,13 +132,16 @@ def main():
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             forced, error, sent = False, None, None
             try:
-                marker = receiver.stdout.readline()
-                if marker != b"signal-ready\n":
-                    raise RuntimeError("Receiver did not install its handlers")
                 sender = build(send_arch, "signal-sender", receiver.pid)
-                sent = subprocess.run(command(send_arch, sender), capture_output=True, timeout=5)
-                receiver.stdin.write(b"u")
-                receiver.stdin.flush()
+                for round_index in range(16):
+                    marker = receiver.stdout.readline()
+                    if marker != b"signal-ready\n":
+                        raise RuntimeError("Receiver did not reach signal round " + str(round_index + 1))
+                    sent = subprocess.run(command(send_arch, sender), capture_output=True, timeout=5)
+                    if sent.returncode != 42:
+                        raise RuntimeError("Signal sender failed at round " + str(round_index + 1))
+                    receiver.stdin.write(b"u")
+                    receiver.stdin.flush()
                 receiver.wait(timeout=5)
             except (OSError, RuntimeError, subprocess.TimeoutExpired) as failure:
                 error = str(failure)
@@ -157,11 +160,11 @@ def main():
                       "sender_fixture_sha256": sha(sender) if sent else None,
                       "receiver_exit_code": receiver.returncode, "sender_exit_code": sent.returncode if sent else None,
                       "receiver_stderr": stderr, "sender_stderr": sent.stderr.decode("utf-8", "replace") if sent else None,
-                      "forced_cleanup": forced, "error": error, "passed": passed}
+                      "rounds": 16, "forced_cleanup": forced, "error": error, "passed": passed}
             records.append(record)
             print(send_arch, "->", receive_arch, "PASS" if passed else "FAIL", flush=True)
     result = {"recorded_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "os": platform.platform(),
-              "scope": "Own native ELF processes: synchronous SIGSEGV for unmapped/read-only/PROT_NONE memory with si_addr, si_code and ucontext recovery; blocked fault diagnostic exit; SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM. No game shutdown acceptance.",
+              "scope": "Own native ELF processes: synchronous SIGSEGV for unmapped/read-only/PROT_NONE memory with si_addr, si_code and ucontext recovery; blocked fault diagnostic exit; SA_SIGINFO sender/origin, Linux GPR/sigmask frame read/write and rt_sigreturn; deliberate unsupported-altstack rejection; cross-process kill(0), blocked SIGUSR2 and SIGTERM for 16 rounds per architecture pair. No game shutdown acceptance.",
               "results": records}
     (BUILD / "process-signal-checks.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not all(row["passed"] for row in records):

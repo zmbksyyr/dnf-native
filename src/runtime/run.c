@@ -122,8 +122,8 @@ static HANDLE output_handle(uintptr_t fd) {
     if (fd >= NR_FD_SLOTS || !(active->file_access[fd] & 2)) return INVALID_HANDLE_VALUE;
     HANDLE file = active->files[fd];
     if (!file || file == INVALID_HANDLE_VALUE) return INVALID_HANDLE_VALUE;
-    SetLastError(NO_ERROR);
-    if (GetFileType(file) == FILE_TYPE_UNKNOWN && GetLastError() != NO_ERROR) return INVALID_HANDLE_VALUE;
+    /* WriteFile reports stale handles itself; querying their type first adds
+       a kernel transition to every log write without changing that result. */
     return file;
 }
 
@@ -652,6 +652,20 @@ static DWORD WINAPI start_guest(void *argument) {
     nr_enter(run->interpreter.allocation ? run->interpreter.entry : program->entry, stack);
 }
 
+static int wait_guest(NrRun *run, HANDLE thread) {
+    HANDLE handles[] = {thread, run->terminate_event, run->usr2_event};
+    for (;;) {
+        DWORD wait = WaitForMultipleObjects(3, handles, FALSE, INFINITE);
+        if (wait == WAIT_OBJECT_0) return 1;
+        if (wait == WAIT_OBJECT_0 + 1) InterlockedOr(&run->external_signal_pending, 1);
+        else if (wait == WAIT_OBJECT_0 + 2) InterlockedOr(&run->external_signal_pending, 2);
+        else {
+            fprintf(stderr, "guest signal wait failed: result=%lu error=%lu\n", wait, GetLastError());
+            return 0;
+        }
+    }
+}
+
 int nr_run(NrRun *run) {
     if (run->argc < 1 || run->argc > 256) return 2;
     size_t bytes = 0;
@@ -705,11 +719,11 @@ int nr_run(NrRun *run) {
         if (timer == TIMERR_NOERROR) timeEndPeriod(1);
         return 1;
     }
-    WaitForSingleObject(thread, INFINITE);
-    for (unsigned i = 1; i < 64; ++i)
-        if (run->threads[i].handle) WaitForSingleObject(run->threads[i].handle, INFINITE);
+    int waited = wait_guest(run, thread);
+    for (unsigned i = 1; waited && i < 64; ++i)
+        if (run->threads[i].handle) waited = wait_guest(run, run->threads[i].handle);
     CloseHandle(thread);
     if (timer == TIMERR_NOERROR) timeEndPeriod(1);
-    fputs("guest thread returned without process exit\n", stderr);
+    if (waited) fputs("guest thread returned without process exit\n", stderr);
     return 1;
 }
