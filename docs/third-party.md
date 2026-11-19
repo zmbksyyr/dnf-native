@@ -3493,6 +3493,10 @@ MySQL 队列、状态回执与自动安装逻辑为本项目新增实现，Linux
 `CUser::SendNotiPacket/SendMaxEquipLevel/_SaveCharacData` 符号及实际调用关系独立实现。
 原接口反汇编与两端通知、存档对照位于 `../x/dnf-gm-output/evidence/online-equipment/`；
 没有搬运参考源码、字节表或补丁，没有修改原版输入文件。
+负重字段依据同一原 ELF 的 `_getCharacInfo`、`setCharacInfoDetail` 与
+`getCurCharacAddInfoR/W` 的装载和访问路径独立确定，未采用参考结构体或字节表。
+实现只通过原可写访问器修改一个 packed 32 位字段，调用原通知与存档，未修改原指令。
+字段推导、定点反汇编与验证收据位于 `../x/dnf-gm-output/evidence/online-weight/`。
 原 ELF、DP2、LuaSQL 和 luv 继续沿用固定 ZIP 的既有来源与分发边界，未修改输入资产。
 
 ## 随包提供的独立 GM

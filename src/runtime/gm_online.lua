@@ -30,6 +30,7 @@ local database_work = function(encoded)
             {version=5, suffix='v5', field='qp', operations="'set_quest_points'"},
             {version=6, suffix='v6', operations="'refresh_billing'"},
             {version=7, suffix='v7', operations="'open_equipment_slots','unlock_equipment_level'"},
+            {version=8, suffix='v8', field='inven_weight', operations="'raise_inventory_weight'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
@@ -108,6 +109,8 @@ local database_work = function(encoded)
                 saved_extra=' AND i.remain_sp_2nd=q.after_sp2 AND i.remain_sfp_1st=q.after_tp AND i.remain_sfp_2nd=q.after_tp2'
             elseif queue.version==5 then
                 saved_table='taiwan_cain.charac_quest_shop'
+            elseif queue.version==8 then
+                saved_table='taiwan_cain.charac_info'
             end
             if queue.version==7 then
                 exec(string.format([[UPDATE %s q
@@ -222,6 +225,8 @@ int DNF_GM_GetEquipmentLevel(CUser *);
 void DNF_GM_SetEquipmentLevel(CUser *, int);
 void DNF_GM_SendEquipmentLevel(CUser *);
 int DNF_GM_SendBasicInfo(CUser *, int, int, int);
+void *DNF_GM_PropertiesRead(CUser *);
+void *DNF_GM_PropertiesWrite(CUser *);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -261,6 +266,16 @@ symbols.alias('DNF_GM_GetEquipmentLevel','_ZNK15CUserCharacInfo25GetCurCharacMax
 symbols.alias('DNF_GM_SetEquipmentLevel','_ZN15CUserCharacInfo25SetCurCharacMaxEquipLevelEi')
 symbols.alias('DNF_GM_SendEquipmentLevel','_ZN5CUser17SendMaxEquipLevelEv')
 symbols.alias('DNF_GM_SendBasicInfo','_ZN5CUser14SendNotiPacketENS_11eSendTargetE15ENUM_NOTIPACKETi')
+symbols.alias('DNF_GM_PropertiesRead','_ZNK15CUserCharacInfo20getCurCharacAddInfoREv')
+symbols.alias('DNF_GM_PropertiesWrite','_ZN15CUserCharacInfo20getCurCharacAddInfoWEv')
+
+local function inventory_weight(ptr,write)
+    local data=write and ffi.C.DNF_GM_PropertiesWrite(ptr) or ffi.C.DNF_GM_PropertiesRead(ptr)
+    assert(data~=nil and tonumber(ffi.cast('unsigned int',data))~=0,'character properties missing')
+    -- Pinned original loader/setter: inven_weight is at character +0xc2;
+    -- the original properties accessor returns character +0x88, packed.
+    return ffi.cast('int *',ffi.cast('char *',data)+0x3a)
+end
 
 local function skill_points(ptr)
     local values=ffi.new('int[4]')
@@ -298,6 +313,7 @@ end,function(encoded)
         local billing = req.version==6 and req.operation=='refresh_billing'
         local equipment_slots = req.version==7 and req.operation=='open_equipment_slots'
         local equipment_level = req.version==7 and req.operation=='unlock_equipment_level'
+        local weight = req.version==8 and req.operation=='raise_inventory_weight'
         local waiting=false
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
@@ -363,6 +379,20 @@ end,function(encoded)
                     if ok then receipt.state,receipt.note='applied','save_queued' end
                 else receipt.note='quest_points_limit' end
             end
+        elseif weight and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
+            local before,after=tonumber(inventory_weight(user.fptr,false)[0]),tonumber(req.amount)
+            if before>=0 and after==99999999 then
+                receipt.before,receipt.after=before,after
+                receipt.state,receipt.note='unknown','apply_failed'
+                local ok=pcall(function()
+                    -- The mutable accessor marks character properties dirty.
+                    inventory_weight(user.fptr,true)[0]=after
+                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,0,2,1)==1,'weight notification failed')
+                    assert(tonumber(inventory_weight(user.fptr,false)[0])==after,'weight readback differs')
+                    ffi.C.DNF_GM_SaveCharac(user.fptr)
+                end)
+                if ok then receipt.state,receipt.note='applied','save_queued' end
+            else receipt.note='weight_limit' end
         elseif (equipment_slots or equipment_level) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local get=equipment_slots and ffi.C.DNF_GM_GetEquipmentSlots or ffi.C.DNF_GM_GetEquipmentLevel
             local before,after=tonumber(get(user.fptr)),tonumber(req.amount)
@@ -407,7 +437,7 @@ end,function(encoded)
                 end)
                 if ok then receipt.state,receipt.note='applied','save_queued' end
             else receipt.note='fatigue_limit' end
-        elseif not money and not coin and not fatigue and not skills and not quest_points and not equipment_slots and not equipment_level then receipt.note='unsupported_operation'
+        elseif not money and not coin and not fatigue and not skills and not quest_points and not equipment_slots and not equipment_level and not weight then receipt.note='unsupported_operation'
         elseif (money or coin) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local inventory = user:GetCurCharacInvenR()
             if inventory then
