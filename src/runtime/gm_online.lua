@@ -28,6 +28,7 @@ local database_work = function(encoded)
             {version=3, suffix='v3', field='fatigue', operations="'refill_fatigue'"},
             {version=4, suffix='v4', field='remain_sp', operations="'set_skill_points'"},
             {version=5, suffix='v5', field='qp', operations="'set_quest_points'"},
+            {version=6, suffix='v6', operations="'refresh_billing'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
@@ -37,7 +38,9 @@ local database_work = function(encoded)
                     amount_sp2 INT UNSIGNED NOT NULL, amount_tp INT UNSIGNED NOT NULL, amount_tp2 INT UNSIGNED NOT NULL,
                     before_sp2 INT UNSIGNED NULL, after_sp2 INT UNSIGNED NULL,
                     before_tp INT UNSIGNED NULL, after_tp INT UNSIGNED NULL,
-                    before_tp2 INT UNSIGNED NULL, after_tp2 INT UNSIGNED NULL,]] or ''
+                    before_tp2 INT UNSIGNED NULL, after_tp2 INT UNSIGNED NULL,]] or queue.version==6 and [[
+                    amount_point INT UNSIGNED NOT NULL,
+                    before_point INT UNSIGNED NULL, after_point INT UNSIGNED NULL,]] or ''
                 exec(string.format([[CREATE TABLE IF NOT EXISTS dnf_gm_hosts_%s (
                     channel_no INT UNSIGNED PRIMARY KEY, owner CHAR(32) CHARACTER SET ascii NOT NULL,
                     seen DATETIME(6) NOT NULL) ENGINE=InnoDB]], queue.suffix))
@@ -88,6 +91,9 @@ local database_work = function(encoded)
                         values=values..string.format(',before_sp2=%u,after_sp2=%u,before_tp=%u,after_tp=%u,before_tp2=%u,after_tp2=%u',
                             receipt.before_sp2,receipt.after_sp2,receipt.before_tp,receipt.after_tp,receipt.before_tp2,receipt.after_tp2)
                     end
+                    if receipt.before_point then
+                        values=values..string.format(',before_point=%u,after_point=%u',receipt.before_point,receipt.after_point)
+                    end
                     exec(string.format([[UPDATE %s SET state='%s',note='%s',updated=NOW(6)%s
                         WHERE token=%s AND owner=%s AND state='claimed']],pending_table,receipt.state,receipt.note,values,token(receipt.token),owner))
                 end
@@ -102,11 +108,13 @@ local database_work = function(encoded)
             elseif queue.version==5 then
                 saved_table='taiwan_cain.charac_quest_shop'
             end
-            exec(string.format([[UPDATE %s q JOIN %s i ON i.charac_no=q.charac_no
-                SET q.state='done',q.note='saved',q.updated=NOW(6)
-                WHERE q.owner=%s AND q.state='applied' AND i.%s=q.after_value%s]],pending_table,saved_table,owner,queue.field,saved_extra))
-            exec(string.format([[UPDATE %s SET state='unknown',note='save_unconfirmed',updated=NOW(6)
-                WHERE owner=%s AND state='applied' AND updated<DATE_SUB(NOW(6),INTERVAL 15 SECOND)]],pending_table,owner))
+            if queue.version~=6 then
+                exec(string.format([[UPDATE %s q JOIN %s i ON i.charac_no=q.charac_no
+                    SET q.state='done',q.note='saved',q.updated=NOW(6)
+                    WHERE q.owner=%s AND q.state='applied' AND i.%s=q.after_value%s]],pending_table,saved_table,owner,queue.field,saved_extra))
+                exec(string.format([[UPDATE %s SET state='unknown',note='save_unconfirmed',updated=NOW(6)
+                    WHERE owner=%s AND state='applied' AND updated<DATE_SUB(NOW(6),INTERVAL 15 SECOND)]],pending_table,owner))
+            end
             -- Lost work and a previous host's commands are ambiguous, never pending
             -- again. End them explicitly so they cannot block this account forever.
             exec(string.format([[UPDATE %s q SET state='unknown',note='host_or_work_lost',updated=NOW(6)
@@ -117,7 +125,8 @@ local database_work = function(encoded)
                 WHERE owner=%s AND state='claimed' AND expires<NOW(6)]],pending_table,owner))
             exec(string.format([[UPDATE %s SET state='rejected',note='expired',updated=NOW(6)
                 WHERE state='pending' AND expires<NOW(6)]],pending_table))
-            local extra_fields=queue.version==4 and ',q.amount_sp2,q.amount_tp,q.amount_tp2' or ''
+            local extra_fields=queue.version==4 and ',q.amount_sp2,q.amount_tp,q.amount_tp2' or
+                queue.version==6 and ',q.amount_point' or ''
             local pending = rows(string.format([[SELECT q.token,q.m_id,q.charac_no,q.operation,q.amount%s
                 FROM %s q JOIN taiwan_login.login_account_3 l ON l.m_id=q.m_id
                 WHERE q.state='pending' AND q.expires>NOW(6) AND l.login_status>=1 AND l.m_channel_no=%d
@@ -126,8 +135,20 @@ local database_work = function(encoded)
                         AND (prior.created<q.created OR (prior.created=q.created AND prior.token<q.token)))))
                 %s ORDER BY q.created LIMIT 32]],extra_fields,pending_table,cfg.channel,pending_table,other_work))
             for _, req in ipairs(pending) do
-                local changed = exec(string.format([[UPDATE %s SET state='claimed',owner=%s,updated=NOW(6)
-                    WHERE token=%s AND state='pending' AND expires>NOW(6)]],pending_table,owner,token(req.token)))
+                local balance_values=''
+                if queue.version==6 then
+                    -- A reload follows all committed billing changes, including
+                    -- concurrent awards. Its acknowledgement is not a replay of
+                    -- the amount originally awarded by any one GM transaction.
+                    local balance=rows(string.format([[SELECT COALESCE(c.cera,0) AS cera,COALESCE(p.cera_point,0) AS point
+                        FROM d_taiwan.accounts a LEFT JOIN taiwan_billing.cash_cera c ON c.account=a.UID
+                        LEFT JOIN taiwan_billing.cash_cera_point p ON p.account=a.UID WHERE a.UID=%u]],tonumber(req.m_id)))[1]
+                    assert(balance,'billing account disappeared')
+                    req.amount,req.amount_point=balance.cera,balance.point
+                    balance_values=string.format(',amount=%u,amount_point=%u',tonumber(req.amount),tonumber(req.amount_point))
+                end
+                local changed = exec(string.format([[UPDATE %s SET state='claimed',owner=%s,updated=NOW(6)%s
+                    WHERE token=%s AND state='pending' AND expires>NOW(6)]],pending_table,owner,balance_values,token(req.token)))
                 if changed == 1 then req.version=queue.version; commands[#commands+1] = req end
             end
         end
@@ -178,6 +199,11 @@ void DNF_GM_UpdateData(CUser *);
 int DNF_GM_GetQP(CUser *);
 void DNF_GM_SetQP(CUser *, int);
 void *DNF_GM_GetExpandData(CUser *, int);
+extern void *DNF_GM_IPGHelper;
+void DNF_GM_QueryCash(void *, CUser *);
+unsigned int DNF_GM_GetCera(CUser *);
+unsigned int DNF_GM_GetCeraPoint(CUser *);
+void DNF_GM_SendCash(CUser *, bool);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -205,6 +231,11 @@ symbols.alias('DNF_GM_UpdateData', '_ZN5CUser10UpdateDataEv')
 symbols.alias('DNF_GM_GetQP', '_ZN5CUser13getQuestPointEv')
 symbols.alias('DNF_GM_SetQP', '_ZN5CUser13setQuestPointEi')
 symbols.alias('DNF_GM_GetExpandData', '_ZNK5CUser19GetCharacExpandDataE23ENUM_CHARAC_EXPAND_TYPE')
+symbols.alias('DNF_GM_IPGHelper','_ZN10GlobalData12s_pIPGHelperE')
+symbols.alias('DNF_GM_QueryCash','_ZN8WongWork3IPG10CIPGHelper8IPGQueryEP5CUser')
+symbols.alias('DNF_GM_GetCera','_ZN5CUser7GetCeraEv')
+symbols.alias('DNF_GM_GetCeraPoint','_ZN5CUser12GetCeraPointEv')
+symbols.alias('DNF_GM_SendCash','_ZN5CUser12SendCashDataEb')
 
 local function skill_points(ptr)
     local values=ffi.new('int[4]')
@@ -212,7 +243,7 @@ local function skill_points(ptr)
     return {tonumber(values[0]),tonumber(values[1]),tonumber(values[2]),tonumber(values[3])}
 end
 
-local state = {owner='', receipts={}, busy=false}
+local state = {owner='', receipts={}, busy=false, billing={}}
 local worker = uv.new_work(function(encoded)
     package.path='/dp2/lua/?.lua;/dp2/lua/?/init.lua;'..package.path
     return assert(loadfile('/dp2/dnf-gm-online.lua'))('worker')(encoded)
@@ -239,9 +270,26 @@ end,function(encoded)
         local fatigue = req.version==3 and req.operation=='refill_fatigue'
         local skills = req.version==4 and req.operation=='set_skill_points'
         local quest_points = req.version==5 and req.operation=='set_quest_points'
+        local billing = req.version==6 and req.operation=='refresh_billing'
+        local waiting=false
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
                 receipt.state,receipt.note,receipt.charac_no='done','active_character',user:GetCharacNo()
+            end
+        elseif billing then
+            -- The SQL billing transaction is already committed. Only request its
+            -- original asynchronous reload; never write a cached balance to SQL
+            -- or increment a reward again when refreshing fails.
+            receipt.state,receipt.note='unknown','billing_user_unavailable'
+            if user and user:GetState()>=3 and ffi.C.DNF_GM_IPGHelper~=nil then
+                receipt.before=tonumber(ffi.C.DNF_GM_GetCera(user.fptr))
+                receipt.before_point=tonumber(ffi.C.DNF_GM_GetCeraPoint(user.fptr))
+                receipt.after,receipt.after_point=tonumber(req.amount),tonumber(req.amount_point)
+                local ok=pcall(ffi.C.DNF_GM_QueryCash,ffi.C.DNF_GM_IPGHelper,user.fptr)
+                if ok then
+                    state.billing[#state.billing+1]={mid=tonumber(req.m_id),receipt=receipt,deadline=uv.now()+15000}
+                    waiting=true
+                else receipt.note='billing_query_failed' end
             end
         elseif skills and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local after={tonumber(req.amount),tonumber(req.amount_sp2),tonumber(req.amount_tp),tonumber(req.amount_tp2)}
@@ -339,12 +387,33 @@ end,function(encoded)
                 else receipt.note = money and 'money_overflow' or 'coin_overflow' end
             else receipt.note = 'inventory_missing' end
         end
-        state.receipts[#state.receipts+1] = receipt
+        if not waiting then state.receipts[#state.receipts+1] = receipt end
     end
 end)
 state.timer = uv.new_timer()
 state.timer:start(100,500,function()
     if state.busy then return end
+    for i=#state.billing,1,-1 do
+        local pending=state.billing[i]
+        local receipt=pending.receipt
+        local ptr=world.FindUserByAcc(pending.mid)
+        local user=ptr and game.fac.user(ptr)
+        local finished=false
+        if not user or user:GetState()<3 then
+            receipt.note='billing_user_left';finished=true
+        elseif tonumber(ffi.C.DNF_GM_GetCera(user.fptr))==receipt.after and
+            tonumber(ffi.C.DNF_GM_GetCeraPoint(user.fptr))==receipt.after_point then
+            local ok=pcall(ffi.C.DNF_GM_SendCash,user.fptr,false)
+            receipt.state,receipt.note=ok and 'done' or 'unknown',ok and 'billing_refreshed' or 'billing_notify_failed'
+            finished=true
+        elseif uv.now()>=pending.deadline then
+            receipt.note='billing_refresh_unconfirmed';finished=true
+        end
+        if finished then
+            state.receipts[#state.receipts+1]=receipt
+            table.remove(state.billing,i)
+        end
+    end
     config.owner,config.receipts = state.owner,state.receipts
     state.busy = true
     worker:queue(json.encode(config))
@@ -355,5 +424,5 @@ _DP.add_unload_handler(function()
     state.timer:stop()
     if not uv.is_closing(state.timer) then state.timer:close() end
 end)
-io.stderr:write('GM bridge installed; online coin/money/fatigue/skill/QP commands require an acknowledged save\n')
+io.stderr:write('GM bridge installed; online character saves and billing refreshes require acknowledgement\n')
 return state

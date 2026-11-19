@@ -3485,6 +3485,10 @@ P32 的 UTF-8 拆分修复依据固定 auction／point 的 `NextToken` 反汇编
 接口独立实现；通过符号名解析原函数，没有搬运逆向源码、补丁表或参考工程脚本。
 MySQL 队列、状态回执与自动安装逻辑为本项目新增实现，Linux 与 Native 使用同一 helper。
 原接口的保存排队语义、两端真实存档和失败行为的验证见[验证记录](validation.md#gm-在线保存与真实界面2026-11-18)。
+在线点券刷新同样依据原 ELF 的 `GlobalData::s_pIPGHelper`、`CIPGHelper::IPGQuery`、
+`CUser::GetCera/GetCeraPoint/SendCashData` 符号及原余额请求的调用关系独立实现。
+未搬运参考兼容层或逆向源码实现；原函数反汇编、双平台缓存读回与实际通知正文的证据位于
+`../x/dnf-gm-output/evidence/online-cera/`，测试诊断不进入发布包。
 原 ELF、DP2、LuaSQL 和 luv 继续沿用固定 ZIP 的既有来源与分发边界，未修改输入资产。
 
 ## 随包提供的独立 GM
