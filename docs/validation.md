@@ -1716,3 +1716,32 @@ AcceptEx 单包成功、扩大容量或及时调度当作 accept 前复位的完
 `reset-acceptex-ownership.{c,py}` 及对应 `evidence/` 目录；阶段入口为
 `evidence/tcp-ownership-decision.json`。API 约定来源为 Microsoft
 [WSAGetOverlappedResult](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsagetoverlappedresult)。
+
+### 邮件附件与 GM 删除的内存态对照（2026-11-19）
+
+沿用 Windows 10 x64 build 19044、原 i386 game（SHA-256
+`da417c5e65918f655afcddb6edfdaf2fa1e77b2f208e5aa397f021fa23b79979`）、
+MySQL 5.7.44 及授权的 Ubuntu 22.04.5／WSL2 Linux 5.10.16.3 独立副本。
+两端 game、PVF 和 `cfg/siroco11.cfg` 哈希相同。Native 与 Robot 生产代码没有修改。
+外部 Robot 协议探针使用正常登录、加密及发送路径，经 CMD 99 打开邮箱、CMD 98
+领取附件；测试 Lua 只读取邮箱状态，Linux 的空邮箱初始化实验另行标记。
+
+Windows 材料 3037、时装 1970031、宠物 63000 的 GM 发放、通知、原邮箱加载、
+真实领取和下线保存通过。原版 Linux 首轮加载失败：未初始化的已加载 postal 游标
+使 SQL 过滤新邮件，并非物品字段或 Windows 字节布局差异。仅在确认邮箱为空后，
+调用原 `SetLoadState`／`Init` 清除游标，三类附件随后正常领取、保存。原始失败与
+诊断后结果分开保留。Native 的原构造器标量初始化修复早已随 `0dadb1b` 提交，
+见 architecture.md 的邮箱构造说明；本轮没有新增二进制补丁。
+
+又在原版 Linux 复现 GM 在线软删邮件后仍可领取缓存附件并保存。GM 现在在事务内
+锁定邮件与收件账号状态，在线或退出中拒绝删除，避免只改 SQL 却报告附件已撤销。
+候选在 Windows 和 Linux 均完成缓存附件、拒绝删除、正常领取及下线保存；Linux
+沿用上面的初始化诊断条件，不将其记为未修改原版邮箱基线通过。单条、角色批量、
+全服删除和扫描邮件附件清理复用同一数据入口；两端各 7 项定向数据回归覆盖单条／
+批量的在线与退出状态、离线删除、附件归属及故障回滚，未单独操作全服清理按钮。
+
+测试相关整表数据、表结构、自增计数及触发器核对恢复；配置和探针在正常停服后恢复。
+早期外部探针将空 C 指针误作非 nil，触发原 GetLetterId 空指针退出，已修正探针并
+保留现场，不计作生产缺陷或成功结果。测试二进制、探针及私有收据不进入发布包。
+证据入口为 `../x/dnf-gm-output/evidence/online-mail/final-summary.json`；
+本轮证明原协议领取与存档，不外推为图形客户端全部展示、宠物技能或装备业务验收。
