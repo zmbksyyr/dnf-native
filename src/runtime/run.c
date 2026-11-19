@@ -52,6 +52,22 @@ static void cache_memory_region(MEMORY_BASIC_INFORMATION info) {
     if (active->memory_region_count < NR_MEMORY_REGIONS) ++active->memory_region_count;
 }
 
+/* Caller holds memory_lock. An unrelated mapping must not discard cached
+   permissions for large live pools: VirtualQuery scans their page tables. */
+void nr_memory_invalidate(NrRun *run, uintptr_t address, size_t bytes) {
+    if (!bytes) return;
+    unsigned previous = run->memory_region_count;
+    for (unsigned i = 0; i < run->memory_region_count;) {
+        MEMORY_BASIC_INFORMATION *region = &run->memory_regions[i];
+        uintptr_t first = (uintptr_t)region->BaseAddress;
+        int overlaps = first <= address ? address - first < region->RegionSize : first - address < bytes;
+        if (overlaps) *region = run->memory_regions[--run->memory_region_count];
+        else ++i;
+    }
+    if (run->memory_region_count != previous)
+        run->memory_region_cursor = run->memory_region_count % NR_MEMORY_REGIONS;
+}
+
 static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
     if (!bytes) return 1;
     if (address > UINTPTR_MAX - bytes) return 0;
@@ -96,7 +112,7 @@ static int memory_check(uintptr_t address, uintptr_t bytes, int write) {
         if (!cached) {
             if (!VirtualQuery((const void *)address, &info, sizeof(info))) return 0;
             /* Cache both code reads and data, retaining the queried protection
-               for the write check below. VM/brk changes invalidate all entries;
+               for the write check below. VM/brk changes invalidate overlaps;
                file views, uncommitted pages and guards remain uncached. */
             if (info.State == MEM_COMMIT && info.Type == MEM_PRIVATE &&
                 !(info.Protect & (PAGE_NOACCESS | PAGE_GUARD)))
@@ -386,7 +402,11 @@ static intptr_t dispatch_inner(uintptr_t number, const uintptr_t args[6], uintpt
         if (!a || a < active->heap_base || a - active->heap_base > 64 * 1024 * 1024)
             goto brk_done;
         size_t committed = (size_t)((a - active->heap_base + 4095) & ~(uintptr_t)4095);
-        active->memory_region_count = active->memory_region_cursor = 0;
+        if (committed != active->heap_committed) {
+            size_t first = committed < active->heap_committed ? committed : active->heap_committed;
+            size_t last = committed > active->heap_committed ? committed : active->heap_committed;
+            nr_memory_invalidate(active, active->heap_base + first, last - first);
+        }
         if (committed > active->heap_committed &&
             !VirtualAlloc((void *)(active->heap_base + active->heap_committed),
                           committed - active->heap_committed, MEM_COMMIT, PAGE_READWRITE))

@@ -92,7 +92,7 @@ typedef struct {
     unsigned vm_count; /* Highest slot that has been used; holes remain reusable. */
     CRITICAL_SECTION memory_lock;
     unsigned vm_reset_generation;
-    /* Committed private regions; cleared under memory_lock on VM/brk changes. */
+    /* Committed private regions; overlapping VM/brk changes invalidate entries. */
     MEMORY_BASIC_INFORMATION memory_regions[NR_MEMORY_REGIONS];
     unsigned memory_region_count, memory_region_cursor;
     NrSignal actions[65];
@@ -120,6 +120,7 @@ int nr_game_configure(NrRun *run, const char **error);
 int nr_game_mailbox(NrRun *run, CONTEXT *context);
 int nr_auction_configure(NrRun *run, const char **error);
 int nr_memory(uintptr_t address, uintptr_t bytes, int write);
+void nr_memory_invalidate(NrRun *run, uintptr_t address, size_t bytes);
 int nr_path(NrRun *run, const char *guest, wchar_t *path);
 int nr_files(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *result);
 unsigned nr_fd_reserve(NrRun *run);

@@ -474,9 +474,14 @@ int nr_vm(NrRun *run, uintptr_t number, const uintptr_t args[6], intptr_t *resul
     /* Threads share one Linux address space. Reserve, publish and release its
        records together so concurrent mmap/munmap cannot claim the same slot. */
     EnterCriticalSection(&run->memory_lock);
-    run->memory_region_count = run->memory_region_cursor = 0;
+    /* Nonfixed mmap creates a new allocation; msync changes no permissions.
+       Invalidate only affected pages for replacement, unmap, protection and
+       discard, including a failed operation that may have changed a prefix. */
+    int changes_existing = number != MSYNC && (number != MMAP || (args[3] & 0x10));
+    size_t bytes = args[1] > SIZE_MAX - 4095 ? SIZE_MAX : (args[1] + 4095) & ~(size_t)4095;
+    if (changes_existing) nr_memory_invalidate(run, args[0], bytes);
     int handled = vm_operation(run, number, args, result);
-    run->memory_region_count = run->memory_region_cursor = 0;
+    if (changes_existing) nr_memory_invalidate(run, args[0], bytes);
     LeaveCriticalSection(&run->memory_lock);
     return handled;
 }
