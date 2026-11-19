@@ -42,7 +42,14 @@ QP 限定为原 getter 的非负有符号 32 位范围；离线允许懒建 QP �
 仅更新 QP，不重置已有属性、重置计数或任务碎片。
 `inspect` 命令只读当前角色，供 GM 冻结仅在线泡点收件名单；没有把登录表账号在线标记外推为所有角色在线。
 
-复活币／inspect 沿用 v1 队列，金币使用 v2，补满疲劳使用 v3，SP/TP 使用 v4，QP 使用 v5，在线账单刷新使用 v6；各自独立队列和心跳，防止旧 helper 误处理新操作。
+装备栏与装备等级共用 v7 队列。前者调用原 `SetCurExpEquipSlotStat(3)` 开启两个扩展槽，
+显式标记角色统计为待保存，再发送原基本信息通知；后者调用原 `SetCurCharacMaxEquipLevel`，
+由原 setter 标记管理数据修改，再发送原装备等级通知。原 `_SaveCharacData` 排队存档，
+分别确认 `charac_stat.add_slot_flag` 或 `charac_manage_info.max_equip_level` 才完成。
+不改原指令或原内存布局；等级限定 1..255，离线允许懒建管理行，只更新目标字段，
+保留支援兵角色及技能选择。实际离线 SQL 同时检查归属、未删除、离线，装备栏要求统计行存在。
+
+复活币／inspect 沿用 v1 队列，金币使用 v2，补满疲劳使用 v3，SP/TP 使用 v4，QP 使用 v5，在线账单刷新使用 v6，装备设置使用 v7；各自独立队列和心跳，防止旧 helper 误处理新操作。
 同账号任一队列存在 claimed／applied 时，其他队列不领取，避免原游戏保存时互相覆盖。
 MySQL 队列表使用唯一 token，状态为 pending→claimed→applied→done，
 或 rejected/unknown。每个队列每 500ms 至多处理 32 条，同账号只领取最早一条，

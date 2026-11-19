@@ -44,12 +44,13 @@ GitHub 仓库使用 Git LFS 管理这两份 ZIP。克隆前准备 Git LFS 并执
 ## GM 在线金币、复活币与疲劳
 
 [独立 GM 工具](https://github.com/zmbksyyr/dnf-dm-c) 可连接 Native 或原版 Linux 服务端。
-在线金币、复活币、补满疲劳、SP/TP 和 QP 通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
+在线金币、复活币、补满疲劳、SP/TP、QP、装备栏和装备等级通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
 快捷增加按实际余额累加；金币使用原游戏的等级／PVF 金币上限，超限拒绝，不截断发放。
 疲劳按原游戏当前基础与额外上限补满，并清除已使用计数；离线按角色上限补满基础疲劳，保留额外疲劳。
 本项目固定原 ELF 的 `charac_stat.fatigue` 表示剩余疲劳，清零会耗尽疲劳。
 “满 SP/TP”统一设置四组计数为 65535；原协议每组只有 16 位，旧值 90000 会在报文中截成 24464。
 QP 沿用 90000 的一键目标，原通知使用 32 位数值；在线和离线均支持 0..2147483647，保留已购买属性、重置次数和任务碎片。
+装备栏开启两个扩展槽；装备等级按 GM 的 `settings.ini` 中 `[gm] lev_max`（默认 85）设置，保留原有支援兵选择。
 其他缓存角色数值仍需退出游戏后修改。此接口不依赖 Robot，也不新增端口。
 
 Native 在固定 game 启用 DP2 时自动安装桥接，从实例 `login.private.cnf` 读取连接，
@@ -58,8 +59,8 @@ Linux 可使用同一份 [gm_online.lua](../src/runtime/gm_online.lua)：将其�
 `/dp2/dnf-gm-online.lua`，创建 `/dp2/gm-online.private.json`，再于 DP2 入口加载 helper。
 配置为 `{"host":"127.0.0.1","port":3306,"user":"game","password":"uu5!^%jg","channel":3011}`；
 `channel` 取实际 `server_group*1000+channel_no`，密码为数据库明文连接密码，不能使用游戏配置中的加密值。
-连接账号须能创建和读写 `d_taiwan.dnf_gm_hosts_v1/v2/v3/v4/v5/v6`、`dnf_gm_online_v1/v2/v3/v4/v5/v6`。
-金币使用独立 v2 队列，疲劳使用 v3，SP/TP 使用 v4，QP 使用 v5，泡点的在线点券刷新使用 v6；旧 helper 不能处理新增命令，升级时同时更新 GM 和 helper。
+连接账号须能创建和读写 `d_taiwan.dnf_gm_hosts_v1/v2/v3/v4/v5/v6/v7`、`dnf_gm_online_v1/v2/v3/v4/v5/v6/v7`。
+金币使用独立 v2 队列，疲劳使用 v3，SP/TP 使用 v4，QP 使用 v5，泡点的在线点券刷新使用 v6，装备栏与装备等级共用 v7；旧 helper 不能处理新增命令，升级时同时更新 GM 和 helper。
 
 点券与赠送点券以账单表为准。泡点提交账单后，桥接调用原游戏的异步余额重载，核对游戏缓存并发送余额通知，
 不会把旧内存值写回账单。命令入队失败时整笔 SQL 回滚；提交后刷新无法确认时会提示“已入账、刷新未确认”，
