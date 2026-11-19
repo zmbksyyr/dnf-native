@@ -3481,9 +3481,10 @@ P32 的 UTF-8 拆分修复依据固定 auction／point 的 `NextToken` 反汇编
 
 ## GM 在线桥接
 
-`src/runtime/gm_online.lua` 依据固定基底中原 game 的动态符号及已有 DP2/LuaSQL/luv
+桥接源码现由独立 GM 项目的 `src/gm_bridge.lua` 管理，Native 不再内置或自动安装。
+该模块原在本项目开发，依据固定基底中原 game 的动态符号及已有 DP2/LuaSQL/luv
 接口独立实现；通过符号名解析原函数，没有搬运逆向源码、补丁表或参考工程脚本。
-MySQL 队列、状态回执与自动安装逻辑为本项目新增实现，Linux 与 Native 使用同一 helper。
+MySQL 队列与状态回执为独立实现，Linux 与 Windows 兼容宿主使用同一 helper。
 原接口的保存排队语义、两端真实存档和失败行为的验证见[验证记录](validation.md#gm-在线保存与真实界面2026-11-18)。
 在线点券刷新同样依据原 ELF 的 `GlobalData::s_pIPGHelper`、`CIPGHelper::IPGQuery`、
 `CUser::GetCera/GetCeraPoint/SendCashData` 符号及原余额请求的调用关系独立实现。

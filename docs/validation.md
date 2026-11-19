@@ -2,6 +2,18 @@
 
 本文区分清理阶段、上轮目录整理和原项目历史实测。验证环境、源码/程序哈希及实际运行范围以对应 JSON 收据为准。用户已确认现有业务验证通过；下文保留各阶段的具体测试和历史故障记录。
 
+## GM 独立桥接（2026-11-19）
+
+桥接源码迁入独立 GM 项目，字节不变；Native 移除内置脚本和自动安装、读取 GM 资源的逻辑。
+在 Windows 10 IoT Enterprise LTSC 2021 x64 build 19044 的独立副本中，
+新版控制台在缺少 GM 脚本、配置及入口时正常初始化原 game，未创建或改写这些文件。
+按 GM 简短指南部署导出脚本后，完成 13 项实际 GM 控件／生产数据入口检查，
+包括能力失效／恢复、禁止在线 SQL 回退、在线原接口存档与离线修改；导出窗口另通过 6 项检查。
+两项目均以告警即错误构建，GM 内置自检全部通过。本轮没有新增 Linux 或图形客户端验收，
+具体范围见独立 GM 的 `docs/audit.md`。
+证据位于 `../x/dnf-gm-output/evidence/gm-capabilities/`：
+`windows-independent-final-v5.private.json`、`bridge-export-ui.json` 和 `native-independent-boundary/`。
+
 ## 泡点点券入账与游戏缓存刷新（2026-11-19）
 
 沿用下节固定原 ELF、PVF、DP2、MySQL 5.7.44 及 Windows 10 x64 build 19044／

@@ -20,7 +20,9 @@ flowchart TD
 
 ## GM 在线命令
 
-`src/runtime/gm_online.lua` 使用固定原 game 的 DP2 符号接口，不更改 ELF 或新增网络监听。
+桥接已归入独立 [GM 项目](https://github.com/zmbksyyr/dnf-dm-c/blob/main/docs/bridge.md)，
+由其 `src/gm_bridge.lua` 自带并导出；Native 仅随包分发 GM，不安装或管理桥接。
+下面记录与原 ELF 的接口语义及历史联调行为。模块使用固定原 game 的 DP2 符号接口，不更改 ELF 或新增网络监听。
 所有 SQL 在原 luv worker 中执行；完成回调在游戏线程重新查找账号、检查状态与当前角色，
 才调用 `CInventory::SetCoin/GetCoin`、`CUser::SendCoin/SaveMoneyCoin`；
 金币调用 `CInventory::get_money/set_money` 和 `CUser::SendUpdateItemList(0,0)`。
