@@ -3497,6 +3497,10 @@ MySQL 队列、状态回执与自动安装逻辑为本项目新增实现，Linux
 `getCurCharacAddInfoR/W` 的装载和访问路径独立确定，未采用参考结构体或字节表。
 实现只通过原可写访问器修改一个 packed 32 位字段，调用原通知与存档，未修改原指令。
 字段推导、定点反汇编与验证收据位于 `../x/dnf-gm-output/evidence/online-weight/`。
+角色等级依据同一原 ELF 的 `CUser::SetCharacLevel/_onLevelUp`、经验曲线、
+SP/TP 计算、通知和保存路径独立实现；未调用有 GM 身份和固定上限检查的调试入口，
+也未补丁跳过其检查。使用已核对的底层原接口组合实现 GM 操作；不直接写等级内存，
+不复制参考逆向源码。定点反汇编与实验记录位于 `../x/dnf-gm-output/evidence/online-level/`。
 原 ELF、DP2、LuaSQL 和 luv 继续沿用固定 ZIP 的既有来源与分发边界，未修改输入资产。
 
 ## 随包提供的独立 GM

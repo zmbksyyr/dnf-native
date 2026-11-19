@@ -31,6 +31,7 @@ local database_work = function(encoded)
             {version=6, suffix='v6', operations="'refresh_billing'"},
             {version=7, suffix='v7', operations="'open_equipment_slots','unlock_equipment_level'"},
             {version=8, suffix='v8', field='inven_weight', operations="'raise_inventory_weight'"},
+            {version=9, suffix='v9', operations="'set_character_level'"},
         }
         if cfg.owner == '' then
             for _, queue in ipairs(queues) do
@@ -43,6 +44,12 @@ local database_work = function(encoded)
                     before_tp2 INT UNSIGNED NULL, after_tp2 INT UNSIGNED NULL,]] or queue.version==6 and [[
                     amount_point INT UNSIGNED NOT NULL,
                     before_point INT UNSIGNED NULL, after_point INT UNSIGNED NULL,]] or ''
+                if queue.version==9 then extra_columns=[[
+                    amount_exp INT UNSIGNED NOT NULL,
+                    before_exp INT UNSIGNED NULL, after_exp INT UNSIGNED NULL,
+                    after_sp INT UNSIGNED NULL, after_sp2 INT UNSIGNED NULL,
+                    after_tp INT UNSIGNED NULL, after_tp2 INT UNSIGNED NULL,
+                    after_money INT UNSIGNED NULL,]] end
                 exec(string.format([[CREATE TABLE IF NOT EXISTS dnf_gm_hosts_%s (
                     channel_no INT UNSIGNED PRIMARY KEY, owner CHAR(32) CHARACTER SET ascii NOT NULL,
                     seen DATETIME(6) NOT NULL) ENGINE=InnoDB]], queue.suffix))
@@ -96,6 +103,10 @@ local database_work = function(encoded)
                     if receipt.before_point then
                         values=values..string.format(',before_point=%u,after_point=%u',receipt.before_point,receipt.after_point)
                     end
+                    if receipt.before_exp then
+                        values=values..string.format(',before_exp=%u,after_exp=%u,after_sp=%u,after_sp2=%u,after_tp=%u,after_tp2=%u,after_money=%u',
+                            receipt.before_exp,receipt.after_exp,receipt.after_sp,receipt.after_sp2,receipt.after_tp,receipt.after_tp2,receipt.after_money)
+                    end
                     exec(string.format([[UPDATE %s SET state='%s',note='%s',updated=NOW(6)%s
                         WHERE token=%s AND owner=%s AND state='claimed']],pending_table,receipt.state,receipt.note,values,token(receipt.token),owner))
                 end
@@ -112,7 +123,20 @@ local database_work = function(encoded)
             elseif queue.version==8 then
                 saved_table='taiwan_cain.charac_info'
             end
-            if queue.version==7 then
+            if queue.version==9 then
+                -- The original saves current experience in charac_stat;
+                -- charac_info.exp is not refreshed by its normal save path.
+                exec(string.format([[UPDATE %s q
+                    JOIN taiwan_cain.charac_info c ON c.charac_no=q.charac_no
+                    JOIN taiwan_cain.charac_stat s ON s.charac_no=q.charac_no
+                    JOIN taiwan_cain_2nd.skill k ON k.charac_no=q.charac_no
+                    JOIN taiwan_cain_2nd.inventory i ON i.charac_no=q.charac_no
+                    SET q.state='done',q.note='saved',q.updated=NOW(6)
+                    WHERE q.owner=%s AND q.state='applied' AND c.lev=q.after_value AND s.exp=q.after_exp
+                    AND k.remain_sp=q.after_sp AND k.remain_sp_2nd=q.after_sp2
+                    AND k.remain_sfp_1st=q.after_tp AND k.remain_sfp_2nd=q.after_tp2
+                    AND i.money=q.after_money]],pending_table,owner))
+            elseif queue.version==7 then
                 exec(string.format([[UPDATE %s q
                     LEFT JOIN taiwan_cain.charac_stat s ON s.charac_no=q.charac_no
                     LEFT JOIN taiwan_cain.charac_manage_info m ON m.charac_no=q.charac_no
@@ -140,7 +164,7 @@ local database_work = function(encoded)
             exec(string.format([[UPDATE %s SET state='rejected',note='expired',updated=NOW(6)
                 WHERE state='pending' AND expires<NOW(6)]],pending_table))
             local extra_fields=queue.version==4 and ',q.amount_sp2,q.amount_tp,q.amount_tp2' or
-                queue.version==6 and ',q.amount_point' or ''
+                queue.version==6 and ',q.amount_point' or queue.version==9 and ',q.amount_exp' or ''
             local pending = rows(string.format([[SELECT q.token,q.m_id,q.charac_no,q.operation,q.amount%s
                 FROM %s q JOIN taiwan_login.login_account_3 l ON l.m_id=q.m_id
                 WHERE q.state='pending' AND q.expires>NOW(6) AND l.login_status>=1 AND l.m_channel_no=%d
@@ -227,6 +251,16 @@ void DNF_GM_SendEquipmentLevel(CUser *);
 int DNF_GM_SendBasicInfo(CUser *, int, int, int);
 void *DNF_GM_PropertiesRead(CUser *);
 void *DNF_GM_PropertiesWrite(CUser *);
+void *DNF_GM_DataManager();
+int DNF_GM_LevelExperience(void *, int);
+int DNF_GM_LevelSkillPoints(void *, int);
+int DNF_GM_GetLevel(CUser *);
+int DNF_GM_GetExperience(CUser *);
+void DNF_GM_SetExperience(CUser *, int);
+int DNF_GM_SetLevel(CUser *, int);
+void DNF_GM_SetStoredLevel(CUser *, int);
+void DNF_GM_OnLevelUp(CUser *);
+void DNF_GM_RefreshMaxLevel(CUser *);
 ]]
 symbols.alias('DNF_GM_GetCoin', '_ZNK10CInventory7GetCoinEv')
 symbols.alias('DNF_GM_SetCoin', '_ZN10CInventory7SetCoinEj')
@@ -268,6 +302,16 @@ symbols.alias('DNF_GM_SendEquipmentLevel','_ZN5CUser17SendMaxEquipLevelEv')
 symbols.alias('DNF_GM_SendBasicInfo','_ZN5CUser14SendNotiPacketENS_11eSendTargetE15ENUM_NOTIPACKETi')
 symbols.alias('DNF_GM_PropertiesRead','_ZNK15CUserCharacInfo20getCurCharacAddInfoREv')
 symbols.alias('DNF_GM_PropertiesWrite','_ZN15CUserCharacInfo20getCurCharacAddInfoWEv')
+symbols.alias('DNF_GM_DataManager','_Z14G_CDataManagerv')
+symbols.alias('DNF_GM_LevelExperience','_ZNK12CDataManager13get_level_expEi')
+symbols.alias('DNF_GM_LevelSkillPoints','_ZNK12CDataManager14GetSpAtLevelUpEi')
+symbols.alias('DNF_GM_GetLevel','_ZNK15CUserCharacInfo16get_charac_levelEv')
+symbols.alias('DNF_GM_GetExperience','_ZNK15CUserCharacInfo15getCurCharacExpEv')
+symbols.alias('DNF_GM_SetExperience','_ZN15CUserCharacInfo15setCurCharacExpEi')
+symbols.alias('DNF_GM_SetLevel','_ZN5CUser14SetCharacLevelEi')
+symbols.alias('DNF_GM_SetStoredLevel','_ZN15CUserCharacInfo17setCurCharacLevelEi')
+symbols.alias('DNF_GM_OnLevelUp','_ZN5CUser10_onLevelUpEv')
+symbols.alias('DNF_GM_RefreshMaxLevel','_ZN5CUser21CalcurateUserMaxLevelEv')
 
 local function inventory_weight(ptr,write)
     local data=write and ffi.C.DNF_GM_PropertiesWrite(ptr) or ffi.C.DNF_GM_PropertiesRead(ptr)
@@ -281,6 +325,27 @@ local function skill_points(ptr)
     local values=ffi.new('int[4]')
     ffi.C.DNF_GM_GetSkillPoints(ffi.C.DNF_GM_SkillRead(ptr),values,values+1,values+2,values+3)
     return {tonumber(values[0]),tonumber(values[1]),tonumber(values[2]),tonumber(values[3])}
+end
+
+-- Preflight the original per-level point changes before its setters mutate
+-- anything: the original storage is int32, but the skill notification is uint16.
+local function level_skill_points(ptr,before,after,manager)
+    local points=skill_points(ptr)
+    local function valid()
+        for _,value in ipairs(points) do if value<0 or value>65535 then return false end end
+        return true
+    end
+    if not valid() then return nil end
+    local step=after>=before and 1 or -1
+    local old=before
+    for target=before+step,after,step do
+        local delta=step*tonumber(ffi.C.DNF_GM_LevelSkillPoints(manager,step==1 and target or target+1))
+        for i=1,2 do points[i]=math.max(0,math.min(1073741823,points[i]+delta)) end
+        for i=3,4 do points[i]=target>49 and (old>50 and points[i]+step or target-49) or 0 end
+        if not valid() then return nil end
+        old=target
+    end
+    return points
 end
 
 local state = {owner='', receipts={}, busy=false, billing={}}
@@ -314,6 +379,7 @@ end,function(encoded)
         local equipment_slots = req.version==7 and req.operation=='open_equipment_slots'
         local equipment_level = req.version==7 and req.operation=='unlock_equipment_level'
         local weight = req.version==8 and req.operation=='raise_inventory_weight'
+        local level = req.version==9 and req.operation=='set_character_level'
         local waiting=false
         if req.operation=='inspect' and req.version==1 then
             if user and user:GetState()>=3 and user:GetCharacNo()>0 then
@@ -379,6 +445,53 @@ end,function(encoded)
                     if ok then receipt.state,receipt.note='applied','save_queued' end
                 else receipt.note='quest_points_limit' end
             end
+        elseif level and user and user:GetState()==3 and user:GetCharacNo()==tonumber(req.charac_no) then
+            local before,after=tonumber(ffi.C.DNF_GM_GetLevel(user.fptr)),tonumber(req.amount)
+            local before_exp,target_exp=tonumber(ffi.C.DNF_GM_GetExperience(user.fptr)),tonumber(req.amount_exp)
+            local manager=ffi.C.DNF_GM_DataManager()
+            if after>=1 and after<=127 and before>=1 and before<=127 and target_exp>=0 and target_exp<=2147483647
+                and tonumber(ffi.C.DNF_GM_LevelExperience(manager,after))==target_exp
+                and (after==1 or target_exp>tonumber(ffi.C.DNF_GM_LevelExperience(manager,after-1))) then
+                local projected=level_skill_points(user.fptr,before,after,manager)
+                if not projected then receipt.note='level_skill_points_limit'
+                else
+                receipt.before,receipt.after=before,after
+                receipt.state,receipt.note='unknown','apply_failed'
+                local ok=pcall(function()
+                    -- Original GM level changes advance one level at a time,
+                    -- preserving its per-level SP/TP, stat and reward rules.
+                    local inventory=assert(user:GetCurCharacInvenR(),'inventory missing')
+                    local step=after>=before and 1 or -1
+                    for next_level=before+step,after,step do
+                        assert(ffi.C.DNF_GM_SetLevel(user.fptr,next_level)==1,'level setter failed')
+                    end
+                    -- Failed original saves clear their dirty flags. A same-level
+                    -- retry requeues current data without repeating points/rewards.
+                    if before==after then
+                        ffi.C.DNF_GM_SetStoredLevel(user.fptr,after)
+                        ffi.C.DNF_GM_SkillWrite(user.fptr)
+                    end
+                    if before~=after then ffi.C.DNF_GM_OnLevelUp(user.fptr) end
+                    ffi.C.DNF_GM_SetExperience(user.fptr,target_exp)
+                    ffi.C.DNF_GM_RefreshMaxLevel(user.fptr)
+                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,1,37,0)==1,'level notification failed')
+                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,0,2,0)==1,'public level notification failed')
+                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,1,2,1)==1,'level properties notification failed')
+                    ffi.C.DNF_GM_SendSkill(user.fptr)
+                    assert(tonumber(ffi.C.DNF_GM_GetLevel(user.fptr))==after and
+                        tonumber(ffi.C.DNF_GM_GetExperience(user.fptr))==target_exp,'level readback differs')
+                    local sp=skill_points(user.fptr)
+                    for i=1,4 do assert(sp[i]==projected[i],'level skill points differ') end
+                    receipt.before_exp,receipt.after_exp=before_exp,target_exp
+                    receipt.after_sp,receipt.after_sp2,receipt.after_tp,receipt.after_tp2=sp[1],sp[2],sp[3],sp[4]
+                    receipt.after_money=tonumber(ffi.C.DNF_GM_GetMoney(inventory.fptr))
+                    ffi.C.DNF_GM_UpdateData(user.fptr)
+                end)
+                if ok then receipt.state,receipt.note='applied','save_queued' end
+                end
+            else receipt.note='level_curve_mismatch' end
+        elseif level and user and user:GetCharacNo()==tonumber(req.charac_no) then
+            receipt.note='level_requires_town'
         elseif weight and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local before,after=tonumber(inventory_weight(user.fptr,false)[0]),tonumber(req.amount)
             if before>=0 and after==99999999 then
@@ -437,7 +550,7 @@ end,function(encoded)
                 end)
                 if ok then receipt.state,receipt.note='applied','save_queued' end
             else receipt.note='fatigue_limit' end
-        elseif not money and not coin and not fatigue and not skills and not quest_points and not equipment_slots and not equipment_level and not weight then receipt.note='unsupported_operation'
+        elseif not money and not coin and not fatigue and not skills and not quest_points and not equipment_slots and not equipment_level and not weight and not level then receipt.note='unsupported_operation'
         elseif (money or coin) and user and user:GetState()>=3 and user:GetCharacNo()==tonumber(req.charac_no) then
             local inventory = user:GetCurCharacInvenR()
             if inventory then
