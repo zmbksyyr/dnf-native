@@ -299,6 +299,7 @@ symbols.alias('DNF_GM_SaveCharacStat','_ZN15CUserCharacInfo20enableSaveCharacSta
 symbols.alias('DNF_GM_GetEquipmentLevel','_ZNK15CUserCharacInfo25GetCurCharacMaxEquipLevelEv')
 symbols.alias('DNF_GM_SetEquipmentLevel','_ZN15CUserCharacInfo25SetCurCharacMaxEquipLevelEi')
 symbols.alias('DNF_GM_SendEquipmentLevel','_ZN5CUser17SendMaxEquipLevelEv')
+-- Original eSendTarget 1 is self; 0 broadcasts a visible user's packet to online players.
 symbols.alias('DNF_GM_SendBasicInfo','_ZN5CUser14SendNotiPacketENS_11eSendTargetE15ENUM_NOTIPACKETi')
 symbols.alias('DNF_GM_PropertiesRead','_ZNK15CUserCharacInfo20getCurCharacAddInfoREv')
 symbols.alias('DNF_GM_PropertiesWrite','_ZN15CUserCharacInfo20getCurCharacAddInfoWEv')
@@ -500,7 +501,7 @@ end,function(encoded)
                 local ok=pcall(function()
                     -- The mutable accessor marks character properties dirty.
                     inventory_weight(user.fptr,true)[0]=after
-                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,0,2,1)==1,'weight notification failed')
+                    assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,1,2,1)==1,'weight notification failed')
                     assert(tonumber(inventory_weight(user.fptr,false)[0])==after,'weight readback differs')
                     ffi.C.DNF_GM_SaveCharac(user.fptr)
                 end)
@@ -517,7 +518,7 @@ end,function(encoded)
                     if equipment_slots then
                         ffi.C.DNF_GM_SetEquipmentSlots(user.fptr,after)
                         ffi.C.DNF_GM_SaveCharacStat(user.fptr)
-                        assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,0,2,1)==1,'equipment slot notification failed')
+                        assert(ffi.C.DNF_GM_SendBasicInfo(user.fptr,1,2,1)==1,'equipment slot notification failed')
                     else
                         -- The original setter marks management data dirty and
                         -- preserves the tag character and striker selection.
