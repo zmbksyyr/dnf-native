@@ -1667,3 +1667,26 @@ ESP、标志（含 DF）、x87/XMM/MXCSR、UDP/TCP 实际字节、EAGAIN/EFAULT/
 本阶段汇总、逐轮数据、原始失败候选和恢复记录位于仓库外
 `../x/dnf-gm-output/evidence/fast-socket-gateway/`，入口为 `final-summary.json`，
 当前宿主 GM 窗口回执另见 `online-qp/fast-recv-final-windows-gui.private.json`。
+
+### TCP 接收取消与 AcceptEx 的排除实验（2026-11-19）
+
+在上述同一 Windows 10 x64 build 19044 与 LLVM-MinGW 20261104 环境，继续使用仓库外独立
+Winsock 程序核查数据所有权，没有修改生产宿主或正式包。i686/x86_64 共 96 组受控取消：
+先排队后续接收、再用 `CancelIoEx(socket, &old_overlapped)` 取消旧接收的 48 组，后续接收均以
+995 取消；取消完成后才提交后续接收的 48 组均读到正确字节。普通接收／MSG_WAITALL、旧请求
+是否已有部分数据、是否切换非阻塞模式、socket／WSASocket 和是否再排队尾部请求不改变这个结果。
+因此“先挂好下一组接收，再取消当前 WAITALL”在本机不能消除接收所有权间隙。
+
+另有双架构 72 组预先提交 AcceptEx、延迟 300 ms 处理完成结果的实验：接收容量为 1 字节、
+64 KiB 或 256 KiB，对端发送后立即 RST。足够容量能保留单次发送的 4096 字节；但 48/128 KiB
+按 16 KiB 分段发送时，即使容量足够仍只保留首段，其余读取返回真实复位错误。不能把
+AcceptEx 单包成功、扩大容量或及时调度当作 accept 前复位的完整解决方案。
+
+全部长度仅取成功的 `WSAGetOverlappedResult`；失败时该 API 不更新输出长度，未使用缓冲区
+内容或 OVERLAPPED 内部值推算有效字节。本轮结论限定于本机复现，没有外推到其他 Windows
+版本，也没有把候选方案写成已经修复的兼容层能力。
+
+原语源码与逐组原始结果位于仓库外 `../x/dnf-gm-output/cancel-receive-isolate.{c,py}`、
+`reset-acceptex-ownership.{c,py}` 及对应 `evidence/` 目录；阶段入口为
+`evidence/tcp-ownership-decision.json`。API 约定来源为 Microsoft
+[WSAGetOverlappedResult](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsagetoverlappedresult)。
