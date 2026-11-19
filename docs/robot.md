@@ -8,7 +8,7 @@ Robot 是独立的可选 Windows 模块。Native GUI 只负责开关、实例生
 
 在“功能”窗口启用 Robot 后，开关立即写入当前实例 `services.ini`，Robot 出现在服务列表末尾；整体启动会按正常服务顺序启动它，停止、日志和资源统计沿用同一套服务控制。启用期间 Native 的拍卖维护按钮全部置灰，拍卖索引、数据库和内存维护由 Robot 负责。关闭 Robot 后 Native 维护恢复。
 
-Native 只在 game 目录补齐缺失的默认 `privatekey.pem`，并调用 Robot 的密钥检查入口；不会写入 Robot 自己的 `robot/keys`。Robot 启动后按自己的规则同步和校验公钥，已有自定义密钥不被覆盖。Robot 的配置、日志和状态均位于实例 `robot/` 目录。
+Native 在实例初始化时即于 game 目录准备默认配对密钥；启用和启动 Robot 时复用本项目登录器的 RSA 实现补齐、校验，不再启动 Robot 做前置密钥检查。已有配对密钥保留，冲突明确失败；不会写入 Robot 自己的 `robot/keys`。Robot 启动后按自己的规则同步和校验公钥。Robot 的配置、日志和状态均位于实例 `robot/` 目录。
 
 ## 宿主配置契约
 

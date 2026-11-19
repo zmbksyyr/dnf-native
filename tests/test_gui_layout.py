@@ -133,7 +133,7 @@ def main():
             assert visible[101][2] + round(44*dpi/96) < visible[250][0], "directory and IP groups touch"
             assert visible[102][3] < visible[220][1] < visible[202][1] < visible[206][1]
             for identifiers in [[102, 260, 101, 250, 251, 262, 116, 280, 224, 223],
-                                [207, 213, 300],
+                                [207, 213, 290, 300],
                                 [112, 111, 113, 114, 115, 282],
                                 [284, 285, 286, 287, 288, 283, 241, 243, 242]]:
                 for a, b in zip(identifiers, identifiers[1:]):
@@ -163,13 +163,17 @@ def main():
         market = wait_for(lambda: next(iter(windows(process.pid, "DnfNativeMarketMaintenance")), None), "market maintenance window", 5)
         market_client = w.RECT()
         user.GetClientRect(market, c.byref(market_client))
-        market_controls = [301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 320, 321, 325, 230, 231, 233, 234, 235, 236]
+        market_controls = [291, 292, 294, 295, 296, 301, 302, 303, 304, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 320, 321, 325, 230, 231, 233, 234, 235, 236]
         for identifier in market_controls:
             child = user.GetDlgItem(market, identifier)
             assert child and user.IsWindowVisible(child), (identifier, "market control missing")
             area = rect(child, market)
             assert 0 <= area.left < area.right <= market_client.right
             assert 0 <= area.top < area.bottom <= market_client.bottom, (identifier, area.top, area.bottom, market_client.bottom)
+        path, select, sync, pvf, keys, settings = [rect(user.GetDlgItem(market,i),market) for i in [294,291,292,295,296,325]]
+        assert path.right < select.left and select.right < sync.left
+        assert path.bottom < pvf.top and pvf.right < keys.left
+        assert pvf.top == keys.top and keys.bottom < settings.top
         for row, header in (([310, 311, 312, 313], 320), ([314, 315, 316, 317], 321)):
             areas=[rect(user.GetDlgItem(market, identifier), market) for identifier in row]
             assert len({area.top for area in areas}) == 1

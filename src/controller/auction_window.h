@@ -21,6 +21,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
         case WM_CREATE: {
             app->market_window=w;
             auto add=[&](const wchar_t *type,const wchar_t *text,DWORD style,int id,int x,int y,int width,int height) {
+                if(id!=MARKET_SUMMARY && id!=MARKET_STATUS && (id<CLIENT_SELECT || id>CLIENT_KEYS)) y+=100;
                 HWND c=CreateWindowExW(0,type,text,WS_CHILD|WS_VISIBLE|style,app->px(x),app->px(y),app->px(width),app->px(height),w,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),nullptr,nullptr);
                 require(c!=nullptr,"Create market maintenance control"); SendMessageW(c,WM_SETFONT,reinterpret_cast<WPARAM>(app->font),TRUE);
                 if(!wcscmp(type,L"BUTTON") && (style&BS_TYPEMASK)==BS_OWNERDRAW) SetWindowSubclass(c,button_proc,1,0);
@@ -35,6 +36,11 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             if(!app->banner) app->banner=CreateSolidBrush(RGB(247,250,255));
             add(L"STATIC",L"",SS_PATHELLIPSIS|SS_NOPREFIX|SS_CENTERIMAGE,MARKET_SUMMARY,28,18,816,18);
             add(L"STATIC",L"",SS_CENTERIMAGE,MARKET_STATUS,28,38,816,18);
+            add(L"STATIC",L"",SS_PATHELLIPSIS|SS_NOPREFIX|SS_CENTERIMAGE,CLIENT_PATH,32,84,576,26);
+            add(L"BUTTON",L"选择客户端",BS_OWNERDRAW|WS_TABSTOP,CLIENT_SELECT,622,82,108,30);
+            add(L"BUTTON",L"重新同步",BS_OWNERDRAW|WS_TABSTOP,CLIENT_IMPORT,742,82,106,30);
+            add(L"STATIC",L"",SS_CENTERIMAGE,CLIENT_PVF,32,122,200,26);
+            add(L"STATIC",L"",SS_CENTERIMAGE,CLIENT_KEYS,244,122,200,26);
             add(L"STATIC",L"运行设置",SS_CENTERIMAGE,325,32,78,96,22);
             add(L"STATIC",L"等级上限",SS_CENTERIMAGE,LEVEL_LABEL,32,108,76,30);
             HWND level=add(L"COMBOBOX",L"",CBS_DROPDOWNLIST|CBS_OWNERDRAWFIXED|CBS_HASSTRINGS|WS_TABSTOP,LEVEL_CAP,116,108,90,30);
@@ -73,6 +79,8 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 SendMessageW(GetDlgItem(w,id),WM_SETFONT,reinterpret_cast<WPARAM>(app->strong_font),TRUE);
             app->show_plugins(); app->show_level(); app->show_robot(); app->controls();
             market_summary();
+            app->client_status={4,4};app->client_labels();
+            PostMessageW(app->window,WM_COMMAND,CLIENT_CHECK,0);
             app->market_tooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
                 CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,w,nullptr,GetModuleHandleW(nullptr),nullptr);
             require(app->market_tooltip!=nullptr,"Create PVF path tooltip");
@@ -90,9 +98,10 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 rounded(dc,r,fill,border,app->px(12));
             };
             panel(16,12,864,64,RGB(247,250,255),RGB(222,231,245));
-            panel(16,72,864,156,RGB(255,255,255),RGB(228,234,245));
-            panel(16,164,864,274,RGB(255,255,255),RGB(228,234,245));
-            panel(16,282,864,446,RGB(255,255,255),RGB(228,234,245));
+            panel(16,72,864,164,RGB(255,255,255),RGB(228,234,245));
+            panel(16,172,864,256,RGB(255,255,255),RGB(228,234,245));
+            panel(16,264,864,374,RGB(255,255,255),RGB(228,234,245));
+            panel(16,382,864,546,RGB(255,255,255),RGB(228,234,245));
             EndPaint(w,&paint); return 0;
         }
         case WM_CTLCOLORSTATIC:
@@ -105,6 +114,11 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
                 return reinterpret_cast<LRESULT>(app->banner);
             }
             SetBkColor(dc,RGB(255,255,255));
+            {
+                int id=GetDlgCtrlID(reinterpret_cast<HWND>(lp));
+                int state=id==CLIENT_PVF?app->client_status.pvf:id==CLIENT_KEYS?app->client_status.keys:0;
+                SetTextColor(dc,state==1?RGB(24,135,86):state==2||state==3?RGB(194,67,58):RGB(92,108,128));
+            }
             return reinterpret_cast<LRESULT>(app->surface);
         }
         case WM_ERASEBKGND: { RECT r;GetClientRect(w,&r);FillRect(reinterpret_cast<HDC>(wp),&r,app->background);return 1; }
@@ -112,6 +126,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
         case WM_COMMAND: {
             int id=LOWORD(wp);
             if(id==IDCANCEL) { SendMessageW(w,WM_CLOSE,0,0); return 0; }
+            if(id==CLIENT_SELECT || id==CLIENT_IMPORT) {SendMessageW(app->window,WM_COMMAND,wp,lp);return 0;}
             if(id==DP2_ENABLE || id==FRIDA_ENABLE || id==ROBOT_ENABLE || id==LEVEL_CAP || id==LEVEL_APPLY) {
                 SendMessageW(app->window,WM_COMMAND,wp,lp);return 0;
             }
@@ -121,7 +136,7 @@ static LRESULT CALLBACK market_proc(HWND w,UINT message,WPARAM wp,LPARAM lp) {
             return 0;
         }
         case WM_CLOSE:
-            if(app->busy) return 0;
+            if(app->busy && app->operation!=CLIENT_CHECK) return 0;
             DestroyWindow(w); return 0;
         case WM_DESTROY:
             if(app->market_tooltip) DestroyWindow(app->market_tooltip);
@@ -138,7 +153,7 @@ static void open_market_window() {
     if(app->market_window) { SetForegroundWindow(app->market_window); return; }
     WNDCLASSW cls{}; cls.lpfnWndProc=market_proc; cls.hInstance=GetModuleHandleW(nullptr); cls.hCursor=LoadCursorW(nullptr,IDC_ARROW); cls.lpszClassName=L"DnfNativeMarketMaintenance";
     if(!RegisterClassW(&cls) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) require(false,"Register market maintenance window");
-    RECT size{0,0,app->px(880),app->px(460)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
+    RECT size{0,0,app->px(880),app->px(560)}; AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE,WS_EX_CONTROLPARENT);
     RECT owner;GetWindowRect(app->window,&owner);
     HWND w=CreateWindowExW(WS_EX_CONTROLPARENT,cls.lpszClassName,L"功能",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,
         std::max(0L,owner.left+(owner.right-owner.left-(size.right-size.left))/2),std::max(0L,owner.top),size.right-size.left,size.bottom-size.top,app->window,nullptr,cls.hInstance,nullptr);

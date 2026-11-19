@@ -221,6 +221,7 @@ static void create_game_instance(HWND window, const std::wstring &exe, const std
     }
     stop_database(window, exe, instance, live); CloseHandle(live.process); live = {};
     require(CopyFileW(service_template.c_str(), (instance + L"\\services.ini").c_str(), TRUE), "Commit instance service list");
+    prepare_game_keys(instance);
     require(DeleteFileW(seed.c_str()), "Remove imported setup seed");
     require(DeleteFileW(service_template.c_str()), "Remove setup service template");
     write_private(instance + L"\\instance-setup.txt", "Application seed SHA256=" + seed_hash + "\nImport re-export: byte identical.\nApplication accounts: generated per instance.\nDatabase stopped normally.\n");

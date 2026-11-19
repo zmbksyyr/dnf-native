@@ -18,7 +18,8 @@ enum { INSTANCE = 101, BROWSE, PORT, INITIALIZE = 110, START, STOP, BACKUP, REST
        LOG_ENCODING = 241, LOG_FOLLOW, LOG_REFRESH, LOG_FOLDER,
        SERVICE_IP = 250, IP_APPLY, CREATE_INSTANCE = 260, DELETE_INSTANCE, CHECK_RESOURCES };
 enum { INSTANCE_MORE = 280, DATABASE_INFO = 282, LOG_FILTER,
-       LOG_CONSOLE_TAB, LOG_SERVICE_TAB, LOG_ERROR_TAB, LOG_MYSQL_TAB, LOG_FILES };
+       LOG_CONSOLE_TAB, LOG_SERVICE_TAB, LOG_ERROR_TAB, LOG_MYSQL_TAB, LOG_FILES,
+       GM_OPEN=290, CLIENT_SELECT, CLIENT_IMPORT, CLIENT_CHECK, CLIENT_PATH, CLIENT_PVF, CLIENT_KEYS };
 // The log-file menu posts these command ids for the source at that offset. The
 // window handles them directly as well, so a source can be opened without the
 // popup; the menu and the message share one contract.
@@ -173,11 +174,13 @@ static void stop_database(HWND window, const std::wstring &exe, const std::wstri
 }
 
 #include "instance_setup.h"
+#include "client_sync.h"
 
 struct Result {
     bool success = false, stopped = false, created = false, deleted = false;
     Session started;
     std::wstring status, details, maintenance;
+    client_sync::Status client;
 };
 
 static std::wstring service_group(const std::wstring &name) {
@@ -219,6 +222,18 @@ struct App {
     std::wstring service_tip_text;
     bool market_guard_supported = false;
     std::wstring market_pvf_text;
+    client_sync::Status client_status;
+    std::wstring client_signature;
+    void client_labels() {
+        if(!market_window) return;
+        auto client=client_sync::selected(current);
+        SetWindowTextW(GetDlgItem(market_window,CLIENT_PATH),client.empty()?L"未选择客户端（可选）":client.c_str());
+        for(auto pair:{std::pair<int,int>{CLIENT_PVF,client_status.pvf},{CLIENT_KEYS,client_status.keys}}) {
+            const wchar_t *state=pair.second==1?L"一致":pair.second==2?L"不一致":pair.second==3?L"无法核对":pair.second==4?L"检查中":L"未关联";
+            auto text=std::wstring(L"● ")+(pair.first==CLIENT_PVF?L"PVF ":L"密钥 ")+state;
+            SetWindowTextW(GetDlgItem(market_window,pair.first),text.c_str());
+        }
+    }
     std::wstring market_report = L"点击“检查兼容性”读取当前 PVF 与存量订单。";
     HFONT font = nullptr, strong_font = nullptr, log_font = nullptr, small_font = nullptr;
     HBRUSH background = nullptr, surface = nullptr;
@@ -693,6 +708,7 @@ struct App {
         EnableWindow(GetDlgItem(window, CREATE_INSTANCE), resources_ready && !active && !session.process);
         EnableWindow(GetDlgItem(window, INSTANCE_MORE), !busy);
         EnableWindow(GetDlgItem(window, CHECK_RESOURCES), TRUE);
+        EnableWindow(GetDlgItem(window, GM_OPEN), present(resources+L"\\DNF_GM.exe"));
         bool initialized = instance_initialized();
         bool restore_pending = !current.empty() && present(current + L"\\restore.pending");
         bool pending = instance_pending();
@@ -715,6 +731,8 @@ struct App {
         EnableWindow(GetDlgItem(window, MARKET_OPEN), game && !pending);
         if(market_window) {
             EnableWindow(market_window,TRUE);
+            EnableWindow(GetDlgItem(market_window,CLIENT_SELECT),!active && !pending);
+            EnableWindow(GetDlgItem(market_window,CLIENT_IMPORT),!active && !pending && !client_sync::selected(current).empty());
             bool frida=setting(current+L"\\services.ini",L"plugins",L"mode")==L"frida";
             EnableWindow(GetDlgItem(market_window,MARKET_DP2),
                          (frida && market_guard_supported) || market::options(current).dp2);
@@ -851,7 +869,14 @@ struct App {
                     }
                     start_service(service,instance,service_job);
                 };
-                if(id>=market::Check && id<=market::Reset) {
+                if(id==CLIENT_IMPORT || id==CLIENT_CHECK) {
+                    if(id==CLIENT_IMPORT) {
+                        if(instance_pending()) throw std::runtime_error("Complete instance maintenance before client import");
+                        result->details=client_sync::import(instance,services,target);
+                        result->status=L"客户端同步完成";
+                    }
+                    result->client=client_sync::inspect(instance,services);
+                } else if(id>=market::Check && id<=market::Reset) {
                     if(GetPrivateProfileIntW(L"robot",L"enabled",0,(instance+L"\\services.ini").c_str())==1)
                         throw std::runtime_error("Robot owns market maintenance; use Robot controls");
                     result->details=market::maintain(tool,instance,assets,services,service_job,id,selected<0?2:selected,market_options,market_identity);
@@ -887,7 +912,7 @@ struct App {
                             auto fresh=load_services(instance,runtime);
                             auto added=std::find_if(fresh.begin(),fresh.end(),[](const Service &s){return s.external;});
                             if(added==fresh.end()) throw std::runtime_error("Robot service is missing");
-                            prepare_robot_game_keys(*added,instance);
+                            prepare_game_keys(instance);
                             services.push_back(*added);
                         } catch(...) {market::replace_file(config,before);throw;}
                     } else if(!robot_enabled && robot!=services.end()) {
@@ -1049,6 +1074,7 @@ struct App {
                 result->details += L"\r\n" + result->status;
                 if (id == BACKUP || id == RESTORE || id == RECOVER) result->maintenance = result->status;
                 result->stopped = owned.process && WaitForSingleObject(owned.process, 0) == WAIT_OBJECT_0;
+                if(id==CLIENT_IMPORT) result->client=client_sync::inspect(instance,services);
             }
             PostMessageW(window, DONE_MESSAGE, 0, reinterpret_cast<LPARAM>(result.release()));
         });
@@ -1518,6 +1544,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             for (const auto &button : std::vector<std::pair<int, const wchar_t *>>{{START,L"启动"},{STOP,L"停止"},{BACKUP,L"备份…"},{RESTORE,L"还原…"},{RECOVER,L"恢复操作"},{FOLDER,L"实例目录"}})
                 control(L"BUTTON", button.second, WS_TABSTOP, button.first);
             control(L"BUTTON", L"功能", WS_TABSTOP, MARKET_OPEN);
+            control(L"BUTTON", L"打开 GM", WS_TABSTOP, GM_OPEN);
             app->output = control(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_TABSTOP, 206);
             SendMessageW(app->output, WM_SETFONT, reinterpret_cast<WPARAM>(app->log_font), TRUE);
             control(L"STATIC", L"服务", SS_CENTERIMAGE, 207);
@@ -1597,7 +1624,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             // Seven columns and three rows share their hit rectangles with the
             // native selection model; metadata moves to the real detail action.
             place(207,36,108,34,22);place(213,76,108,140,22);
-            place(MARKET_OPEN,width-110,103,76,30);
+            place(GM_OPEN,width-210,103,90,30);place(MARKET_OPEN,width-110,103,76,30);
             place(SERVICE_LIST,36,150,width-72,148);
             place(202,72,337,54,28);place(201,128,338,48,26);place(203,198,337,28,30);place(PORT,232,342,48,20);
             place(212,296,338,std::max(0,width-826),26);
@@ -1697,7 +1724,13 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             app->show_level();
             if (app->operation==START || app->operation==ALL_START || app->operation==MONTHLY_PREPARE) app->monthly_checked=GetTickCount64();
             if (!result->maintenance.empty()) app->maintenance_summary = result->maintenance;
-            app->show_services(); app->finish(*result); app->controls(); app->scan_logs();
+            app->show_services();
+            if(app->operation!=CLIENT_CHECK || !result->success) app->finish(*result);
+            if(app->operation==CLIENT_CHECK || app->operation==CLIENT_IMPORT) {
+                app->client_status=result->client;
+                app->client_signature=client_sync::signature(app->current,app->services);app->client_labels();
+            }
+            app->controls(); app->scan_logs();
             if(app->operation>=market::Check && app->operation<=market::Reset) {
                 app->market_report=result->status+L"\r\n"+result->details;
                 if(app->market_window) {
@@ -1710,7 +1743,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                     app->log_selected=i;app->refresh_log(true);break;
                 }
             }
-            if (app->closing && result->success && !app->session.process && !app->services_running()) PostMessageW(window, WM_CLOSE, 0, 0);
+            if (app->closing && (app->operation==CLIENT_CHECK || (result->success && !app->session.process && !app->services_running()))) PostMessageW(window, WM_CLOSE, 0, 0);
             else app->closing = false;
             return 0;
         }
@@ -1745,6 +1778,9 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 app->monthly_checked=GetTickCount64(); app->action(MONTHLY_PREPARE);
             }
             app->refresh_log();
+            if(app->market_window && !app->busy && client_sync::signature(app->current,app->services)!=app->client_signature) {
+                app->client_status={4,4};app->client_labels();app->action(CLIENT_CHECK);
+            }
             return 0;
         case WM_CONTEXTMENU: {
             if (reinterpret_cast<HWND>(wparam) != GetDlgItem(window,SERVICE_LIST) || app->busy) break;
@@ -1776,6 +1812,20 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
                 return 0;
             }
             if(id==MARKET_OPEN && HIWORD(wparam)==BN_CLICKED && !app->busy) {open_market_window();return 0;}
+            if(id==GM_OPEN) {
+                auto gm=app->resources+L"\\DNF_GM.exe";STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
+                auto command=quote(gm);
+                require(CreateProcessW(gm.c_str(),command.data(),nullptr,nullptr,FALSE,0,nullptr,app->resources.c_str(),&startup,&process),"Open independent GM");
+                CloseHandle(process.hThread);CloseHandle(process.hProcess);return 0;
+            }
+            if((id==CLIENT_SELECT || id==CLIENT_IMPORT || id==CLIENT_CHECK) && !app->busy) {
+                if(id==CLIENT_CHECK) {app->action(CLIENT_CHECK);return 0;}
+                if(app->services_running()) {app->notice(L"请先停止服务，再同步客户端 PVF 和密钥。");return 0;}
+                auto client=client_sync::selected(app->current);
+                if(id==CLIENT_SELECT) client=choose_folder(app->market_window,L"选择客户端根目录（包含 Script.pvf）",client);
+                if(!client.empty()) {app->client_status={4,4};app->client_labels();app->action(CLIENT_IMPORT,client);}
+                return 0;
+            }
             if (id==LOG_FILTER && HIWORD(wparam)==EN_CHANGE) {app->refresh_log(true);return 0;}
             if (id == INSTANCE && HIWORD(wparam) == EN_CHANGE) { if (app->output) app->load(); return 0; }
             if (id == SERVICE_LIST && HIWORD(wparam) == LBN_SELCHANGE && !app->busy) {
@@ -1936,6 +1986,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             return 0;
         }
         case WM_CLOSE:
+            if(app->busy && app->operation==CLIENT_CHECK) {app->closing=true;return 0;}
             if (app->busy) { app->notice(L"正在执行操作，请等待完成后关闭"); return 0; }
             if (app->services_running()) { app->closing = true; app->action(ALL_STOP); return 0; }
             if (app->session.process) { app->closing = true; app->action(STOP); return 0; }

@@ -18,6 +18,18 @@ flowchart TD
 
 普通指令由同架构 CPU 执行，宿主对 syscall 和 Linux TLS 边界进行适配。每个服务是独立 Windows 进程；DP2/Lua/Frida 和 game 保持同进程指针及 ABI。没有引入 CPU 模拟器、通用全程序翻译或内核驱动。
 
+## GM 入口与可选客户端同步
+
+主界面通过 `CreateProcessW` 打开随包独立 GM，不传实例或连接参数，也不纳入服务 Job。
+`game_keys.h` 复用本项目登录器的 CryptoAPI RSA 导出实现，在新实例初始化时准备配对密钥；
+Robot 启用、启动复用同一检查，已有公私钥不匹配时失败并保留文件。
+
+`client_sync.h` 读取客户端 `Script.pvf` 和私钥，公钥由实际私钥派生。
+同步只在服务全部停止后执行，先备份旧文件、暂存新文件，随后提交 PVF、双方缺失的密钥及
+`services.ini` 的 `[client] directory`。失败按相反顺序恢复；备份留在实例 `.mysql/client-sync-*`。
+指示灯在后台核对 PVF 的 SHA-256 和公私钥配对，定时发现文件大小或修改时间改变后重新核对，
+不在界面线程散列大文件，不自动启动服务、改等级或清理拍卖订单。
+
 ## GM 在线命令
 
 桥接已归入独立 [GM 项目](https://github.com/zmbksyyr/dnf-dm-c/blob/main/docs/bridge.md)，
@@ -92,12 +104,11 @@ MySQL 队列表使用唯一 token，状态为 pending→claimed→applied→done
 v6 直接从 claimed 到 done／unknown，不使用角色字段的 applied→存档确认路径。
 GM 显示实际部分结果并停止泡点，避免定时重复发放。登录或切换角色竞态仍由游戏线程复查，拒绝错误目标。
 
-`controller/game_compat.h` 在固定 game、启用 DP2 且存在 `login.private.cnf` 时，
-从 GUI 内嵌资源安装 helper 和带标记的入口段。首次备份入口、旧 helper 及发生变更的自动配置；
-保留入口其他内容和无生成标记的自定义配置。Linux 使用相同 Lua 与配置格式，无需 Native GUI 或 Robot。
+GM 桥接由独立 GM 项目随程序导出脚本、配置和简短说明，Native 不安装或升级该模块。
+Linux 与 Windows 宿主使用同一份 GM 模块；`controller/game_compat.h` 只处理原有拍卖兼容。
 原 luv 对较大 work function 的序列化曾在两端原游戏中崩溃，因此 worker 仅传短入口，
 业务代码在 worker 内 loadfile，不把数据库操作移回游戏主线程。
-停用时先停 game，再移除入口中的 GM 标记段及对应 helper/配置；保留队列与备份供核对。
+停用桥接时先停 game，再按 GM 的说明移除入口中的标记段及对应 helper/配置；保留队列与备份供核对。
 不要将 unknown 改回 pending 或自动重发；旧备份若包含后续用户改动，不能盲目覆盖整个 DP2 入口。
 
 ## ELF 宿主
@@ -124,7 +135,9 @@ Windows 线程清理；唤醒 join 后不再使用 guest 栈或其 TLS。
 
 `nr_memory` 的缓存只记录有效范围和页权限，不缓存内存内容。大块清零在同一映射锁内
 将已核对的私有可写页还原为相同的已提交、可读写状态，因此保留权限缓存；失败会
-明确终止。改变映射、保护或 brk 的路径仍使缓存失效，防止沿用已撤销权限。
+明确终止。改变映射、保护或 brk 的路径只使重叠范围的缓存失效，防止沿用已撤销权限。
+非固定地址 mmap 新建分配、msync 不撤销既有权限，不清空其他区域缓存。
+检查和修改仍使用同一映射锁，失败的部分修改也清除涉及范围。
 
 `adapt.c` 使用固定 Zydis/Zycore 解码，记录原 syscall/TLS 站点并适配加载副本。x64 syscall 和常规 TLS 陷入经 Windows VEH 分发；x86 `int 0x80` 在异常边界处理。常见 x86 GS 绝对读取、MOV 写入、ADD 读取、32 位 CMPXCHG 及间接调用可经每线程 Windows TLS 槽直接执行，每次重新读取当前 TLS 基址与调用目标。MOV 写入和 ADD 覆盖 glibc 线程清理链、errno 查询；CMPXCHG 覆盖 glibc/pthread 取消状态的高频原子更新，保留原 LOCK 前缀和 CPU 比较交换语义，不在宿主中模拟读改写。跳板保留真实 CPU 标志及无关寄存器；间接调用保留原寄存器、标志、返回地址和一个返回字的栈布局，避免重复异常解码与刷新指令缓存。其他已支持的 TLS 由 `tls.c` 处理，未实现站点记录地址并失败退出。
 
@@ -337,6 +350,6 @@ send/recv、connect 和 accept 通过 select 等待真实就绪，重试保留�
 
 `src/runtime/elf.c` 的全文件哈希仍保持 SHA-256 身份校验，但读取改为 64 KiB `ReadFile` 分块，减少大 ELF 启动时对只读映射工作集的影响。`NrRun` 在启动时缓存 `DNF_NATIVE_TRACE`、`DNF_NATIVE_EPOLL_TRACE` 和 QPC 频率，syscall、socket、epoll 与文件热路径不再重复查询环境变量或频率。
 
-已提交私有内存的 `VirtualQuery` 结果使用 32 项缓存，代码读取和数据访问均保留真实页权限检查；guest 所有权仍逐次核对。Windows 查询从当前页开始返回区间，因此缓存把同一分配、相同权限且终点相同的重复尾段合并，避免角色对象交错访问时重复淘汰和扫描大区页表。VM、brk 与零页重置在同一映射锁内使缓存失效；文件视图、未提交页和 guard 保留直接查询。该规则依据 [VirtualQuery](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualquery) 返回区间语义独立实现。运行 ELF 时申请 1ms Windows 定时器分辨率，正常返回时配对释放。epoll 从上次返回位置继续扫描就绪项，避免小 `maxevents` 长期饿死后续描述符。`pread64` 用独立重开句柄和 OVERLAPPED 偏移读取，保留原文件位置。
+已提交私有内存的 `VirtualQuery` 结果使用 32 项缓存，代码读取和数据访问均保留真实页权限检查；guest 所有权仍逐次核对。Windows 查询从当前页开始返回区间，因此缓存把同一分配、相同权限且终点相同的重复尾段合并，避免角色对象交错访问时重复淘汰和扫描大区页表。VM 和 brk 在同一映射锁内只清除发生变化的重叠范围；成功恢复原权限的零页重置保留缓存。文件视图、未提交页和 guard 保留直接查询。该规则依据 [VirtualQuery](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualquery) 返回区间语义独立实现。运行 ELF 时申请 1ms Windows 定时器分辨率，正常返回时配对释放。epoll 从上次返回位置继续扫描就绪项，避免小 `maxevents` 长期饿死后续描述符。`pread64` 用独立重开句柄和 OVERLAPPED 偏移读取，保留原文件位置。
 
 Robot 通过独立 `robot.exe` 进程接入服务列表末尾。Native 只创建实例目录配置、命名停止事件和 Job Object 归属；Robot 通过 `--config-dir`、`--stop-event` 及 `host-profile.json` 选择宿主。Windows 进程、内存补丁和市场维护由 Robot 自己的平台层处理，Linux 原有路径保留；依赖 `/root/run`、`/root/stop` 的入口在 Windows 明确不支持并置灰。详见 [Robot 接入](robot.md)。

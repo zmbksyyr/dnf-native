@@ -42,6 +42,8 @@ static std::wstring setting(const std::wstring &file, const std::wstring &sectio
     return std::wstring(value, size);
 }
 
+#include "game_keys.h"
+
 static std::string utf8_path(const std::wstring &value) {
     if (value.empty()) return {};
     int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
@@ -66,51 +68,6 @@ static std::string json_escape(const std::string &value) {
         }
     }
     return result;
-}
-
-// The launcher key pair is consumed by the original game process. Robot reads
-// that pair from the game directory during its own initialization, so the
-// controller only fills missing files there and never writes Robot-owned keys.
-static void prepare_robot_game_keys(const Service &robot, const std::wstring &instance) {
-    const auto manifest=instance+L"\\services.ini";
-    const std::wstring binary=instance+L"\\"+setting(manifest,L"game",L"root")+setting(manifest,L"game",L"elf");
-    const std::wstring game_dir=binary.substr(0,binary.find_last_of(L"\\/"));
-    const std::wstring target_private = game_dir + L"\\privatekey.pem";
-    const std::wstring target_public = game_dir + L"\\publickey.pem";
-    bool added_private=GetFileAttributesW(target_private.c_str())==INVALID_FILE_ATTRIBUTES;
-    bool added_public=GetFileAttributesW(target_public.c_str())==INVALID_FILE_ATTRIBUTES;
-    directory(game_dir);
-    if(added_private) {
-        HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(201), RT_RCDATA);
-        require(resource != nullptr, "Find default Robot game key");
-        HGLOBAL loaded = LoadResource(nullptr, resource);
-        require(loaded != nullptr, "Load default Robot game key");
-        const char *bytes = static_cast<const char *>(LockResource(loaded));
-        require(bytes != nullptr, "Read default Robot game key");
-        write_private(target_private, std::string(bytes, SizeofResource(nullptr, resource)));
-    }
-    directory(instance+L"\\.mysql");
-    File log=private_file(instance+L"\\.mysql\\robot-key-check.private.log",CREATE_ALWAYS);
-    SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};
-    File input(CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,0,nullptr));
-    STARTUPINFOW startup{}; startup.cb=sizeof(startup); startup.dwFlags=STARTF_USESTDHANDLES;
-    startup.hStdInput=input.handle; startup.hStdOutput=startup.hStdError=log.handle;
-    PROCESS_INFORMATION child{};
-    std::wstring command=quote(robot.executable)+L" --check-game-keypair "+quote(binary);
-    bool created=CreateProcessW(robot.executable.c_str(),command.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,instance.c_str(),&startup,&child)!=FALSE;
-    bool valid=false;
-    if(created) {
-        CloseHandle(child.hThread);
-        DWORD waited=WaitForSingleObject(child.hProcess,10000),code=1;
-        if(waited!=WAIT_OBJECT_0) {TerminateProcess(child.hProcess,1);WaitForSingleObject(child.hProcess,10000);}
-        else GetExitCodeProcess(child.hProcess,&code);
-        valid=code==0;CloseHandle(child.hProcess);
-    }
-    if(!valid) {
-        if(added_private) DeleteFileW(target_private.c_str());
-        if(added_public) DeleteFileW(target_public.c_str());
-        throw std::runtime_error("Game RSA pair is invalid or Robot key check failed; existing keys preserved; inspect robot-key-check.private.log");
-    }
 }
 
 static std::vector<Service> load_services(const std::wstring &instance, const std::wstring &runtime) {
@@ -397,7 +354,7 @@ static void start_service(Service &service, const std::wstring &instance, HANDLE
     service.stopping = false;
     service.normal_stop = false;
     if (service.external) {
-        prepare_robot_game_keys(service, instance);
+        prepare_game_keys(instance);
         directory(service.config_dir + L"\\conf");
         const std::wstring config = service.config_dir + L"\\conf\\config.ini";
         if (GetFileAttributesW(config.c_str()) == INVALID_FILE_ATTRIBUTES) {
