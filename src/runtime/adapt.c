@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NR_SITE_CACHE_SIZE 256
+static const NrTrap *volatile nr_site_cache[NR_SITE_CACHE_SIZE];
+/* Off only for measurement: NR_SITE_CACHE_OFF=1 forces the binary search path. */
+static int nr_site_cache_enabled = -1;static void nr_site_cache_bench(const NrElf *elf);
+
 #ifndef _WIN64
 DWORD nr_thread_tls_slot(void);
 void nr_tls_uninitialized(void);
@@ -325,19 +330,64 @@ int nr_adapt(NrElf *elf, const char **error) {
     if (!FlushInstructionCache(GetCurrentProcess(), elf->allocation, elf->allocation_size)) return 0;
     fprintf(stderr, "adapt sha256=%s sections=%zu syscall_traps=%zu tls_traps=%zu tls_direct=%zu\n",
             elf->sha256, section_count, syscall_count, tls_count, direct_count);
+    nr_site_cache_bench(elf);
     *error = NULL;
     return 1;
+}/* Self-measurement for the site cache: time the same lookups with the cache on and
+   off so the change carries its own evidence. Enabled by NR_SITE_BENCH=1. */
+static void nr_site_cache_bench(const NrElf *elf) {
+    const char *flag = getenv("NR_SITE_BENCH");
+    if (!flag || flag[0] != '1' || elf->trap_count < 8) return;
+    size_t take = elf->trap_count < 64 ? elf->trap_count : 64;
+    LARGE_INTEGER freq, start, stop;
+    QueryPerformanceFrequency(&freq);
+    double results[2];
+    for (int pass = 0; pass < 2; ++pass) {
+        int enabled = pass == 0;
+        nr_site_cache_enabled = enabled;
+        if (!enabled) memset((void *)nr_site_cache, 0, sizeof(nr_site_cache));
+        for (size_t i = 0; i < take; ++i) nr_syscall_site(elf, elf->traps[i].pc);
+        QueryPerformanceCounter(&start);
+        for (int round = 0; round < 20000; ++round) {
+            for (size_t i = 0; i < take; ++i) nr_syscall_site(elf, elf->traps[i].pc);
+        }
+        QueryPerformanceCounter(&stop);
+        double total = (double)(stop.QuadPart - start.QuadPart) / (double)freq.QuadPart;
+        results[pass] = total * 1e9 / (20000.0 * (double)take);
+    }
+    nr_site_cache_enabled = 1;
+    fprintf(stderr, "site_cache_bench lookups=%zu cache_ns=%.1f bsearch_ns=%.1f speedup=%.2fx\n",
+            take, results[0], results[1], results[1] / (results[0] > 0 ? results[0] : 1));
 }
+
+
+
+/* Every trapped syscall used to binary-search the whole site table. The same
+   handful of sites repeat constantly, so a direct-mapped cache keyed by the
+   program counter turns almost every lookup into a single read. Entries are
+   immutable once adaptation finishes, and the stored pointer is validated
+   against its own pc, so a racing write can never yield a wrong site. */
 
 
 const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc) {
     uintptr_t base = (uintptr_t)elf->allocation;
     if (!base || pc < base || pc - base >= elf->allocation_size) return NULL;
+    if (nr_site_cache_enabled < 0) {
+        const char *off = getenv("NR_SITE_CACHE_OFF");
+        nr_site_cache_enabled = !(off && off[0] == '1');
+    }
+    unsigned slot = (unsigned)((pc >> 2) & (NR_SITE_CACHE_SIZE - 1));
+    if (nr_site_cache_enabled) {
+        const NrTrap *cached = nr_site_cache[slot];
+        if (cached && cached->pc == pc) return cached;
+    }
     size_t low = 0, high = elf->trap_count;
     while (low < high) {
         size_t middle = low + (high - low) / 2;
         if (elf->traps[middle].pc < pc) low = middle + 1;
         else high = middle;
     }
-    return low < elf->trap_count && elf->traps[low].pc == pc ? &elf->traps[low] : NULL;
+    const NrTrap *found = low < elf->trap_count && elf->traps[low].pc == pc ? &elf->traps[low] : NULL;
+    if (found && nr_site_cache_enabled) nr_site_cache[slot] = found;
+    return found;
 }
