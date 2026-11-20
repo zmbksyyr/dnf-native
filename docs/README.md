@@ -1,5 +1,7 @@
 # DNF Native：使用与构建
 
+既有问题的机制、排除方案和复核入口见[实验知识](knowledge.md)；各轮实际验证与现场索引见[验证记录](validation.md)。
+
 本项目用独立实现的 Windows x86/x64 宿主执行原版 DNF 台服 Linux ELF，提供原生 Win32 控制台。产品运行不依赖 Python、VM、WSL、Docker、驱动或系统安装的 MySQL，不安装 Windows 服务。目标系统为 Windows 7/10/11 x64；已有运行证据限 Windows 10 x64 10.0.19044，不能据此宣布其他系统通过。
 
 当前采用 **GUI + ZIP 资源 + 独立实例目录**，包体积没有上限。旧单文件 MySQL、CAB 和 210 MB 限制属于历史交付形态。

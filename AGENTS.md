@@ -27,6 +27,7 @@
 ## 项目入口
 
 - 当前使用与构建：`docs/README.md`；实现与边界：`docs/architecture.md`；验证及历史证据：`docs/validation.md`；第三方来源与必要许可声明：`docs/third-party.md`。
+- 实验知识与排查入口：`docs/knowledge.md`。处理既有问题前先查已证实根因、已排除路线和证据，再判断是否需要新实验；Robot／GM 业务知识归各自仓库的 `docs/`。
 - 源码按功能集中于 `src/runtime/`、`src/controller/`、`src/database/`、`src/login/`，共享 Win32 文件接口为 `src/win32_files.h`；第三方源码为 `src/third_party/`。
 - 正常构建从 `resources/` 的 ZIP 基底开始，入口为 `python -B tools/build_all.py`；`tools/` 仅保留当前工具准备、构建、资源核验与打包依赖，旧 CAB/原始输入重建工具从 Git 历史追溯。
 - 测试与公共夹具位于 `tests/`，运行资源直接取自仓库 ZIP 或明确指定的私有实例。Python 入口和它们启动的 Python 子进程均使用 `-B`，避免仓库内产生 `__pycache__/`。根目录的项目文档仅保留本文件。
