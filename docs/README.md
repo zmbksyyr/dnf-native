@@ -95,6 +95,16 @@ $env:DNF_NATIVE_LOCAL = 'D:\cache\dnf-runtime\x\your-development-cache'
 
 其内部应有 `toolchains/llvm-mingw-20261104-msvcrt-x86_64/bin/` 和 `sources/zydis-4.1.1/`。构建只读取这些依赖；不要对只读历史缓存运行导入或 bootstrap 命令。
 
+多个仓库共用工作区且用户另行指定产物根目录时，可在构建和测试前设置
+`DNF_NATIVE_OUTPUT_ROOT`。所有开发产物写入该根下的 `dnf-native-output/`；
+未设置时仍使用仓库同级 `../x/`，不允许指向源码仓库内。
+
+```powershell
+$env:DNF_NATIVE_OUTPUT_ROOT = 'D:\cache\dnf\x\acceptance-20261121'
+```
+
+`DNF_NATIVE_LOCAL` 单独控制开发依赖缓存，可继续只读复用已有工具链。
+
 从仓库资源完整构建：
 
 完整产品包还需要同级 `dnf-robot`（`feature/windows-host-adapter` 分支）及

@@ -9,7 +9,10 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD = ROOT.parent / "x/dnf-native-output"
+OUTPUT = Path(os.environ.get("DNF_NATIVE_OUTPUT_ROOT", str(ROOT.parent / "x"))).resolve()
+if OUTPUT.is_relative_to(ROOT):
+    raise ValueError("Generated output must stay outside the repository")
+BUILD = OUTPUT / "dnf-native-output"
 LOCAL = Path(os.environ.get("DNF_NATIVE_LOCAL", str(BUILD / ".local"))).resolve()
 VERSION = "20261104"
 NAME = f"llvm-mingw-{VERSION}-msvcrt-x86_64"
@@ -27,8 +30,8 @@ def external_output(path):
     path = Path(path).resolve()
     if path.is_relative_to(ROOT):
         raise ValueError("Generated output must stay outside the repository, under ../x/")
-    if not path.is_relative_to(ROOT.parent / "x"):
-        raise ValueError("Generated output must stay under ../x/")
+    if not path.is_relative_to(OUTPUT):
+        raise ValueError("Generated output must stay under the configured external output root")
     return path
 
 

@@ -76,5 +76,6 @@ int nr_service_adapt(NrElf *elf, const char **error);
 int nr_pvf_adapt(NrElf *elf, const char **error);
 int nr_zero_adapt(NrElf *elf, const char **error);
 const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc);
+void nr_site_cache_bench(const NrElf *elf);
 
 #endif
