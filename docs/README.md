@@ -45,7 +45,7 @@ GitHub 仓库使用 Git LFS 管理这两份 ZIP。克隆前准备 Git LFS 并执
 
 ## GM 在线金币、复活币与疲劳
 
-[独立 GM 工具](https://github.com/zmbksyyr/dnf-dm-c) 可连接 Native 或原版 Linux 服务端。
+[独立 GM 工具](https://github.com/zmbksyyr/dnf-gm) 可连接 Native 或原版 Linux 服务端。
 在线金币、复活币、补满疲劳、SP/TP、QP、装备栏、装备等级、负重上限和角色等级通过游戏线程修改，再确认原游戏存档，避免退出时被内存旧值覆盖。
 快捷增加按实际余额累加；金币使用原游戏的等级／PVF 金币上限，超限拒绝，不截断发放。
 疲劳按原游戏当前基础与额外上限补满，并清除已使用计数；离线按角色上限补满基础疲劳，保留额外疲劳。
@@ -64,7 +64,7 @@ GM 与 Native、Robot 相互独立。可选桥接脚本由 GM 自带，在“关
 DP2 配置步骤，并一起导出脚本、配置和说明；Linux 与 Windows 兼容宿主使用同一模块。
 Native 仅随包提供独立 GM，不读取其资源、不安装桥接或生成其配置。
 已有实例中先前部署的桥接和用户配置保留，由 GM 项目维护和升级；
-新部署按 [GM 桥接说明](https://github.com/zmbksyyr/dnf-dm-c/blob/main/docs/bridge.md) 配置。
+新部署按 [GM 桥接说明](https://github.com/zmbksyyr/dnf-gm/blob/main/docs/bridge.md) 配置。
 GM 自动检测账号所在频道的有效心跳和分项能力，支持时自动桥接，
 不支持时置灰并提示离线修改，后台再次核对，不能退回直接改在线角色 SQL。
 
@@ -108,7 +108,7 @@ $env:DNF_NATIVE_OUTPUT_ROOT = 'D:\cache\dnf\x\acceptance-20261121'
 从仓库资源完整构建：
 
 完整产品包还需要同级 `dnf-robot`（`feature/windows-host-adapter` 分支）及
-`dnf-dm-c` 源码。Robot 使用 Go，GM 沿用自身的 Zig 构建入口；这些都是开发依赖，
+`dnf-gm` 源码。Robot 使用 Go，GM 沿用自身的 Zig 构建入口；这些都是开发依赖，
 运行发布包无需安装它们。
 
 ```powershell
@@ -123,7 +123,7 @@ python -B tools/build_mysql.py
 python -B tools/build_gui.py
 python -B tools/build_login.py
 python -B tools/build_robot.py  # 从同级 dnf-robot 分支构建可选 Windows Robot
-python -B tools/build_gm.py     # 从同级 dnf-dm-c 构建独立 GM
+python -B tools/build_gm.py     # 从同级 dnf-gm 构建独立 GM
 python -B tools/build_instance_package.py --output ../x/dnf-native-output/package
 ```
 
@@ -142,7 +142,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 | `build_mysql.py` | 官方 MySQL 文件准备与维护程序 |
 | `build_login.py` | 独立登录器与默认密钥配对核验 |
 | `build_robot.py` | 从同级 dnf-robot 分支构建可选 Windows Robot |
-| `build_gm.py` | 从同级 dnf-dm-c 构建独立 GM，记录源码和程序哈希 |
+| `build_gm.py` | 从同级 dnf-gm 构建独立 GM，记录源码和程序哈希 |
 | `build_gui.py` | Win32 GUI 与 ZIP 解压组件 |
 | `build_instance_package.py` | 核对资源、源码和构建收据，生成当前产品包 |
 | `build_all.py` | 按顺序调用上述构建步骤 |
@@ -169,7 +169,7 @@ python -B tools/build_instance_package.py --output ../x/dnf-native-output/packag
 GM 随正式包放在 `resources/DNF_GM.exe`，独立打开使用，不作为服务启动或停止。
 主界面“打开 GM”直接启动它，仍使用 GM 自己的连接配置。
 默认连接仍为 `127.0.0.1:3306`、`game / uu5!^%jg`，程序保留自己的配置；
-不会读取或覆盖控制台实例的连接配置。打包要求同级 `dnf-dm-c` 源码及其现有 Zig
+不会读取或覆盖控制台实例的连接配置。打包要求同级 `dnf-gm` 源码及其现有 Zig
 构建依赖，核对源码和构建收据后只交付 EXE，不附带开发机的测试配置或数据库。
 
 界面按用户指定的 Win32 参考图独立实现：顶部为实例选择、目录、服务 IP 与整体启停；中部按 7 列平铺全部 19 项真实服务，随后是独立 MySQL 横条；底部为日志。点击左上实例名展开已记住的实例列表，或选择其他本地目录，“+”创建实例，“⋯”提供初始化、删除及维护日志入口。卡片单击选择、双击看日志，方向键按行列移动；悬停各卡片显示服务用途，例如“游戏主服务”“拍卖行”“金币寄售”，不重复服务名称或添加括号，空白处不显示提示。服务区只保留“功能”按钮；右键菜单仅保留“启动所选”“停止所选”“检查资源”三个四字动作，顶部“检查资源”将资源检查、所选服务元数据和就绪状态统一写入主日志。目录地址与服务 IP 分组显示。参考图中的演示服务名称和模拟运行状态不进入产品。成功选择有效实例后即保存到当前用户 `%LOCALAPPDATA%\DNF-Native\instances.ini`，无需启动服务；关闭重开恢复最后选择，并保留其他实例。显式 `--instance` 参数优先，不会自动启动数据库或服务。

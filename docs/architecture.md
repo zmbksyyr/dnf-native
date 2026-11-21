@@ -32,7 +32,7 @@ Robot 启用、启动复用同一检查，已有公私钥不匹配时失败并�
 
 ## GM 在线命令
 
-桥接已归入独立 [GM 项目](https://github.com/zmbksyyr/dnf-dm-c/blob/main/docs/bridge.md)，
+桥接已归入独立 [GM 项目](https://github.com/zmbksyyr/dnf-gm/blob/main/docs/bridge.md)，
 由其 `src/gm_bridge.lua` 自带并导出；Native 仅随包分发 GM，不安装或管理桥接。
 下面记录与原 ELF 的接口语义及历史联调行为。模块使用固定原 game 的 DP2 符号接口，不更改 ELF 或新增网络监听。
 所有 SQL 在原 luv worker 中执行；完成回调在游戏线程重新查找账号、检查状态与当前角色，

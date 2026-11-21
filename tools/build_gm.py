@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, default=ROOT.parent / "dnf-dm-c")
+    parser.add_argument("--source", type=Path, default=ROOT.parent / "dnf-gm")
     parser.add_argument("--output", type=Path, default=BUILD / "gm")
     args = parser.parse_args()
     source = args.source.resolve(strict=True)
