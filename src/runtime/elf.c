@@ -1,3 +1,5 @@
+void nr_site_cache_reset(void);
+
 #include "elf.h"
 #include <bcrypt.h>
 #include <string.h>
@@ -212,6 +214,7 @@ void nr_elf_close(NrElf *elf) {
     if (elf->allocation) VirtualFree(elf->allocation, 0, MEM_RELEASE);
     if (elf->file) UnmapViewOfFile(elf->file);
     if (elf->file_handle) CloseHandle(elf->file_handle);
+    nr_site_cache_reset();
     if (elf->traps) HeapFree(GetProcessHeap(), 0, elf->traps);
     memset(elf, 0, sizeof(*elf));
 }

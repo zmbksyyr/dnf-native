@@ -369,6 +369,12 @@ static void nr_site_cache_bench(const NrElf *elf) {
    against its own pc, so a racing write can never yield a wrong site. */
 
 
+/* The cache holds pointers into an ELF's trap table, so it must be dropped when
+   that table is freed - otherwise a later ELF could hit a stale entry whose pc
+   validation would read freed memory. */
+void nr_site_cache_reset(void) {
+    memset((void *)nr_site_cache, 0, sizeof(nr_site_cache));
+}
 const NrTrap *nr_syscall_site(const NrElf *elf, uintptr_t pc) {
     uintptr_t base = (uintptr_t)elf->allocation;
     if (!base || pc < base || pc - base >= elf->allocation_size) return NULL;
