@@ -223,3 +223,4 @@ GM 内存态操作的业务语义归 GM `docs/knowledge.md`，Robot 调度与战
 - anti 插件在场时角色页出现空白，隔离插件后恢复；插件已按原哈希恢复。这不是 Native 登录失败结论，也没有把它作为 Robot 业务修复。
 - 复制过滤不得用 `core.*` 通配符判断崩溃转储：合法的 `core.lua`、`core.so` 会被误报或遗漏。应按 ELF 文件头 `ET_CORE` 识别转储，并保留合法模块。
 - 本次停止收据记录 `dbmw_guild` 返回 `-11`，其发生时点未定位；该异常不能记为整组服务正常停止，也没有据此修改 Native 代码。收据位于 `x/acceptance-20261121/linux-live-20261122/stage4/service-stop.json`。
+- 11月22日stage5运行期0.5秒poll未发现辅助服务退出；从全alive开始的停止watch将本轮辅助非零退出定位到stack停止请求之后。`dbmw_mnt=-11`，manager/dbmw_guild/dbmw_stat/monitor/guild/statics/coserver均为1；game正常exit0。dbmw_guild在只观察GDB下exit1、未捕获SIGSEGV，不能据此解释或宣称修复stage4的-11。没有修改Native源码，也不把本轮整组停止记为正常。证据为stage5下`service-stop-timeline.json`、`guild-shutdown-gdb.log`及`activegate2-cleanup.json`。
