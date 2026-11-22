@@ -214,3 +214,12 @@ GM 自检／首次打开会生成 `resources/config/`，它属于验证现场，
 只有目标 ELF／PVF／客户端／系统改变、出现反例，或测试确实未覆盖当前问题时，才重新实验。
 新增记录应包含触发条件、根因、最终决定、排除方案、验证层级和证据位置；旧计划被后续实测推翻时明确更正。
 GM 内存态操作的业务语义归 GM `docs/knowledge.md`，Robot 调度与战斗归其对应文档，避免三仓重复维护同一结论。
+
+## 2026-11-22 Linux 隔离验收环境诊断
+
+本节只记录 Native 侧环境诊断，不把 Robot 的地下城业务结果归入 Native 功能验收。
+
+- DrvFS 上运行原 i386 glibc 的 `stat` 曾返回 `errno=75 (EOVERFLOW)`，导致 auction 在初始化阶段退出。GDB 记录见 `x/acceptance-20261121/linux-live-20261122/stage3/auction-overflow-gdb.log`，复现脚本为 `prove_linux_live_stat_overflow.py`；将验收资产放到私有 ext4 盘后该文件系统诊断不再阻塞服务启动。该结果只适用于本次隔离副本和挂载方式。
+- anti 插件在场时角色页出现空白，隔离插件后恢复；插件已按原哈希恢复。这不是 Native 登录失败结论，也没有把它作为 Robot 业务修复。
+- 复制过滤不得用 `core.*` 通配符判断崩溃转储：合法的 `core.lua`、`core.so` 会被误报或遗漏。应按 ELF 文件头 `ET_CORE` 识别转储，并保留合法模块。
+- 本次停止收据记录 `dbmw_guild` 返回 `-11`，其发生时点未定位；该异常不能记为整组服务正常停止，也没有据此修改 Native 代码。收据位于 `x/acceptance-20261121/linux-live-20261122/stage4/service-stop.json`。
