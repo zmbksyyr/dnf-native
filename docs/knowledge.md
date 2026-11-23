@@ -234,3 +234,6 @@ Robot材料请求的Windows Native/Linux隔离对照中，Windows game经控制�
 原channel SHA-256为7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd，core的NT_FILE及首个4096字节原ELF页独立匹配。主线程栈位于exit→全局日志对象析构→fclose；并存CheckThread在gFileLogError的endl中调用空地址，先触发SIGSEGV，再由原Neof_SignalHandler(sig11)→abort形成SIGABRT。core于21:50:28创建，game已于21:50:14正常退出，bridge重连错误持续至故障。定位为停止期间日志销毁与工作线程写日志竞争，尚未证明具体成员释放次序，也没有原ELF修复。
 
 所有新增进程已退出、挂载和loop已移除，DP2账号认证及grants精确恢复，原33306 MySQL保留。完整core、原字节检查和GDB警告/失败诊断见x/acceptance-20261121/material-fault1/{channel-core-diagnosis.json,channel-core-final.private.log,linux-run1-runtime-cleanup.json,diagnostic-notes.md}，统一审计为该目录stage-audit.json。Native实现未改；材料业务结果归Robot审查，不把Linux原服务故障归因于Windows宿主。后续停服验收须核对依赖顺序及工作线程结束，不能以进程最终消失代替正常退出。
+
+
+- 11月23日后续material-deadline1在独立冷拷贝上先停game、再按辅助启动逆序停止，使channel先于bridge等依赖退出。本次channel24055正常exit0、只读检查其目录无新增core，game24067/MySQL23930亦为0；manager、三项dbmw、monitor、guild、statics、coserver仍为1。此单次顺序调整未修改原ELF/Native实现，不证明此前日志竞争已修复或整栈正常。清理、旧源只读复核与原始输出见x/acceptance-20261121/material-deadline1/{linux-run1-runtime-cleanup.json,channel-cleanup-check.json,stage-audit.json}；材料回执超时的产品修复及业务验证归Robot仓库。
