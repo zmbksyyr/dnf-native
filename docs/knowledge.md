@@ -225,3 +225,12 @@ GM 内存态操作的业务语义归 GM `docs/knowledge.md`，Robot 调度与战
 - 本次停止收据记录 `dbmw_guild` 返回 `-11`，其发生时点未定位；该异常不能记为整组服务正常停止，也没有据此修改 Native 代码。收据位于 `x/acceptance-20261121/linux-live-20261122/stage4/service-stop.json`。
 - 11月22日stage5运行期0.5秒poll未发现辅助服务退出；从全alive开始的停止watch将本轮辅助非零退出定位到stack停止请求之后。`dbmw_mnt=-11`，manager/dbmw_guild/dbmw_stat/monitor/guild/statics/coserver均为1；game正常exit0。dbmw_guild在只观察GDB下exit1、未捕获SIGSEGV，不能据此解释或宣称修复stage4的-11。没有修改Native源码，也不把本轮整组停止记为正常。证据为stage5下`service-stop-timeline.json`、`guild-shutdown-gdb.log`及`activegate2-cleanup.json`。
 - 11月23日 `linux-combat1` 在Linux原ELF隔离栈上正常请求停止后，`dbmw_guild=-11`，manager/dbmw_mnt/dbmw_stat/monitor/guild/statics/coserver为1；bridge/community/auction/point/channel/relay/stun和本轮game为0，独立Robot及sink亦为0。`before-stack-stop.json`和`isolated-stack-finished.json`将该退出限制在本次停止请求之后，不将整组记为干净停止，也不归因于Windows Native宿主。额外bind和ext4已卸载，新MySQL关闭，原33306实例保留。本轮没有修改Native实现或新增Native业务验收；Robot真实战斗及客户端加载退出结果归其仓库。证据 `x/acceptance-20261121/linux-combat1/stage-audit.json`（SHA-256 `e389c3cc61d7d57f0aeccc6246bf13a9226ea1ac8ed78ee32df5396667511f1a`）及`service-stop.json`。
+
+
+## 2026-11-23 Linux 原 channel 停服时的日志竞争
+
+Robot材料请求的Windows Native/Linux隔离对照中，Windows game经控制器正常停止exit0；Linux game和MySQL亦为0，但原channel最终为-6，并新增1377308672字节core。本次私有脚本先停game，再按启动顺序停止辅助服务，bridge先于channel；不能据此称整栈正常停止或Native功能通过。
+
+原channel SHA-256为7f7f6bd9eea6452dc463bca2f2e33f07eec7675e9f37e280e92739cfb87747bd，core的NT_FILE及首个4096字节原ELF页独立匹配。主线程栈位于exit→全局日志对象析构→fclose；并存CheckThread在gFileLogError的endl中调用空地址，先触发SIGSEGV，再由原Neof_SignalHandler(sig11)→abort形成SIGABRT。core于21:50:28创建，game已于21:50:14正常退出，bridge重连错误持续至故障。定位为停止期间日志销毁与工作线程写日志竞争，尚未证明具体成员释放次序，也没有原ELF修复。
+
+所有新增进程已退出、挂载和loop已移除，DP2账号认证及grants精确恢复，原33306 MySQL保留。完整core、原字节检查和GDB警告/失败诊断见x/acceptance-20261121/material-fault1/{channel-core-diagnosis.json,channel-core-final.private.log,linux-run1-runtime-cleanup.json,diagnostic-notes.md}，统一审计为该目录stage-audit.json。Native实现未改；材料业务结果归Robot审查，不把Linux原服务故障归因于Windows宿主。后续停服验收须核对依赖顺序及工作线程结束，不能以进程最终消失代替正常退出。
