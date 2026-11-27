@@ -1,19 +1,14 @@
 """Build the optional Windows Robot module from the sibling source checkout."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 
-from bootstrap import BUILD, external_output
+from bootstrap import BUILD, external_output, sha256
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def main():

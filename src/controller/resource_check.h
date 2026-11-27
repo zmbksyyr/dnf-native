@@ -5,8 +5,10 @@ static const wchar_t *package_files[] = {
 };
 
 static std::wstring missing_resources(const std::wstring &folder) {
-    std::wstring missing;
-    for (const wchar_t *name : {L"resources.ini", L"mysql.zip", L"dnf-host-x86.exe", L"dnf-host-x64.exe", L"native.zip", L"mysql-control.exe", L"robot.exe"}) {
+    DWORD manifest_attributes = GetFileAttributesW((folder + L"\\resources.ini").c_str());
+    std::wstring missing = manifest_attributes == INVALID_FILE_ATTRIBUTES || (manifest_attributes & FILE_ATTRIBUTE_DIRECTORY)
+        ? L"resources.ini" : L"";
+    for (const wchar_t *name : package_files) {
         DWORD attributes = GetFileAttributesW((folder + L"\\" + name).c_str());
         if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY)) {
             if (!missing.empty()) missing += L"、";
