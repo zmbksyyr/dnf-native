@@ -42,6 +42,10 @@ def main():
     manifest = configparser.ConfigParser(interpolation=None)
     manifest.read(instance / "services.ini", encoding="utf-16")
     manifest["game"]["automatic"] = "0"
+    robot_enabled = manifest.getboolean("robot", "enabled", fallback=False)
+    original_peer_count = sum(1 for key, name in manifest["services"].items()
+                              if key.startswith("service") and name in manifest and
+                              manifest[name].get("automatic") == "1")
     with (instance / "services.ini").open("w", encoding="utf-16") as stream:
         manifest.write(stream)
     receipt = {"recorded_utc": stamp, "os": platform.platform(), "gui_sha256": sha256(gui),
@@ -73,8 +77,8 @@ def main():
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 224)), "whole-stop enabled")
         checks["start_window_response_ms"] = responsive(window)
         receipt["started_rows"] = rows(window)
-        assert sum("进程运行中" in row for row in rows(window)) >= 15
-        checks["fifteen_original_peer_processes"] = True
+        assert sum("进程运行中" in row for row in rows(window)) >= original_peer_count
+        checks["original_peer_processes"] = original_peer_count
         select_service(window, "channel")
         details = service_details(window)
         assert "运行时通道已接入" in details, details
@@ -118,7 +122,8 @@ def main():
         click(window, 221)
         wait_for(lambda: status(window).startswith("操作失败"), "ELF identity rejection")
         wait_for(lambda: user.IsWindowEnabled(user.GetDlgItem(window, 220)), "failed start completed")
-        checks["changed_elf_rejected_without_stopping_other_services"] = sum("进程运行中" in row for row in rows(window)) == 14
+        checks["changed_elf_rejected_without_stopping_other_services"] = (
+            sum("进程运行中" in row for row in rows(window)) == original_peer_count - 1 + int(robot_enabled))
         elf.write_bytes(original)
         baseline = len(log_text(window))
         context_action("S"); ready(window, "channel：进程运行中", 20, since=baseline)
@@ -136,8 +141,9 @@ def main():
             return "服务进程已退出，数据库已停止" in text
         wait_for(whole_stop_finished,"whole stop with live count",120)
         wait_for(lambda:title(user.GetDlgItem(window,213)).startswith('0 /'),"zero running count",5)
-        assert max(counts)==15,counts
-        checks["live_count_updates_before_whole_stop_completes"] = any(0<n<15 for n in counts)
+        expected_live = original_peer_count + int(robot_enabled)
+        assert max(counts)==expected_live,counts
+        checks["live_count_updates_before_whole_stop_completes"] = any(0<n<expected_live for n in counts)
         receipt["whole_stop_live_counts"] = list(dict.fromkeys(counts))
         receipt["stopped_rows"] = rows(window)
         peers = [name for name in manifest["services"].values() if name in manifest and manifest[name].get("automatic") == "1"]
@@ -159,7 +165,7 @@ def main():
         # Repeated launch and ordinary window-close must also stop every owned peer.
         click(window, 223); ready(window, "已启动默认服务进程", 90)
         time.sleep(25)
-        assert sum("进程运行中" in row for row in rows(window)) >= 15
+        assert sum("进程运行中" in row for row in rows(window)) >= original_peer_count
         checks["second_launch_channel_protocol"] = channel(7001)
         checks["second_launch_relay_and_monitor_protocol"] = relay(True)
         checks["second_launch_stun_protocol"] = stun()
