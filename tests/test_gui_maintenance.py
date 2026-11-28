@@ -61,6 +61,9 @@ def main():
         manifest = configparser.ConfigParser(interpolation=None)
         manifest.read(instance / "services.ini", encoding="utf-16")
         order = [manifest["services"]["service" + str(i)] for i in range(manifest.getint("services", "count"))]
+        # The controller appends the enabled external Robot after the ELF list.
+        if manifest.getboolean("robot", "enabled", fallback=False):
+            order.append("robot")
         trace = re.findall(r"正在停止服务：([^\r\n]+)", output)
         expected = [name for name in reversed(order) if name in peers]
         if trace != expected:
