@@ -56,10 +56,11 @@ def main():
     previous_server_logs = set((instance / ".mysql").glob("gui-*-server.private.log"))
     try:
         window = wait_for(lambda: next(iter(windows(process.pid, "DNFNativeController")), None), "main window")
-        assert len(rows(window)) == 19
-        checks["nineteen_service_entries"] = True
-        print("GUI: 19 original service entries", flush=True)
-        assert len(list_rows(window)) == 19
+        expected_entries = 19 + int(manifest.getboolean("robot", "enabled", fallback=False))
+        assert len(rows(window)) == expected_entries
+        checks["service_entries_including_enabled_external_robot"] = True
+        print("GUI: service entries", expected_entries, flush=True)
+        assert len(list_rows(window)) == expected_entries
         assert not user.GetDlgItem(window, 221)
         select_service(window, "game")
         details = service_details(window)
