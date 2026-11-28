@@ -101,6 +101,7 @@ static unsigned update_service_ip(const std::vector<Service> &services, const st
             ++written;
         }
     } catch (...) {
+        DeleteFileW((changes[written].path + L".ip-new").c_str());
         bool restored = true;
         for (size_t i=0;i<written;++i) restored = CopyFileW(changes[i].backup.c_str(),changes[i].path.c_str(),FALSE) && restored;
         if (!restored) throw std::runtime_error("Service IP update failed and rollback was incomplete; inspect .settings backup");
