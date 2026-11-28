@@ -63,7 +63,7 @@ def main():
             raise RuntimeError(f"Native {operation} failed; see private command {index}")
         return result
 
-    def running_sql(statements):
+    def running_sql(statements, expected_output=None):
         nonlocal server, options
         pipe = "DNFMaintenanceTest" + secrets.token_hex(8)
         options = ["--defaults-file=client.private.cnf", "--protocol=PIPE", "--socket=" + pipe,
@@ -84,14 +84,23 @@ def main():
         if busy.returncode == 0:
             raise RuntimeError("Backup accepted a running instance")
         checks["running_instance_refused"] = True
-        invoke("mysql", options, statements)
+        result = invoke("mysql", options, statements)
         stopped = invoke("mysql", options, b"SHUTDOWN;\n", check=False)
         server.wait(timeout=45)
         if server.returncode or (stopped.returncode and b"ERROR 2013 (HY000)" not in stopped.stderr):
             raise RuntimeError("Private mutation server shutdown failed")
         server = None
+        if expected_output is not None and expected_output not in result.stdout.replace(b"\r\n", b"\n"):
+            raise RuntimeError("Stored text bytes differ; see the private SQL result")
         return child_pid
 
+    # Verify stored bytes directly: comparing two dumps can hide the same lossy
+    # text conversion in both exports. Include every latin1 byte and UTF-8 text
+    # beyond latin1, including a supplementary character.
+    legacy_hex = bytes(range(256)).hex().upper().encode("ascii")
+    unicode_hex = "中文角色😀".encode("utf-8").hex().upper().encode("ascii")
+    text_query = b"SELECT CONCAT(HEX(legacy_text),':',HEX(unicode_text)) FROM native_restore_probe.text_row;\n"
+    expected_text = legacy_hex + b":" + unicode_hex + b"\n"
     try:
         running_sql(b"CREATE DATABASE native_restore_probe;\n"
                     b"CREATE TABLE native_restore_probe.innodb_row(id INT PRIMARY KEY,body VARBINARY(32)) ENGINE=InnoDB;\n"
@@ -100,7 +109,10 @@ def main():
                     b"INSERT INTO native_restore_probe.myisam_row VALUES(2,0xE4B8ADE69687);\n"
                     b"DELIMITER $$\r\nCREATE PROCEDURE native_restore_probe.native_crlf()\r\nBEGIN\r\nSELECT 1;\r\nEND$$\r\nDELIMITER ;\r\n"
                     b"CREATE EVENT native_restore_probe.native_event ON SCHEDULE EVERY 1 DAY DISABLE DO SELECT 1;\n"
-                    b"CREATE TRIGGER native_restore_probe.native_trigger BEFORE INSERT ON native_restore_probe.myisam_row FOR EACH ROW SET NEW.body=0xAA;\n")
+                    b"CREATE TRIGGER native_restore_probe.native_trigger BEFORE INSERT ON native_restore_probe.myisam_row FOR EACH ROW SET NEW.body=0xAA;\n"
+                    b"CREATE TABLE native_restore_probe.text_row(id INT PRIMARY KEY,legacy_text VARCHAR(256) CHARACTER SET latin1,unicode_text VARCHAR(128) CHARACTER SET utf8mb4) ENGINE=InnoDB;\n"
+                    b"INSERT INTO native_restore_probe.text_row VALUES(1,0x" + legacy_hex + b",0x" + unicode_hex + b");\n")
+        running_sql(text_query, expected_text)
         first = probe / "完整备份 (first)"
         invoke("backup", [first])
         first_hash = sha256(first / "logical.sql")
@@ -144,6 +156,8 @@ def main():
         invoke("backup", [restored])
         if sha256(restored / "logical.sql") != first_hash:
             raise RuntimeError("Restored database backup differs from the selected backup")
+        running_sql(text_query, expected_text)
+        checks["latin1_and_unicode_stored_text_bytes_preserved"] = True
         checks["native_shadow_restore_byte_exact"] = True
         checks["innodb_myisam_binary_rows_and_extra_schema_removal"] = True
         checks["accounts_routines_events_and_triggers_restored"] = True

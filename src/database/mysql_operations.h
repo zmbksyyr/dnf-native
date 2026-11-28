@@ -86,7 +86,7 @@ class Maintenance {
         return {L"--defaults-file=client.private.cnf", L"--protocol=MEMORY", L"--host=localhost",
                 L"--shared-memory-base-name=" + endpoint,
                 L"--ssl-mode=DISABLED", L"--batch", L"--skip-column-names", L"--comments", L"--binary-mode",
-                L"--default-character-set=latin1"};
+                L"--default-character-set=utf8mb4"};
     }
 public:
     Maintenance(const std::wstring &payload, const std::wstring &database, const std::wstring &operation)
@@ -122,14 +122,17 @@ public:
         if (uuid.size() != 37 || uuid.back() != '\n') throw std::runtime_error("Unexpected server UUID result");
         return uuid.substr(0, 36);
     }
-    void dump(const std::wstring &path) {
+    void dump(const std::wstring &path, const wchar_t *character_set = L"utf8mb4") {
         File output = private_file(path);
         File error = private_file(work + L"\\dump.private.log", CREATE_ALWAYS);
         // Preserve official Windows text stdout bytes. --result-file loses CR
         // bytes in stored programs on the next mysql stdin import.
         Child child = launch(root, instance, L"mysqldump", {
             L"--defaults-file=client.private.cnf", L"--protocol=MEMORY", L"--host=localhost", L"--shared-memory-base-name=" + endpoint,
-            L"--ssl-mode=DISABLED", L"--default-character-set=latin1", L"--lock-all-tables", L"--routines",
+            // A latin1 result connection replaces UTF-8-only characters with
+            // question marks before mysqldump can serialize them. utf8mb4 also
+            // round-trips legacy latin1 text; binary columns use --hex-blob.
+            L"--ssl-mode=DISABLED", std::wstring(L"--default-character-set=") + character_set, L"--lock-all-tables", L"--routines",
             L"--events", L"--triggers", L"--hex-blob", L"--skip-comments", L"--set-gtid-purged=OFF",
             // Optimizer statistics regenerate when tables are restored. Stored
             // routines/events are exported once, as definitions; dumping their
@@ -259,7 +262,15 @@ static int restore_database(const std::wstring &root, const std::wstring &instan
     private_directory(verify_work);
     {
         Maintenance candidate(root, shadow, verify_work);
-        candidate.dump(work + L"\\restored.sql");
+        // Format-1 backups written before UTF-8 export used latin1. Reexport
+        // with that recorded encoding so those existing backups still verify.
+        File source = input_file(backup + L"\\logical.sql");
+        char header[512];
+        DWORD bytes = 0;
+        require(ReadFile(source.handle, header, sizeof(header), &bytes, nullptr), "Read backup encoding");
+        const wchar_t *character_set = std::string(header, bytes).find("/*!40101 SET NAMES latin1 */;") != std::string::npos
+                                      ? L"latin1" : L"utf8mb4";
+        candidate.dump(work + L"\\restored.sql", character_set);
         candidate.stop();
     }
     if (file_digest(work + L"\\restored.sql") != file_digest(backup + L"\\logical.sql"))
